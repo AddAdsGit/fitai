@@ -3031,8 +3031,8 @@ export default function App() {
   };
 
   const [profileData, setProfileDataState] = useState(INITIAL_PROFILE_STATE);
-  const [mealsState, setMealsState] = useState<Meal[]>(INITIAL_MEALS);
-  const [recipes, setRecipesState] = useState<Recipe[]>(INITIAL_RECIPES);
+  const [mealsState, setMealsState] = useState<Meal[]>([]);
+  const [recipes, setRecipesState] = useState<Recipe[]>([]);
 
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [loginUsername, setLoginUsername] = useState("");
@@ -3345,6 +3345,13 @@ export default function App() {
     const resolvedRecipes = typeof newRecipes === 'function' ? newRecipes(recipes) : newRecipes;
     setRecipesState(resolvedRecipes);
   };
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setMealsState(INITIAL_MEALS);
+      setRecipesState(INITIAL_RECIPES);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
