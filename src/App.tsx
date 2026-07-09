@@ -205,6 +205,7 @@ const ProgressBar = ({
   index = 0,
   unit = "",
 }: {
+  key?: string;
   value: number;
   max?: number;
   label: string;
@@ -682,6 +683,7 @@ const ProfileView = ({
   currentStreak,
   mealsState,
 }: {
+  key?: string;
   profileData: any;
   setProfileData: any;
   setActiveTab: (tab: string) => void;
@@ -1365,6 +1367,7 @@ const EditProfileView = ({
   setProfileData,
   setActiveTab,
 }: {
+  key?: string;
   profileData: any;
   setProfileData: any;
   setActiveTab: (tab: string) => void;
@@ -2097,6 +2100,7 @@ const SettingsView = ({
   onLogout,
   session,
 }: {
+  key?: string;
   profileData: any;
   setProfileData: any;
   triggerToast: (msg: string) => void;
@@ -2112,6 +2116,7 @@ const SettingsView = ({
   const [notionDb, setNotionDb] = useState(profileData.notionDatabaseId || "");
   const [sheetsWebhook, setSheetsWebhook] = useState(profileData.googleSheetsWebhookUrl || "");
   const [gptUrlVal, setGptUrlVal] = useState(localStorage.getItem("fitai_custom_gpt_url") || "");
+  const [geminiKeyVal, setGeminiKeyVal] = useState(localStorage.getItem("fitai_gemini_api_key") || "");
 
   const handleSaveNotion = () => {
     setProfileData({
@@ -2133,6 +2138,11 @@ const SettingsView = ({
   const handleSaveGptUrl = () => {
     localStorage.setItem("fitai_custom_gpt_url", gptUrlVal.trim());
     triggerToast("💾 Saved Custom GPT Link!");
+  };
+
+  const handleSaveGeminiKey = () => {
+    localStorage.setItem("fitai_gemini_api_key", geminiKeyVal.trim());
+    triggerToast("💾 Saved Gemini API Key!");
   };
 
   const copyToClipboard = (text: string, label: string) => {

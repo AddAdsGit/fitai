@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-timezone-offset",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PATCH, DELETE",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
 };
 
 serve(async (req) => {
@@ -212,19 +212,52 @@ serve(async (req) => {
           }
         }
 
-        const { dateStr, timeStr } = getLocalTimeAndDate();
+        // Resolve time using user-supplied value, body.timezone, or timezoneOffset header
+        let resolvedTime = body.time;
+        if (!resolvedTime) {
+          if (body.timezone) {
+            try {
+              resolvedTime = new Date().toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+                timeZone: body.timezone,
+              });
+            } catch (e) {
+              console.error(`Invalid timezone provided: ${body.timezone}`, e);
+            }
+          }
+          if (!resolvedTime) {
+            resolvedTime = getLocalTimeAndDate().timeStr;
+          }
+        }
+
+        // Resolve date using user-supplied value, body.timezone, or timezoneOffset header
+        let resolvedDate = body.date;
+        if (!resolvedDate) {
+          if (body.timezone) {
+            try {
+              resolvedDate = new Date().toLocaleDateString("en-CA", { timeZone: body.timezone }); // YYYY-MM-DD
+            } catch (e) {
+              console.error(`Invalid timezone provided: ${body.timezone}`, e);
+            }
+          }
+          if (!resolvedDate) {
+            resolvedDate = getLocalTimeAndDate().dateStr;
+          }
+        }
 
         const mealData = {
           profile_id: profile.id,
           name: body.name,
-          time: body.time || timeStr,
+          time: resolvedTime,
           type: body.type || "Meal",
           calories: parseInt(body.calories),
           protein: parseInt(body.protein || 0),
           carbs: parseInt(body.carbs || 0),
           fats: parseInt(body.fats || 0),
           image: finalImageUrl,
-          date: body.date || dateStr
+          date: resolvedDate
         };
 
         const { data: newMeal, error: insertError } = await supabase
@@ -389,6 +422,8 @@ serve(async (req) => {
         });
       }
     }
+
+
 
     // --- RECIPES ENDPOINTS ---
     if (path.endsWith("/recipes")) {
