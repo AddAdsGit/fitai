@@ -4012,11 +4012,10 @@ export default function App() {
               />
             </div>
 
-            {/* Bio Description (ChatGPT Blocked from modifying) */}
+            {/* Bio Description */}
             <div className="space-y-1">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1 flex items-center justify-between">
-                <span>About Yourself</span>
-                <span className="text-[7px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full font-black">AI Blocked</span>
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                About Yourself
               </label>
               <textarea
                 placeholder="Describe your lifestyle, fitness goals, or allergies... (Only you can edit this)"
