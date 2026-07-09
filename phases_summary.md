@@ -15,9 +15,10 @@ This table summarizes the phases, key features, and UI/UX improvements successfu
 | **Phase 5** | **Zero-Friction Seeding & AI Text Logger** | Seeded 43 mock records for `Manikanta putta` and `John Doe`. Restored two-field Quick Logger with local NLP parser fallback (logs description-only items automatically with zero API costs). | Enabled immediate visual evaluation of charts, and lowered logging friction to zero. |
 | **Phase 5** | **Segmented Manual & AI Refiner** | Added Manual/AI tab segment switcher in `ManualLogModal` calling Gemini API (`gemini-1.5-flash`). Implemented a side-by-side original vs AI-refined macro approval preview screen. | Allows instruction-based editing (e.g. *"add 50g chicken"*) with user verification before saving. |
 | **Phase 5** | **Edge Function & GPT Polish** | Extended edge function with `PATCH` (update) and `DELETE` endpoints. Documented critical instruction guidelines in `openapi.yaml` and Settings schema for Custom GPT. | Lets the Custom GPT perform complex portion scaling and macro math, keeping the app fast and free. |
+| **Phase 5 (Polish)** | **Premium UX Key Lock & Links** | Removed emojis from segment tabs. Added active key checking to modal: shows a locked premium card redirecting to Settings and external Google AI Studio link if key is missing. | Prevents broken alert errors, matches world-class premium design guidelines, and helps setup keys. |
 
 ---
 
 ## 🧪 Verification & Build Status
 *   **TypeScript Compilation**: Checked with `npx tsc --noEmit` $\rightarrow$ **0 errors**.
-*   **Production Build**: Tested via `npm run build` $\rightarrow$ Successfully bundled chunks in **7.16 seconds**.
+*   **Production Build**: Tested via `npm run build` $\rightarrow$ Successfully bundled chunks in **6.42 seconds**.
