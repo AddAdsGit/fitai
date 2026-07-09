@@ -2550,11 +2550,48 @@ const OAuthConsentView = ({
 }) => {
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [session, setSession] = useState<any>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const clientId = params.get("client_id") || "";
   const redirectUri = params.get("redirect_uri") || "";
   const state = params.get("state") || "";
+
+  // Check if user is already logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setCheckingSession(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+    });
+    return () => listener?.subscription.unsubscribe();
+  }, []);
+
+  // Google login — passes current consent URL as redirectTo so params survive after login
+  const handleGoogleLoginForConsent = async () => {
+    setIsSigningIn(true);
+    try {
+      // Preserve ALL current URL params so after Google login user lands back here
+      const returnUrl = window.location.href;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: returnUrl,
+        },
+      });
+      if (error) {
+        triggerToast("❌ Google login failed");
+        setIsSigningIn(false);
+      }
+    } catch {
+      triggerToast("❌ Google login error");
+      setIsSigningIn(false);
+    }
+  };
 
   const handleApprove = async () => {
     if (!clientId || !redirectUri) {
@@ -2620,6 +2657,75 @@ const OAuthConsentView = ({
     }, 1000);
   };
 
+  // Loading state while checking session
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center font-sans">
+        <div className="w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // NOT LOGGED IN — show login prompt, preserve consent URL through Google OAuth
+  if (!session) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.3 }}
+        className="px-6 py-12 max-w-[448px] mx-auto text-left font-sans flex flex-col justify-center min-h-[calc(100vh-80px)]"
+      >
+        <div className="bg-white rounded-[32px] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.04)] border border-black/5 space-y-6 relative overflow-hidden">
+          <div className="absolute -top-12 -left-12 w-32 h-32 bg-orange-100 rounded-full blur-3xl opacity-60" />
+          <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-orange-100 rounded-full blur-3xl opacity-60" />
+
+          {/* Header */}
+          <div className="flex items-center justify-center gap-6 relative z-10 py-4">
+            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg shadow-orange-150 flex items-center justify-center rotate-3 shrink-0">
+              <Sparkles className="text-white w-7 h-7 fill-white" />
+            </div>
+            <div className="flex flex-col gap-1 items-center justify-center">
+              <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
+              <div className="h-0.5 w-10 bg-gradient-to-r from-orange-500 to-stone-400" />
+            </div>
+            <div className="w-14 h-14 rounded-2xl bg-stone-900 shadow-lg flex items-center justify-center -rotate-3 shrink-0">
+              <Bot className="text-white w-7 h-7" />
+            </div>
+          </div>
+
+          <div className="space-y-2 text-center relative z-10">
+            <h2 className="text-xl font-black text-stone-850">Sign in to connect</h2>
+            <p className="text-[11px] text-stone-400 font-medium leading-relaxed">
+              ChatGPT wants to connect to your FitAI account. Sign in first to approve or deny this request.
+            </p>
+          </div>
+
+          <div className="space-y-3 pt-2 relative z-10">
+            <button
+              onClick={handleGoogleLoginForConsent}
+              disabled={isSigningIn}
+              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-stone-50 disabled:opacity-60 border border-stone-200 text-stone-700 text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer shadow-sm"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              {isSigningIn ? "Signing in..." : "Continue with Google"}
+            </button>
+          </div>
+
+          <p className="text-[8px] text-stone-400 text-center font-medium relative z-10">
+            After signing in, you'll return here to approve the ChatGPT connection.
+          </p>
+        </div>
+      </motion.div>
+    );
+  }
+
+  // LOGGED IN — show consent UI
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -2706,6 +2812,7 @@ const OAuthConsentView = ({
     </motion.div>
   );
 };
+
 
 const ManualLogModal = ({
   onClose,
@@ -3316,7 +3423,7 @@ export default function App() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: "https://fitpush.vercel.app"
         }
       });
       if (error) {
@@ -3707,36 +3814,6 @@ export default function App() {
   const [customCalVal, setCustomCalVal] = useState("");
   const [customCalName, setCustomCalName] = useState("");
   const [toastMessage, setToastMessage] = useState<React.ReactNode | string | null>(null);
-
-  // Recent meals: last 90 days, used for the Insights/Progress charts
-  const [recentMeals, setRecentMeals] = useState<Meal[]>([]);
-  useEffect(() => {
-    if (!isSupabaseConfigured || !activeProfileId) return;
-    const load = async () => {
-      const cutoff = formatDateStr(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
-      const { data, error } = await supabase
-        .from('meals')
-        .select('*')
-        .eq('profile_id', activeProfileId)
-        .gte('date', cutoff)
-        .order('date', { ascending: false });
-      if (!error && data) {
-        setRecentMeals(data.map((m) => ({
-          id: m.id,
-          name: m.name,
-          time: m.time,
-          type: m.type,
-          calories: m.calories,
-          protein: m.protein,
-          carbs: m.carbs,
-          fats: m.fats,
-          image: m.image,
-          date: m.date,
-        })));
-      }
-    };
-    load();
-  }, [activeProfileId]);
 
   // Automatic toast dismissal
   useEffect(() => {
@@ -4918,7 +4995,7 @@ export default function App() {
             triggerToast={(msg) => setToastMessage(msg)}
             activeProfileId={activeProfileId}
             currentStreak={currentStreak}
-            recentMeals={recentMeals}
+            mealsState={mealsState}
           />
         )}
         {activeTab === "edit-profile" && (
