@@ -2540,6 +2540,173 @@ const SettingsView = ({
   );
 };
 
+const OAuthConsentView = ({
+  setActiveTab,
+  triggerToast,
+}: {
+  key?: string;
+  setActiveTab: (tab: string) => void;
+  triggerToast: (msg: string) => void;
+}) => {
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  const params = useMemo(() => new URLSearchParams(window.location.search), []);
+  const clientId = params.get("client_id") || "";
+  const redirectUri = params.get("redirect_uri") || "";
+  const state = params.get("state") || "";
+
+  const handleApprove = async () => {
+    if (!clientId || !redirectUri) {
+      triggerToast("❌ Missing OAuth configuration parameters");
+      return;
+    }
+
+    setIsApproving(true);
+    try {
+      const sessionStr = localStorage.getItem("sb-twrjigbbgioqdpwvkblo-auth-token");
+      let jwtToken = "";
+      if (sessionStr) {
+        const parsed = JSON.parse(sessionStr);
+        jwtToken = parsed?.access_token || "";
+      }
+
+      if (!jwtToken) {
+        triggerToast("❌ Session expired. Please log in again.");
+        setIsApproving(false);
+        return;
+      }
+
+      const response = await fetch(
+        `https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action/oauth/approve`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${jwtToken}`,
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            redirect_uri: redirectUri,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Failed to generate authorization code");
+      }
+
+      const data = await response.json();
+      const code = data.code;
+
+      triggerToast("✨ Authorized successfully! Redirecting...");
+      
+      setTimeout(() => {
+        window.location.href = `${redirectUri}?code=${code}&state=${encodeURIComponent(state)}`;
+      }, 1000);
+    } catch (err: any) {
+      console.error(err);
+      triggerToast(`❌ Authorization failed: ${err.message}`);
+      setIsApproving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsRejecting(true);
+    triggerToast("🔒 Connection cancelled.");
+    setTimeout(() => {
+      window.location.href = `${redirectUri}?error=access_denied&state=${encodeURIComponent(state)}`;
+    }, 1000);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.3 }}
+      className="px-6 py-12 max-w-[448px] mx-auto text-left font-sans flex flex-col justify-center min-h-[calc(100vh-80px)]"
+    >
+      <div className="bg-white rounded-[32px] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.04)] border border-black/5 space-y-6 relative overflow-hidden">
+        {/* Decorative background glow */}
+        <div className="absolute -top-12 -left-12 w-32 h-32 bg-orange-100 rounded-full blur-3xl opacity-60" />
+        <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-orange-100 rounded-full blur-3xl opacity-60" />
+
+        {/* Integration Header */}
+        <div className="flex items-center justify-center gap-6 relative z-10 py-4">
+          <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg shadow-orange-150 flex items-center justify-center rotate-3 shrink-0">
+            <Sparkles className="text-white w-7 h-7 fill-white" />
+          </div>
+          <div className="flex flex-col gap-1 items-center justify-center">
+            <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
+            <div className="h-0.5 w-10 bg-gradient-to-r from-orange-500 to-stone-400" />
+          </div>
+          <div className="w-14 h-14 rounded-2xl bg-stone-900 shadow-lg flex items-center justify-center -rotate-3 shrink-0">
+            <Bot className="text-white w-7 h-7" />
+          </div>
+        </div>
+
+        {/* Text Details */}
+        <div className="space-y-2 text-center relative z-10">
+          <h2 className="text-xl font-black text-stone-850">Connect to ChatGPT</h2>
+          <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest leading-normal">
+            FitAI Companion Custom GPT
+          </p>
+        </div>
+
+        <div className="bg-stone-50/50 border border-stone-150/50 rounded-2xl p-4.5 space-y-3.5 relative z-10">
+          <p className="text-xs text-stone-600 font-medium leading-relaxed">
+            By authorizing, you allow the **FitAI Companion** Custom GPT in ChatGPT to:
+          </p>
+          <ul className="space-y-2.5">
+            <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
+              <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <span>Read your height, weight, and target daily goals.</span>
+            </li>
+            <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
+              <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <span>Log new meals and snack entries on your daily calendar.</span>
+            </li>
+            <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
+              <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <span>Fetch and update your stored custom recipes.</span>
+            </li>
+            <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
+              <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <span>Save custom food memories, likes, and exclusions.</span>
+            </li>
+          </ul>
+        </div>
+
+        {/* Actions */}
+        <div className="space-y-2.5 pt-2 relative z-10">
+          <button
+            onClick={handleApprove}
+            disabled={isApproving || isRejecting}
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-orange-100"
+          >
+            {isApproving ? "Authorizing..." : "Approve Connection"}
+          </button>
+          <button
+            onClick={handleCancel}
+            disabled={isApproving || isRejecting}
+            className="w-full bg-stone-100 hover:bg-stone-200 disabled:opacity-50 text-stone-700 text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer text-center"
+          >
+            Cancel
+          </button>
+        </div>
+        
+        <div className="text-center pt-2">
+          <span className="text-[8px] text-stone-400 font-semibold uppercase tracking-wider block">
+            Client ID: {clientId || "Unknown"}
+          </span>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 const ManualLogModal = ({
   onClose,
   onAddMeal,
@@ -2951,7 +3118,13 @@ const formatDateStr = (d: Date): string => {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("home");
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("page") === "oauth-consent") {
+      return "oauth-consent";
+    }
+    return "home";
+  });
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null);
   const [isCameraFullScreen, setIsCameraFullScreen] = useState(false);
 
@@ -4726,6 +4899,13 @@ export default function App() {
             setActiveTab={setActiveTab}
           />
         )}
+        {activeTab === "oauth-consent" && (
+          <OAuthConsentView
+            key="oauth-consent-tab"
+            setActiveTab={setActiveTab}
+            triggerToast={(msg) => setToastMessage(msg)}
+          />
+        )}
       </AnimatePresence>
 
       {/* World-Class Detail & Edit Recipe Popup Overlay */}
@@ -5714,62 +5894,64 @@ export default function App() {
       </AnimatePresence>
 
       {/* Bottom Navigation */}
-      <nav
-        id="bottom-nav"
-        className="fixed bottom-6 left-6 right-6 max-w-[calc(448px-3rem)] mx-auto z-50"
-      >
-        <div
-          id="nav-container"
-          className="backdrop-blur-2xl bg-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-[24px] p-2 flex items-center justify-between gap-2 border border-white/50 w-full"
+      {activeTab !== "oauth-consent" && (
+        <nav
+          id="bottom-nav"
+          className="fixed bottom-6 left-6 right-6 max-w-[calc(448px-3rem)] mx-auto z-50"
         >
-          <NavButton
-            id="nav-home"
-            icon={Home}
-            label="Home"
-            active={activeTab === "home"}
-            onClick={() => setActiveTab("home")}
-          />
+          <div
+            id="nav-container"
+            className="backdrop-blur-2xl bg-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-[24px] p-2 flex items-center justify-between gap-2 border border-white/50 w-full"
+          >
+            <NavButton
+              id="nav-home"
+              icon={Home}
+              label="Home"
+              active={activeTab === "home"}
+              onClick={() => setActiveTab("home")}
+            />
 
-          <div className="flex-1 flex justify-center">
-            {selectedDate === todayStr ? (
-              <motion.button
-                id="fab-add-food"
-                onClick={() => {
-                  const gptUrl = localStorage.getItem("fitai_custom_gpt_url");
-                  if (gptUrl && gptUrl.trim()) {
-                    window.open(gptUrl.trim(), "_blank");
-                  } else {
-                    setIsCameraFullScreen(true);
-                  }
-                }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="w-full h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-[16px] shadow-[0_8px_30px_rgb(251,146,60,0.4)] flex items-center justify-center text-white relative overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_white_0%,_transparent_40%)] opacity-30" />
-                <Plus className="w-7 h-7 stroke-[3px]" />
-              </motion.button>
-            ) : (
-              <div
-                id="fab-disabled"
-                className="w-full h-14 bg-stone-50 border border-stone-200/50 rounded-[16px] flex flex-col items-center justify-center text-stone-400 select-none opacity-60"
-                title="Logs are only editable on today's date"
-              >
-                <Plus className="w-5 h-5 stroke-[2px]" />
-                <span className="text-[7px] font-black uppercase tracking-widest mt-0.5">Locked</span>
-              </div>
-            )}
+            <div className="flex-1 flex justify-center">
+              {selectedDate === todayStr ? (
+                <motion.button
+                  id="fab-add-food"
+                  onClick={() => {
+                    const gptUrl = localStorage.getItem("fitai_custom_gpt_url");
+                    if (gptUrl && gptUrl.trim()) {
+                      window.open(gptUrl.trim(), "_blank");
+                    } else {
+                      setIsCameraFullScreen(true);
+                    }
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-[16px] shadow-[0_8px_30px_rgb(251,146,60,0.4)] flex items-center justify-center text-white relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_white_0%,_transparent_40%)] opacity-30" />
+                  <Plus className="w-7 h-7 stroke-[3px]" />
+                </motion.button>
+              ) : (
+                <div
+                  id="fab-disabled"
+                  className="w-full h-14 bg-stone-50 border border-stone-200/50 rounded-[16px] flex flex-col items-center justify-center text-stone-400 select-none opacity-60"
+                  title="Logs are only editable on today's date"
+                >
+                  <Plus className="w-5 h-5 stroke-[2px]" />
+                  <span className="text-[7px] font-black uppercase tracking-widest mt-0.5">Locked</span>
+                </div>
+              )}
+            </div>
+
+            <NavButton
+              id="nav-profile"
+              icon={User}
+              label="Profile"
+              active={activeTab === "profile"}
+              onClick={() => setActiveTab("profile")}
+            />
           </div>
-
-          <NavButton
-            id="nav-profile"
-            icon={User}
-            label="Profile"
-            active={activeTab === "profile"}
-            onClick={() => setActiveTab("profile")}
-          />
-        </div>
-      </nav>
+        </nav>
+      )}
     </div>
   );
 }

@@ -89,3 +89,21 @@ create policy "Users can perform all actions on their own meals" on public.meals
 
 create policy "Users can perform all actions on their own recipes" on public.recipes
   for all using (auth.uid() = profile_id) with check (auth.uid() = profile_id);
+
+-- OAUTH CODES TABLE FOR CUSTOM GPT INTEGRATION
+create table public.oauth_codes (
+  id uuid default gen_random_uuid() primary key,
+  code text unique not null,
+  profile_id uuid references public.profiles(id) on delete cascade not null,
+  client_id text not null,
+  redirect_uri text not null,
+  expires_at timestamp with time zone not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS
+alter table public.oauth_codes enable row level security;
+
+-- Policies for oauth_codes
+create policy "Allow service_role to manage oauth codes" on public.oauth_codes
+  for all using (true) with check (true);

@@ -14,7 +14,173 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Authenticate Request
+    const url = new URL(req.url);
+    const path = url.pathname;
+    const method = req.method;
+
+    // 1. Initialize Supabase Client (needed for all operations)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    // --- OAUTH2 ENDPOINTS (Bypass API Key authentication checks) ---
+
+    // A. GET /oauth/authorize
+    if (path.endsWith("/oauth/authorize") && method === "GET") {
+      const clientId = url.searchParams.get("client_id");
+      const redirectUri = url.searchParams.get("redirect_uri");
+      const state = url.searchParams.get("state");
+
+      if (!clientId || !redirectUri || !state) {
+        return new Response(JSON.stringify({ error: "Missing required parameters: client_id, redirect_uri, state" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const redirectBase = Deno.env.get("FRONTEND_URL") || "http://localhost:3000";
+      const consentUrl = `${redirectBase}/?page=oauth-consent&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          ...corsHeaders,
+          "Location": consentUrl,
+        },
+      });
+    }
+
+    // B. POST /oauth/approve
+    if (path.endsWith("/oauth/approve") && method === "POST") {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Missing or invalid Authorization header" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const userJwtToken = authHeader.substring(7).trim();
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser(userJwtToken);
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized. Invalid session token." }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const body = await req.json();
+      const { client_id, redirect_uri } = body;
+
+      if (!client_id || !redirect_uri) {
+        return new Response(JSON.stringify({ error: "Missing client_id or redirect_uri in body" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const authCode = "ac_" + crypto.randomUUID().replace(/-/g, "");
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      const { error: insertError } = await supabase
+        .from("oauth_codes")
+        .insert({
+          code: authCode,
+          profile_id: user.id,
+          client_id,
+          redirect_uri,
+          expires_at: expiresAt,
+        });
+
+      if (insertError) {
+        console.error("Failed to insert oauth code:", insertError);
+        return new Response(JSON.stringify({ error: "Failed to generate authorization code" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ code: authCode }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // C. POST /oauth/token
+    if (path.endsWith("/oauth/token") && method === "POST") {
+      const contentType = req.headers.get("content-type") || "";
+      let code = "";
+      let clientId = "";
+      let redirectUri = "";
+
+      if (contentType.includes("application/x-www-form-urlencoded")) {
+        const formData = await req.formData();
+        code = formData.get("code")?.toString() || "";
+        clientId = formData.get("client_id")?.toString() || "";
+        redirectUri = formData.get("redirect_uri")?.toString() || "";
+      } else {
+        try {
+          const body = await req.json();
+          code = body.code || "";
+          clientId = body.client_id || "";
+          redirectUri = body.redirect_uri || "";
+        } catch (_) {
+          // ignore parsing error
+        }
+      }
+
+      if (!code) {
+        return new Response(JSON.stringify({ error: "Missing required parameter: code" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: oauthRecord, error: fetchError } = await supabase
+        .from("oauth_codes")
+        .select("*")
+        .eq("code", code)
+        .maybeSingle();
+
+      if (fetchError || !oauthRecord) {
+        return new Response(JSON.stringify({ error: "Invalid or expired authorization code" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (new Date(oauthRecord.expires_at).getTime() < Date.now()) {
+        await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
+        return new Response(JSON.stringify({ error: "Authorization code has expired" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
+
+      const { data: userProfile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("api_key")
+        .eq("id", oauthRecord.profile_id)
+        .single();
+
+      if (profileErr || !userProfile) {
+        return new Response(JSON.stringify({ error: "User profile not found" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        access_token: userProfile.api_key,
+        token_type: "Bearer",
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // --- STANDARD API REQUEST AUTHENTICATION ---
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Missing or invalid Authorization header" }), {
@@ -25,12 +191,7 @@ serve(async (req) => {
 
     const apiKey = authHeader.substring(7).trim();
 
-    // 2. Initialize Supabase Client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-    // 3. Resolve user profile by API Key
+    // Resolve user profile by API Key
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
@@ -43,10 +204,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const url = new URL(req.url);
-    const path = url.pathname;
-    const method = req.method;
 
     // Parse timezone offset header (in minutes, e.g. -330 for IST +5:30)
     const timezoneOffsetHeader = req.headers.get("x-timezone-offset");
