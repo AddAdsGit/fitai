@@ -50,7 +50,30 @@ In the Actions editor, click **Authentication** and configure:
 | Scope | *(leave blank)* |
 | Token Format | `Bearer` |
 
-> ⚠️ **IMPORTANT**: With OAuth configured, ChatGPT will automatically ask every user to "Connect their account" the first time they try to use FitAI. They log in via the FitAI app and approve access — no manual token copying needed.
+> ⚠️ **IMPORTANT**: The OAuth consent page always redirects to **https://fitpush.vercel.app** (production). Never use localhost for OAuth — it won't work for other users.
+
+---
+
+### Google OAuth Setup (Supabase Auth)
+
+To allow users to log in via Google on the FitAI consent page:
+
+1. Go to **Supabase Dashboard** → `twrjigbbgioqdpwvkblo` → **Auth** → **Providers** → **Google**
+2. Enable Google provider and add your Google OAuth Client ID + Secret
+3. Set the **Authorized redirect URI** in your Google Cloud Console to:
+   ```
+   https://twrjigbbgioqdpwvkblo.supabase.co/auth/v1/callback
+   ```
+4. In Supabase Auth settings, set the **Site URL** to:
+   ```
+   https://fitpush.vercel.app
+   ```
+5. Add to **Redirect URLs** allowlist:
+   ```
+   https://fitpush.vercel.app/*
+   ```
+
+> This ensures Google OAuth always lands back on `fitpush.vercel.app`, not localhost.
 
 ---
 
