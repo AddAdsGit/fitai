@@ -154,6 +154,9 @@ paths:
                 image:
                   type: string
                   description: Optional public web image URL of this food item. You can search the web (e.g. Unsplash or open food databases) to find a high-quality relevant picture link matching this food.
+                timezone:
+                  type: string
+                  description: The user's timezone identifier (e.g., "America/New_York", "Asia/Kolkata"). If provided, it is used to resolve the current local date and time if they are not explicitly specified.
       responses:
         '201':
           description: Meal logged successfully

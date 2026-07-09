@@ -2037,9 +2037,58 @@ paths:
                   type: string
                 date:
                   type: string
+                timezone:
+                  type: string
       responses:
         '201':
           description: Meal logged successfully
+    delete:
+      summary: Delete a logged meal
+      operationId: deleteMeal
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Meal deleted successfully
+    patch:
+      summary: Update a logged meal
+      operationId: updateMeal
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                calories:
+                  type: integer
+                protein:
+                  type: integer
+                carbs:
+                  type: integer
+                fats:
+                  type: integer
+                type:
+                  type: string
+                time:
+                  type: string
+                date:
+                  type: string
+      responses:
+        '200':
+          description: Meal updated successfully
   /recipes:
     get:
       summary: List user recipes
