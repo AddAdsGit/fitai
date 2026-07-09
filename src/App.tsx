@@ -3046,6 +3046,8 @@ export default function App() {
   const [onboardName, setOnboardName] = useState("");
   const [onboardHeight, setOnboardHeight] = useState("170");
   const [onboardWeight, setOnboardWeight] = useState("70");
+  const [onboardDob, setOnboardDob] = useState("1998-05-15");
+  const [onboardGender, setOnboardGender] = useState("Male");
   const [onboardBio, setOnboardBio] = useState("");
   const [onboardAvatar, setOnboardAvatar] = useState("");
   const [isOnboardLoading, setIsOnboardLoading] = useState(false);
@@ -3192,6 +3194,8 @@ export default function App() {
           image_url: onboardAvatar || null,
           height: parseInt(onboardHeight) || 170,
           weight: parseFloat(onboardWeight) || 70,
+          dob: onboardDob,
+          gender: onboardGender,
           description: onboardBio.trim(),
           preferences: updatedPrefs
         })
@@ -3207,6 +3211,8 @@ export default function App() {
           imageUrl: onboardAvatar || null,
           height: parseInt(onboardHeight) || 170,
           weight: parseFloat(onboardWeight) || 70,
+          dob: onboardDob,
+          gender: onboardGender,
           description: onboardBio.trim(),
           preferences: updatedPrefs
         }));
@@ -3485,6 +3491,8 @@ export default function App() {
       setOnboardHeight(String(profile.height || 170));
       setOnboardWeight(String(profile.weight || 70));
       setOnboardBio(profile.description || "");
+      setOnboardDob(profile.dob || "1998-05-15");
+      setOnboardGender(profile.gender || "Male");
 
       const { data: recipesData, error: recipesErr } = await supabase
         .from('recipes')
@@ -3989,6 +3997,34 @@ export default function App() {
                   required
                   className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
                 />
+              </div>
+            </div>
+
+            {/* DOB & Gender */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Date of Birth</label>
+                <input
+                  type="date"
+                  value={onboardDob}
+                  onChange={(e) => setOnboardDob(e.target.value)}
+                  required
+                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Gender</label>
+                <select
+                  value={onboardGender}
+                  onChange={(e) => setOnboardGender(e.target.value)}
+                  required
+                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3.5 text-xs font-bold text-stone-700 focus:outline-none focus:border-orange-500 shadow-sm transition-all cursor-pointer"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Non-Binary">Non-Binary</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
             </div>
 
