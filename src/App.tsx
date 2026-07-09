@@ -3043,6 +3043,13 @@ export default function App() {
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [authLoading, setAuthLoading] = useState(false);
 
+  const [onboardName, setOnboardName] = useState("");
+  const [onboardHeight, setOnboardHeight] = useState("170");
+  const [onboardWeight, setOnboardWeight] = useState("70");
+  const [onboardBio, setOnboardBio] = useState("");
+  const [onboardAvatar, setOnboardAvatar] = useState("");
+  const [isOnboardLoading, setIsOnboardLoading] = useState(false);
+
   const handleUserAuthenticated = async (user: any) => {
     try {
       const { data: existing, error } = await supabase
@@ -3168,6 +3175,48 @@ export default function App() {
       showToast(`❌ Error signing up: ${err.message}`);
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  const handleOnboardSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeProfileId) return;
+
+    setIsOnboardLoading(true);
+    try {
+      const updatedPrefs = [...(profileData.preferences || []), "onboarded"];
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          display_name: onboardName.trim(),
+          image_url: onboardAvatar || null,
+          height: parseInt(onboardHeight) || 170,
+          weight: parseFloat(onboardWeight) || 70,
+          description: onboardBio.trim(),
+          preferences: updatedPrefs
+        })
+        .eq('id', activeProfileId);
+
+      if (error) {
+        showToast("❌ Failed to save onboarding settings");
+        console.error(error);
+      } else {
+        setProfileDataState((prev: any) => ({
+          ...prev,
+          name: onboardName.trim(),
+          imageUrl: onboardAvatar || null,
+          height: parseInt(onboardHeight) || 170,
+          weight: parseFloat(onboardWeight) || 70,
+          description: onboardBio.trim(),
+          preferences: updatedPrefs
+        }));
+        showToast("✨ Welcome to FitAI! Setup complete.");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("❌ Unexpected onboarding error");
+    } finally {
+      setIsOnboardLoading(false);
     }
   };
 
@@ -3430,6 +3479,12 @@ export default function App() {
         notionDatabaseId: profile.notion_database_id || "",
         googleSheetsWebhookUrl: profile.google_sheets_webhook_url || ""
       });
+
+      setOnboardName(profile.display_name || "");
+      setOnboardAvatar(profile.image_url || "");
+      setOnboardHeight(String(profile.height || 170));
+      setOnboardWeight(String(profile.weight || 70));
+      setOnboardBio(profile.description || "");
 
       const { data: recipesData, error: recipesErr } = await supabase
         .from('recipes')
@@ -3791,6 +3846,179 @@ export default function App() {
 
         {/* Footer info */}
         <div className="text-center text-[8px] text-stone-300 font-bold tracking-widest uppercase">
+          Powered by Supabase & Custom GPT
+        </div>
+      </div>
+    );
+  }
+
+  const isOnboarded = profileData.preferences?.includes("onboarded");
+
+  if (isSupabaseConfigured && activeProfileId && !isOnboarded) {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-8 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
+        {/* Absolute Custom Toast Alert */}
+        <AnimatePresence>
+          {toastMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -40, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{ type: "spring", damping: 20, stiffness: 300 }}
+              className="fixed top-8 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-[380px] z-[250] pointer-events-auto"
+            >
+              <div className="bg-stone-900/95 backdrop-blur-md text-white text-xs font-bold py-3.5 px-4 rounded-2xl shadow-2xl border border-white/10 flex items-center justify-between gap-3 font-sans">
+                <span className="flex-1 tracking-tight leading-tight">{toastMessage}</span>
+                <button
+                  onClick={() => setToastMessage(null)}
+                  className="w-5 h-5 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="my-auto space-y-6 py-6">
+          {/* Logo */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center rotate-6">
+              <Sparkles className="text-white w-6 h-6 -rotate-6 fill-white" />
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-center mt-2">
+              Setup Your Profile
+            </h1>
+            <p className="text-[9px] text-stone-400 font-bold uppercase tracking-widest text-center">
+              Let's customize your AI nutrition targets.
+            </p>
+          </div>
+
+          <form onSubmit={handleOnboardSubmit} className="space-y-4">
+            {/* Profile Avatar Selection (Canvas Resized Upload) */}
+            <div className="flex flex-col items-center gap-2 py-2">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-stone-200 shadow-inner flex items-center justify-center bg-stone-100">
+                  {onboardAvatar ? (
+                    <img src={onboardAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-stone-300 font-bold text-lg uppercase">{onboardName?.slice(0, 2) || "AI"}</span>
+                  )}
+                </div>
+                <label className="absolute bottom-0 right-0 w-7 h-7 bg-stone-900 text-white rounded-full border-2 border-white flex items-center justify-center cursor-pointer shadow-md hover:bg-stone-850 active:scale-95 transition-all">
+                  <Camera className="w-3.5 h-3.5" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                          const canvas = document.createElement("canvas");
+                          let width = img.width;
+                          let height = img.height;
+                          const max = 200;
+                          if (width > max || height > max) {
+                            if (width > height) {
+                              height = Math.round((height * max) / width);
+                              width = max;
+                            } else {
+                              width = Math.round((width * max) / height);
+                              height = max;
+                            }
+                          }
+                          canvas.width = width;
+                          canvas.height = height;
+                          const ctx = canvas.getContext("2d");
+                          if (ctx) {
+                            ctx.drawImage(img, 0, 0, width, height);
+                            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                            setOnboardAvatar(dataUrl);
+                          }
+                        };
+                        img.src = event.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+              </div>
+              <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest">
+                Choose profile photo
+              </span>
+            </div>
+
+            {/* Display Name */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Full Name</label>
+              <input
+                type="text"
+                placeholder="Full Name (e.g. Alex Doe)"
+                value={onboardName}
+                onChange={(e) => setOnboardName(e.target.value)}
+                required
+                className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
+              />
+            </div>
+
+            {/* Height & Weight */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Height (cm)</label>
+                <input
+                  type="number"
+                  placeholder="Height (cm)"
+                  value={onboardHeight}
+                  onChange={(e) => setOnboardHeight(e.target.value)}
+                  required
+                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  placeholder="Weight (kg)"
+                  value={onboardWeight}
+                  onChange={(e) => setOnboardWeight(e.target.value)}
+                  required
+                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Bio Description (ChatGPT Blocked from modifying) */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1 flex items-center justify-between">
+                <span>About Yourself</span>
+                <span className="text-[7px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full font-black">AI Blocked</span>
+              </label>
+              <textarea
+                placeholder="Describe your lifestyle, fitness goals, or allergies... (Only you can edit this)"
+                value={onboardBio}
+                onChange={(e) => setOnboardBio(e.target.value)}
+                rows={3}
+                className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all resize-none animate-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isOnboardLoading}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/50 disabled:opacity-50 disabled:pointer-events-none cursor-pointer mt-2"
+            >
+              {isOnboardLoading ? "Saving Setup..." : "Complete Setup"}
+            </button>
+          </form>
+        </div>
+
+        {/* Footer info */}
+        <div className="text-center text-[8px] text-stone-300 font-bold tracking-widest uppercase py-4">
           Powered by Supabase & Custom GPT
         </div>
       </div>
