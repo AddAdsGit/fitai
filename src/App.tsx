@@ -4000,32 +4000,16 @@ export default function App() {
               </div>
             </div>
 
-            {/* DOB & Gender */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Date of Birth</label>
-                <input
-                  type="date"
-                  value={onboardDob}
-                  onChange={(e) => setOnboardDob(e.target.value)}
-                  required
-                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Gender</label>
-                <select
-                  value={onboardGender}
-                  onChange={(e) => setOnboardGender(e.target.value)}
-                  required
-                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3.5 text-xs font-bold text-stone-700 focus:outline-none focus:border-orange-500 shadow-sm transition-all cursor-pointer"
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Non-Binary">Non-Binary</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
+            {/* Date of Birth */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Date of Birth</label>
+              <input
+                type="date"
+                value={onboardDob}
+                onChange={(e) => setOnboardDob(e.target.value)}
+                required
+                className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
+              />
             </div>
 
             {/* Bio Description (ChatGPT Blocked from modifying) */}
