@@ -33,6 +33,7 @@ import {
   Info,
   Database,
   Trash2,
+  Edit2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -657,17 +658,7 @@ const ProgressBar = ({
   );
 };
 
-const PRESET_DIETS = [
-  { name: "Keto", emoji: "🥑", label: "Ketogenic" },
-  { name: "Vegan", emoji: "🌱", label: "Vegan" },
-  { name: "Vegetarian", emoji: "🥗", label: "Vegetarian" },
-  { name: "Gluten Free", emoji: "🌾", label: "Gluten-Free" },
-  { name: "Dairy Free", emoji: "🥛", label: "Dairy-Free" },
-  { name: "Halal", emoji: "🕌", label: "Halal" },
-  { name: "Low Carb", emoji: "🍳", label: "Low-Carb" },
-  { name: "Nut Free", emoji: "🥜", label: "Nut-Free" },
-  { name: "Shellfish Free", emoji: "🦀", label: "No Shellfish" },
-];
+
 
 const ProfileView = ({
   profileData,
@@ -701,8 +692,6 @@ const ProfileView = ({
     "meals",
   );
   const [showFullDesc, setShowFullDesc] = useState(false);
-  const [customPrefText, setCustomPrefText] = useState("");
-  const [showCustomInput, setShowCustomInput] = useState(false);
 
 
 
@@ -741,46 +730,7 @@ const ProfileView = ({
     triggerToast(`Daily ${field.charAt(0).toUpperCase() + field.slice(1)} goal updated and synced successfully!`);
   };
 
-  const removePreference = (index: number) => {
-    const prefToRemove = profileData.preferences[index];
-    if (["onboarded", "refine_food_pics"].includes(prefToRemove)) return;
-    const newPrefs = [...profileData.preferences];
-    newPrefs.splice(index, 1);
-    setProfileData({ ...profileData, preferences: newPrefs });
-  };
 
-
-
-  const togglePreference = (prefName: string) => {
-    if (["onboarded", "refine_food_pics"].includes(prefName.toLowerCase())) return;
-    const index = profileData.preferences.findIndex(
-      (p: string) => p.toLowerCase() === prefName.toLowerCase(),
-    );
-    if (index !== -1) {
-      removePreference(index);
-    } else {
-      setProfileData({
-        ...profileData,
-        preferences: [...profileData.preferences, prefName],
-      });
-    }
-  };
-
-  const handleAddCustomPref = () => {
-    if (customPrefText.trim()) {
-      const alreadyExists = profileData.preferences.some(
-        (p: string) => p.toLowerCase() === customPrefText.trim().toLowerCase(),
-      );
-      if (!alreadyExists) {
-        setProfileData({
-          ...profileData,
-          preferences: [...profileData.preferences, customPrefText.trim()],
-        });
-      }
-      setCustomPrefText("");
-      setShowCustomInput(false);
-    }
-  };
 
 
 
@@ -1098,15 +1048,21 @@ const ProfileView = ({
                     key={recipe.id}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => openRecipeDetails(recipe)}
-                    className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150"
+                    className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150 border border-white/5"
                   >
-                    {/* Cover Photo */}
-                    <img
-                      src={recipe.image}
-                      className="w-full h-full object-cover pointer-events-none"
-                      alt={recipe.name}
-                      referrerPolicy="no-referrer"
-                    />
+                    {/* Cover Photo or Fallback Gradient */}
+                    {!hasNoGeneratedImage(recipe.image) ? (
+                      <img
+                        src={recipe.image}
+                        className="w-full h-full object-cover pointer-events-none"
+                        alt={recipe.name}
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-stone-800 to-stone-950 flex items-center justify-center pointer-events-none">
+                        <Utensils className="w-9 h-9 text-white opacity-20" />
+                      </div>
+                    )}
 
                     {/* Gradient Scrim Vignette for supreme text legibility */}
                     <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none z-10" />
@@ -1140,134 +1096,6 @@ const ProfileView = ({
 
         {profileTab === "goals" && (
           <div className="p-6 max-w-[calc(448px)] mx-auto space-y-6">
-            {/* Preferences */}
-            <div className="bg-white rounded-[28px] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.03)] border border-black/5">
-              <div className="mb-4">
-                <h4 className="text-[11px] font-black text-orange-600 uppercase tracking-widest mb-1 flex items-center gap-1.5">
-                  <Target className="w-3.5 h-3.5" />
-                  Dietary Profiler
-                </h4>
-                <p className="text-xs text-orange-950/50 font-medium font-sans">
-                  Toggle active diets, allergen exclusions, or type a custom
-                  preference below.
-                </p>
-              </div>
-
-              {/* Presets Toggle Grid */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {PRESET_DIETS.map((diet) => {
-                  const isActive = profileData.preferences.some(
-                    (p: string) => p.toLowerCase() === diet.name.toLowerCase(),
-                  );
-                  return (
-                    <motion.button
-                      key={diet.name}
-                      onClick={() => togglePreference(diet.name)}
-                      whileTap={{ scale: 0.95 }}
-                      className={cn(
-                        "px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-300 shadow-sm font-sans",
-                        isActive
-                          ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-orange-400/20 border border-transparent"
-                          : "bg-orange-50/20 border border-orange-100/40 text-orange-950/70 hover:bg-orange-50 hover:text-orange-950",
-                      )}
-                    >
-                      <span>{diet.emoji}</span>
-                      <span>{diet.label}</span>
-                      {isActive && (
-                        <span className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center text-white ml-0.5">
-                          <X className="w-2.5 h-2.5" />
-                        </span>
-                      )}
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              {/* Custom Exclusions List & Creator */}
-              <div className="border-t border-black/[0.03] pt-4 mt-2">
-                {/* Custom items currently active (non-presets) */}
-                {profileData.preferences.filter(
-                  (p: string) =>
-                    !PRESET_DIETS.some(
-                      (d) => d.name.toLowerCase() === p.toLowerCase(),
-                    ) && p !== "onboarded" && p !== "refine_food_pics",
-                ).length > 0 && (
-                  <div className="mb-4">
-                    <h5 className="text-[10px] font-black text-orange-950/30 uppercase tracking-widest mb-2 font-sans">
-                      Custom Exclusions
-                    </h5>
-                    <div className="flex flex-wrap gap-2">
-                      {profileData.preferences.map(
-                        (pref: string, i: number) => {
-                          const isP = PRESET_DIETS.some(
-                            (d) => d.name.toLowerCase() === pref.toLowerCase(),
-                          );
-                          if (isP || pref === "onboarded" || pref === "refine_food_pics") return null;
-                          return (
-                            <div
-                              key={i}
-                              className="px-3 py-1.5 bg-yellow-50/50 border border-yellow-200/50 rounded-lg text-xs font-bold text-yellow-800 flex items-center gap-1.5 shadow-sm font-sans"
-                            >
-                              <span>🔖</span>
-                              <span>{pref}</span>
-                              <button
-                                onClick={() => removePreference(i)}
-                                className="w-4 h-4 bg-yellow-100 text-yellow-600 rounded-full flex justify-center items-center hover:bg-yellow-200 transition-colors"
-                              >
-                                <X className="w-2.5 h-2.5" />
-                              </button>
-                            </div>
-                          );
-                        },
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Inline Custom Input Maker */}
-                <div className="relative">
-                  {showCustomInput ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-2 bg-orange-50/30 p-1.5 rounded-2xl border border-orange-100/30"
-                    >
-                      <input
-                        type="text"
-                        placeholder="Ex: No cilantro, Soy-Free..."
-                        value={customPrefText}
-                        onChange={(e) => setCustomPrefText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleAddCustomPref();
-                        }}
-                        className="flex-1 bg-transparent border-none outline-none text-xs font-bold text-orange-950 px-3 placeholder:text-orange-950/30 font-sans"
-                        autoFocus
-                      />
-                      <button
-                        onClick={handleAddCustomPref}
-                        className="px-3.5 py-1.5 bg-orange-500 hover:bg-orange-600 font-bold text-[11px] text-white rounded-xl transition-colors shadow-sm shadow-orange-500/10 font-sans"
-                      >
-                        Add
-                      </button>
-                      <button
-                        onClick={() => setShowCustomInput(false)}
-                        className="w-7 h-7 bg-white shadow-sm border border-gray-100 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </motion.div>
-                  ) : (
-                    <button
-                      onClick={() => setShowCustomInput(true)}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-orange-50/30 border border-dashed border-orange-200/60 hover:border-orange-300 text-orange-600 hover:text-orange-700 rounded-xl text-xs font-bold transition-all duration-200 mt-1 font-sans"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Custom Restriction</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
 
             {/* Goals */}
             <div className="bg-white rounded-[28px] p-6 shadow-sm border border-black/5">
@@ -2782,11 +2610,13 @@ const ManualLogModal = ({
   onAddMeal,
   mealToEdit,
   onNavigateToSettings,
+  mealsState = [],
 }: {
   onClose: () => void;
   onAddMeal: (meal: any) => void;
   mealToEdit?: Meal | null;
   onNavigateToSettings: () => void;
+  mealsState?: Meal[];
 }) => {
   const [name, setName] = useState(mealToEdit?.name || "");
   const [calories, setCalories] = useState(mealToEdit ? String(mealToEdit.calories) : "");
@@ -2803,9 +2633,14 @@ const ManualLogModal = ({
     return new Date().toLocaleTimeString("en-US", timeOptions);
   });
 
-  const [segment, setSegment] = useState<"manual" | "ai">("manual");
+  const [segment, setSegment] = useState<"quick" | "detailed">(() => {
+    if (mealToEdit) return "detailed";
+    return "quick";
+  });
+  const [searchQuery, setSearchQuery] = useState("");
   const [aiInstruction, setAiInstruction] = useState("");
-  const [aiPreview, setAiPreview] = useState<{ calories: number; protein: number; carbs: number; fats: number; name: string } | null>(null);
+  const [imageUrl, setImageUrl] = useState(mealToEdit?.image || "");
+  const [showImagePanel, setShowImagePanel] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const hasGeminiKey = !!(
@@ -2813,11 +2648,70 @@ const ManualLogModal = ({
     (import.meta as any).env.VITE_GEMINI_API_KEY?.trim()
   );
 
+  interface QuickLogItem {
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    image: string;
+    type?: string;
+  }
+
+  const quickLogItems = useMemo(() => {
+    const itemsMap = new Map<string, QuickLogItem>();
+    const getKey = (n: string) => n.trim().toLowerCase();
+
+    // 1. Add user history items first (most recent)
+    if (mealsState) {
+      mealsState.forEach(item => {
+        const key = getKey(item.name);
+        if (!itemsMap.has(key)) {
+          itemsMap.set(key, {
+            name: item.name,
+            calories: item.calories,
+            protein: item.protein,
+            carbs: item.carbs,
+            fats: item.fats,
+            image: item.image || "",
+            type: item.type
+          });
+        }
+      });
+    }
+
+    // 2. Add system defaults
+    const defaults = [...INITIAL_MEALS, ...INITIAL_RECIPES];
+    defaults.forEach(item => {
+      const key = getKey(item.name);
+      if (!itemsMap.has(key)) {
+        itemsMap.set(key, {
+          name: item.name,
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fats: item.fats,
+          image: item.image || "",
+          type: (item as any).type || "Meal"
+        });
+      }
+    });
+
+    return Array.from(itemsMap.values());
+  }, [mealsState]);
+
+  const filteredQuickItems = useMemo(() => {
+    if (!searchQuery.trim()) return quickLogItems;
+    const q = searchQuery.toLowerCase();
+    return quickLogItems.filter(item => item.name.toLowerCase().includes(q));
+  }, [quickLogItems, searchQuery]);
+
   const handleRefineWithAi = async () => {
     if (!aiInstruction.trim()) return;
 
     // Retrieve local Gemini API Key
-    const key = localStorage.getItem("fitai_gemini_api_key") || (import.meta as any).env.VITE_GEMINI_API_KEY || "";
+    const key = localStorage.getItem("fitai_gemini_api_key") || 
+                (import.meta as any).env.VITE_GEMINI_API_KEY || "";
     if (!key) {
       alert("Please save your Gemini API Key in Settings first to use AI Refinements!");
       return;
@@ -2869,13 +2763,12 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
       }
 
       const result = JSON.parse(cleaned);
-      setAiPreview({
-        name: result.name || name || "Refined Meal",
-        calories: Math.max(0, parseInt(result.calories) || 0),
-        protein: Math.max(0, parseInt(result.protein) || 0),
-        carbs: Math.max(0, parseInt(result.carbs) || 0),
-        fats: Math.max(0, parseInt(result.fats) || 0),
-      });
+      if (result.name) setName(result.name);
+      if (result.calories !== undefined) setCalories(String(Math.max(0, parseInt(result.calories) || 0)));
+      if (result.protein !== undefined) setProtein(String(Math.max(0, parseInt(result.protein) || 0)));
+      if (result.carbs !== undefined) setCarbs(String(Math.max(0, parseInt(result.carbs) || 0)));
+      if (result.fats !== undefined) setFats(String(Math.max(0, parseInt(result.fats) || 0)));
+      setAiInstruction("");
     } catch (err: any) {
       console.error(err);
       alert(`AI Processing Error: ${err.message || "Could not parse instruction"}`);
@@ -2891,14 +2784,14 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-stone-950/40 backdrop-blur-md"
       />
       <motion.div
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 220 }}
-        className="bg-white rounded-t-[36px] w-full max-w-md p-6 space-y-6 relative z-10 shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-white/85 backdrop-blur-xl border-t border-x border-white/60 rounded-t-[36px] w-full max-w-md p-6 space-y-6 relative z-10 shadow-2xl flex flex-col max-h-[90vh]"
       >
         <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] shrink-0">
           <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1.5">
@@ -2914,99 +2807,219 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
         </div>
 
         {/* Tab Segment Switcher */}
-        {!aiPreview && (
-          <div className="flex bg-stone-100 rounded-xl p-1 shrink-0">
-            <button
-              onClick={() => setSegment("manual")}
-              className={cn(
-                "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                segment === "manual" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
-              )}
-            >
-              Manual Log
-            </button>
-            <button
-              onClick={() => setSegment("ai")}
-              className={cn(
-                "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                segment === "ai" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
-              )}
-            >
-              AI Refiner
-            </button>
-          </div>
-        )}
+        <div className="flex bg-stone-100 rounded-xl p-1 shrink-0">
+          <button
+            onClick={() => setSegment("quick")}
+            className={cn(
+              "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+              segment === "quick" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
+            )}
+          >
+            Quick Log
+          </button>
+          <button
+            onClick={() => setSegment("detailed")}
+            className={cn(
+              "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+              segment === "detailed" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
+            )}
+          >
+            Detailed Log
+          </button>
+        </div>
 
         <div className="flex-1 overflow-y-auto pr-0.5 space-y-4 text-left">
-          {aiPreview ? (
-            /* AI APPROVAL PREVIEW PANEL */
-            <div className="space-y-4 font-sans">
-              <div className="bg-orange-50/50 border border-orange-100 rounded-[24px] p-5 space-y-4 shadow-sm">
-                <div className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest border-b border-orange-100/50 pb-2">
-                  Preview AI Updates
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
-                    <span>Name</span>
-                    <span className="text-orange-600 truncate max-w-[220px]">{aiPreview.name}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
-                    <span>Calories</span>
-                    <div>
-                      <span className="text-stone-400 font-mono line-through mr-1.5">{calories || 0} kcal</span>
-                      <span className="text-emerald-600 font-mono font-black">{aiPreview.calories} kcal</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
-                    <span>Protein</span>
-                    <div>
-                      <span className="text-stone-400 font-mono line-through mr-1.5">{protein || 0}g</span>
-                      <span className="text-orange-600 font-mono font-black">{aiPreview.protein}g</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
-                    <span>Carbs</span>
-                    <div>
-                      <span className="text-stone-400 font-mono line-through mr-1.5">{carbs || 0}g</span>
-                      <span className="text-indigo-600 font-mono font-black">{aiPreview.carbs}g</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
-                    <span>Fats</span>
-                    <div>
-                      <span className="text-stone-400 font-mono line-through mr-1.5">{fats || 0}g</span>
-                      <span className="text-amber-600 font-mono font-black">{aiPreview.fats}g</span>
-                    </div>
-                  </div>
-                </div>
+          {segment === "quick" ? (
+            /* QUICK LOG TAB */
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search past logs & default foods..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-9 pr-4 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              <div className="flex gap-2.5">
-                <button
-                  onClick={() => setAiPreview(null)}
-                  className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-600 font-black text-[10px] uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                >
-                  Discard
-                </button>
-                <button
-                  onClick={() => {
-                    setName(aiPreview.name);
-                    setCalories(String(aiPreview.calories));
-                    setProtein(String(aiPreview.protein));
-                    setCarbs(String(aiPreview.carbs));
-                    setFats(String(aiPreview.fats));
-                    setAiPreview(null);
-                    setSegment("manual");
-                  }}
-                  className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-center shadow-md shadow-orange-500/10 transition-colors cursor-pointer"
-                >
-                  Approve & Apply
-                </button>
+              {/* Food Items List */}
+              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-0.5">
+                {filteredQuickItems.length === 0 ? (
+                  <div className="text-center py-8 text-stone-450 text-[10px] font-bold">
+                    No matching food items found.
+                  </div>
+                ) : (
+                  filteredQuickItems.map((item, index) => {
+                    const isDefaultImage = hasNoGeneratedImage(item.image);
+                    return (
+                      <div
+                        key={`${item.name}-${index}`}
+                        className="bg-stone-50/40 hover:bg-stone-50 border border-stone-200/50 rounded-2xl p-3 flex items-center justify-between gap-3 transition-colors shadow-2xs"
+                      >
+                        {/* Left Side: Preview & Name & Macros */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          {isDefaultImage ? (
+                            <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0 border border-orange-100/50 shadow-inner">
+                              <Utensils className="w-5 h-5 text-orange-500" />
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs">
+                              <img
+                                src={item.image}
+                                className="w-full h-full object-cover"
+                                alt={item.name}
+                              />
+                            </div>
+                          )}
+
+                          <div className="text-left min-w-0">
+                            <h5 className="text-[11px] font-black text-stone-900 truncate leading-snug">
+                              {item.name}
+                            </h5>
+                            <div className="text-[9px] font-bold text-stone-500 mt-0.5 flex flex-wrap gap-x-1.5 items-center">
+                              <span className="text-orange-600 font-extrabold">{item.calories} kcal</span>
+                              <span className="text-stone-300">•</span>
+                              <span>{item.protein}g P</span>
+                              <span className="text-stone-300">•</span>
+                              <span>{item.carbs}g C</span>
+                              <span className="text-stone-300">•</span>
+                              <span>{item.fats}g F</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right Side: Quick Add & Modify Buttons */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Modify Button */}
+                          <button
+                            onClick={() => {
+                              setName(item.name);
+                              setCalories(String(item.calories));
+                              setProtein(String(item.protein));
+                              setCarbs(String(item.carbs));
+                              setFats(String(item.fats));
+                              setSegment("detailed");
+                            }}
+                            className="w-8 h-8 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40"
+                            title="Modify before logging"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Quick Add Button */}
+                          <button
+                            onClick={() => {
+                              onAddMeal({
+                                name: item.name,
+                                calories: item.calories,
+                                protein: item.protein,
+                                carbs: item.carbs,
+                                fats: item.fats,
+                                type: item.type || "Meal",
+                                image: item.image
+                              });
+                              onClose();
+                            }}
+                            className="w-8 h-8 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white flex items-center justify-center cursor-pointer transition-all active:scale-95 shadow-xs shadow-orange-500/10"
+                            title="Log immediately"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
-          ) : segment === "manual" ? (
-            /* MANUAL EDIT TAB */
+          ) : (
+            /* DETAILED EDIT TAB */
             <div className="space-y-4">
+              {/* Premium Full-bleed Cover Banner */}
+              <div className="h-32 w-[calc(100%+3rem)] -mx-6 -mt-6 relative overflow-hidden bg-stone-100 shrink-0 border-b border-stone-200/50">
+                {!hasNoGeneratedImage(imageUrl) ? (
+                  <img
+                    src={imageUrl}
+                    className="w-full h-full object-cover"
+                    alt={name || "Meal Cover"}
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#fffbfa] to-[#f9f6f3] flex items-center justify-center">
+                    <Utensils className="w-10 h-10 text-orange-500 opacity-20" />
+                  </div>
+                )}
+                {/* Subtle top shadow gradient overlay for aesthetics */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent pointer-events-none" />
+
+                {/* Edit Photo Overlaid Button */}
+                <button
+                  onClick={() => setShowImagePanel(!showImagePanel)}
+                  className="absolute bottom-3 right-3 backdrop-blur-md bg-black/45 hover:bg-black/60 border border-white/10 text-white text-[8px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer z-25 shadow-sm shadow-black/10 active:scale-95"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{showImagePanel ? "Close Edit" : "Edit Image"}</span>
+                </button>
+              </div>
+
+              {/* Slide-down Image Editor Drawer */}
+              {showImagePanel && (
+                <div className="bg-stone-50 border border-stone-200/50 rounded-2xl p-3.5 space-y-3 animate-fade-in">
+                  <div className="flex items-center gap-1.5 text-[9px] font-black text-stone-500 uppercase tracking-wider">
+                    <Camera className="w-3.5 h-3.5 text-stone-500" />
+                    <span>Change Cover Image</span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="text"
+                      placeholder="Paste cover image link here..."
+                      value={imageUrl.startsWith("data:") ? "" : imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-900 focus:outline-none focus:border-orange-500 placeholder-stone-400"
+                    />
+                    <div className="flex gap-2 items-center">
+                      <div className="relative inline-block">
+                        <button className="bg-stone-900 hover:bg-stone-850 text-white text-[9px] font-black uppercase tracking-wider px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-3xs">
+                          Upload Photo
+                        </button>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setImageUrl(reader.result as string);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                      </div>
+                      {imageUrl && (
+                        <button
+                          onClick={() => setImageUrl("")}
+                          className="text-[9px] font-bold text-red-500 hover:text-red-650 ml-1.5 cursor-pointer"
+                        >
+                          Remove Photo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
                   Meal / Snack Name
@@ -3085,71 +3098,43 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                   />
                 </div>
               </div>
-            </div>
-          ) : !hasGeminiKey ? (
-            /* AI REFINER TAB - LOCKED CONFIGURATION STATE */
-            <div className="space-y-6 py-6 text-center font-sans">
-              <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center mx-auto shadow-2xs border border-orange-100/50">
-                <Sparkles className="w-5 h-5 text-orange-500" />
-              </div>
-              <div className="space-y-1.5 px-2">
-                <h5 className="text-xs font-black uppercase tracking-wider text-stone-850">
-                  AI Refinement Locked
-                </h5>
-                <p className="text-[10px] text-stone-500 font-bold max-w-[250px] mx-auto leading-normal">
-                  Configure your Gemini API key in settings to unlock text-based recipe refinement & macro calculation.
-                </p>
-              </div>
-              <div className="pt-2 flex flex-col gap-3">
-                <div>
-                  <a
-                    href="https://aistudio.google.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-orange-600 hover:text-orange-700 bg-orange-50 px-3.5 py-1.5 rounded-full border border-orange-100/70 cursor-pointer transition-colors"
-                  >
-                    Get Free Gemini Key ↗
-                  </a>
-                </div>
-                <button
-                  onClick={() => {
-                    onClose();
-                    onNavigateToSettings();
-                  }}
-                  className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl transition-all cursor-pointer shadow-3xs"
-                >
-                  Configure Settings
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* AI REFINER TAB - UNLOCKED ACTIVE STATE */
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                  Refinement Instructions / Prompt
-                </label>
-                <textarea
-                  placeholder="E.g. 'I had it with extra chicken', 'make it a half portion', 'add a glass of orange juice'..."
-                  value={aiInstruction}
-                  onChange={(e) => setAiInstruction(e.target.value)}
-                  className="w-full bg-[#fcfbfa] border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500 min-h-[90px] resize-none"
-                />
-              </div>
 
-              <button
-                onClick={handleRefineWithAi}
-                disabled={isProcessing || !aiInstruction.trim()}
-                className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-2.5 rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-orange-400" />
-                {isProcessing ? "Processing with Gemini..." : "Refine Meal with AI"}
-              </button>
+              {/* Minimalist AI Refinement Input */}
+              {hasGeminiKey ? (
+                <div className="bg-[#fffbfa] border border-orange-100/50 rounded-2xl p-3.5 space-y-2 relative overflow-hidden">
+                  <div className="flex items-center gap-1.5 text-[9px] font-black text-orange-950/50 uppercase tracking-wider">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
+                    <span>Adjust with AI</span>
+                  </div>
+                  <div className="flex gap-2 relative z-10">
+                    <input
+                      type="text"
+                      placeholder="E.g. 'double portion', 'add 1 egg'..."
+                      value={aiInstruction}
+                      onChange={(e) => setAiInstruction(e.target.value)}
+                      className="flex-1 bg-white border border-stone-200/60 rounded-xl px-3 py-2 text-xs font-semibold text-stone-900 focus:outline-none focus:border-orange-500 placeholder-stone-400"
+                    />
+                    <button
+                      onClick={handleRefineWithAi}
+                      disabled={isProcessing || !aiInstruction.trim()}
+                      className="bg-stone-950 hover:bg-stone-900 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-wider px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+                    >
+                      {isProcessing ? "Refining..." : "Refine"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-stone-50 border border-stone-200/40 rounded-2xl p-3 text-center">
+                  <span className="text-[9px] font-bold text-stone-400">
+                    ⚠️ Configure Gemini Key in Settings to unlock AI adjustments
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {(!aiPreview && (segment === "manual" || hasGeminiKey)) && (
+        {segment === "detailed" && (
           <div className="shrink-0 pt-2 border-t border-stone-100">
             <button
               onClick={() => {
@@ -3163,13 +3148,13 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                   fats: parseInt(fats) || 0,
                   type: mealToEdit?.type || "Manual Log",
                   time: time.trim(),
-                  image: mealToEdit?.image
+                  image: imageUrl
                 });
                 onClose();
               }}
               className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-xs py-3.5 rounded-xl font-black uppercase tracking-widest text-center shadow-lg transition-colors cursor-pointer"
             >
-              {mealToEdit ? "Update Meal" : "Add to Daily Plate"}
+              {mealToEdit ? "Update Meal" : "Add today's log"}
             </button>
           </div>
         )}
@@ -3178,6 +3163,12 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
   );
 };
 
+
+// Utility: Check if a meal/recipe image is ungenerated / uses fallback placeholder
+const hasNoGeneratedImage = (imagePath?: string): boolean => {
+  if (!imagePath) return true;
+  return imagePath.includes("photo-1546069901-ba9599a7e63c");
+};
 
 // Utility: format a Date object to YYYY-MM-DD string
 const formatDateStr = (d: Date): string => {
@@ -3213,11 +3204,14 @@ export default function App() {
   const [editPopupTags, setEditPopupTags] = useState<string[]>([]);
   const [editPopupIngredients, setEditPopupIngredients] = useState("");
   const [editPopupInstructions, setEditPopupInstructions] = useState("");
+  const [editPopupImage, setEditPopupImage] = useState("");
+  const [showRecipeImagePanel, setShowRecipeImagePanel] = useState(false);
   const [editPopupMicros, setEditPopupMicros] = useState<
     { name: string; value: number; unit: string }[]
   >([]);
   const [aiConfigMode, setAiConfigMode] = useState<"ai" | "manual">("ai");
   const [isAiCalculating, setIsAiCalculating] = useState(false);
+  const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
 
   type GoalPopupType = "dailyCalories" | "weightGoal" | null;
   const [activeGoalConfigPopup, setActiveGoalConfigPopup] =
@@ -3617,7 +3611,7 @@ export default function App() {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setMealsState(INITIAL_MEALS);
+      // Don't seed mealsState with fake meals — start empty so insights show real data
       setRecipesState(INITIAL_RECIPES);
     }
   }, []);
@@ -3801,6 +3795,120 @@ export default function App() {
 
   const showToast = (msg: React.ReactNode | string) => {
     setToastMessage(msg);
+  };
+
+  const handleGenerateAiRecipe = async () => {
+    // 1. Check if Gemini key is available
+    const key = localStorage.getItem("fitai_gemini_api_key") || 
+                (import.meta as any).env.VITE_GEMINI_API_KEY || "";
+    if (!key) {
+      alert("Please configure your Gemini API Key in settings first!");
+      return;
+    }
+
+    setIsGeneratingRecipe(true);
+    try {
+      // 2. Fetch logged progress for today
+      const today = new Date().toISOString().split("T")[0];
+      const todayMeals = mealsState.filter(m => m.date === today);
+      const mealsSummary = todayMeals.map(m => `- ${m.name} (${m.calories} kcal, ${m.protein}g Protein, ${m.carbs}g Carbs, ${m.fats}g Fats)`).join("\n");
+
+      // 3. Calculate remaining macros based on goals
+      const totalCalories = todayMeals.reduce((sum, m) => sum + m.calories, 0);
+      const totalProtein = todayMeals.reduce((sum, m) => sum + m.protein, 0);
+      const totalCarbs = todayMeals.reduce((sum, m) => sum + m.carbs, 0);
+      const totalFats = todayMeals.reduce((sum, m) => sum + m.fats, 0);
+
+      const targetCalories = profileData.goals?.dailyCalories || 2000;
+      const targetProtein = profileData.macros?.protein || 150;
+      const targetCarbs = profileData.macros?.carbs || 50;
+      const targetFats = profileData.macros?.fats || 80;
+
+      const remainingCalories = Math.max(0, targetCalories - totalCalories);
+      const remainingProtein = Math.max(0, targetProtein - totalProtein);
+      const remainingCarbs = Math.max(0, targetCarbs - totalCarbs);
+      const remainingFats = Math.max(0, targetFats - totalFats);
+
+      const prompt = `You are a professional dietitian. Generate a custom meal recipe based on the user's consumption today and remaining macro goals.
+Meals already logged today:
+${mealsSummary || "None logged yet"}
+
+Remaining macro goals:
+- Calories: ${remainingCalories} kcal
+- Protein: ${remainingProtein}g
+- Carbs: ${remainingCarbs}g
+- Fats: ${remainingFats}g
+
+User profile details:
+- Height: ${profileData.height} cm
+- Weight: ${profileData.weight} kg
+- Gender: ${profileData.gender}
+- Preferences: ${(profileData.preferences || []).join(", ") || "None"}
+- Health notes: ${(profileData.memories || []).join(", ") || "None"}
+
+Generate a single custom meal recipe that helps complete their macro goals for today. It must align with user preferences and allergies.
+Return a JSON object containing the recipe details:
+{
+  "name": "Creative Recipe Title",
+  "time": "Prep time (e.g. '12 mins')",
+  "calories": ${remainingCalories > 0 ? remainingCalories : 500},
+  "protein": ${remainingProtein > 0 ? remainingProtein : 30},
+  "carbs": ${remainingCarbs > 0 ? remainingCarbs : 40},
+  "fats": ${remainingFats > 0 ? remainingFats : 15},
+  "tags": ["AI Recommended"],
+  "ingredients": ["exact ingredient 1 with quantity", "ingredient 2", ...],
+  "instructions": "Step-by-step description of how to prepare the recipe..."
+}
+Do not include any markdown styling, backticks, or "json" prefix. Just return the raw JSON string itself.`;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to contact Gemini API");
+      }
+
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      
+      // Clean up text
+      let cleaned = rawText.trim();
+      if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+      }
+
+      const result = JSON.parse(cleaned);
+      const generatedRecipe: Recipe = {
+        id: "new-ai-" + Date.now(),
+        name: result.name || "AI Personalized Recipe",
+        time: result.time || "15 mins",
+        calories: Math.max(0, parseInt(result.calories) || 0),
+        protein: Math.max(0, parseInt(result.protein) || 0),
+        carbs: Math.max(0, parseInt(result.carbs) || 0),
+        fats: Math.max(0, parseInt(result.fats) || 0),
+        tags: result.tags || ["Custom", "AI Generated"],
+        ingredients: result.ingredients || [],
+        instructions: result.instructions || "Prep and enjoy!",
+        image: "", // Use fallback template card
+      };
+
+      // Open the details popup with this newly generated recipe!
+      setSelectedRecipePopup(generatedRecipe);
+      setIsEditingRecipe(false);
+      showToast("✨ AI generated a custom recipe matching your macros!");
+    } catch (err: any) {
+      console.error(err);
+      alert(`AI Recipe Generation Error: ${err.message || "Could not generate recipe"}`);
+    } finally {
+      setIsGeneratingRecipe(false);
+    }
   };
 
   const onAddMeal = async (newMealOrRecipe: {
@@ -4044,6 +4152,8 @@ export default function App() {
     setEditPopupTags(recipe.tags || []);
     setEditPopupIngredients((recipe.ingredients || []).join("\n"));
     setEditPopupInstructions(recipe.instructions || "");
+    setEditPopupImage(recipe.image || "");
+    setShowRecipeImagePanel(false);
     setEditPopupMicros(recipe.micros || []);
     setAiConfigMode(
       recipe.micros && recipe.micros.length > 0 ? "manual" : "ai",
@@ -4748,13 +4858,23 @@ export default function App() {
                   {selectedDate === todayStr ? "Today's Consumption" : "Logged Consumption"}
                 </h3>
                 {selectedDate === todayStr && (
-                  <button
-                    onClick={() => setIsCameraFullScreen(true)}
-                    className="text-orange-600 font-black uppercase text-[10px] tracking-[0.15em] flex items-center gap-1 group bg-orange-100/50 px-3 py-1.5 rounded-full border border-orange-200/30 hover:bg-orange-200/50 transition-colors"
-                  >
-                    Add{" "}
-                    <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleGenerateAiRecipe}
+                      disabled={isGeneratingRecipe}
+                      className="text-orange-950/75 font-black uppercase text-[9px] tracking-wider flex items-center gap-1.5 bg-[#fffbfa] border border-orange-100 hover:bg-orange-50 px-3.5 py-1.5 rounded-full shadow-2xs transition-all cursor-pointer disabled:opacity-50 select-none active:scale-95 z-20"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
+                      <span>{isGeneratingRecipe ? "Generating..." : "AI Recipe"}</span>
+                    </button>
+                    <button
+                      onClick={() => setIsCameraFullScreen(true)}
+                      className="text-orange-600 font-black uppercase text-[10px] tracking-[0.15em] flex items-center gap-1 group bg-orange-100/50 px-3.5 py-1.5 rounded-full border border-orange-200/30 hover:bg-orange-200/50 transition-colors cursor-pointer select-none active:scale-95"
+                    >
+                      <span>Add</span>
+                      <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -4808,6 +4928,79 @@ export default function App() {
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
+                          </div>
+                        </motion.div>
+                      );
+                    }
+
+                    const hasImage = !hasNoGeneratedImage(meal.image);
+
+                    if (!hasImage) {
+                      return (
+                        <motion.div
+                          key={meal.id}
+                          whileHover={{ y: -4, scale: 1.01 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => handleEditMeal(meal)}
+                          className="relative rounded-[32px] overflow-hidden aspect-[4/3] sm:aspect-video shadow-xl shadow-stone-200/10 group cursor-pointer border border-stone-200/40 bg-gradient-to-br from-[#fffbfa] to-[#f9f6f3]"
+                        >
+                          {/* Centered Watermark Utensils Badge */}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03]">
+                            <Utensils className="w-40 h-40 text-stone-900" />
+                          </div>
+
+                          {/* Top Bar: Time, Calories, and Delete */}
+                          <div className="absolute top-5 left-5 right-5 flex justify-between items-center z-20">
+                            <div className="bg-stone-100/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/40">
+                              <span className="text-[10px] font-black uppercase tracking-[0.1em] text-stone-600">
+                                {meal.time}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-full font-black flex items-center gap-1 shadow-md">
+                                <span className="text-sm">{meal.calories}</span>
+                                <span className="text-[9px] uppercase tracking-wider opacity-90">
+                                  Kcal
+                                </span>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteMeal(meal);
+                                }}
+                                className="w-8 h-8 rounded-full bg-stone-100 hover:bg-red-50 hover:text-red-500 border border-stone-200 flex items-center justify-center text-stone-500 cursor-pointer transition-colors"
+                                title="Delete log"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Bottom Content: Name and Macros */}
+                          <div className="absolute bottom-5 left-5 right-5 text-left">
+                            <h4 className="text-stone-900 text-xl sm:text-2xl font-black mb-4 leading-tight tracking-tight">
+                              {meal.name}
+                            </h4>
+
+                            <div className="flex gap-4">
+                              {[
+                                { l: "Protein", v: meal.protein },
+                                { l: "Carbs", v: meal.carbs },
+                                { l: "Fats", v: meal.fats },
+                              ].map((m) => (
+                                <div key={m.l} className="flex items-center gap-1.5">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-stone-300 shadow-3xs" />
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-stone-400">
+                                      {m.l}
+                                    </span>
+                                    <span className="text-sm font-bold text-stone-850">
+                                      {m.v}g
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </motion.div>
                       );
@@ -5007,14 +5200,31 @@ export default function App() {
               className="bg-stone-50 rounded-t-[36px] w-full max-w-[448px] h-[85vh] overflow-hidden flex flex-col shadow-2xl border-t border-white/20"
             >
               {/* Image Title Banner */}
-              <div className="h-44 w-full relative shrink-0 bg-orange-100">
-                <img
-                  src={selectedRecipePopup.image}
-                  className="w-full h-full object-cover"
-                  alt={selectedRecipePopup.name}
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/30 to-black/10" />
+              <div className="h-44 w-full relative shrink-0 bg-stone-900">
+                {!hasNoGeneratedImage(isEditingRecipe ? editPopupImage : selectedRecipePopup.image) ? (
+                  <img
+                    src={isEditingRecipe ? editPopupImage : selectedRecipePopup.image}
+                    className="w-full h-full object-cover animate-fade-in"
+                    alt={selectedRecipePopup.name}
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-stone-850 to-stone-950 flex items-center justify-center">
+                    <Utensils className="w-12 h-12 text-white opacity-20" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/30 to-black/10 pointer-events-none" />
+
+                {/* Edit Photo Overlaid Button */}
+                {isEditingRecipe && (
+                  <button
+                    onClick={() => setShowRecipeImagePanel(!showRecipeImagePanel)}
+                    className="absolute bottom-3 right-3 backdrop-blur-md bg-black/45 hover:bg-black/60 border border-white/10 text-white text-[8px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer z-25 shadow-sm shadow-black/10 active:scale-95"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{showRecipeImagePanel ? "Close Edit" : "Edit Image"}</span>
+                  </button>
+                )}
 
                 {/* Header buttons */}
                 <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
@@ -5052,6 +5262,54 @@ export default function App() {
 
               {/* Scrollable Form / Details Wrapper */}
               <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-6">
+                {isEditingRecipe && showRecipeImagePanel && (
+                  /* RECIPE COVER IMAGE EDITOR DRAWER */
+                  <div className="bg-white rounded-3xl p-5 border border-black/[0.04] shadow-sm space-y-3 text-left animate-fade-in">
+                    <div className="flex items-center gap-1.5 text-[10px] font-black text-orange-950/40 uppercase tracking-widest border-b border-black/[0.02] pb-2">
+                      <Camera className="w-3.5 h-3.5 text-stone-500" />
+                      <span>Recipe Cover Image Settings</span>
+                    </div>
+                    <div className="flex flex-col gap-2.5">
+                      <input
+                        type="text"
+                        placeholder="Paste image URL here..."
+                        value={editPopupImage.startsWith("data:") ? "" : editPopupImage}
+                        onChange={(e) => setEditPopupImage(e.target.value)}
+                        className="w-full bg-stone-50 border border-stone-200 focus:border-orange-500 rounded-xl px-3 py-2 text-xs font-semibold text-stone-900 focus:outline-none placeholder-stone-400"
+                      />
+                      <div className="flex gap-2 items-center">
+                        <div className="relative inline-block">
+                          <button className="bg-stone-900 hover:bg-stone-850 text-white text-[9px] font-black uppercase tracking-wider px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-3xs">
+                            Upload Photo
+                          </button>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setEditPopupImage(reader.result as string);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                        </div>
+                        {editPopupImage && (
+                          <button
+                            onClick={() => setEditPopupImage("")}
+                            className="text-[9px] font-bold text-red-500 hover:text-red-655 ml-1.5 cursor-pointer"
+                          >
+                            Remove Photo
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {!isEditingRecipe ? (
                   /* VIEW MODE */
                   <div className="space-y-6 text-left">
@@ -5459,7 +5717,11 @@ export default function App() {
                 {!isEditingRecipe ? (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setIsEditingRecipe(true)}
+                      onClick={() => {
+                        setEditPopupImage(selectedRecipePopup.image || "");
+                        setShowRecipeImagePanel(false);
+                        setIsEditingRecipe(true);
+                      }}
                       className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 border border-stone-200/50 text-stone-700 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer"
                     >
                       ✏️ Edit recipe
@@ -5525,7 +5787,7 @@ export default function App() {
                           carbs: parseInt(editPopupCarbs) || 0,
                           fats: parseInt(editPopupFats) || 0,
                           tags: editPopupTags.length > 0 ? editPopupTags : ["Custom"],
-                          image: selectedRecipePopup.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
+                          image: editPopupImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
                           ingredients: finalIngredients,
                           instructions: editPopupInstructions.trim() || "Mix ingredients and serve fresh!",
                           micros: editPopupMicros,
@@ -5970,6 +6232,7 @@ export default function App() {
             onAddMeal={onAddMeal}
             mealToEdit={mealToEdit}
             onNavigateToSettings={() => setActiveTab("profile")}
+            mealsState={mealsState}
           />
         )}
       </AnimatePresence>
