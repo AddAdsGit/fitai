@@ -2455,107 +2455,60 @@ security:
           </div>
         </div>
 
-        {/* ChatGPT Custom GPT Action settings */}
+        {/* ChatGPT Custom GPT Integration */}
         {isSupabaseConfigured && (
           <div>
             <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
-              Custom GPT Action Setup
+              ChatGPT Integration
             </h3>
             <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-4">
-              <p className="text-[10px] text-stone-500 leading-relaxed font-semibold">
-                🤖 Connect your ChatGPT Custom GPT to track food/images directly into FitAI in real-time. Use the credentials below:
-              </p>
-              
-              <div className="space-y-3">
-                {/* API Endpoint field */}
-                <div>
-                  <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                    Edge Action URL (Server URL)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={edgeFunctionUrl}
-                      className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[10px] font-bold text-stone-700 focus:outline-none"
-                    />
-                    <button
-                      onClick={() => copyToClipboard(edgeFunctionUrl, "API Endpoint URL")}
-                      className="bg-stone-900 text-white text-[9px] font-black uppercase tracking-wider px-3.5 rounded-xl hover:bg-stone-850 active:scale-95 transition-all"
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
-
-                {/* API Key field */}
-                <div>
-                  <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                    Your Authentication Token (Bearer Key)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      readOnly
-                      value={profileData.api_key || "No token generated"}
-                      className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[10px] font-bold text-stone-700 focus:outline-none"
-                    />
-                    <button
-                      onClick={() => copyToClipboard(profileData.api_key, "API Bearer Token")}
-                      className="bg-stone-900 text-white text-[9px] font-black uppercase tracking-wider px-3.5 rounded-xl hover:bg-stone-850 active:scale-95 transition-all"
-                    >
-                      Copy Key
-                    </button>
-                  </div>
-                </div>
-
-                {/* Custom GPT Redirect Link field */}
-                <div className="pt-2 border-t border-stone-100">
-                  <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                    ChatGPT Custom GPT Redirect Link
-                  </label>
-                  <p className="text-[8px] text-stone-400 font-semibold mb-2 leading-tight">
-                    Optional: Paste your Custom GPT URL here (e.g., https://chatgpt.com/g/g-xxxxx). If set, the homepage manual "+" button will open this Custom GPT in a new tab immediately.
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="url"
-                      placeholder="e.g. https://chatgpt.com/g/g-your-custom-gpt"
-                      value={gptUrlVal}
-                      onChange={(e) => setGptUrlVal(e.target.value)}
-                      className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[10px] font-bold text-stone-700 focus:outline-none"
-                    />
-                    <button
-                      onClick={handleSaveGptUrl}
-                      className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider px-3.5 rounded-xl active:scale-95 transition-all"
-                    >
-                      Save Link
-                    </button>
-                  </div>
-                </div>
-
-                {/* OpenAPI YAML Schema toggle */}
-                <div className="pt-2">
+              {/* API Key field */}
+              <div>
+                <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                  Your Authentication Token (Bearer Key)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    readOnly
+                    value={profileData.api_key || "No token generated"}
+                    className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[10px] font-bold text-stone-700 focus:outline-none"
+                  />
                   <button
-                    onClick={() => setShowYaml(!showYaml)}
-                    className="w-full bg-orange-50 hover:bg-orange-100 text-orange-600 text-[9px] font-black uppercase tracking-widest py-2 rounded-xl transition-colors border border-orange-200/50"
+                    onClick={() => copyToClipboard(profileData.api_key, "API Bearer Token")}
+                    className="bg-stone-900 text-white text-[9px] font-black uppercase tracking-wider px-3.5 rounded-xl hover:bg-stone-850 active:scale-95 transition-all cursor-pointer"
                   >
-                    {showYaml ? "Hide OpenAPI YAML Spec" : "Show OpenAPI YAML Spec"}
+                    Copy Token
                   </button>
-                  {showYaml && (
-                    <div className="mt-3 relative text-left">
-                      <pre className="text-[8px] font-bold bg-stone-950 text-emerald-400/90 rounded-2xl p-4 overflow-x-auto max-h-48 leading-relaxed border border-stone-850 select-text">
-                        {openApiYaml}
-                      </pre>
-                      <button
-                        onClick={() => copyToClipboard(openApiYaml, "OpenAPI Schema")}
-                        className="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white text-[8px] font-black uppercase px-2 py-1 rounded-lg"
-                      >
-                        Copy Spec
-                      </button>
-                    </div>
-                  )}
                 </div>
+                <span className="text-[8px] text-stone-400 font-semibold mt-1 block">
+                  Paste this token as the Bearer token in your Custom GPT configuration.
+                </span>
+              </div>
+
+              {/* Custom GPT Redirect Link field */}
+              <div className="pt-3 border-t border-stone-100">
+                <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                  Custom GPT URL
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="e.g. https://chatgpt.com/g/g-xxxx"
+                    value={gptUrlVal}
+                    onChange={(e) => setGptUrlVal(e.target.value)}
+                    className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[10px] font-bold text-stone-700 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSaveGptUrl}
+                    className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-xl active:scale-95 transition-all cursor-pointer"
+                  >
+                    Save URL
+                  </button>
+                </div>
+                <span className="text-[8px] text-stone-400 font-semibold mt-1 block">
+                  Optional: Syncs the "+" shortcut button on your homepage to open your custom GPT session.
+                </span>
               </div>
             </div>
           </div>
@@ -2689,6 +2642,73 @@ security:
 
           </div>
         </div>
+
+        {/* Developer Settings (Collapsable) */}
+        {isSupabaseConfigured && (
+          <div>
+            <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
+              Developer Options
+            </h3>
+            <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-4">
+              <button
+                onClick={() => setShowYaml(!showYaml)}
+                className="w-full bg-stone-50 hover:bg-stone-100 text-stone-700 text-[9px] font-black uppercase tracking-wider py-3 rounded-xl transition-all border border-stone-200 cursor-pointer"
+              >
+                {showYaml ? "Hide API Details" : "Show Developer API / YAML Specs"}
+              </button>
+
+              <AnimatePresence>
+                {showYaml && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-4 pt-2 overflow-hidden"
+                  >
+                    {/* API Endpoint field */}
+                    <div>
+                      <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                        Edge Action URL (Server URL)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={edgeFunctionUrl}
+                          className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[9px] font-bold text-stone-700 focus:outline-none"
+                        />
+                        <button
+                          onClick={() => copyToClipboard(edgeFunctionUrl, "API Endpoint URL")}
+                          className="bg-stone-900 text-white text-[9px] font-black uppercase tracking-wider px-3.5 rounded-xl hover:bg-stone-850 active:scale-95 transition-all cursor-pointer"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* OpenAPI Spec */}
+                    <div>
+                      <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                        OpenAPI YAML Specification
+                      </label>
+                      <div className="relative text-left">
+                        <pre className="text-[8px] font-bold bg-stone-950 text-emerald-400/90 rounded-2xl p-4 overflow-x-auto max-h-48 leading-relaxed border border-stone-850 select-text">
+                          {openApiYaml}
+                        </pre>
+                        <button
+                          onClick={() => copyToClipboard(openApiYaml, "OpenAPI Schema")}
+                          className="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white text-[8px] font-black uppercase px-2 py-1 rounded-lg cursor-pointer"
+                        >
+                          Copy Spec
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
 
         {/* Account Management */}
         <div>
