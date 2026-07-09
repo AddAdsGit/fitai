@@ -1,7 +1,21 @@
 openapi: 3.1.0
 info:
   title: FitAI GPT Sync Action API
-  description: API for synchronizing user profiles, food/nutrition logs, recipes, and memories with the FitAI dashboard.
+  description: |
+    API for synchronizing user profiles, food/nutrition logs, recipes, and memories with the FitAI dashboard.
+    
+    CRITICAL BEHAVIORAL RULES FOR THE CUSTOM GPT:
+    1. Recipe Modifications & Extras: If the user logs a meal that modifies a stored recipe (e.g., "burrito with extra chicken and rice"), the GPT must:
+       a. Call GET /recipes to list recipes, matching the base item ("burrito").
+       b. Retrieve the macros for the base recipe.
+       c. Estimate the nutritional values of the extras specified (e.g., extra chicken and rice).
+       d. Sum the base macros and the extras macros to compute the new total.
+       e. Log the combined meal via POST /meals using the combined macros and appending the extra description to the name (e.g. "Burrito with extra chicken and rice").
+    2. Editing Logged Meals by Instruction: If the user wants to adjust a logged meal (e.g., "actually, make that breakfast 2 eggs instead of 1"), the GPT must:
+       a. Call GET /meals?date=YYYY-MM-DD to find the target meal.
+       b. Estimate the updated calorie/macro totals based on the change request.
+       c. Call PATCH /meals?id=<id> with the updated calorie/macro numbers.
+    3. Deleting Logged Meals: If the user requests to delete or remove a logged item, the GPT must call GET /meals to find the ID and invoke DELETE /meals?id=<id>.
   version: 1.0.0
 servers:
   - url: https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action
@@ -143,6 +157,67 @@ paths:
       responses:
         '201':
           description: Meal logged successfully
+    delete:
+      summary: Delete a logged meal
+      description: Remove a logged meal entry from the dashboard by its unique ID.
+      operationId: deleteMeal
+      parameters:
+        - name: id
+          in: query
+          description: The unique UUID of the meal to delete.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Meal deleted successfully
+        '400':
+          description: Missing ID parameter
+        '404':
+          description: Meal not found
+    patch:
+      summary: Update a logged meal
+      description: Modify properties of an existing logged meal by its unique ID.
+      operationId: updateMeal
+      parameters:
+        - name: id
+          in: query
+          description: The unique UUID of the meal to update.
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                calories:
+                  type: integer
+                protein:
+                  type: integer
+                carbs:
+                  type: integer
+                fats:
+                  type: integer
+                type:
+                  type: string
+                time:
+                  type: string
+                date:
+                  type: string
+                image:
+                  type: string
+      responses:
+        '200':
+          description: Meal updated successfully
+        '400':
+          description: Missing ID or invalid parameters
+        '404':
+          description: Meal not found
   /recipes:
     get:
       summary: List user recipes

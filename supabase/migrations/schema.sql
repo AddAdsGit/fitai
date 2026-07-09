@@ -3,7 +3,7 @@ create extension if not exists "uuid-ossp";
 
 -- PROFILES TABLE
 create table public.profiles (
-  id uuid default gen_random_uuid() primary key,
+  id uuid references auth.users(id) on delete cascade primary key,
   username text unique not null,
   display_name text not null,
   image_url text,
@@ -80,7 +80,12 @@ alter table public.profiles enable row level security;
 alter table public.meals enable row level security;
 alter table public.recipes enable row level security;
 
--- Create simple relaxed policies for anon read/write access (perfect for shared user/friend tracker)
-create policy "Allow all anon access on profiles" on public.profiles for all using (true) with check (true);
-create policy "Allow all anon access on meals" on public.meals for all using (true) with check (true);
-create policy "Allow all anon access on recipes" on public.recipes for all using (true) with check (true);
+-- Create policies for authenticated user access
+create policy "Users can perform all actions on their own profile" on public.profiles
+  for all using (auth.uid() = id) with check (auth.uid() = id);
+
+create policy "Users can perform all actions on their own meals" on public.meals
+  for all using (auth.uid() = profile_id) with check (auth.uid() = profile_id);
+
+create policy "Users can perform all actions on their own recipes" on public.recipes
+  for all using (auth.uid() = profile_id) with check (auth.uid() = profile_id);

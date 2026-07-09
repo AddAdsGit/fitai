@@ -3,8 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-timezone-offset",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PATCH, DELETE",
 };
 
 serve(async (req) => {
@@ -48,7 +48,25 @@ serve(async (req) => {
     const path = url.pathname;
     const method = req.method;
 
-    console.log(`[gpt-action] Request: ${method} ${path} for user: ${profile.username}`);
+    // Parse timezone offset header (in minutes, e.g. -330 for IST +5:30)
+    const timezoneOffsetHeader = req.headers.get("x-timezone-offset");
+    let timezoneOffset = 0;
+    if (timezoneOffsetHeader) {
+      const parsed = parseInt(timezoneOffsetHeader);
+      if (!isNaN(parsed)) {
+        timezoneOffset = parsed;
+      }
+    }
+
+    const getLocalTimeAndDate = () => {
+      const localTimeMs = Date.now() - (timezoneOffset * 60 * 1000);
+      const d = new Date(localTimeMs);
+      const dateStr = d.toISOString().split("T")[0];
+      const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+      return { dateStr, timeStr };
+    };
+
+    console.log(`[gpt-action] Request: ${method} ${path} for user: ${profile.username} (timezoneOffset: ${timezoneOffset})`);
 
     // 4. API Router
     
@@ -105,7 +123,7 @@ serve(async (req) => {
     // --- MEALS ENDPOINTS ---
     if (path.endsWith("/meals")) {
       if (method === "GET") {
-        const queryDate = url.searchParams.get("date") || new Date().toISOString().split("T")[0];
+        const queryDate = url.searchParams.get("date") || getLocalTimeAndDate().dateStr;
         const { data: meals, error: mealsError } = await supabase
           .from("meals")
           .select("*")
@@ -194,17 +212,19 @@ serve(async (req) => {
           }
         }
 
+        const { dateStr, timeStr } = getLocalTimeAndDate();
+
         const mealData = {
           profile_id: profile.id,
           name: body.name,
-          time: body.time || new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }),
+          time: body.time || timeStr,
           type: body.type || "Meal",
           calories: parseInt(body.calories),
           protein: parseInt(body.protein || 0),
           carbs: parseInt(body.carbs || 0),
           fats: parseInt(body.fats || 0),
           image: finalImageUrl,
-          date: body.date || new Date().toISOString().split("T")[0]
+          date: body.date || dateStr
         };
 
         const { data: newMeal, error: insertError } = await supabase
@@ -282,6 +302,89 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({ message: "Meal logged successfully", meal: newMeal }), {
           status: 201,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else if (method === "DELETE") {
+        const mealId = url.searchParams.get("id");
+        if (!mealId) {
+          return new Response(JSON.stringify({ error: "Meal ID parameter ('id') is required" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: deletedMeal, error: deleteError } = await supabase
+          .from("meals")
+          .delete()
+          .eq("id", mealId)
+          .eq("profile_id", profile.id)
+          .select("*")
+          .maybeSingle();
+
+        if (deleteError) {
+          return new Response(JSON.stringify({ error: "Failed to delete meal", details: deleteError }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (!deletedMeal) {
+          return new Response(JSON.stringify({ error: "Meal not found or unauthorized" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ message: "Meal deleted successfully", meal: deletedMeal }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else if (method === "PATCH") {
+        const mealId = url.searchParams.get("id");
+        if (!mealId) {
+          return new Response(JSON.stringify({ error: "Meal ID parameter ('id') is required" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const body = await req.json();
+
+        const updateData: Record<string, any> = {};
+        if (body.name !== undefined) updateData.name = body.name;
+        if (body.calories !== undefined) updateData.calories = parseInt(body.calories);
+        if (body.protein !== undefined) updateData.protein = parseInt(body.protein);
+        if (body.carbs !== undefined) updateData.carbs = parseInt(body.carbs);
+        if (body.fats !== undefined) updateData.fats = parseInt(body.fats);
+        if (body.type !== undefined) updateData.type = body.type;
+        if (body.time !== undefined) updateData.time = body.time;
+        if (body.date !== undefined) updateData.date = body.date;
+        if (body.image !== undefined) updateData.image = body.image;
+
+        const { data: updatedMeal, error: updateError } = await supabase
+          .from("meals")
+          .update(updateData)
+          .eq("id", mealId)
+          .eq("profile_id", profile.id)
+          .select("*")
+          .maybeSingle();
+
+        if (updateError) {
+          return new Response(JSON.stringify({ error: "Failed to update meal", details: updateError }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (!updatedMeal) {
+          return new Response(JSON.stringify({ error: "Meal not found or unauthorized" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ message: "Meal updated successfully", meal: updatedMeal }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

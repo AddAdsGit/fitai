@@ -3,11 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Flame,
   Home,
-  Settings,
   Plus,
   BarChart2,
   ChevronRight,
@@ -15,37 +14,20 @@ import {
   Target,
   Zap,
   User,
-  ScanLine,
-  Keyboard,
   X,
-  Mic,
   Calendar as CalendarIcon,
   Bot,
   Brain,
-  Grid3X3,
-  Type,
   Camera,
-  MessageSquare,
-  Wand2,
-  Crown,
   Smile,
-  Moon,
-  Footprints,
-  Droplet,
   Utensils,
-  Send,
   BookOpen,
   Search,
   Sparkles,
   Clock,
-  Heart,
   PlusCircle,
   Filter,
   Check,
-  Cloud,
-  RefreshCw,
-  Radio,
-  ChevronDown,
   Scale,
   Ruler,
   Info,
@@ -60,17 +42,15 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Cell,
-  AreaChart,
-  Area,
   LineChart,
   Line,
+  ReferenceLine,
 } from "recharts";
 import { cn } from "./lib/utils";
 import { calculateNutritionFromIngredients } from "./utils/nutritionCalculator";
 import { supabase, isSupabaseConfigured } from "./lib/supabaseClient";
 
-// --- Types ---
-type ViewMode = "macros" | "micros";
+
 
 interface Meal {
   id: string;
@@ -100,7 +80,6 @@ interface Recipe {
   micros?: { name: string; value: number; unit: string }[];
 }
 
-// --- Mock Data ---
 const INITIAL_MEALS: Meal[] = [
   {
     id: "1",
@@ -113,7 +92,7 @@ const INITIAL_MEALS: Meal[] = [
     fats: 18,
     image:
       "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=60",
-    date: "2026-07-08",
+    date: new Date().toISOString().split('T')[0],
   },
   {
     id: "2",
@@ -126,7 +105,7 @@ const INITIAL_MEALS: Meal[] = [
     fats: 15,
     image:
       "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=60",
-    date: "2026-07-08",
+    date: new Date().toISOString().split('T')[0],
   },
 ];
 
@@ -213,88 +192,7 @@ const INITIAL_RECIPES: Recipe[] = [
   },
 ];
 
-const DAYS = [
-  { day: "THU", date: 11 },
-  { day: "FRI", date: 12 },
-  { day: "SAT", date: 13 },
-  { day: "SUN", date: 14, active: true },
-  { day: "MON", date: 15 },
-  { day: "TUE", date: 16 },
-];
-
-const WEEKLY_CALORIES = [
-  { day: "Mon", calories: 1850, goal: 2000 },
-  { day: "Tue", calories: 1920, goal: 2000 },
-  { day: "Wed", calories: 2100, goal: 2000 },
-  { day: "Thu", calories: 1750, goal: 2000 },
-  { day: "Fri", calories: 1980, goal: 2000 },
-  { day: "Sat", calories: 2400, goal: 2000 },
-  { day: "Sun", calories: 1450, goal: 2000 },
-];
-
-const WEEKLY_MACROS = [
-  { day: "Mon", protein: 120, carbs: 150, fats: 50 },
-  { day: "Tue", protein: 130, carbs: 160, fats: 55 },
-  { day: "Wed", protein: 110, carbs: 180, fats: 60 },
-  { day: "Thu", protein: 140, carbs: 140, fats: 45 },
-  { day: "Fri", protein: 125, carbs: 170, fats: 65 },
-  { day: "Sat", protein: 150, carbs: 200, fats: 70 },
-  { day: "Sun", protein: 115, carbs: 130, fats: 40 },
-];
-
-const WEEKLY_MICROS = [
-  { day: "Mon", score: 85 },
-  { day: "Tue", score: 90 },
-  { day: "Wed", score: 75 },
-  { day: "Thu", score: 95 },
-  { day: "Fri", score: 80 },
-  { day: "Sat", score: 70 },
-  { day: "Sun", score: 88 },
-];
-
-const MONTHLY_CALORIES = Array.from({ length: 30 }, (_, i) => ({
-  day: (i + 1).toString(),
-  calories: Math.round(1800 + Math.sin(i) * 300 + Math.cos(i * 2) * 200),
-  goal: 2000,
-}));
-
-const SIXTY_CALORIES = Array.from({ length: 60 }, (_, i) => ({
-  day: (i + 1).toString(),
-  calories: Math.round(1800 + Math.sin(i / 1.5) * 300 + Math.cos(i * 1.2) * 200),
-  goal: 2000,
-}));
-
-const NINETY_CALORIES = Array.from({ length: 90 }, (_, i) => ({
-  day: (i + 1).toString(),
-  calories: Math.round(1800 + Math.sin(i / 2) * 300 + Math.cos(i) * 200),
-  goal: 2000,
-}));
-
-const MONTHLY_MACROS = Array.from({ length: 30 }, (_, i) => ({
-  day: (i + 1).toString(),
-  protein: Math.round(120 + Math.sin(i / 2) * 20),
-  carbs: Math.round(150 + Math.cos(i / 2) * 30),
-  fats: Math.round(55 + Math.sin(i) * 15),
-}));
-
-const SIXTY_MACROS = Array.from({ length: 60 }, (_, i) => ({
-  day: (i + 1).toString(),
-  protein: Math.round(120 + Math.sin(i / 3) * 25),
-  carbs: Math.round(150 + Math.cos(i / 3) * 35),
-  fats: Math.round(55 + Math.sin(i / 2) * 18),
-}));
-
-const NINETY_MACROS = Array.from({ length: 90 }, (_, i) => ({
-  day: (i + 1).toString(),
-  protein: Math.round(120 + Math.sin(i / 4) * 30),
-  carbs: Math.round(150 + Math.cos(i / 4) * 40),
-  fats: Math.round(55 + Math.sin(i / 3) * 20),
-}));
-
-const MONTHLY_MICROS = Array.from({ length: 30 }, (_, i) => ({
-  day: (i + 1).toString(),
-  score: Math.min(100, Math.max(0, Math.round(80 + Math.sin(i / 3) * 15))),
-}));
+// Mock data constants removed — InsightsView now uses real mealsState data
 
 // --- Components ---
 
@@ -307,7 +205,6 @@ const ProgressBar = ({
   index = 0,
   unit = "",
 }: {
-  key?: string;
   value: number;
   max?: number;
   label: string;
@@ -342,13 +239,91 @@ const ProgressBar = ({
     </div>
   </div>
 );
-
-const InsightsView = ({
+const InsightsView = ({
   currentStreak = 0,
+  mealsState = [],
+  profileData,
 }: {
   currentStreak?: number;
+  mealsState?: Meal[];
+  profileData: any;
 }) => {
   const [timeRange, setTimeRange] = useState<"7D" | "30D" | "60D" | "90D">("7D");
+
+  const localFormatDateStr = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  };
+
+  const chartData = useMemo(() => {
+    const numDays = timeRange === "7D" ? 7 : timeRange === "30D" ? 30 : timeRange === "60D" ? 60 : 90;
+    const data = [];
+    const today = new Date();
+    
+    for (let i = numDays - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = localFormatDateStr(d);
+      
+      const daysMeals = (mealsState || []).filter(m => m.date === dateStr);
+      const calories = daysMeals.reduce((sum, m) => sum + m.calories, 0);
+      const protein = daysMeals.reduce((sum, m) => sum + m.protein, 0);
+      const carbs = daysMeals.reduce((sum, m) => sum + m.carbs, 0);
+      const fats = daysMeals.reduce((sum, m) => sum + m.fats, 0);
+      
+      let dayLabel = "";
+      if (timeRange === "7D") {
+        const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        dayLabel = daysOfWeek[d.getDay()];
+      } else {
+        dayLabel = d.getDate().toString();
+      }
+      
+      data.push({
+        day: dayLabel,
+        calories,
+        goal: profileData?.goals?.dailyCalories || 2000,
+        protein,
+        carbs,
+        fats,
+        date: dateStr
+      });
+    }
+    return data;
+  }, [timeRange, mealsState, profileData]);
+
+  const avgCalories = useMemo(() => {
+    const daysWithData = chartData.filter(item => item.calories > 0);
+    if (daysWithData.length === 0) return 0;
+    const total = daysWithData.reduce((sum, item) => sum + item.calories, 0);
+    return Math.round(total / daysWithData.length);
+  }, [chartData]);
+
+  const hasAnyData = useMemo(() => chartData.some(d => d.calories > 0), [chartData]);
+
+  // Compute best streak from meal history
+  const bestStreak = useMemo(() => {
+    if (!mealsState || mealsState.length === 0) return 0;
+    const datesWithLogs = new Set(mealsState.map(m => m.date));
+    const sortedDates = Array.from(datesWithLogs).sort();
+    if (sortedDates.length === 0) return 0;
+    let best = 1;
+    let current = 1;
+    for (let i = 1; i < sortedDates.length; i++) {
+      const prev = new Date(sortedDates[i - 1] + "T00:00:00");
+      const curr = new Date(sortedDates[i] + "T00:00:00");
+      const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) {
+        current++;
+        best = Math.max(best, current);
+      } else {
+        current = 1;
+      }
+    }
+    return best;
+  }, [mealsState]);
 
   return (
     <motion.div
@@ -364,50 +339,20 @@ const InsightsView = ({
           Your Progress
         </h2>
         <div className="flex bg-orange-100/50 rounded-full p-1 border border-orange-200/30">
-          <button
-            onClick={() => setTimeRange("7D")}
-            className={cn(
-              "text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1.5 rounded-full transition-colors",
-              timeRange === "7D"
-                ? "bg-orange-500 text-white shadow-sm"
-                : "text-orange-900/60 hover:text-orange-900",
-            )}
-          >
-            7D
-          </button>
-          <button
-            onClick={() => setTimeRange("30D")}
-            className={cn(
-              "text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1.5 rounded-full transition-colors",
-              timeRange === "30D"
-                ? "bg-orange-500 text-white shadow-sm"
-                : "text-orange-900/60 hover:text-orange-900",
-            )}
-          >
-            30D
-          </button>
-          <button
-            onClick={() => setTimeRange("60D")}
-            className={cn(
-              "text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1.5 rounded-full transition-colors",
-              timeRange === "60D"
-                ? "bg-orange-500 text-white shadow-sm"
-                : "text-orange-900/60 hover:text-orange-900",
-            )}
-          >
-            60D
-          </button>
-          <button
-            onClick={() => setTimeRange("90D")}
-            className={cn(
-              "text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1.5 rounded-full transition-colors",
-              timeRange === "90D"
-                ? "bg-orange-500 text-white shadow-sm"
-                : "text-orange-900/60 hover:text-orange-900",
-            )}
-          >
-            90D
-          </button>
+          {(["7D", "30D", "60D", "90D"] as const).map((range) => (
+            <button
+              key={range}
+              onClick={() => setTimeRange(range)}
+              className={cn(
+                "text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1.5 rounded-full transition-colors",
+                timeRange === range
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "text-orange-900/60 hover:text-orange-900",
+              )}
+            >
+              {range}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -439,7 +384,7 @@ const InsightsView = ({
               <br />
               Streak
             </div>
-            <div className="text-2xl font-black text-orange-950">{currentStreak}🔥</div>
+            <div className="text-2xl font-black text-orange-950">{bestStreak}🏆</div>
           </div>
         </div>
       </div>
@@ -452,7 +397,7 @@ const InsightsView = ({
               Calories
             </div>
             <div className="text-3xl font-black text-orange-950">
-              1,860{" "}
+              {avgCalories.toLocaleString()}{" "}
               <span className="text-sm font-bold text-orange-900/40 tracking-normal">
                 avg/d
               </span>
@@ -463,11 +408,18 @@ const InsightsView = ({
           </div>
         </div>
 
+        {!hasAnyData ? (
+          <div className="h-48 w-full flex flex-col items-center justify-center text-center">
+            <span className="text-3xl mb-2">📊</span>
+            <p className="text-xs font-bold text-orange-950/50">No calorie data yet</p>
+            <p className="text-[10px] text-orange-950/30 font-medium mt-1">Start logging meals to see your calorie trends</p>
+          </div>
+        ) : (
         <div className="h-48 w-full">
           <ResponsiveContainer width="100%" height="100%">
             {timeRange === "7D" ? (
               <BarChart
-                data={WEEKLY_CALORIES}
+                data={chartData}
                 margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
               >
                 <XAxis
@@ -493,10 +445,11 @@ const InsightsView = ({
                     color: "#431407",
                     fontWeight: 900,
                   }}
-                  itemStyle={{ color: "#FF7008", fontWeight: 900 }}
+                  itemStyle={{ color: "#FF7008", pointerEvents: "none" }}
                 />
+                <ReferenceLine y={profileData?.goals?.dailyCalories || 2000} stroke="#f9731640" strokeDasharray="6 4" strokeWidth={1.5} />
                 <Bar dataKey="calories" radius={[6, 6, 6, 6]}>
-                  {WEEKLY_CALORIES.map((entry, index) => (
+                  {chartData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={entry.calories > entry.goal ? "#fed7aa" : "#f97316"}
@@ -506,7 +459,7 @@ const InsightsView = ({
               </BarChart>
             ) : (
               <LineChart
-                data={timeRange === "30D" ? MONTHLY_CALORIES : timeRange === "60D" ? SIXTY_CALORIES : NINETY_CALORIES}
+                data={chartData}
                 margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
               >
                 <XAxis
@@ -539,6 +492,7 @@ const InsightsView = ({
                   }}
                   itemStyle={{ color: "#FF7008", fontWeight: 900 }}
                 />
+                <ReferenceLine y={profileData?.goals?.dailyCalories || 2000} stroke="#f9731640" strokeDasharray="6 4" strokeWidth={1.5} />
                 <Line
                   type="monotone"
                   dataKey="calories"
@@ -556,6 +510,7 @@ const InsightsView = ({
             )}
           </ResponsiveContainer>
         </div>
+        )}
       </div>
 
       {/* Macros Chart Card */}
@@ -566,7 +521,7 @@ const InsightsView = ({
               Macros Split
             </div>
             <div className="text-xl font-black text-orange-950">
-              Weekly Trend
+              Macro Trend
             </div>
           </div>
         </div>
@@ -575,7 +530,7 @@ const InsightsView = ({
           <ResponsiveContainer width="100%" height="100%">
             {timeRange === "7D" ? (
               <BarChart
-                data={WEEKLY_MACROS}
+                data={chartData}
                 margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
               >
                 <XAxis
@@ -618,7 +573,7 @@ const InsightsView = ({
               </BarChart>
             ) : (
               <LineChart
-                data={timeRange === "30D" ? MONTHLY_MACROS : timeRange === "60D" ? SIXTY_MACROS : NINETY_MACROS}
+                data={chartData}
                 margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
               >
                 <XAxis
@@ -697,7 +652,6 @@ const InsightsView = ({
           </div>
         </div>
       </div>
-
     </motion.div>
   );
 };
@@ -726,8 +680,8 @@ const ProfileView = ({
   triggerToast,
   activeProfileId,
   currentStreak,
+  mealsState,
 }: {
-  key?: string;
   profileData: any;
   setProfileData: any;
   setActiveTab: (tab: string) => void;
@@ -739,6 +693,7 @@ const ProfileView = ({
   triggerToast: (msg: string) => void;
   activeProfileId: string | null;
   currentStreak: number;
+  mealsState: Meal[];
 }) => {
   const [profileTab, setProfileTab] = useState<"meals" | "insights" | "goals">(
     "meals",
@@ -754,45 +709,14 @@ const ProfileView = ({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showLabelsDropdown, setShowLabelsDropdown] = useState(false);
   const [expandedRecipeId, setExpandedRecipeId] = useState<string | null>(null);
-  const [showNewRecipeModal, setShowNewRecipeModal] = useState(false);
 
-  // Active configure popup state variables
-  const [selectedConfigRecipe, setSelectedConfigRecipe] =
-    useState<Recipe | null>(null);
-  const [servingScale, setServingScale] = useState<number>(1);
-  const [isManualAdjust, setIsManualAdjust] = useState<boolean>(false);
-  const [customCalories, setCustomCalories] = useState<number>(0);
-  const [customProtein, setCustomProtein] = useState<number>(0);
-  const [customCarbs, setCustomCarbs] = useState<number>(0);
-  const [customFats, setCustomFats] = useState<number>(0);
-
-  // Sync manual adjustments to scales dynamically
-  useEffect(() => {
-    if (selectedConfigRecipe && !isManualAdjust) {
-      setCustomCalories(
-        Math.round(selectedConfigRecipe.calories * servingScale),
-      );
-      setCustomProtein(Math.round(selectedConfigRecipe.protein * servingScale));
-      setCustomCarbs(Math.round(selectedConfigRecipe.carbs * servingScale));
-      setCustomFats(Math.round(selectedConfigRecipe.fats * servingScale));
-    }
-  }, [selectedConfigRecipe, servingScale, isManualAdjust]);
-
-  // Form states for creating custom recipe
-  const [newRecName, setNewRecName] = useState("");
-  const [newRecTime, setNewRecTime] = useState("");
-  const [newRecCalories, setNewRecCalories] = useState("");
-  const [newRecProtein, setNewRecProtein] = useState("");
-  const [newRecCarbs, setNewRecCarbs] = useState("");
-  const [newRecFats, setNewRecFats] = useState("");
-  const [newRecTags, setNewRecTags] = useState<string[]>([]);
-  const [newRecIngredients, setNewRecIngredients] = useState("");
-  const [newRecInstructions, setNewRecInstructions] = useState("");
+  // Active recipe configuration states cleaned up and moved to main App level for dossier overlay.
 
   const filteredRecipes = recipes.filter((r) => {
     const sMatch =
       r.name.toLowerCase().includes(recipeSearch.toLowerCase()) ||
-      r.tags.some((t) => t.toLowerCase().includes(recipeSearch.toLowerCase()));
+      r.tags.some((t) => t.toLowerCase().includes(recipeSearch.toLowerCase())) ||
+      (r.ingredients || []).some((ing) => ing.toLowerCase().includes(recipeSearch.toLowerCase()));
     const tMatch = selectedTags.length > 0
       ? selectedTags.every((st) => r.tags.some((t) => t.toLowerCase() === st.toLowerCase()))
       : true;
@@ -816,22 +740,17 @@ const ProfileView = ({
   };
 
   const removePreference = (index: number) => {
+    const prefToRemove = profileData.preferences[index];
+    if (["onboarded", "refine_food_pics"].includes(prefToRemove)) return;
     const newPrefs = [...profileData.preferences];
     newPrefs.splice(index, 1);
     setProfileData({ ...profileData, preferences: newPrefs });
   };
 
-  const addPreference = () => {
-    const pref = prompt("Enter new preference:");
-    if (pref) {
-      setProfileData({
-        ...profileData,
-        preferences: [...profileData.preferences, pref],
-      });
-    }
-  };
+
 
   const togglePreference = (prefName: string) => {
+    if (["onboarded", "refine_food_pics"].includes(prefName.toLowerCase())) return;
     const index = profileData.preferences.findIndex(
       (p: string) => p.toLowerCase() === prefName.toLowerCase(),
     );
@@ -1157,234 +1076,7 @@ const ProfileView = ({
               )}
             </div>
 
-            {/* Custom Add Recipe inline overlay form */}
-            {showNewRecipeModal && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white rounded-[24px] p-5 shadow-lg border border-orange-100 space-y-4"
-              >
-                <div className="flex justify-between items-center border-b border-black/[0.03] pb-2 font-sans">
-                  <h5 className="font-bold text-sm text-orange-950 flex items-center gap-1.5 font-sans">
-                    <Sparkles className="w-4 h-4 text-orange-500" />
-                    Create Custom Recipe
-                  </h5>
-                  <button
-                    onClick={() => setShowNewRecipeModal(false)}
-                    className="text-gray-400 hover:text-black"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
-                    <label className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest block mb-1">
-                      Recipe Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Grandma's Protein Oatmeal"
-                      value={newRecName}
-                      onChange={(e) => setNewRecName(e.target.value)}
-                      className="w-full bg-orange-50/20 border border-orange-100 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 outline-none focus:border-orange-500 font-sans"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest block mb-1">
-                      Prep Time
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="15 mins"
-                      value={newRecTime}
-                      onChange={(e) => setNewRecTime(e.target.value)}
-                      className="w-full bg-orange-50/20 border border-orange-100 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 outline-none focus:border-orange-500 font-sans"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest block mb-1">
-                      Calories (kcal)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="350"
-                      value={newRecCalories}
-                      onChange={(e) => setNewRecCalories(e.target.value)}
-                      className="w-full bg-orange-50/20 border border-orange-100 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 outline-none focus:border-orange-500 font-sans"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest block mb-1">
-                      Protein (g)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="20"
-                      value={newRecProtein}
-                      onChange={(e) => setNewRecProtein(e.target.value)}
-                      className="w-full bg-orange-50/20 border border-orange-100 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 outline-none focus:border-orange-500 font-sans"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest block mb-1">
-                      Carbs (g)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="40"
-                      value={newRecCarbs}
-                      onChange={(e) => setNewRecCarbs(e.target.value)}
-                      className="w-full bg-orange-50/20 border border-orange-100 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 outline-none focus:border-orange-500 font-sans"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest block mb-1">
-                      Fats (g)
-                    </label>
-                    <input
-                      type="number"
-                      placeholder="10"
-                      value={newRecFats}
-                      onChange={(e) => setNewRecFats(e.target.value)}
-                      className="w-full bg-orange-50/20 border border-orange-100 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 outline-none focus:border-orange-500 font-sans"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest block mb-1">
-                      Dietary Tags (comma-separated)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Keto, Gluten Free"
-                      value={newRecTags.join(", ")}
-                      onChange={(e) =>
-                        setNewRecTags(
-                          e.target.value.split(",").map((s) => s.trim()),
-                        )
-                      }
-                      className="w-full bg-orange-50/20 border border-orange-100 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 outline-none focus:border-orange-500 font-sans"
-                    />
-                  </div>
-                  <div className="col-span-2 font-sans font-medium">
-                    <label className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest block mb-1 font-sans">
-                      Ingredients (one per line)
-                    </label>
-                    <textarea
-                      rows={2}
-                      placeholder="e.g. Oats&#10;Almond milk&#10;Chia seeds"
-                      value={newRecIngredients}
-                      onChange={(e) => setNewRecIngredients(e.target.value)}
-                      className="w-full bg-orange-50/20 border border-orange-100 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 outline-none focus:border-orange-500 font-sans"
-                    />
-                  </div>
-                  <div className="col-span-2 font-sans font-medium">
-                    <label className="text-[10px] font-bold text-orange-950/40 uppercase tracking-widest block mb-1 font-sans font-extrabold">
-                      Instructions
-                    </label>
-                    <textarea
-                      rows={2}
-                      placeholder="e.g. Cook oats with almond milk, then stir in chia seeds."
-                      value={newRecInstructions}
-                      onChange={(e) => setNewRecInstructions(e.target.value)}
-                      className="w-full bg-orange-50/20 border border-orange-100 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 outline-none focus:border-orange-500 font-sans"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2 font-sans">
-                  <button
-                    onClick={async () => {
-                      if (!newRecName.trim()) return;
-                      const newRecipe: Recipe = {
-                        id: "rec-" + Date.now(),
-                        name: newRecName.trim(),
-                        time: newRecTime || "10 mins",
-                        calories: parseInt(newRecCalories) || 0,
-                        protein: parseInt(newRecProtein) || 0,
-                        carbs: parseInt(newRecCarbs) || 0,
-                        fats: parseInt(newRecFats) || 0,
-                        tags: newRecTags.filter(Boolean),
-                        image:
-                          "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=400&q=80",
-                        ingredients: newRecIngredients
-                          .split("\n")
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                        instructions:
-                          newRecInstructions.trim() || "Mix and serve!",
-                      };
-
-                      if (isSupabaseConfigured && activeProfileId) {
-                        try {
-                          const { data, error } = await supabase
-                            .from('recipes')
-                            .insert({
-                              profile_id: activeProfileId,
-                              name: newRecipe.name,
-                              time: newRecipe.time,
-                              calories: newRecipe.calories,
-                              protein: newRecipe.protein,
-                              carbs: newRecipe.carbs,
-                              fats: newRecipe.fats,
-                              tags: newRecipe.tags,
-                              image: newRecipe.image,
-                              ingredients: newRecipe.ingredients,
-                              instructions: newRecipe.instructions
-                            })
-                            .select('*')
-                            .single();
-                          if (error) {
-                            console.error("Error creating recipe in Supabase:", error);
-                            setRecipes([newRecipe, ...recipes]);
-                          } else if (data) {
-                            const mapped: Recipe = {
-                              id: data.id,
-                              name: data.name,
-                              time: data.time,
-                              calories: data.calories,
-                              protein: data.protein,
-                              carbs: data.carbs,
-                              fats: data.fats,
-                              tags: data.tags || [],
-                              image: data.image,
-                              ingredients: data.ingredients || [],
-                              instructions: data.instructions,
-                              micros: data.micros || []
-                            };
-                            setRecipes([mapped, ...recipes]);
-                          }
-                        } catch (err) {
-                          console.error("Error creating recipe in Supabase:", err);
-                          setRecipes([newRecipe, ...recipes]);
-                        }
-                      } else {
-                        setRecipes([newRecipe, ...recipes]);
-                      }
-
-                      // Reset form
-                      setNewRecName("");
-                      setNewRecTime("");
-                      setNewRecCalories("");
-                      setNewRecProtein("");
-                      setNewRecCarbs("");
-                      setNewRecFats("");
-                      setNewRecTags([]);
-                      setNewRecIngredients("");
-                      setNewRecInstructions("");
-                      setShowNewRecipeModal(false);
-                    }}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 py-2.5 rounded-xl text-white text-xs font-black shadow-md shadow-orange-500/10 transition-colors font-sans"
-                  >
-                    Save Recipe
-                  </button>
-                  <button
-                    onClick={() => setShowNewRecipeModal(false)}
-                    className="bg-gray-100 hover:bg-gray-200 py-2.5 px-4 rounded-xl text-gray-500 text-xs font-black transition-colors font-sans"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </motion.div>
-            )}
+            {/* Custom Add Recipe inline overlay form removed as it is handled by full recipe popup overlay */}
 
             {/* Instagram Style Square Recipe Feed */}
             <div className="grid grid-cols-3 gap-[1.5px] -mx-6 pb-6">
@@ -1440,7 +1132,7 @@ const ProfileView = ({
 
         {profileTab === "insights" && (
           <div className="pb-8">
-            <InsightsView currentStreak={currentStreak} />
+            <InsightsView currentStreak={currentStreak} mealsState={mealsState} profileData={profileData} />
           </div>
         )}
 
@@ -1673,7 +1365,6 @@ const EditProfileView = ({
   setProfileData,
   setActiveTab,
 }: {
-  key?: string;
   profileData: any;
   setProfileData: any;
   setActiveTab: (tab: string) => void;
@@ -2238,62 +1929,24 @@ const ProUpgradeModal = ({ onClose }: { onClose: () => void }) => (
   </div>
 );
 
-const SettingsView = ({
-  profileData,
-  setProfileData,
-  triggerToast,
-  onLogout,
-  session,
-}: {
-  key?: string;
-  profileData: any;
-  setProfileData: any;
-  triggerToast: (msg: string) => void;
-  onLogout: () => void;
-  session: any;
-}) => {
-  const [showPro, setShowPro] = useState(false);
-  const [showYaml, setShowYaml] = useState(false);
-
-  const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
-  const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gpt-action`;
-
-  const [notionKey, setNotionKey] = useState(profileData.notionApiKey || "");
-  const [notionDb, setNotionDb] = useState(profileData.notionDatabaseId || "");
-  const [sheetsWebhook, setSheetsWebhook] = useState(profileData.googleSheetsWebhookUrl || "");
-  const [gptUrlVal, setGptUrlVal] = useState(localStorage.getItem("fitai_custom_gpt_url") || "");
-
-  const handleSaveNotion = () => {
-    setProfileData({
-      ...profileData,
-      notionApiKey: notionKey.trim(),
-      notionDatabaseId: notionDb.trim()
-    });
-    triggerToast("💾 Saved Notion settings! Syncing to Supabase...");
-  };
-
-  const handleSaveSheets = () => {
-    setProfileData({
-      ...profileData,
-      googleSheetsWebhookUrl: sheetsWebhook.trim()
-    });
-    triggerToast("💾 Saved Google Sheets webhook! Syncing...");
-  };
-
-  const handleSaveGptUrl = () => {
-    localStorage.setItem("fitai_custom_gpt_url", gptUrlVal.trim());
-    triggerToast("💾 Saved Custom GPT Link!");
-  };
-
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    triggerToast(`📋 Copied ${label} to clipboard!`);
-  };
-
-  const openApiYaml = `openapi: 3.1.0
+const getOpenApiYaml = (edgeFunctionUrl: string) => `openapi: 3.1.0
 info:
   title: FitAI GPT Sync Action API
-  description: API for synchronizing user profiles, food/nutrition logs, recipes, and memories with the FitAI dashboard.
+  description: |
+    API for synchronizing user profiles, food/nutrition logs, recipes, and memories with the FitAI dashboard.
+    
+    CRITICAL BEHAVIORAL RULES FOR THE CUSTOM GPT:
+    1. Recipe Modifications & Extras: If the user logs a meal that modifies a stored recipe (e.g., "burrito with extra chicken and rice"), the GPT must:
+       a. Call GET /recipes to list recipes, matching the base item ("burrito").
+       b. Retrieve the macros for the base recipe.
+       c. Estimate the nutritional values of the extras specified (e.g., extra chicken and rice).
+       d. Sum the base macros and the extras macros to compute the new total.
+       e. Log the combined meal via POST /meals using the combined macros and appending the extra description to the name (e.g. "Burrito with extra chicken and rice").
+    2. Editing Logged Meals by Instruction: If the user wants to adjust a logged meal (e.g., "actually, make that breakfast 2 eggs instead of 1"), the GPT must:
+       a. Call GET /meals?date=YYYY-MM-DD to find the target meal.
+       b. Estimate the updated calorie/macro totals based on the change request.
+       c. Call PATCH /meals?id=<id> with the updated calorie/macro numbers.
+    3. Deleting Logged Meals: If the user requests to delete or remove a logged item, the GPT must call GET /meals to find the ID and invoke DELETE /meals?id=<id>.
   version: 1.0.0
 servers:
   - url: ${edgeFunctionUrl}
@@ -2437,6 +2090,58 @@ components:
 security:
   - BearerAuth: []`;
 
+const SettingsView = ({
+  profileData,
+  setProfileData,
+  triggerToast,
+  onLogout,
+  session,
+}: {
+  profileData: any;
+  setProfileData: any;
+  triggerToast: (msg: string) => void;
+  onLogout: () => void;
+  session: any;
+}) => {
+  const [showPro, setShowPro] = useState(false);
+
+  const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
+  const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gpt-action`;
+
+  const [notionKey, setNotionKey] = useState(profileData.notionApiKey || "");
+  const [notionDb, setNotionDb] = useState(profileData.notionDatabaseId || "");
+  const [sheetsWebhook, setSheetsWebhook] = useState(profileData.googleSheetsWebhookUrl || "");
+  const [gptUrlVal, setGptUrlVal] = useState(localStorage.getItem("fitai_custom_gpt_url") || "");
+
+  const handleSaveNotion = () => {
+    setProfileData({
+      ...profileData,
+      notionApiKey: notionKey.trim(),
+      notionDatabaseId: notionDb.trim()
+    });
+    triggerToast("💾 Saved Notion settings! Syncing to Supabase...");
+  };
+
+  const handleSaveSheets = () => {
+    setProfileData({
+      ...profileData,
+      googleSheetsWebhookUrl: sheetsWebhook.trim()
+    });
+    triggerToast("💾 Saved Google Sheets webhook! Syncing...");
+  };
+
+  const handleSaveGptUrl = () => {
+    localStorage.setItem("fitai_custom_gpt_url", gptUrlVal.trim());
+    triggerToast("💾 Saved Custom GPT Link!");
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    triggerToast(`📋 Copied ${label} to clipboard!`);
+  };
+
+  const openApiYaml = useMemo(() => getOpenApiYaml(edgeFunctionUrl), [edgeFunctionUrl]);
+
   return (
     <>
       <motion.div
@@ -2444,7 +2149,7 @@ security:
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: 20 }}
         transition={{ duration: 0.3 }}
-        className="px-6 mt-8 relative z-10 space-y-6 pb-24 font-sans text-left"
+        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
       >
         <div className="flex justify-between items-end mb-2 text-left">
           <h2 className="text-[3rem] font-light tracking-tight text-[#1a1a1a] leading-none mb-4">
@@ -2496,6 +2201,30 @@ security:
                 </span>
               </div>
 
+              {/* OpenAPI Schema Copy */}
+              <div className="pt-3 border-t border-stone-100">
+                <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                  OpenAPI Schema for Custom GPT Action
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value="openapi.yaml (FitAI GPT Action Spec)"
+                    className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[10px] font-bold text-stone-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => copyToClipboard(openApiYaml, "OpenAPI Schema")}
+                    className="bg-stone-900 text-white text-[9px] font-black uppercase tracking-wider px-3.5 rounded-xl hover:bg-stone-850 active:scale-95 transition-all cursor-pointer"
+                  >
+                    Copy Schema
+                  </button>
+                </div>
+                <span className="text-[8px] text-stone-400 font-semibold mt-1 block">
+                  Copy and paste this OpenAPI spec into the Custom GPT Actions schema builder.
+                </span>
+              </div>
+
               {/* Custom GPT Redirect Link field */}
               <div className="pt-3 border-t border-stone-100">
                 <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
@@ -2518,6 +2247,31 @@ security:
                 </div>
                 <span className="text-[8px] text-stone-400 font-semibold mt-1 block">
                   Optional: Syncs the "+" shortcut button on your homepage to open your custom GPT session.
+                </span>
+              </div>
+
+              {/* Gemini API Key field */}
+              <div className="pt-3 border-t border-stone-100">
+                <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                  Gemini API Key (For local AI Text Refinement)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    placeholder="Enter Gemini API Key..."
+                    value={geminiKeyVal}
+                    onChange={(e) => setGeminiKeyVal(e.target.value)}
+                    className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[10px] font-bold text-stone-700 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSaveGeminiKey}
+                    className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-xl active:scale-95 transition-all cursor-pointer"
+                  >
+                    Save Key
+                  </button>
+                </div>
+                <span className="text-[8px] text-stone-400 font-semibold mt-1 block">
+                  Enables text-based recipe adjustments (e.g. "add 50g chicken") locally with zero server cost.
                 </span>
               </div>
             </div>
@@ -2720,16 +2474,19 @@ security:
 const ManualLogModal = ({
   onClose,
   onAddMeal,
+  mealToEdit,
 }: {
   onClose: () => void;
   onAddMeal: (meal: any) => void;
+  mealToEdit?: Meal | null;
 }) => {
-  const [name, setName] = useState("");
-  const [calories, setCalories] = useState("");
-  const [protein, setProtein] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [fats, setFats] = useState("");
+  const [name, setName] = useState(mealToEdit?.name || "");
+  const [calories, setCalories] = useState(mealToEdit ? String(mealToEdit.calories) : "");
+  const [protein, setProtein] = useState(mealToEdit ? String(mealToEdit.protein) : "");
+  const [carbs, setCarbs] = useState(mealToEdit ? String(mealToEdit.carbs) : "");
+  const [fats, setFats] = useState(mealToEdit ? String(mealToEdit.fats) : "");
   const [time, setTime] = useState(() => {
+    if (mealToEdit?.time) return mealToEdit.time;
     const timeOptions: Intl.DateTimeFormatOptions = {
       hour: "numeric",
       minute: "2-digit",
@@ -2737,6 +2494,82 @@ const ManualLogModal = ({
     };
     return new Date().toLocaleTimeString("en-US", timeOptions);
   });
+
+  const [segment, setSegment] = useState<"manual" | "ai">("manual");
+  const [aiInstruction, setAiInstruction] = useState("");
+  const [aiPreview, setAiPreview] = useState<{ calories: number; protein: number; carbs: number; fats: number; name: string } | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleRefineWithAi = async () => {
+    if (!aiInstruction.trim()) return;
+
+    // Retrieve local Gemini API Key
+    const key = localStorage.getItem("fitai_gemini_api_key") || (import.meta as any).env.VITE_GEMINI_API_KEY || "";
+    if (!key) {
+      alert("Please save your Gemini API Key in Settings first to use AI Refinements!");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const prompt = `You are a nutrition calculator. You are modifying a meal log based on an instruction.
+Base meal:
+- Name: "${name || "Meal"}"
+- Calories: ${calories || 0} kcal
+- Protein: ${protein || 0}g
+- Carbs: ${carbs || 0}g
+- Fats: ${fats || 0}g
+
+Instruction: "${aiInstruction}"
+
+Return a JSON object containing the updated values:
+{
+  "name": "updated name (include modifications if relevant)",
+  "calories": updated_calories,
+  "protein": updated_protein,
+  "carbs": updated_carbs,
+  "fats": updated_fats
+}
+Do not return any markdown formatting, backticks, or "json" prefix. Just return the raw JSON string itself.`;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to contact Gemini API");
+      }
+
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      
+      // Clean up text
+      let cleaned = rawText.trim();
+      if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+      }
+
+      const result = JSON.parse(cleaned);
+      setAiPreview({
+        name: result.name || name || "Refined Meal",
+        calories: Math.max(0, parseInt(result.calories) || 0),
+        protein: Math.max(0, parseInt(result.protein) || 0),
+        carbs: Math.max(0, parseInt(result.carbs) || 0),
+        fats: Math.max(0, parseInt(result.fats) || 0),
+      });
+    } catch (err: any) {
+      console.error(err);
+      alert(`AI Processing Error: ${err.message || "Could not parse instruction"}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end justify-center font-sans">
@@ -2752,12 +2585,12 @@ const ManualLogModal = ({
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 220 }}
-        className="bg-white rounded-t-[36px] w-full max-w-md p-6 space-y-6 relative z-10 shadow-2xl"
+        className="bg-white rounded-t-[36px] w-full max-w-md p-6 space-y-6 relative z-10 shadow-2xl flex flex-col max-h-[90vh]"
       >
-        <div className="flex justify-between items-center pb-2 border-b border-black/[0.04]">
+        <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] shrink-0">
           <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1.5">
             <Utensils className="w-4 h-4 text-orange-500" />
-            Manual Calorie Log
+            {mealToEdit ? "Edit Meal Log" : "New Calorie Log"}
           </h4>
           <button
             onClick={onClose}
@@ -2767,106 +2600,230 @@ const ManualLogModal = ({
           </button>
         </div>
 
-        <div className="space-y-4 text-left">
-          <div>
-            <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-              Meal / Snack Name
-            </label>
-            <input
-              type="text"
-              placeholder="E.g. Grilled Chicken Salad"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
-              autoFocus
-            />
+        {/* Tab Segment Switcher */}
+        {!aiPreview && (
+          <div className="flex bg-stone-100 rounded-xl p-1 shrink-0">
+            <button
+              onClick={() => setSegment("manual")}
+              className={cn(
+                "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                segment === "manual" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
+              )}
+            >
+              📝 Manual Edit
+            </button>
+            <button
+              onClick={() => setSegment("ai")}
+              className={cn(
+                "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                segment === "ai" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
+              )}
+            >
+              🤖 AI Refiner
+            </button>
           </div>
+        )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                Calories (kcal)
-              </label>
-              <input
-                type="number"
-                placeholder="0"
-                value={calories}
-                onChange={(e) => setCalories(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1 flex items-center gap-1">
-                <Clock className="w-3 h-3 text-stone-400" /> Log Time (Local)
-              </label>
-              <input
-                type="text"
-                placeholder="E.g. 12:30 PM"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
-              />
-            </div>
-          </div>
+        <div className="flex-1 overflow-y-auto pr-0.5 space-y-4 text-left">
+          {aiPreview ? (
+            /* AI APPROVAL PREVIEW PANEL */
+            <div className="space-y-4 font-sans">
+              <div className="bg-orange-50/50 border border-orange-100 rounded-[24px] p-5 space-y-4 shadow-sm">
+                <div className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest border-b border-orange-100/50 pb-2">
+                  Preview AI Updates
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
+                    <span>Name</span>
+                    <span className="text-orange-600 truncate max-w-[220px]">{aiPreview.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
+                    <span>Calories</span>
+                    <div>
+                      <span className="text-stone-400 font-mono line-through mr-1.5">{calories || 0} kcal</span>
+                      <span className="text-emerald-600 font-mono font-black">{aiPreview.calories} kcal</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
+                    <span>Protein</span>
+                    <div>
+                      <span className="text-stone-400 font-mono line-through mr-1.5">{protein || 0}g</span>
+                      <span className="text-orange-600 font-mono font-black">{aiPreview.protein}g</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
+                    <span>Carbs</span>
+                    <div>
+                      <span className="text-stone-400 font-mono line-through mr-1.5">{carbs || 0}g</span>
+                      <span className="text-indigo-600 font-mono font-black">{aiPreview.carbs}g</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-bold text-stone-900">
+                    <span>Fats</span>
+                    <div>
+                      <span className="text-stone-400 font-mono line-through mr-1.5">{fats || 0}g</span>
+                      <span className="text-amber-600 font-mono font-black">{aiPreview.fats}g</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                Protein (g)
-              </label>
-              <input
-                type="number"
-                placeholder="0"
-                value={protein}
-                onChange={(e) => setProtein(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
-              />
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => setAiPreview(null)}
+                  className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-600 font-black text-[10px] uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={() => {
+                    setName(aiPreview.name);
+                    setCalories(String(aiPreview.calories));
+                    setProtein(String(aiPreview.protein));
+                    setCarbs(String(aiPreview.carbs));
+                    setFats(String(aiPreview.fats));
+                    setAiPreview(null);
+                    setSegment("manual");
+                  }}
+                  className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-center shadow-md shadow-orange-500/10 transition-colors cursor-pointer"
+                >
+                  Approve & Apply
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                Carbs (g)
-              </label>
-              <input
-                type="number"
-                placeholder="0"
-                value={carbs}
-                onChange={(e) => setCarbs(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
-              />
+          ) : segment === "manual" ? (
+            /* MANUAL EDIT TAB */
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                  Meal / Snack Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="E.g. Grilled Chicken Salad"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                    Calories (kcal)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={calories}
+                    onChange={(e) => setCalories(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-stone-400" /> Log Time (Local)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="E.g. 12:30 PM"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                    Protein (g)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={protein}
+                    onChange={(e) => setProtein(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                    Carbs (g)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={carbs}
+                    onChange={(e) => setCarbs(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                    Fats (g)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={fats}
+                    onChange={(e) => setFats(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                Fats (g)
-              </label>
-              <input
-                type="number"
-                placeholder="0"
-                value={fats}
-                onChange={(e) => setFats(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
-              />
+          ) : (
+            /* AI REFINER TAB */
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
+                  Refinement Instructions / Prompt
+                </label>
+                <textarea
+                  placeholder="E.g. 'I had it with extra chicken', 'make it a half portion', 'add a glass of orange juice'..."
+                  value={aiInstruction}
+                  onChange={(e) => setAiInstruction(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500 min-h-[90px] resize-none"
+                />
+              </div>
+
+              <button
+                onClick={handleRefineWithAi}
+                disabled={isProcessing || !aiInstruction.trim()}
+                className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-2.5 rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                {isProcessing ? "Processing with Gemini..." : "Refine Meal with AI"}
+              </button>
             </div>
-          </div>
+          )}
         </div>
 
-        <button
-          onClick={() => {
-            if (!name.trim()) return;
-            onAddMeal({
-              name: name.trim(),
-              calories: parseInt(calories) || 0,
-              protein: parseInt(protein) || 0,
-              carbs: parseInt(carbs) || 0,
-              fats: parseInt(fats) || 0,
-              type: "Manual Log",
-              time: time.trim(),
-            });
-            onClose();
-          }}
-          className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-xs py-3.5 rounded-xl font-black uppercase tracking-widest text-center shadow-lg transition-colors cursor-pointer"
-        >
-          Add to Daily Plate
-        </button>
+        {!aiPreview && (
+          <div className="shrink-0 pt-2 border-t border-stone-100">
+            <button
+              onClick={() => {
+                if (!name.trim()) return;
+                onAddMeal({
+                  id: mealToEdit?.id,
+                  name: name.trim(),
+                  calories: parseInt(calories) || 0,
+                  protein: parseInt(protein) || 0,
+                  carbs: parseInt(carbs) || 0,
+                  fats: parseInt(fats) || 0,
+                  type: mealToEdit?.type || "Manual Log",
+                  time: time.trim(),
+                  image: mealToEdit?.image
+                });
+                onClose();
+              }}
+              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-xs py-3.5 rounded-xl font-black uppercase tracking-widest text-center shadow-lg transition-colors cursor-pointer"
+            >
+              {mealToEdit ? "Update Meal" : "Add to Daily Plate"}
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   );
@@ -2882,14 +2839,15 @@ const formatDateStr = (d: Date): string => {
 };
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<ViewMode>("macros");
   const [activeTab, setActiveTab] = useState("home");
+  const [mealToEdit, setMealToEdit] = useState<Meal | null>(null);
   const [isCameraFullScreen, setIsCameraFullScreen] = useState(false);
 
   // Custom world-class popup states
   const [selectedRecipePopup, setSelectedRecipePopup] = useState<Recipe | null>(
     null,
   );
+  const [isDataLoading, setIsDataLoading] = useState(false);
   const [isEditingRecipe, setIsEditingRecipe] = useState(false);
   const [editPopupName, setEditPopupName] = useState("");
   const [editPopupTime, setEditPopupTime] = useState("");
@@ -3350,56 +3308,6 @@ export default function App() {
         }
       }
 
-      // Check if the database has any profiles. If empty, create the default johndoe
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .limit(1);
-
-      if (error) {
-        console.error("Error loading profiles:", error);
-        return;
-      }
-
-      if (!profiles || profiles.length === 0) {
-        const defaultProf = {
-          username: "johndoe",
-          display_name: "John Doe",
-          image_url: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=60",
-          description: "Fitness enthusiast & tech geek. Building a sustainable, high-protein lifestyle. Always optimizing!",
-          height: 183,
-          weight: 80,
-          dob: "1998-05-15",
-          gender: "Male",
-          memories: [
-            "Prefers high protein diet, specifically chicken and eggs.",
-            "Allergic to shellfish.",
-            "Usually works out at 6 PM on weekdays."
-          ],
-          preferences: ["Gluten Free", "Keto"],
-          daily_calories_goal: 2000,
-          weight_goal: 75.0,
-          protein_goal: 150,
-          carbs_goal: 50,
-          fats_goal: 80,
-          fiber_goal: 30,
-          track_micros: true,
-          micros: [
-            { name: "Selenium", target: 55, unit: "mcg" },
-            { name: "Vitamin A", target: 900, unit: "mcg" }
-          ],
-          api_key: "test_gpt_secret_token_123"
-        };
-
-        const { error: createErr } = await supabase
-          .from('profiles')
-          .insert(defaultProf);
-
-        if (createErr) {
-          console.error("Error creating default profile:", createErr);
-        }
-      }
-
       setActiveProfileId(null);
     };
 
@@ -3409,117 +3317,103 @@ export default function App() {
   useEffect(() => {
     if (!isSupabaseConfigured || !activeProfileId) return;
 
-    const loadProfileAndRecipes = async () => {
-      const { data: profile, error: profileErr } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', activeProfileId)
-        .single();
+    const loadUserData = async () => {
+      setIsDataLoading(true);
+      try {
+        const [profileRes, recipesRes, mealsRes] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', activeProfileId).single(),
+          supabase.from('recipes').select('*').eq('profile_id', activeProfileId).order('name', { ascending: true }),
+          supabase.from('meals').select('*').eq('profile_id', activeProfileId).order('created_at', { ascending: false })
+        ]);
 
-      if (profileErr) {
-        console.error("Error loading profile details:", profileErr);
-        return;
-      }
+        if (profileRes.error) {
+          console.error("Error loading profile details:", profileRes.error);
+        } else if (profileRes.data) {
+          const profile = profileRes.data;
+          setProfileDataState({
+            name: profile.display_name,
+            username: profile.username || "",
+            imageUrl: profile.image_url,
+            description: profile.description,
+            height: profile.height,
+            weight: profile.weight,
+            dob: profile.dob,
+            gender: profile.gender,
+            memories: profile.memories || [],
+            preferences: profile.preferences || [],
+            goals: {
+              dailyCalories: profile.daily_calories_goal,
+              weightGoal: profile.weight_goal
+            },
+            macros: {
+              protein: profile.protein_goal,
+              carbs: profile.carbs_goal,
+              fats: profile.fats_goal,
+              fiber: profile.fiber_goal
+            },
+            trackMicros: profile.track_micros,
+            micros: profile.micros || [],
+            api_key: profile.api_key,
+            notionApiKey: profile.notion_api_key || "",
+            notionDatabaseId: profile.notion_database_id || "",
+            googleSheetsWebhookUrl: profile.google_sheets_webhook_url || ""
+          });
 
-      setProfileDataState({
-        name: profile.display_name,
-        username: profile.username || "",
-        imageUrl: profile.image_url,
-        description: profile.description,
-        height: profile.height,
-        weight: profile.weight,
-        dob: profile.dob,
-        gender: profile.gender,
-        memories: profile.memories || [],
-        preferences: profile.preferences || [],
-        goals: {
-          dailyCalories: profile.daily_calories_goal,
-          weightGoal: profile.weight_goal
-        },
-        macros: {
-          protein: profile.protein_goal,
-          carbs: profile.carbs_goal,
-          fats: profile.fats_goal,
-          fiber: profile.fiber_goal
-        },
-        trackMicros: profile.track_micros,
-        micros: profile.micros || [],
-        api_key: profile.api_key,
-        notionApiKey: profile.notion_api_key || "",
-        notionDatabaseId: profile.notion_database_id || "",
-        googleSheetsWebhookUrl: profile.google_sheets_webhook_url || ""
-      });
+          setOnboardName(profile.display_name || "");
+          setOnboardAvatar(profile.image_url || "");
+          setOnboardHeight(String(profile.height || 170));
+          setOnboardWeight(String(profile.weight || 70));
+          setOnboardBio(profile.description || "");
+          setOnboardDob(profile.dob || "1998-05-15");
+          setOnboardGender(profile.gender || "Male");
+        }
 
-      setOnboardName(profile.display_name || "");
-      setOnboardAvatar(profile.image_url || "");
-      setOnboardHeight(String(profile.height || 170));
-      setOnboardWeight(String(profile.weight || 70));
-      setOnboardBio(profile.description || "");
-      setOnboardDob(profile.dob || "1998-05-15");
-      setOnboardGender(profile.gender || "Male");
+        if (recipesRes.error) {
+          console.error("Error loading recipes:", recipesRes.error);
+        } else {
+          const mappedRecipes: Recipe[] = (recipesRes.data || []).map(r => ({
+            id: r.id,
+            name: r.name,
+            time: r.time,
+            calories: r.calories,
+            protein: r.protein,
+            carbs: r.carbs,
+            fats: r.fats,
+            tags: r.tags || [],
+            image: r.image,
+            ingredients: r.ingredients || [],
+            instructions: r.instructions,
+            micros: r.micros || []
+          }));
+          setRecipesState(mappedRecipes);
+        }
 
-      const { data: recipesData, error: recipesErr } = await supabase
-        .from('recipes')
-        .select('*')
-        .eq('profile_id', activeProfileId)
-        .order('name', { ascending: true });
-
-      if (recipesErr) {
-        console.error("Error loading recipes:", recipesErr);
-      } else {
-        const mappedRecipes: Recipe[] = (recipesData || []).map(r => ({
-          id: r.id,
-          name: r.name,
-          time: r.time,
-          calories: r.calories,
-          protein: r.protein,
-          carbs: r.carbs,
-          fats: r.fats,
-          tags: r.tags || [],
-          image: r.image,
-          ingredients: r.ingredients || [],
-          instructions: r.instructions,
-          micros: r.micros || []
-        }));
-        setRecipesState(mappedRecipes);
+        if (mealsRes.error) {
+          console.error("Error loading meals from Supabase:", mealsRes.error);
+        } else {
+          const mappedMeals: Meal[] = (mealsRes.data || []).map(m => ({
+            id: m.id,
+            name: m.name,
+            time: m.time,
+            type: m.type,
+            calories: m.calories,
+            protein: m.protein,
+            carbs: m.carbs,
+            fats: m.fats,
+            image: m.image,
+            date: m.date
+          }));
+          setMealsState(mappedMeals);
+        }
+      } catch (err) {
+        console.error("Unexpected error loading user data:", err);
+      } finally {
+        setIsDataLoading(false);
       }
     };
 
-    loadProfileAndRecipes();
+    loadUserData();
   }, [activeProfileId]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured || !activeProfileId) return;
-
-    const loadMeals = async () => {
-      const { data: mealsData, error: mealsErr } = await supabase
-        .from('meals')
-        .select('*')
-        .eq('profile_id', activeProfileId)
-        .eq('date', selectedDate)
-        .order('created_at', { ascending: false });
-
-      if (mealsErr) {
-        console.error("Error loading meals from Supabase:", mealsErr);
-      } else {
-        const mappedMeals: Meal[] = (mealsData || []).map(m => ({
-          id: m.id,
-          name: m.name,
-          time: m.time,
-          type: m.type,
-          calories: m.calories,
-          protein: m.protein,
-          carbs: m.carbs,
-          fats: m.fats,
-          image: m.image,
-          date: m.date
-        }));
-        setMealsState(mappedMeals);
-      }
-    };
-
-    loadMeals();
-  }, [activeProfileId, selectedDate]);
 
 
 
@@ -3527,7 +3421,7 @@ export default function App() {
 
   const [customCalVal, setCustomCalVal] = useState("");
   const [customCalName, setCustomCalName] = useState("");
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<React.ReactNode | string | null>(null);
 
   // Automatic toast dismissal
   useEffect(() => {
@@ -3539,11 +3433,12 @@ export default function App() {
     }
   }, [toastMessage]);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: React.ReactNode | string) => {
     setToastMessage(msg);
   };
 
   const onAddMeal = async (newMealOrRecipe: {
+    id?: string;
     name: string;
     calories: number;
     protein: number;
@@ -3559,6 +3454,67 @@ export default function App() {
       hour12: true,
     };
     const formattedTime = newMealOrRecipe.time || new Date().toLocaleTimeString("en-US", timeOptions);
+
+    if (newMealOrRecipe.id) {
+      if (isSupabaseConfigured && profileData.api_key) {
+        try {
+          const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+          const res = await fetch(`${supabaseUrl}/functions/v1/gpt-action/meals?id=${newMealOrRecipe.id}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${profileData.api_key}`
+            },
+            body: JSON.stringify({
+              name: newMealOrRecipe.name,
+              calories: newMealOrRecipe.calories,
+              protein: newMealOrRecipe.protein,
+              carbs: newMealOrRecipe.carbs,
+              fats: newMealOrRecipe.fats,
+              image: newMealOrRecipe.image,
+              type: newMealOrRecipe.type,
+              time: formattedTime,
+              date: selectedDate
+            })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const mapped: Meal = {
+              id: data.meal.id,
+              name: data.meal.name,
+              time: data.meal.time,
+              type: data.meal.type,
+              calories: data.meal.calories,
+              protein: data.meal.protein,
+              carbs: data.meal.carbs,
+              fats: data.meal.fats,
+              image: data.meal.image,
+              date: data.meal.date
+            };
+            setMealsState((prev) => prev.map(m => m.id === mapped.id ? mapped : m));
+            showToast(`🍽️ Meal updated successfully!`);
+            return;
+          }
+        } catch (err) {
+          console.error("Error updating meal through Edge Function:", err);
+        }
+      }
+
+      setMealsState((prev) => prev.map(m => m.id === newMealOrRecipe.id ? {
+        ...m,
+        name: newMealOrRecipe.name,
+        time: formattedTime,
+        type: newMealOrRecipe.type || m.type,
+        calories: newMealOrRecipe.calories,
+        protein: newMealOrRecipe.protein,
+        carbs: newMealOrRecipe.carbs,
+        fats: newMealOrRecipe.fats,
+        image: newMealOrRecipe.image || m.image
+      } : m));
+      showToast("🍽️ Meal updated locally");
+      return;
+    }
 
     if (isSupabaseConfigured && profileData.api_key) {
       try {
@@ -3625,6 +3581,89 @@ export default function App() {
 
     setMealsState((prev) => [meal, ...prev]);
     showToast(`🍽️ Logged: "${newMealOrRecipe.name}" (+${newMealOrRecipe.calories} kcal)`);
+  };
+
+  const [lastDeletedMeal, setLastDeletedMeal] = useState<Meal | null>(null);
+  const deleteTimeoutRef = useRef<number | null>(null);
+
+  const commitDeletion = async (meal: Meal) => {
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('meals')
+        .delete()
+        .eq('id', meal.id);
+      if (error) {
+        console.error("Error committing meal delete in Supabase:", error);
+      }
+    }
+  };
+
+  const handleEditMeal = (meal: Meal) => {
+    setMealToEdit(meal);
+    setIsCameraFullScreen(true);
+  };
+
+  const handleDeleteMeal = (meal: Meal) => {
+    if (deleteTimeoutRef.current && lastDeletedMeal) {
+      clearTimeout(deleteTimeoutRef.current);
+      commitDeletion(lastDeletedMeal);
+    }
+
+    setLastDeletedMeal(meal);
+    setMealsState(prev => prev.filter(m => m.id !== meal.id));
+
+    deleteTimeoutRef.current = setTimeout(() => {
+      commitDeletion(meal);
+      setLastDeletedMeal(null);
+      deleteTimeoutRef.current = null;
+    }, 4000) as any;
+
+    showToast(
+      <div className="flex items-center justify-between w-full gap-2">
+        <span>🗑️ Meal deleted</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setMealsState(prev => [meal, ...prev]);
+            setLastDeletedMeal(null);
+            if (deleteTimeoutRef.current) {
+              clearTimeout(deleteTimeoutRef.current);
+              deleteTimeoutRef.current = null;
+            }
+            showToast("Restored meal!");
+          }}
+          className="text-orange-400 hover:text-orange-300 font-extrabold uppercase text-[10px] tracking-wider bg-white/10 px-2.5 py-1 rounded-lg ml-2 active:scale-95 transition-all"
+        >
+          Undo
+        </button>
+      </div>
+    );
+  };
+
+  const handleDeleteRecipe = async (recipeId: string) => {
+    if (!confirm("Are you sure you want to delete this recipe?")) return;
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('recipes')
+          .delete()
+          .eq('id', recipeId);
+        if (error) {
+          console.error("Error deleting recipe in Supabase:", error);
+          showToast("❌ Error deleting recipe");
+          return;
+        }
+      } catch (err) {
+        console.error("Error deleting recipe:", err);
+        showToast("❌ Error deleting recipe");
+        return;
+      }
+    }
+
+    setRecipesState(prev => prev.filter(r => r.id !== recipeId));
+    setSelectedRecipePopup(null);
+    showToast("🗑️ Recipe deleted");
   };
 
   const openRecipeDetails = (recipe: Recipe) => {
@@ -3836,6 +3875,23 @@ export default function App() {
     );
   }
 
+  if (isDataLoading) {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans p-6 max-w-md mx-auto space-y-8 flex flex-col justify-center items-center">
+        <div className="animate-pulse flex flex-col items-center gap-6 w-full px-4">
+          <div className="w-16 h-16 bg-orange-200/50 rounded-2xl animate-bounce" />
+          <div className="w-48 h-6 bg-orange-200/40 rounded-lg" />
+          <div className="w-56 h-56 bg-orange-200/30 rounded-full flex items-center justify-center">
+            <div className="w-40 h-40 bg-[#FAF9F6] rounded-full" />
+          </div>
+          <div className="w-full h-24 bg-orange-200/20 rounded-[24px]" />
+          <div className="w-full h-12 bg-orange-200/25 rounded-2xl" />
+          <div className="w-full h-32 bg-orange-200/20 rounded-[28px]" />
+        </div>
+      </div>
+    );
+  }
+
   const isOnboarded = profileData.preferences?.includes("onboarded");
 
   if (isSupabaseConfigured && activeProfileId && !isOnboarded) {
@@ -3986,6 +4042,21 @@ export default function App() {
                 required
                 className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
               />
+            </div>
+
+            {/* Gender Selector */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Gender</label>
+              <select
+                value={onboardGender}
+                onChange={(e) => setOnboardGender(e.target.value)}
+                required
+                className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 focus:outline-none focus:border-orange-500 shadow-sm transition-all cursor-pointer"
+              >
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
 
             {/* Bio Description */}
@@ -4202,7 +4273,7 @@ export default function App() {
                   },
                   {
                     name: "Fiber",
-                    value: Math.round(totalCarbs * 0.15),
+                    value: 0, // TODO: track real fiber
                     max: profileData.macros.fiber,
                     color: "#6B7280",
                   },
@@ -4227,7 +4298,7 @@ export default function App() {
               <div className="flex gap-2.5 items-stretch w-full">
                 
                 {/* Container 1: Unified Quick Calorie Logger Form */}
-                <div className="flex-1 h-12 bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-3xs flex gap-2 items-center p-1 px-2.5 min-w-0">
+                <div className="w-full h-12 bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-3xs flex gap-2 items-center p-1 px-2.5 min-w-0">
                   {/* description input (first) */}
                   <input
                     type="text"
@@ -4249,45 +4320,57 @@ export default function App() {
                   {/* Submit button (inside container) */}
                   <button
                     onClick={() => {
-                      const amt = parseInt(customCalVal);
-                      if (!amt || amt <= 0) {
-                        showToast("Enter calories");
+                      const name = customCalName.trim();
+                      const kcalStr = customCalVal.trim();
+                      const kcalVal = parseInt(kcalStr);
+
+                      if (!name && !kcalStr) {
+                        showToast("Enter an item name or calories");
                         return;
                       }
-                      const name = customCalName.trim() || "Quick Cal";
-                      onAddMeal({
-                        name,
-                        calories: amt,
-                        protein: 0,
-                        carbs: 0,
-                        fats: 0,
-                        type: "Quick Cal",
-                      });
-                      setCustomCalVal("");
-                      setCustomCalName("");
+
+                      if (kcalStr && kcalVal > 0) {
+                        // Manual entry (has calories specified explicitly)
+                        onAddMeal({
+                          name: name || "Quick Cal Log",
+                          calories: kcalVal,
+                          protein: 0,
+                          carbs: 0,
+                          fats: 0,
+                          type: "Quick Cal",
+                        });
+                        showToast(`Logged "${name || "Quick Cal Log"}" of ${kcalVal} kcal! ⚡`);
+                        setCustomCalName("");
+                        setCustomCalVal("");
+                      } else {
+                        // No calories specified, parse using local calculateNutritionFromIngredients
+                        const ingredientsList = name
+                          .split(/,|and|\+/)
+                          .map((i) => i.trim())
+                          .filter(Boolean);
+                        
+                        const nutrition = calculateNutritionFromIngredients(name, ingredientsList);
+                        
+                        onAddMeal({
+                          name,
+                          calories: nutrition.calories,
+                          protein: nutrition.protein,
+                          carbs: nutrition.carbs,
+                          fats: nutrition.fats,
+                          type: "Quick Cal",
+                        });
+                        
+                        showToast(`🤖 AI Estimated: ${nutrition.calories} kcal, ${nutrition.protein}g Protein`);
+                        setCustomCalName("");
+                        setCustomCalVal("");
+                      }
                     }}
                     className="w-8 h-8 bg-orange-500 hover:bg-orange-600 text-white rounded-xl flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                    title="Log Quick Calories"
+                    title="Log Meal"
                   >
                     <Check className="w-4.5 h-4.5" />
                   </button>
                 </div>
-
-                {/* Container 2: Standalone Manual Calorie Log Button / Custom GPT Link (Far Right) */}
-                <button
-                  onClick={() => {
-                    const gptUrl = localStorage.getItem("fitai_custom_gpt_url");
-                    if (gptUrl && gptUrl.trim()) {
-                      window.open(gptUrl.trim(), "_blank");
-                    } else {
-                      setIsCameraFullScreen(true);
-                    }
-                  }}
-                  className="w-12 h-12 bg-[#1a1a1a] hover:bg-[#2c2c2c] text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-3xs border border-stone-850"
-                  title="Manual Log / Custom GPT"
-                >
-                  <PlusCircle className="w-5 h-5" />
-                </button>
 
               </div>
             </div>
@@ -4327,7 +4410,8 @@ export default function App() {
                           key={meal.id}
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
-                          className="bg-white/80 backdrop-blur-md rounded-2xl border border-white/90 p-4 shadow-3xs flex items-center justify-between gap-4 relative z-10"
+                          onClick={() => handleEditMeal(meal)}
+                          className="bg-white/80 backdrop-blur-md rounded-2xl border border-white/90 p-4 shadow-3xs flex items-center justify-between gap-4 relative z-10 cursor-pointer"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-8 h-8 rounded-xl bg-orange-100/50 flex items-center justify-center text-orange-600 shrink-0">
@@ -4349,24 +4433,9 @@ export default function App() {
                               </span>
                             </div>
                             <button
-                              onClick={async (e) => {
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                if (isSupabaseConfigured) {
-                                  const { error } = await supabase
-                                    .from('meals')
-                                    .delete()
-                                    .eq('id', meal.id);
-                                  if (error) {
-                                    console.error("Error deleting meal:", error);
-                                    showToast("❌ Error deleting log");
-                                  } else {
-                                    setMealsState(prev => prev.filter(m => m.id !== meal.id));
-                                    showToast("🗑️ Log deleted");
-                                  }
-                                } else {
-                                  setMealsState(prev => prev.filter(m => m.id !== meal.id));
-                                  showToast("🗑️ Log deleted");
-                                }
+                                handleDeleteMeal(meal);
                               }}
                               className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40 shrink-0"
                               title="Delete log"
@@ -4383,7 +4452,8 @@ export default function App() {
                         key={meal.id}
                         whileHover={{ y: -4, scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
-                        className="relative rounded-[32px] overflow-hidden aspect-[4/3] sm:aspect-video shadow-xl shadow-orange-200/30 group"
+                        onClick={() => handleEditMeal(meal)}
+                        className="relative rounded-[32px] overflow-hidden aspect-[4/3] sm:aspect-video shadow-xl shadow-orange-200/30 group cursor-pointer"
                       >
                         <img
                           src={meal.image}
@@ -4407,24 +4477,9 @@ export default function App() {
                               </span>
                             </div>
                             <button
-                              onClick={async (e) => {
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                if (isSupabaseConfigured) {
-                                  const { error } = await supabase
-                                    .from('meals')
-                                    .delete()
-                                    .eq('id', meal.id);
-                                  if (error) {
-                                    console.error("Error deleting meal:", error);
-                                    showToast("❌ Error deleting log");
-                                  } else {
-                                    setMealsState(prev => prev.filter(m => m.id !== meal.id));
-                                    showToast("🗑️ Log deleted");
-                                  }
-                                } else {
-                                  setMealsState(prev => prev.filter(m => m.id !== meal.id));
-                                  showToast("🗑️ Log deleted");
-                                }
+                                handleDeleteMeal(meal);
                               }}
                               className="w-8 h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-red-500/80 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
                               title="Delete log"
@@ -4527,6 +4582,9 @@ export default function App() {
               await supabase.auth.signOut();
               localStorage.removeItem("fitai_active_profile_id");
               setActiveProfileId(null);
+              setMealsState([]);
+              setRecipesState([]);
+              setProfileDataState(INITIAL_PROFILE_STATE);
               setToastMessage("🔒 Logged out successfully");
             }}
           />
@@ -4545,6 +4603,7 @@ export default function App() {
             triggerToast={(msg) => setToastMessage(msg)}
             activeProfileId={activeProfileId}
             currentStreak={currentStreak}
+            mealsState={mealsState}
           />
         )}
         {activeTab === "edit-profile" && (
@@ -4949,14 +5008,12 @@ export default function App() {
                                 setIsAiCalculating(false);
                                 
                                 if (!filledSome) {
-                                  // If all fields are already filled, ask if they want to overwrite them
-                                  if (confirm("All fields are currently filled. Overwrite them all with calculated AI estimates?")) {
-                                    setEditPopupCalories(String(calculations.calories));
-                                    setEditPopupProtein(String(calculations.protein));
-                                    setEditPopupCarbs(String(calculations.carbs));
-                                    setEditPopupFats(String(calculations.fats));
-                                    setEditPopupMicros(calculations.micros);
-                                  }
+                                  setEditPopupCalories(String(calculations.calories));
+                                  setEditPopupProtein(String(calculations.protein));
+                                  setEditPopupCarbs(String(calculations.carbs));
+                                  setEditPopupFats(String(calculations.fats));
+                                  setEditPopupMicros(calculations.micros);
+                                  setToastMessage("Estimation calculated and applied! (Values overwritten)");
                                 }
                               }, 850);
                             }}
@@ -5034,6 +5091,15 @@ export default function App() {
                     >
                       ✏️ Edit recipe
                     </button>
+                    {selectedRecipePopup.id !== "new" && (
+                      <button
+                        onClick={() => handleDeleteRecipe(selectedRecipePopup.id)}
+                        className="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-650 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 border border-red-100"
+                        title="Delete recipe"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-550" />
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         onAddMeal({
@@ -5524,8 +5590,12 @@ export default function App() {
       <AnimatePresence>
         {isCameraFullScreen && (
           <ManualLogModal
-            onClose={() => setIsCameraFullScreen(false)}
+            onClose={() => {
+              setIsCameraFullScreen(false);
+              setMealToEdit(null);
+            }}
             onAddMeal={onAddMeal}
+            mealToEdit={mealToEdit}
           />
         )}
       </AnimatePresence>
