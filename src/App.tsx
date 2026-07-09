@@ -4233,7 +4233,7 @@ export default function App() {
                   },
                   {
                     name: "Fiber",
-                    value: 22,
+                    value: Math.round(totalCarbs * 0.15),
                     max: profileData.macros.fiber,
                     color: "#6B7280",
                   },
