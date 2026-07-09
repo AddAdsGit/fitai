@@ -3708,6 +3708,36 @@ export default function App() {
   const [customCalName, setCustomCalName] = useState("");
   const [toastMessage, setToastMessage] = useState<React.ReactNode | string | null>(null);
 
+  // Recent meals: last 90 days, used for the Insights/Progress charts
+  const [recentMeals, setRecentMeals] = useState<Meal[]>([]);
+  useEffect(() => {
+    if (!isSupabaseConfigured || !activeProfileId) return;
+    const load = async () => {
+      const cutoff = formatDateStr(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000));
+      const { data, error } = await supabase
+        .from('meals')
+        .select('*')
+        .eq('profile_id', activeProfileId)
+        .gte('date', cutoff)
+        .order('date', { ascending: false });
+      if (!error && data) {
+        setRecentMeals(data.map((m) => ({
+          id: m.id,
+          name: m.name,
+          time: m.time,
+          type: m.type,
+          calories: m.calories,
+          protein: m.protein,
+          carbs: m.carbs,
+          fats: m.fats,
+          image: m.image,
+          date: m.date,
+        })));
+      }
+    };
+    load();
+  }, [activeProfileId]);
+
   // Automatic toast dismissal
   useEffect(() => {
     if (toastMessage) {
@@ -4888,7 +4918,7 @@ export default function App() {
             triggerToast={(msg) => setToastMessage(msg)}
             activeProfileId={activeProfileId}
             currentStreak={currentStreak}
-            mealsState={mealsState}
+            recentMeals={recentMeals}
           />
         )}
         {activeTab === "edit-profile" && (
