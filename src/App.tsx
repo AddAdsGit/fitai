@@ -343,7 +343,11 @@ const ProgressBar = ({
   </div>
 );
 
-const InsightsView = () => {
+const InsightsView = ({
+  currentStreak = 0,
+}: {
+  currentStreak?: number;
+}) => {
   const [timeRange, setTimeRange] = useState<"7D" | "30D" | "60D" | "90D">("7D");
 
   return (
@@ -420,7 +424,7 @@ const InsightsView = () => {
               <br />
               Streak
             </div>
-            <div className="text-2xl font-black text-orange-950">12🔥</div>
+            <div className="text-2xl font-black text-orange-950">{currentStreak}🔥</div>
           </div>
         </div>
 
@@ -435,7 +439,7 @@ const InsightsView = () => {
               <br />
               Streak
             </div>
-            <div className="text-2xl font-black text-orange-950">18🔥</div>
+            <div className="text-2xl font-black text-orange-950">{currentStreak}🔥</div>
           </div>
         </div>
       </div>
@@ -721,6 +725,7 @@ const ProfileView = ({
   openRecipeDetails,
   triggerToast,
   activeProfileId,
+  currentStreak,
 }: {
   key?: string;
   profileData: any;
@@ -733,6 +738,7 @@ const ProfileView = ({
   openRecipeDetails: (recipe: Recipe) => void;
   triggerToast: (msg: string) => void;
   activeProfileId: string | null;
+  currentStreak: number;
 }) => {
   const [profileTab, setProfileTab] = useState<"meals" | "insights" | "goals">(
     "meals",
@@ -1434,7 +1440,7 @@ const ProfileView = ({
 
         {profileTab === "insights" && (
           <div className="pb-8">
-            <InsightsView />
+            <InsightsView currentStreak={currentStreak} />
           </div>
         )}
 
@@ -1490,7 +1496,7 @@ const ProfileView = ({
                   (p: string) =>
                     !PRESET_DIETS.some(
                       (d) => d.name.toLowerCase() === p.toLowerCase(),
-                    ),
+                    ) && p !== "onboarded" && p !== "refine_food_pics",
                 ).length > 0 && (
                   <div className="mb-4">
                     <h5 className="text-[10px] font-black text-orange-950/30 uppercase tracking-widest mb-2 font-sans">
@@ -1502,7 +1508,7 @@ const ProfileView = ({
                           const isP = PRESET_DIETS.some(
                             (d) => d.name.toLowerCase() === pref.toLowerCase(),
                           );
-                          if (isP) return null;
+                          if (isP || pref === "onboarded" || pref === "refine_food_pics") return null;
                           return (
                             <div
                               key={i}
@@ -2235,12 +2241,16 @@ const ProUpgradeModal = ({ onClose }: { onClose: () => void }) => (
 const SettingsView = ({
   profileData,
   setProfileData,
-  triggerToast
+  triggerToast,
+  onLogout,
+  session,
 }: {
   key?: string;
   profileData: any;
   setProfileData: any;
   triggerToast: (msg: string) => void;
+  onLogout: () => void;
+  session: any;
 }) => {
   const [showPro, setShowPro] = useState(false);
   const [showYaml, setShowYaml] = useState(false);
@@ -2643,73 +2653,6 @@ security:
           </div>
         </div>
 
-        {/* Developer Settings (Collapsable) */}
-        {isSupabaseConfigured && (
-          <div>
-            <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
-              Developer Options
-            </h3>
-            <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-4">
-              <button
-                onClick={() => setShowYaml(!showYaml)}
-                className="w-full bg-stone-50 hover:bg-stone-100 text-stone-700 text-[9px] font-black uppercase tracking-wider py-3 rounded-xl transition-all border border-stone-200 cursor-pointer"
-              >
-                {showYaml ? "Hide API Details" : "Show Developer API / YAML Specs"}
-              </button>
-
-              <AnimatePresence>
-                {showYaml && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="space-y-4 pt-2 overflow-hidden"
-                  >
-                    {/* API Endpoint field */}
-                    <div>
-                      <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                        Edge Action URL (Server URL)
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          readOnly
-                          value={edgeFunctionUrl}
-                          className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[9px] font-bold text-stone-700 focus:outline-none"
-                        />
-                        <button
-                          onClick={() => copyToClipboard(edgeFunctionUrl, "API Endpoint URL")}
-                          className="bg-stone-900 text-white text-[9px] font-black uppercase tracking-wider px-3.5 rounded-xl hover:bg-stone-850 active:scale-95 transition-all cursor-pointer"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* OpenAPI Spec */}
-                    <div>
-                      <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                        OpenAPI YAML Specification
-                      </label>
-                      <div className="relative text-left">
-                        <pre className="text-[8px] font-bold bg-stone-950 text-emerald-400/90 rounded-2xl p-4 overflow-x-auto max-h-48 leading-relaxed border border-stone-850 select-text">
-                          {openApiYaml}
-                        </pre>
-                        <button
-                          onClick={() => copyToClipboard(openApiYaml, "OpenAPI Schema")}
-                          className="absolute top-2 right-2 bg-white/10 hover:bg-white/20 text-white text-[8px] font-black uppercase px-2 py-1 rounded-lg cursor-pointer"
-                        >
-                          Copy Spec
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
-
         {/* Account Management */}
         <div>
           <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
@@ -2717,18 +2660,19 @@ security:
           </h3>
           <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <div className="font-bold text-[#1a1a1a] text-xs">Logged in as @{profileData.username || "guest"}</div>
+              <div className="font-bold text-[#1a1a1a] text-xs">
+                {profileData.username
+                  ? `Logged in as @${profileData.username}`
+                  : session?.user?.email
+                  ? `Signed in as ${session.user.email}`
+                  : "Signed in"}
+              </div>
               <div className="text-[9px] text-stone-400 font-semibold leading-tight mt-1">
                 Sign out of your account on this device
               </div>
             </div>
             <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                localStorage.removeItem("fitai_active_profile_id");
-                setActiveProfileId(null);
-                showToast("🔒 Logged out successfully");
-              }}
+              onClick={onLogout}
               className="bg-stone-900 text-white hover:bg-stone-850 text-[9px] font-black uppercase tracking-wider px-4 py-2 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
             >
               Logout
@@ -2764,30 +2708,7 @@ security:
           </div>
         </div>
 
-        {/* General Options */}
-        <div>
-          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
-            General Options
-          </h3>
-          <div className="bg-white rounded-[24px] p-2 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-            <div className="flex justify-between items-center py-3 px-4 hover:bg-[#f5f5f5] rounded-[16px] transition-colors cursor-pointer group">
-              <div className="flex items-center gap-4">
-                <User className="w-[18px] h-[18px] text-[#4a4a4a]" />
-                <span className="font-medium text-[#1a1a1a]">Profile Configuration</span>
-              </div>
-              <ChevronRight className="w-[16px] h-[16px] text-[#d1d1d1] group-hover:text-[#4a4a4a] transition-colors" />
-            </div>
-            <div className="flex justify-between items-center py-3 px-4 hover:bg-[#f5f5f5] rounded-[16px] transition-colors cursor-pointer group">
-              <div className="flex items-center gap-4">
-                <Target className="w-[18px] h-[18px] text-[#4a4a4a]" />
-                <span className="font-medium text-[#1a1a1a]">Dietary Goals</span>
-              </div>
-              <span className="text-[10px] font-semibold text-[#4a4a4a] bg-[#f5f5f5] px-3 py-1 rounded-full uppercase tracking-wider">
-                Maintain
-              </span>
-            </div>
-          </div>
-        </div>
+
       </motion.div>
       <AnimatePresence>
         {showPro && <ProUpgradeModal onClose={() => setShowPro(false)} />}
@@ -2952,6 +2873,14 @@ const ManualLogModal = ({
 };
 
 
+// Utility: format a Date object to YYYY-MM-DD string
+const formatDateStr = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("macros");
   const [activeTab, setActiveTab] = useState("home");
@@ -3014,24 +2943,31 @@ export default function App() {
       { name: "Vitamin A", target: 900, unit: "mcg" },
     ],
     api_key: "",
+    username: "",
     notionApiKey: "",
     notionDatabaseId: "",
     googleSheetsWebhookUrl: ""
   };
 
   // Precise selected date tracking states
-  const [selectedDate, setSelectedDate] = useState<string>("2026-07-08");
-  const [daysList, setDaysList] = useState([
-    { day: "MON", date: 6, fullDate: "2026-07-06" },
-    { day: "TUE", date: 7, fullDate: "2026-07-07" },
-    { day: "WED", date: 8, fullDate: "2026-07-08" },
-    { day: "THU", date: 9, fullDate: "2026-07-09" },
-    { day: "FRI", date: 10, fullDate: "2026-07-10" },
-    { day: "SAT", date: 11, fullDate: "2026-07-11" },
-  ]);
+  const todayStr = formatDateStr(new Date());
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [daysList, setDaysList] = useState(() => {
+    const DAYS_OF_WEEK = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    const today = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() + (i - 2));
+      return {
+        day: DAYS_OF_WEEK[d.getDay()],
+        date: d.getDate(),
+        fullDate: formatDateStr(d),
+      };
+    });
+  });
   const [isConfiguringDate, setIsConfiguringDate] = useState(false);
   const [configuringDateIndex, setConfiguringDateIndex] = useState<number | null>(null);
-  const [tempFullDate, setTempFullDate] = useState("2026-07-08");
+  const [tempFullDate, setTempFullDate] = useState(todayStr);
 
   const updateDayAtIndex = (index: number, newDateString: string) => {
     const daysOfWeek = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -3487,6 +3423,7 @@ export default function App() {
 
       setProfileDataState({
         name: profile.display_name,
+        username: profile.username || "",
         imageUrl: profile.image_url,
         description: profile.description,
         height: profile.height,
@@ -3727,6 +3664,18 @@ export default function App() {
   const totalProtein = activeMeals.reduce((sum, meal) => sum + meal.protein, 0);
   const totalCarbs = activeMeals.reduce((sum, meal) => sum + meal.carbs, 0);
   const totalFats = activeMeals.reduce((sum, meal) => sum + meal.fats, 0);
+
+  // Compute current streak: count consecutive days with at least one meal, going back from today
+  const currentStreak = (() => {
+    const datesWithLogs = new Set(mealsState.map((m) => m.date));
+    let streak = 0;
+    const d = new Date(todayStr + "T00:00:00");
+    while (datesWithLogs.has(formatDateStr(d))) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  })();
 
   if (isSupabaseConfigured && !activeProfileId) {
     return (
@@ -4120,7 +4069,7 @@ export default function App() {
             className="flex items-center gap-1.5 bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-orange-100/50"
           >
             <span className="text-orange-500 text-lg">🔥</span>
-            <span className="font-bold text-orange-900">12</span>
+            <span className="font-bold text-orange-900">{currentStreak}</span>
           </motion.div>
           <button
             id="profile-avatar"
@@ -4128,7 +4077,7 @@ export default function App() {
             className="w-10 h-10 rounded-full border-2 border-orange-500 p-0.5 overflow-hidden shadow-md cursor-pointer hover:scale-105 transition-transform"
           >
             <img
-              src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=60"
+              src={profileData.imageUrl || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=60"}
               alt="User"
               className="w-full h-full object-cover rounded-full pointer-events-none"
             />
@@ -4347,26 +4296,11 @@ export default function App() {
             <section className="px-6 mt-16 relative z-10">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-black tracking-tight text-orange-950">
-                  {selectedDate === "2026-07-08" ? "Today's Consumption" : "Logged Consumption"}
+                  {selectedDate === todayStr ? "Today's Consumption" : "Logged Consumption"}
                 </h3>
-                {selectedDate === "2026-07-08" && (
+                {selectedDate === todayStr && (
                   <button
-                    onClick={() => {
-                      const name = prompt("Enter food name:");
-                      if (!name) return;
-                      const cal = prompt("Calories (kcal):");
-                      const prot = prompt("Protein (g):");
-                      const carb = prompt("Carbs (g):");
-                      const fat = prompt("Fats (g):");
-                      onAddMeal({
-                        name,
-                        calories: parseInt(cal || "0") || 0,
-                        protein: parseInt(prot || "0") || 0,
-                        carbs: parseInt(carb || "0") || 0,
-                        fats: parseInt(fat || "0") || 0,
-                        type: "Quick Log",
-                      });
-                    }}
+                    onClick={() => setIsCameraFullScreen(true)}
                     className="text-orange-600 font-black uppercase text-[10px] tracking-[0.15em] flex items-center gap-1 group bg-orange-100/50 px-3 py-1.5 rounded-full border border-orange-200/30 hover:bg-orange-200/50 transition-colors"
                   >
                     Add{" "}
@@ -4417,23 +4351,21 @@ export default function App() {
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
-                                if (confirm("Delete this log?")) {
-                                  if (isSupabaseConfigured) {
-                                    const { error } = await supabase
-                                      .from('meals')
-                                      .delete()
-                                      .eq('id', meal.id);
-                                    if (error) {
-                                      console.error("Error deleting meal:", error);
-                                      showToast("❌ Error deleting log");
-                                    } else {
-                                      setMealsState(prev => prev.filter(m => m.id !== meal.id));
-                                      showToast("🗑️ Log deleted");
-                                    }
+                                if (isSupabaseConfigured) {
+                                  const { error } = await supabase
+                                    .from('meals')
+                                    .delete()
+                                    .eq('id', meal.id);
+                                  if (error) {
+                                    console.error("Error deleting meal:", error);
+                                    showToast("❌ Error deleting log");
                                   } else {
                                     setMealsState(prev => prev.filter(m => m.id !== meal.id));
                                     showToast("🗑️ Log deleted");
                                   }
+                                } else {
+                                  setMealsState(prev => prev.filter(m => m.id !== meal.id));
+                                  showToast("🗑️ Log deleted");
                                 }
                               }}
                               className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40 shrink-0"
@@ -4477,23 +4409,21 @@ export default function App() {
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation();
-                                if (confirm("Delete this log?")) {
-                                  if (isSupabaseConfigured) {
-                                    const { error } = await supabase
-                                      .from('meals')
-                                      .delete()
-                                      .eq('id', meal.id);
-                                    if (error) {
-                                      console.error("Error deleting meal:", error);
-                                      showToast("❌ Error deleting log");
-                                    } else {
-                                      setMealsState(prev => prev.filter(m => m.id !== meal.id));
-                                      showToast("🗑️ Log deleted");
-                                    }
+                                if (isSupabaseConfigured) {
+                                  const { error } = await supabase
+                                    .from('meals')
+                                    .delete()
+                                    .eq('id', meal.id);
+                                  if (error) {
+                                    console.error("Error deleting meal:", error);
+                                    showToast("❌ Error deleting log");
                                   } else {
                                     setMealsState(prev => prev.filter(m => m.id !== meal.id));
                                     showToast("🗑️ Log deleted");
                                   }
+                                } else {
+                                  setMealsState(prev => prev.filter(m => m.id !== meal.id));
+                                  showToast("🗑️ Log deleted");
                                 }
                               }}
                               className="w-8 h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-red-500/80 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
@@ -4592,6 +4522,13 @@ export default function App() {
             profileData={profileData}
             setProfileData={setProfileData}
             triggerToast={(msg) => setToastMessage(msg)}
+            session={session}
+            onLogout={async () => {
+              await supabase.auth.signOut();
+              localStorage.removeItem("fitai_active_profile_id");
+              setActiveProfileId(null);
+              setToastMessage("🔒 Logged out successfully");
+            }}
           />
         )}
         {activeTab === "profile" && (
@@ -4607,6 +4544,7 @@ export default function App() {
             openRecipeDetails={openRecipeDetails}
             triggerToast={(msg) => setToastMessage(msg)}
             activeProfileId={activeProfileId}
+            currentStreak={currentStreak}
           />
         )}
         {activeTab === "edit-profile" && (
@@ -5610,7 +5548,7 @@ export default function App() {
           />
 
           <div className="flex-1 flex justify-center">
-            {selectedDate === "2026-07-08" ? (
+            {selectedDate === todayStr ? (
               <motion.button
                 id="fab-add-food"
                 onClick={() => {
