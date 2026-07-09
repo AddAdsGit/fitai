@@ -2252,9 +2252,19 @@ const SettingsView = ({
 
               {/* Gemini API Key field */}
               <div className="pt-3 border-t border-stone-100">
-                <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                  Gemini API Key (For local AI Text Refinement)
-                </label>
+                <div className="flex justify-between items-baseline mb-1">
+                  <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block">
+                    Gemini API Key (For local AI Text Refinement)
+                  </label>
+                  <a
+                    href="https://aistudio.google.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[8px] font-black uppercase text-orange-500 tracking-wider hover:underline"
+                  >
+                    Get Free Key ↗
+                  </a>
+                </div>
                 <div className="flex gap-2">
                   <input
                     type="password"
@@ -2475,10 +2485,12 @@ const ManualLogModal = ({
   onClose,
   onAddMeal,
   mealToEdit,
+  onNavigateToSettings,
 }: {
   onClose: () => void;
   onAddMeal: (meal: any) => void;
   mealToEdit?: Meal | null;
+  onNavigateToSettings: () => void;
 }) => {
   const [name, setName] = useState(mealToEdit?.name || "");
   const [calories, setCalories] = useState(mealToEdit ? String(mealToEdit.calories) : "");
@@ -2499,6 +2511,11 @@ const ManualLogModal = ({
   const [aiInstruction, setAiInstruction] = useState("");
   const [aiPreview, setAiPreview] = useState<{ calories: number; protein: number; carbs: number; fats: number; name: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const hasGeminiKey = !!(
+    localStorage.getItem("fitai_gemini_api_key")?.trim() ||
+    (import.meta as any).env.VITE_GEMINI_API_KEY?.trim()
+  );
 
   const handleRefineWithAi = async () => {
     if (!aiInstruction.trim()) return;
@@ -2606,20 +2623,20 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
             <button
               onClick={() => setSegment("manual")}
               className={cn(
-                "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
                 segment === "manual" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
               )}
             >
-              📝 Manual Edit
+              Manual Log
             </button>
             <button
               onClick={() => setSegment("ai")}
               className={cn(
-                "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
                 segment === "ai" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
               )}
             >
-              🤖 AI Refiner
+              AI Refiner
             </button>
           </div>
         )}
@@ -2773,8 +2790,44 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                 </div>
               </div>
             </div>
+          ) : !hasGeminiKey ? (
+            /* AI REFINER TAB - LOCKED CONFIGURATION STATE */
+            <div className="space-y-6 py-6 text-center font-sans">
+              <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center mx-auto shadow-2xs border border-orange-100/50">
+                <Sparkles className="w-5 h-5 text-orange-500" />
+              </div>
+              <div className="space-y-1.5 px-2">
+                <h5 className="text-xs font-black uppercase tracking-wider text-stone-850">
+                  AI Refinement Locked
+                </h5>
+                <p className="text-[10px] text-stone-500 font-bold max-w-[250px] mx-auto leading-normal">
+                  Configure your Gemini API key in settings to unlock text-based recipe refinement & macro calculation.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-col gap-3">
+                <div>
+                  <a
+                    href="https://aistudio.google.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-orange-600 hover:text-orange-700 bg-orange-50 px-3.5 py-1.5 rounded-full border border-orange-100/70 cursor-pointer transition-colors"
+                  >
+                    Get Free Gemini Key ↗
+                  </a>
+                </div>
+                <button
+                  onClick={() => {
+                    onClose();
+                    onNavigateToSettings();
+                  }}
+                  className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl transition-all cursor-pointer shadow-3xs"
+                >
+                  Configure Settings
+                </button>
+              </div>
+            </div>
           ) : (
-            /* AI REFINER TAB */
+            /* AI REFINER TAB - UNLOCKED ACTIVE STATE */
             <div className="space-y-4">
               <div>
                 <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
@@ -2784,7 +2837,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                   placeholder="E.g. 'I had it with extra chicken', 'make it a half portion', 'add a glass of orange juice'..."
                   value={aiInstruction}
                   onChange={(e) => setAiInstruction(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500 min-h-[90px] resize-none"
+                  className="w-full bg-[#fcfbfa] border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500 min-h-[90px] resize-none"
                 />
               </div>
 
@@ -2800,7 +2853,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
           )}
         </div>
 
-        {!aiPreview && (
+        {(!aiPreview && (segment === "manual" || hasGeminiKey)) && (
           <div className="shrink-0 pt-2 border-t border-stone-100">
             <button
               onClick={() => {
@@ -5596,6 +5649,7 @@ export default function App() {
             }}
             onAddMeal={onAddMeal}
             mealToEdit={mealToEdit}
+            onNavigateToSettings={() => setActiveTab("profile")}
           />
         )}
       </AnimatePresence>
