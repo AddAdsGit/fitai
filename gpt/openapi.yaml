@@ -153,7 +153,11 @@ paths:
                   description: Target date in YYYY-MM-DD format. Defaults to today.
                 image:
                   type: string
-                  description: Optional public web image URL of this food item. You can search the web (e.g. Unsplash or open food databases) to find a high-quality relevant picture link matching this food.
+                  description: >-
+                    Optional public image URL for this food item. IMPORTANT: Do NOT use the URL of any file the user uploaded to the chat — those are temporary private links that will not work.
+                    Instead, search the web for a high-quality food photo and pass a direct public image URL (e.g., from Unsplash, Wikimedia, or a food database).
+                    Example format: "https://images.unsplash.com/photo-xxxx?w=400&q=80".
+                    If you cannot find a suitable public image URL, leave this field empty and the app will auto-generate one.
                 timezone:
                   type: string
                   description: The user's timezone identifier (e.g., "America/New_York", "Asia/Kolkata"). If provided, it is used to resolve the current local date and time if they are not explicitly specified.

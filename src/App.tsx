@@ -3775,7 +3775,50 @@ export default function App() {
     loadUserData();
   }, [activeProfileId]);
 
+  // Real-time subscription: auto-refresh meals when ChatGPT logs a new meal
+  useEffect(() => {
+    if (!isSupabaseConfigured || !activeProfileId) return;
 
+    const channel = supabase
+      .channel(`meals-realtime-${activeProfileId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'meals',
+          filter: `profile_id=eq.${activeProfileId}`,
+        },
+        async () => {
+          // Refetch all meals when any change happens (insert/update/delete)
+          const { data, error } = await supabase
+            .from('meals')
+            .select('*')
+            .eq('profile_id', activeProfileId)
+            .order('created_at', { ascending: false });
+          if (!error && data) {
+            const mappedMeals: Meal[] = data.map((m) => ({
+              id: m.id,
+              name: m.name,
+              time: m.time,
+              type: m.type,
+              calories: m.calories,
+              protein: m.protein,
+              carbs: m.carbs,
+              fats: m.fats,
+              image: m.image,
+              date: m.date,
+            }));
+            setMealsState(mappedMeals);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeProfileId]);
 
 
 
@@ -4859,14 +4902,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 </h3>
                 {selectedDate === todayStr && (
                   <div className="flex gap-2">
-                    <button
-                      onClick={handleGenerateAiRecipe}
-                      disabled={isGeneratingRecipe}
-                      className="text-orange-950/75 font-black uppercase text-[9px] tracking-wider flex items-center gap-1.5 bg-[#fffbfa] border border-orange-100 hover:bg-orange-50 px-3.5 py-1.5 rounded-full shadow-2xs transition-all cursor-pointer disabled:opacity-50 select-none active:scale-95 z-20"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
-                      <span>{isGeneratingRecipe ? "Generating..." : "AI Recipe"}</span>
-                    </button>
                     <button
                       onClick={() => setIsCameraFullScreen(true)}
                       className="text-orange-600 font-black uppercase text-[10px] tracking-[0.15em] flex items-center gap-1 group bg-orange-100/50 px-3.5 py-1.5 rounded-full border border-orange-200/30 hover:bg-orange-200/50 transition-colors cursor-pointer select-none active:scale-95"
