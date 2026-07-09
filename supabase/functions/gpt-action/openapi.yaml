@@ -4,8 +4,8 @@ info:
   description: API for synchronizing user profiles, food/nutrition logs, recipes, and memories with the FitAI dashboard.
   version: 1.0.0
 servers:
-  - url: https://your-project-ref.supabase.co/functions/v1/gpt-action
-    description: Supabase Edge Function URL (replace 'your-project-ref' with your actual Supabase project ID)
+  - url: https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action
+    description: Supabase Edge Function URL for project twrjigbbgioqdpwvkblo
 paths:
   /profile:
     get:
