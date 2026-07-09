@@ -4,6 +4,7 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
-!.env.example
+# NOTE: .env files are intentionally tracked in this PRIVATE repo
+# so development can be resumed on any machine without re-configuring keys.
+# NEVER make this repo public while keys are present.
 .vercel
