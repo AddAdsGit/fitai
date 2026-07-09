@@ -50,7 +50,7 @@ In the Actions editor, click **Authentication** and configure:
 | Scope | *(leave blank)* |
 | Token Format | `Bearer` |
 
-> ⚠️ **IMPORTANT**: The OAuth consent page always redirects to **https://fitpush.vercel.app** (production). Never use localhost for OAuth — it won't work for other users.
+> ⚠️ **IMPORTANT**: The OAuth consent page always redirects to **https://fitpush.vercel.app** (production). Never use localhost for OAuth — it 
 
 ---
 

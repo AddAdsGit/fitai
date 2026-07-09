@@ -2236,52 +2236,15 @@ const SettingsView = ({
               ChatGPT Integration
             </h3>
             <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-4">
-              {/* API Key field */}
-              <div>
-                <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                  Your Authentication Token (Bearer Key)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    readOnly
-                    value={profileData.api_key || "No token generated"}
-                    className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[10px] font-bold text-stone-700 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => copyToClipboard(profileData.api_key, "API Bearer Token")}
-                    className="bg-stone-900 text-white text-[9px] font-black uppercase tracking-wider px-3.5 rounded-xl hover:bg-stone-850 active:scale-95 transition-all cursor-pointer"
-                  >
-                    Copy Token
-                  </button>
+              {/* ChatGPT Connected via OAuth — no manual token needed */}
+              <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl p-3.5">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1 shrink-0 animate-pulse" />
+                <div>
+                  <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">ChatGPT Connected via OAuth</p>
+                  <p className="text-[9px] text-emerald-600 font-medium mt-0.5 leading-relaxed">
+                    Your account connects automatically when users sign in through the Custom GPT. No token copy-paste needed.
+                  </p>
                 </div>
-                <span className="text-[8px] text-stone-400 font-semibold mt-1 block">
-                  Paste this token as the Bearer token in your Custom GPT configuration.
-                </span>
-              </div>
-
-              {/* OpenAPI Schema Copy */}
-              <div className="pt-3 border-t border-stone-100">
-                <label className="text-[8px] font-black uppercase text-stone-400 tracking-wider block mb-1">
-                  OpenAPI Schema for Custom GPT Action
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value="openapi.yaml (FitAI GPT Action Spec)"
-                    className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[10px] font-bold text-stone-500 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => copyToClipboard(openApiYaml, "OpenAPI Schema")}
-                    className="bg-stone-900 text-white text-[9px] font-black uppercase tracking-wider px-3.5 rounded-xl hover:bg-stone-850 active:scale-95 transition-all cursor-pointer"
-                  >
-                    Copy Schema
-                  </button>
-                </div>
-                <span className="text-[8px] text-stone-400 font-semibold mt-1 block">
-                  Copy and paste this OpenAPI spec into the Custom GPT Actions schema builder.
-                </span>
               </div>
 
               {/* Custom GPT Redirect Link field */}
