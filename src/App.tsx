@@ -3854,7 +3854,7 @@ export default function App() {
 
         {/* Footer info */}
         <div className="text-center text-[8px] text-stone-300 font-bold tracking-widest uppercase">
-          Powered by Supabase & Custom GPT
+          © 2026 FitAI. All rights reserved.
         </div>
       </div>
     );
@@ -4018,7 +4018,7 @@ export default function App() {
                 About Yourself
               </label>
               <textarea
-                placeholder="Describe your lifestyle, fitness goals, or allergies... (Only you can edit this)"
+                placeholder="Describe your lifestyle, fitness goals, or allergies... (AI cannot edit this)"
                 value={onboardBio}
                 onChange={(e) => setOnboardBio(e.target.value)}
                 rows={3}
@@ -4038,7 +4038,7 @@ export default function App() {
 
         {/* Footer info */}
         <div className="text-center text-[8px] text-stone-300 font-bold tracking-widest uppercase py-4">
-          Powered by Supabase & Custom GPT
+          © 2026 FitAI. All rights reserved.
         </div>
       </div>
     );
