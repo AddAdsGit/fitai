@@ -1,0 +1,8 @@
+{
+  "name": "FitAI - Nutrition Dashboard",
+  "description": "A high-performance, mobile-first nutrition and fitness tracking dashboard featuring macro and micro nutrient monitoring.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
