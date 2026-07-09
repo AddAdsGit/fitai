@@ -3338,7 +3338,7 @@ export default function App() {
         setActiveProfileId(existing.id);
         localStorage.setItem("fitai_active_profile_id", existing.id);
       } else {
-        const newKey = "sb_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+        const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
         const username = user.email ? user.email.split('@')[0] : "user_" + Math.random().toString(36).substring(7);
         
         const googleName = user.user_metadata?.full_name || username;
@@ -3517,7 +3517,7 @@ export default function App() {
         localStorage.setItem("fitai_active_profile_id", existing.id);
         showToast(`✨ Welcome back, @${username}!`);
       } else {
-        const newKey = "sb_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+        const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
         const newProfile = {
           username,
           display_name: username.charAt(0).toUpperCase() + username.slice(1),
@@ -3685,6 +3685,17 @@ export default function App() {
           console.error("Error loading profile details:", profileRes.error);
         } else if (profileRes.data) {
           const profile = profileRes.data;
+
+          // Auto-sync local timezone to preferences
+          const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const tzPref = `tz_${localTz}`;
+          let currentPrefs = profile.preferences || [];
+          if (!currentPrefs.some((p: string) => p.startsWith("tz_"))) {
+            const updatedPrefs = [...currentPrefs.filter((p: string) => !p.startsWith("tz_")), tzPref];
+            supabase.from('profiles').update({ preferences: updatedPrefs }).eq('id', profile.id).then();
+            profile.preferences = updatedPrefs;
+          }
+
           setProfileDataState({
             name: profile.display_name,
             username: profile.username || "",

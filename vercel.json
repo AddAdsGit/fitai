@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action/:path*"
+    }
+  ]
+}

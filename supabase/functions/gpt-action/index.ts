@@ -174,6 +174,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         access_token: userProfile.api_key,
         token_type: "Bearer",
+        expires_in: 31536000, // 1 year cache for ChatGPT
       }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
