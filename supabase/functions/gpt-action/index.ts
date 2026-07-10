@@ -310,19 +310,41 @@ serve(async (req) => {
           });
         }
 
-        // Check if the user has requested AI Photo refinement
-        const refineFoodPics = profile.preferences?.includes("refine_food_pics") ?? false;
-        
+        // --- Image Resolution ---
+        // Skip any ChatGPT-hosted private file URLs — they are temporary and require
+        // OpenAI session auth. Our server will always get 403 trying to fetch them.
         let imageUrlToDownload = body.image;
-        if (!imageUrlToDownload && refineFoodPics) {
-          // If no custom image was provided, but refiner is active, generate a gourmet styled food photo prompt
-          const searchName = encodeURIComponent(body.name.trim());
-          imageUrlToDownload = `https://image.pollinations.ai/p/gourmet,professional,food,styling,photography,of,${searchName}?width=400&height=300&nologo=true`;
+        if (imageUrlToDownload && (
+          imageUrlToDownload.includes("oaiusercontent.com") ||
+          imageUrlToDownload.includes("openai.com/files") ||
+          imageUrlToDownload.includes("files.oai")
+        )) {
+          console.log(`[image] Skipping private ChatGPT file URL: ${imageUrlToDownload}`);
+          imageUrlToDownload = null;
         }
 
-        let finalImageUrl = imageUrlToDownload || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80";
+        // Check if the user has requested AI Photo refinement
+        const refineFoodPics = profile.preferences?.includes("refine_food_pics") ?? false;
 
-        // Download external image and save to self-hosted Supabase Storage
+        // If no valid image provided, always auto-generate a real Unsplash food photo
+        // using the meal name as the search query. This ensures every meal has a photo.
+        if (!imageUrlToDownload) {
+          const searchQuery = encodeURIComponent(
+            body.name.trim().replace(/[^a-z0-9 ]/gi, " ").trim()
+          );
+          if (refineFoodPics) {
+            // Premium gourmet AI-styled image
+            imageUrlToDownload = `https://image.pollinations.ai/p/gourmet,professional,food,styling,photography,of,${searchQuery}?width=400&height=300&nologo=true`;
+          } else {
+            // Unsplash food search — free, no API key needed, always relevant
+            imageUrlToDownload = `https://source.unsplash.com/600x400/?food,${searchQuery}`;
+          }
+        }
+
+        let finalImageUrl = imageUrlToDownload;
+
+        // Download the resolved external image and save to Supabase Storage
+        // so it's permanently hosted and doesn't break when source URLs expire
         if (imageUrlToDownload && imageUrlToDownload.startsWith("http")) {
           try {
             // Ensure the public bucket exists (ignore errors if already exists)
@@ -332,41 +354,35 @@ serve(async (req) => {
               allowedMimeTypes: ["image/png", "image/jpeg", "image/gif", "image/webp"]
             });
           } catch (e) {
-            // Bucket already exists or admin rights issue
+            // Bucket already exists
           }
 
           try {
-            // Fetch external image URL
             const response = await fetch(imageUrlToDownload);
             if (response.ok) {
               const contentType = response.headers.get("content-type") || "image/jpeg";
               const blob = await response.blob();
-              
-              // Generate unique file path
-              const fileExtension = contentType.split("/")[1] || "jpg";
+              const fileExtension = contentType.split("/")[1]?.split(";")[0] || "jpg";
               const filename = `${profile.id}/${Date.now()}.${fileExtension}`;
 
-              // Upload to Supabase Storage
               const { data: uploadData, error: uploadError } = await supabase.storage
                 .from("meal-images")
-                .upload(filename, blob, {
-                  contentType,
-                  upsert: true
-                });
+                .upload(filename, blob, { contentType, upsert: true });
 
               if (!uploadError) {
-                // Construct public url
                 const { data: urlData } = supabase.storage
                   .from("meal-images")
                   .getPublicUrl(filename);
-                
                 finalImageUrl = urlData.publicUrl;
+                console.log(`[image] Saved to Supabase Storage: ${finalImageUrl}`);
               } else {
-                console.error("Supabase storage upload error:", uploadError);
+                console.error("[image] Supabase storage upload error:", uploadError);
               }
+            } else {
+              console.warn(`[image] Could not fetch image URL (${response.status}): ${imageUrlToDownload}`);
             }
           } catch (err) {
-            console.error("Failed to download external image URL:", err);
+            console.error("[image] Failed to download external image URL:", err);
           }
         }
 

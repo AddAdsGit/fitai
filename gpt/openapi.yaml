@@ -154,10 +154,9 @@ paths:
                 image:
                   type: string
                   description: >-
-                    Optional public image URL for this food item. IMPORTANT: Do NOT use the URL of any file the user uploaded to the chat — those are temporary private links that will not work.
-                    Instead, search the web for a high-quality food photo and pass a direct public image URL (e.g., from Unsplash, Wikimedia, or a food database).
-                    Example format: "https://images.unsplash.com/photo-xxxx?w=400&q=80".
-                    If you cannot find a suitable public image URL, leave this field empty and the app will auto-generate one.
+                    Leave this field EMPTY. Do NOT pass any image URL here — not from the user's upload, not from a web search.
+                    The server automatically fetches a real matching food photo for every meal using the meal name.
+                    Only pass a value here if the user explicitly provides a direct public image URL themselves.
                 timezone:
                   type: string
                   description: The user's timezone identifier (e.g., "America/New_York", "Asia/Kolkata"). If provided, it is used to resolve the current local date and time if they are not explicitly specified.
