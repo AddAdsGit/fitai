@@ -728,6 +728,93 @@ export const SettingsView = ({
                 </button>
               </div>
 
+              <div className="flex flex-col gap-2 pt-3 border-t border-stone-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-stone-700 block">Refine Uploaded Photos with AI</span>
+                    <span className="text-[9px] text-stone-400 font-medium block leading-tight">Replace uploaded food photos with styled AI versions</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const isRefining = profileData.preferences?.includes("refine_food_pics") ?? false;
+                      const updatedPrefs = isRefining
+                        ? (profileData.preferences || []).filter((p: string) => p !== "refine_food_pics")
+                        : [...(profileData.preferences || []), "refine_food_pics"];
+                      setProfileData({
+                        ...profileData,
+                        preferences: updatedPrefs
+                      });
+                      triggerToast(isRefining ? "🎨 AI Photo Refinement disabled" : "🎨 AI Photo Refinement enabled!");
+                    }}
+                    className={`w-10 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative flex items-center cursor-pointer ${
+                      profileData.preferences?.includes("refine_food_pics") ? "bg-emerald-500" : "bg-stone-200"
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
+                        profileData.preferences?.includes("refine_food_pics") ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {profileData.preferences?.includes("refine_food_pics") && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-2 space-y-3 pl-1"
+                  >
+                    <div>
+                      <label className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">Visual Art Style</label>
+                      <select
+                        value={profileData.preferences?.find((p: string) => p.startsWith("food_pic_style:"))?.split(":")[1] || "gourmet"}
+                        onChange={(e) => {
+                          const newStyle = e.target.value;
+                          const filteredPrefs = (profileData.preferences || []).filter((p: string) => !p.startsWith("food_pic_style:"));
+                          setProfileData({
+                            ...profileData,
+                            preferences: [...filteredPrefs, `food_pic_style:${newStyle}`]
+                          });
+                        }}
+                        className="w-full bg-stone-50 border border-stone-150 rounded-xl px-3 py-2 text-[10px] font-bold text-stone-700 focus:outline-none cursor-pointer"
+                      >
+                        <option value="gourmet">Gourmet Studio (Default)</option>
+                        <option value="anime">Anime / Studio Ghibli illustration</option>
+                        <option value="south_indian">Traditional South Indian Home-style</option>
+                        <option value="restaurant">Vibrant Restaurant Plating</option>
+                        <option value="dubai">Dubai Luxury / Fine Dining</option>
+                        <option value="custom">Custom Prompt Style...</option>
+                      </select>
+                    </div>
+
+                    {profileData.preferences?.find((p: string) => p.startsWith("food_pic_style:"))?.split(":")[1] === "custom" && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="space-y-1"
+                      >
+                        <label className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">Custom Style Prompt</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. claymation style, oil painting, sketch"
+                          value={profileData.preferences?.find((p: string) => p.startsWith("food_pic_custom_style:"))?.split(":")[1] || ""}
+                          onChange={(e) => {
+                            const newCustomStyle = e.target.value;
+                            const filteredPrefs = (profileData.preferences || []).filter((p: string) => !p.startsWith("food_pic_custom_style:"));
+                            setProfileData({
+                              ...profileData,
+                              preferences: [...filteredPrefs, `food_pic_custom_style:${newCustomStyle}`]
+                            });
+                          }}
+                          className="w-full bg-stone-50 border border-stone-150 rounded-xl px-3 py-2 text-[10px] font-bold text-stone-700 focus:outline-none focus:border-stone-300"
+                        />
+                      </motion.div>
+                    )}
+                  </motion.div>
+                )}
+              </div>
+
               <div>
                 <span className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">Your Webhook API key</span>
                 <div className="flex gap-2">

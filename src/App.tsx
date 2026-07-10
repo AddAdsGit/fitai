@@ -809,6 +809,7 @@ export default function App() {
       const remainingProtein = Math.max(0, targetProtein - totalProtein);
       const remainingCarbs = Math.max(0, targetCarbs - totalCarbs);
       const remainingFats = Math.max(0, targetFats - totalFats);
+      const remainingFiber = Math.max(0, targetFiber - totalFiber);
       const prompt = `You are a professional dietitian. Generate a custom meal recipe based on the user's consumption today and remaining macro goals.
 Meals already logged today:
 ${mealsSummary || "None logged yet"}

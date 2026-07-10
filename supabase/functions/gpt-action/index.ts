@@ -528,17 +528,44 @@ serve(async (req) => {
         const refineFoodPics = profile.preferences?.includes("refine_food_pics") ?? false;
         const disableEmptyImages = profile.preferences?.includes("disable_empty_images") ?? false;
 
-        // If no valid image URL was resolved, generate a default food photo
-        if (!imageUrlToDownload && !disableEmptyImages) {
-          const searchQuery = encodeURIComponent(
-            body.name.trim().replace(/[^a-z0-9 ]/gi, " ").trim()
-          );
+        // Resolve preferred style prompt prefix
+        const styleTag = profile.preferences?.find((p: string) => p.startsWith("food_pic_style:")) || "food_pic_style:gourmet";
+        const styleKey = styleTag.split(":")[1] || "gourmet";
+        
+        let stylePrompt = "gourmet,professional,food,styling,photography";
+        if (styleKey === "anime") {
+          stylePrompt = "anime style,studio ghibli,detailed,hand-drawn food illustration";
+        } else if (styleKey === "south_indian") {
+          stylePrompt = "traditional south indian home-style food styling,organic,warm lighting";
+        } else if (styleKey === "restaurant") {
+          stylePrompt = "vibrant professional restaurant plating,gourmet food presentation,cinematic lighting";
+        } else if (styleKey === "dubai") {
+          stylePrompt = "dubai luxury fine dining,gold leaf garnish,opulent presentation,professional studio lighting";
+        } else if (styleKey === "custom") {
+          const customTag = profile.preferences?.find((p: string) => p.startsWith("food_pic_custom_style:")) || "food_pic_custom_style:";
+          const customVal = customTag.split(":")[1] || "";
+          if (customVal.trim()) {
+            stylePrompt = customVal.trim().replace(/[^a-z0-9, ]/gi, " ");
+          }
+        }
+
+        const searchQuery = encodeURIComponent(
+          body.name.trim().replace(/[^a-z0-9 ]/gi, " ").trim()
+        );
+
+        if (imageUrlToDownload && refineFoodPics) {
+          // Override real photo with refined AI styled version
+          imageUrlToDownload = `https://image.pollinations.ai/p/${stylePrompt},of,${searchQuery}?width=600&height=400&nologo=true`;
+          console.log(`[image-refinement] Overriding uploaded photo with AI style [${styleKey}]: ${imageUrlToDownload}`);
+        } else if (!imageUrlToDownload && !disableEmptyImages) {
           if (refineFoodPics) {
-            // Premium gourmet AI-styled image
-            imageUrlToDownload = `https://image.pollinations.ai/p/gourmet,professional,food,styling,photography,of,${searchQuery}?width=400&height=300&nologo=true`;
+            // Generate styled fallback for empty logs
+            imageUrlToDownload = `https://image.pollinations.ai/p/${stylePrompt},of,${searchQuery}?width=600&height=400&nologo=true`;
+            console.log(`[image-refinement] Generating styled AI fallback [${styleKey}] for text log: ${imageUrlToDownload}`);
           } else {
-            // Unsplash food search — free, no API key needed, always relevant
+            // Standard Unsplash stock fallback
             imageUrlToDownload = `https://source.unsplash.com/600x400/?food,${searchQuery}`;
+            console.log(`[image-refinement] Using stock fallback for text log: ${imageUrlToDownload}`);
           }
         }
 
