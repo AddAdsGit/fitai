@@ -181,6 +181,191 @@ serve(async (req) => {
       });
     }
 
+    // D. GET or POST /telegram/cron (Bypass standard user authentication)
+    if (path.endsWith("/telegram/cron")) {
+      const cronSecret = Deno.env.get("CRON_SECRET") || "fitai_cron_secret_2026";
+      const requestSecret = url.searchParams.get("secret");
+      if (requestSecret !== cronSecret) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // 1. Fetch profiles with telegram integrations active
+      const { data: activeProfiles, error: fetchErr } = await supabase
+        .from("profiles")
+        .select("*")
+        .or("telegram_reminders_enabled.eq.true,telegram_reports_enabled.eq.true");
+
+      if (fetchErr || !activeProfiles) {
+        return new Response(JSON.stringify({ error: "Failed to fetch active profiles", details: fetchErr }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const results = [];
+
+      for (const prof of activeProfiles) {
+        const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN") || prof.telegram_bot_token;
+        const chatId = prof.telegram_chat_id;
+        if (!botToken || !chatId) continue;
+
+        const tz = prof.timezone || "UTC";
+        // Parse local time
+        let localDateStr = "";
+        let localTimeStr = "";
+        try {
+          const d = new Date();
+          const formatterDate = new Intl.DateTimeFormat("en-US", {
+            timeZone: tz,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          });
+          const formatterTime = new Intl.DateTimeFormat("en-US", {
+            timeZone: tz,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+          });
+
+          // Date format splits to ["MM", "DD", "YYYY"]
+          const partsDate = formatterDate.format(d).split("/");
+          localDateStr = `${partsDate[2]}-${partsDate[0]}-${partsDate[1]}`;
+          localTimeStr = formatterTime.format(d);
+        } catch (tzErr) {
+          console.error(`Invalid timezone for profile ${prof.username}: ${tz}`, tzErr);
+          continue;
+        }
+
+        // A. Daily Report Check
+        if (prof.telegram_reports_enabled) {
+          const currentHour = parseInt(localTimeStr.split(":")[0]);
+          // Send report between 21:00 (9 PM) and 22:00 (10 PM) in user local time
+          if (currentHour >= 21 && currentHour < 22) {
+            // Check if report already sent today
+            if (prof.last_telegram_report_at !== localDateStr) {
+              // Fetch meals for today
+              const { data: meals, error: mealsErr } = await supabase
+                .from("meals")
+                .select("*")
+                .eq("profile_id", prof.id)
+                .eq("date", localDateStr);
+
+              if (!mealsErr && meals) {
+                let totalCals = 0;
+                let totalP = 0;
+                let totalC = 0;
+                let totalF = 0;
+                meals.forEach((m) => {
+                  totalCals += m.calories || 0;
+                  totalP += m.protein || 0;
+                  totalC += m.carbs || 0;
+                  totalF += m.fats || 0;
+                });
+
+                let msg = `📊 *Daily Nutrition Report (${localDateStr})*\n\n`;
+                msg += `👤 *User:* ${prof.display_name}\n\n`;
+                msg += `🔥 *Calories:* ${totalCals} / ${prof.daily_calories_goal} kcal\n`;
+                msg += `🥩 *Protein:* ${totalP} / ${prof.protein_goal}g\n`;
+                msg += `🍞 *Carbs:* ${totalC} / ${prof.carbs_goal}g\n`;
+                msg += `🥑 *Fats:* ${totalF} / ${prof.fats_goal}g\n\n`;
+
+                if (meals.length === 0) {
+                  msg += `⚠️ You logged no meals today. Don't forget to track your nutrition!`;
+                } else {
+                  msg += `🍽️ *Meals logged:* \n`;
+                  meals.forEach((m) => {
+                    msg += `- *${m.name}* (${m.calories} kcal, P:${m.protein}g C:${m.carbs}g F:${m.fats}g)\n`;
+                  });
+                }
+
+                try {
+                  const sendRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      chat_id: chatId,
+                      text: msg,
+                      parse_mode: "Markdown",
+                    }),
+                  });
+
+                  if (sendRes.ok) {
+                    await supabase
+                      .from("profiles")
+                      .update({ last_telegram_report_at: localDateStr })
+                      .eq("id", prof.id);
+                    results.push({ username: prof.username, type: "report", status: "success" });
+                  } else {
+                    const errTxt = await sendRes.text();
+                    console.error(`Failed to send TG report for ${prof.username}: ${errTxt}`);
+                  }
+                } catch (sendErr) {
+                  console.error(`Error sending TG report:`, sendErr);
+                }
+              }
+            }
+          }
+        }
+
+        // B. Reminders Check
+        if (prof.telegram_reminders_enabled && prof.telegram_reminder_times) {
+          const reminderTimes = prof.telegram_reminder_times; // Array of HH:MM strings
+          const currentHourMin = localTimeStr; // "HH:MM"
+          
+          // Check if current hour-min matches any reminder times
+          const isTimeForReminder = reminderTimes.some((rt: string) => {
+            const [rtH, rtM] = rt.split(":").map(Number);
+            const [curH, curM] = currentHourMin.split(":").map(Number);
+            const diffMin = (curH * 60 + curM) - (rtH * 60 + rtM);
+            return diffMin >= 0 && diffMin < 15; // Trigger in 15 minute window
+          });
+
+          if (isTimeForReminder) {
+            // Check if reminder was already sent recently (within 1 hour)
+            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+            const lastSent = prof.last_telegram_reminder_at;
+            if (!lastSent || new Date(lastSent).toISOString() < oneHourAgo) {
+              const msg = `🔔 *FitAI Logging Reminder*\nHi ${prof.display_name}, it's time to log your recent meals to keep up with your daily macro goals!`;
+              
+              try {
+                const sendRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    chat_id: chatId,
+                    text: msg,
+                    parse_mode: "Markdown",
+                  }),
+                });
+
+                if (sendRes.ok) {
+                  await supabase
+                    .from("profiles")
+                    .update({ last_telegram_reminder_at: new Date().toISOString() })
+                    .eq("id", prof.id);
+                  results.push({ username: prof.username, type: "reminder", status: "success" });
+                } else {
+                  const errTxt = await sendRes.text();
+                  console.error(`Failed to send TG reminder for ${prof.username}: ${errTxt}`);
+                }
+              } catch (sendErr) {
+                console.error(`Error sending TG reminder:`, sendErr);
+              }
+            }
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ processed: results }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // --- STANDARD API REQUEST AUTHENTICATION ---
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -311,23 +496,38 @@ serve(async (req) => {
         }
 
         // --- Image Resolution ---
-        // Skip any ChatGPT-hosted private file URLs — they are temporary and require
-        // OpenAI session auth. Our server will always get 403 trying to fetch them.
-        let imageUrlToDownload = body.image;
-        if (imageUrlToDownload && (
-          imageUrlToDownload.includes("oaiusercontent.com") ||
-          imageUrlToDownload.includes("openai.com/files") ||
-          imageUrlToDownload.includes("files.oai")
-        )) {
-          console.log(`[image] Skipping private ChatGPT file URL: ${imageUrlToDownload}`);
-          imageUrlToDownload = null;
+        let imageUrlToDownload = null;
+
+        // 1. Check if an image was uploaded via ChatGPT Actions file references (openaiFileIdRefs)
+        if (body.openaiFileIdRefs && Array.isArray(body.openaiFileIdRefs) && body.openaiFileIdRefs.length > 0) {
+          const imageRef = body.openaiFileIdRefs.find((file: any) => 
+            file.mime_type?.startsWith("image/") || 
+            file.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+          );
+          if (imageRef && imageRef.download_link) {
+            imageUrlToDownload = imageRef.download_link;
+            console.log(`[image] Found uploaded image via openaiFileIdRefs: ${imageUrlToDownload}`);
+          }
+        }
+
+        // 2. Fall back to body.image if no file reference was provided
+        if (!imageUrlToDownload && body.image) {
+          imageUrlToDownload = body.image;
+          // Skip any ChatGPT-hosted private file URLs passed as strings
+          if (
+            imageUrlToDownload.includes("oaiusercontent.com") ||
+            imageUrlToDownload.includes("openai.com/files") ||
+            imageUrlToDownload.includes("files.oai")
+          ) {
+            console.log(`[image] Skipping private ChatGPT file URL: ${imageUrlToDownload}`);
+            imageUrlToDownload = null;
+          }
         }
 
         // Check if the user has requested AI Photo refinement
         const refineFoodPics = profile.preferences?.includes("refine_food_pics") ?? false;
 
-        // If no valid image provided, always auto-generate a real Unsplash food photo
-        // using the meal name as the search query. This ensures every meal has a photo.
+        // If no valid image URL was resolved, generate a default food photo
         if (!imageUrlToDownload) {
           const searchQuery = encodeURIComponent(
             body.name.trim().replace(/[^a-z0-9 ]/gi, " ").trim()
@@ -430,6 +630,7 @@ serve(async (req) => {
           protein: parseInt(body.protein || 0),
           carbs: parseInt(body.carbs || 0),
           fats: parseInt(body.fats || 0),
+          fiber: parseInt(body.fiber || 0),
           image: finalImageUrl,
           date: resolvedDate
         };
@@ -563,6 +764,7 @@ serve(async (req) => {
         if (body.protein !== undefined) updateData.protein = parseInt(body.protein);
         if (body.carbs !== undefined) updateData.carbs = parseInt(body.carbs);
         if (body.fats !== undefined) updateData.fats = parseInt(body.fats);
+        if (body.fiber !== undefined) updateData.fiber = parseInt(body.fiber);
         if (body.type !== undefined) updateData.type = body.type;
         if (body.time !== undefined) updateData.time = body.time;
         if (body.date !== undefined) updateData.date = body.date;
@@ -659,6 +861,50 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({ message: "Recipe saved successfully", recipe: newRecipe }), {
           status: 201,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // --- TELEGRAM ENDPOINTS ---
+    if (path.endsWith("/telegram/test") && method === "POST") {
+      const body = await req.json();
+      const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN") || body.telegram_bot_token || profile.telegram_bot_token;
+      const chatId = body.telegram_chat_id || profile.telegram_chat_id;
+
+      if (!botToken || !chatId) {
+        return new Response(JSON.stringify({ error: "Missing bot token or chat ID" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      try {
+        const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `🔔 *FitAI Telegram Connection Verified!*\nYour account is now linked to receive daily reports and logging reminders.`,
+            parse_mode: "Markdown",
+          }),
+        });
+
+        if (!tgRes.ok) {
+          const errText = await tgRes.text();
+          return new Response(JSON.stringify({ error: `Telegram returned an error: ${errText}` }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ message: "Test message sent successfully!" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: `Failed to contact Telegram: ${String(err)}` }), {
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

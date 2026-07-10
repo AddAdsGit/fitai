@@ -32,6 +32,14 @@ create table public.profiles (
   notion_api_key text,
   notion_database_id text,
   google_sheets_webhook_url text,
+  telegram_bot_token text,
+  telegram_chat_id text,
+  telegram_reminders_enabled boolean default false,
+  telegram_reports_enabled boolean default false,
+  telegram_reminder_times text[] default '{"09:00", "13:00", "20:00"}',
+  last_telegram_report_at date,
+  last_telegram_reminder_at timestamp with time zone,
+  timezone text default 'UTC',
   
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -47,6 +55,7 @@ create table public.meals (
   protein integer not null,
   carbs integer not null,
   fats integer not null,
+  fiber integer default 0 not null,
   image text,
   date date not null, -- E.g., "2026-07-08"
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -62,6 +71,7 @@ create table public.recipes (
   protein integer not null,
   carbs integer not null,
   fats integer not null,
+  fiber integer default 0 not null,
   tags text[] default '{}',
   image text,
   ingredients text[] default '{}',

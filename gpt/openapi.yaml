@@ -18,8 +18,8 @@ info:
     3. Deleting Logged Meals: If the user requests to delete or remove a logged item, the GPT must call GET /meals to find the ID and invoke DELETE /meals?id=<id>.
   version: 1.0.0
 servers:
-  - url: https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action
-    description: Supabase Edge Function URL for project twrjigbbgioqdpwvkblo
+  - url: https://fitpush.vercel.app/api
+    description: FitAI Webhook Action API (Proxied via fitpush.vercel.app)
 paths:
   /profile:
     get:
@@ -160,6 +160,20 @@ paths:
                 timezone:
                   type: string
                   description: The user's timezone identifier (e.g., "America/New_York", "Asia/Kolkata"). If provided, it is used to resolve the current local date and time if they are not explicitly specified.
+                openaiFileIdRefs:
+                  type: array
+                  description: References to images or files uploaded by the user to the chat session. The backend will download these.
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      mime_type:
+                        type: string
+                      download_link:
+                        type: string
       responses:
         '201':
           description: Meal logged successfully

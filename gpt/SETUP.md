@@ -45,8 +45,8 @@ In the Actions editor, click **Authentication** and configure:
 | Authentication Type | `OAuth` |
 | Client ID | `fitai-chatgpt-client` |
 | Client Secret | `fitai-secret-key` |
-| Authorization URL | `https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action/oauth/authorize` |
-| Token URL | `https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action/oauth/token` |
+| Authorization URL | `https://fitpush.vercel.app/api/oauth/authorize` |
+| Token URL | `https://fitpush.vercel.app/api/oauth/token` |
 | Scope | *(leave blank)* |
 | Token Format | `Bearer` |
 
