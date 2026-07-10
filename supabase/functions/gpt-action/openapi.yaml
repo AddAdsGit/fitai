@@ -62,6 +62,7 @@ paths:
                       weight_goal:
                         type: number
     post:
+      x-openai-isConsequential: false
       summary: Update user profile or add memories
       description: Modify user specifications or add new nutritional habits, likes, dislikes, allergies, or fitness details.
       operationId: updateProfile
@@ -114,6 +115,7 @@ paths:
         '200':
           description: Logged meals retrieved successfully
     post:
+      x-openai-isConsequential: false
       summary: Log a new meal
       description: Record a consumed item, specifying name, macros (protein, carbs, fats), and calorie count. Trigger automatic Notion & Google Sheets sync if configured.
       operationId: logMeal
@@ -175,6 +177,7 @@ paths:
         '201':
           description: Meal logged successfully
     delete:
+      x-openai-isConsequential: false
       summary: Delete a logged meal
       description: Remove a logged meal entry from the dashboard by its unique ID.
       operationId: deleteMeal
@@ -193,6 +196,7 @@ paths:
         '404':
           description: Meal not found
     patch:
+      x-openai-isConsequential: false
       summary: Update a logged meal
       description: Modify properties of an existing logged meal by its unique ID.
       operationId: updateMeal
@@ -244,6 +248,7 @@ paths:
         '200':
           description: Recipes retrieved successfully
     post:
+      x-openai-isConsequential: false
       summary: Save a new custom recipe
       description: Store a custom dish outline, including cooking time, macros, tags, ingredients, and instructions.
       operationId: saveRecipe

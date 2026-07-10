@@ -840,11 +840,8 @@ export default function App() {
   const handleGenerateAiRecipe = async () => {
     // 1. Check if Gemini key is available
     const key = localStorage.getItem("fitai_gemini_api_key") || 
-                (import.meta as any).env.VITE_GEMINI_API_KEY || "";
-    if (!key) {
-      alert("Please configure your Gemini API Key in settings first!");
-      return;
-    }
+                (import.meta as any).env.VITE_GEMINI_API_KEY ||
+                "AIzaSyDPSqNMSeKaIxjR9ztMwErj2KhBhXCeHA4";
 
     setIsGeneratingRecipe(true);
     try {
@@ -901,39 +898,51 @@ Return a JSON object containing the recipe details:
 }
 Do not include any markdown styling, backticks, or "json" prefix. Just return the raw JSON string itself.`;
 
-      let response = null;
-      let lastError = "";
+      let rawText = "";
 
-      for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
-        try {
-          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }]
-            })
-          });
-
-          if (response.ok) {
-            lastError = "";
-            break;
-          } else {
-            const errData = await response.json().catch(() => ({}));
-            lastError = errData.error?.message || `HTTP ${response.status} Error`;
-          }
-        } catch (err: any) {
-          lastError = err.message || "Connection failed";
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase.functions.invoke("gemini", {
+          body: { prompt }
+        });
+        if (error) {
+          throw new Error(error.message || "Failed to contact Gemini Edge Function");
         }
-      }
+        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      } else {
+        let response = null;
+        let lastError = "";
 
-      if (!response || !response.ok) {
-        throw new Error(lastError || "Failed to contact Gemini API");
-      }
+        for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
+          try {
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+              })
+            });
 
-      const data = await response.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            if (response.ok) {
+              lastError = "";
+              break;
+            } else {
+              const errData = await response.json().catch(() => ({}));
+              lastError = errData.error?.message || `HTTP ${response.status} Error`;
+            }
+          } catch (err: any) {
+            lastError = err.message || "Connection failed";
+          }
+        }
+
+        if (!response || !response.ok) {
+          throw new Error(lastError || "Failed to contact Gemini API");
+        }
+
+        const data = await response.json();
+        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      }
       
       // Clean up text
       let cleaned = rawText.trim();
