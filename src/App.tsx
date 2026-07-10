@@ -2949,56 +2949,30 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
           ) : (
             /* DETAILED EDIT TAB */
             <div className="space-y-4">
-              {/* ── World-class Photo Zone ── */}
+              {/* ── Photo Zone: Upload Only ── */}
               <div className="relative">
-                {/* Photo Preview / Upload Zone */}
                 <div
-                  className={`relative w-full rounded-3xl overflow-hidden transition-all duration-300 ${
-                    !hasNoGeneratedImage(imageUrl)
-                      ? "h-52 shadow-xl shadow-orange-100/40"
-                      : "h-44 border-2 border-dashed border-orange-200 bg-gradient-to-br from-orange-50/60 to-amber-50/40"
+                  className={`relative w-full rounded-3xl overflow-hidden transition-all duration-500 ${
+                    imageUrl && !hasNoGeneratedImage(imageUrl)
+                      ? "h-52 shadow-2xl shadow-orange-100/50"
+                      : "h-44 border-2 border-dashed border-stone-200 bg-stone-50/80"
                   }`}
                 >
-                  {/* Has Image */}
-                  {!hasNoGeneratedImage(imageUrl) ? (
+                  {imageUrl && !hasNoGeneratedImage(imageUrl) ? (
+                    /* ── Has photo: full-bleed preview ── */
                     <>
                       <img
                         src={imageUrl}
                         className="w-full h-full object-cover"
                         alt={name || "Meal photo"}
                       />
-                      {/* Dark gradient for legibility */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none" />
-
-                      {/* Overlay action pills */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent pointer-events-none" />
+                      {/* Action pills on top of photo */}
                       <div className="absolute bottom-3 left-3 right-3 flex gap-2">
-                        {/* AI Generate */}
-                        {hasGeminiKey && name.trim() && (
-                          <button
-                            onClick={async () => {
-                              const key = localStorage.getItem("fitai_gemini_api_key") || (import.meta as any).env.VITE_GEMINI_API_KEY || "";
-                              if (!key || !name.trim()) return;
-                              setIsProcessing(true);
-                              try {
-                                const q = encodeURIComponent(name.trim().replace(/\s+/g, ","));
-                                setImageUrl(`https://image.pollinations.ai/prompt/gourmet,professional,food,photography,${q},plated,beautiful,restaurant?width=600&height=400&nologo=true&seed=${Date.now()}`);
-                              } finally { setIsProcessing(false); }
-                            }}
-                            disabled={isProcessing}
-                            className="flex-1 backdrop-blur-md bg-white/20 hover:bg-white/30 border border-white/30 text-white text-[9px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                          >
-                            <Sparkles className="w-3 h-3" />
-                            <span>{isProcessing ? "Generating…" : "Regenerate"}</span>
-                          </button>
-                        )}
-                        {/* Upload */}
-                        <label className="flex-1 backdrop-blur-md bg-white/20 hover:bg-white/30 border border-white/30 text-white text-[9px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95">
-                          <Camera className="w-3 h-3" />
-                          <span>Change</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
+                        <label className="flex-1 backdrop-blur-md bg-white/20 hover:bg-white/35 active:bg-white/40 border border-white/25 text-white text-[10px] font-black uppercase tracking-wider py-2.5 rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer select-none">
+                          <Camera className="w-3.5 h-3.5" />
+                          Change Photo
+                          <input type="file" accept="image/*" className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {
@@ -3009,80 +2983,38 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                             }}
                           />
                         </label>
-                        {/* Remove */}
                         <button
                           onClick={() => setImageUrl("")}
-                          className="backdrop-blur-md bg-black/30 hover:bg-red-500/70 border border-white/10 text-white text-[9px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                          className="backdrop-blur-md bg-black/30 hover:bg-red-500/80 border border-white/10 text-white w-10 rounded-2xl flex items-center justify-center cursor-pointer transition-all active:scale-95 select-none"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
                     </>
                   ) : (
-                    /* Empty state — big inviting upload area */
-                    <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
-                      <div className="w-14 h-14 rounded-2xl bg-orange-100/70 flex items-center justify-center shadow-inner">
-                        <Camera className="w-6 h-6 text-orange-400" />
+                    /* ── Empty: big tap-to-upload zone ── */
+                    <label className="flex flex-col items-center justify-center h-full gap-4 cursor-pointer group px-4">
+                      <div className="w-16 h-16 rounded-2xl bg-white border border-stone-200 shadow-sm flex items-center justify-center group-hover:scale-105 group-hover:shadow-md transition-all duration-300">
+                        <Camera className="w-7 h-7 text-stone-400 group-hover:text-orange-500 transition-colors duration-300" />
                       </div>
                       <div className="text-center">
-                        <p className="text-xs font-black text-orange-800/60 tracking-wide">Add a food photo</p>
-                        <p className="text-[10px] text-orange-700/40 font-medium mt-0.5">Makes your log look 10× better</p>
+                        <p className="text-sm font-black text-stone-600 tracking-tight group-hover:text-stone-800 transition-colors">Tap to add a photo</p>
+                        <p className="text-[11px] text-stone-400 font-medium mt-0.5">JPG, PNG, WEBP · from your camera or gallery</p>
                       </div>
-                      <div className="flex gap-2 w-full max-w-xs">
-                        {/* AI Generate button (only if name typed) */}
-                        {hasGeminiKey && name.trim() ? (
-                          <button
-                            onClick={async () => {
-                              setIsProcessing(true);
-                              try {
-                                const q = encodeURIComponent(name.trim().replace(/\s+/g, ","));
-                                setImageUrl(`https://image.pollinations.ai/prompt/gourmet,professional,food,photography,${q},plated,beautiful,restaurant?width=600&height=400&nologo=true&seed=${Date.now()}`);
-                              } finally { setIsProcessing(false); }
-                            }}
-                            disabled={isProcessing}
-                            className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 text-white text-[9px] font-black uppercase tracking-wider py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md shadow-orange-200/50"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            {isProcessing ? "Generating…" : "AI Photo"}
-                          </button>
-                        ) : (
-                          <div className="flex-1 bg-orange-100/50 text-orange-400 text-[9px] font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 opacity-60">
-                            <Sparkles className="w-3 h-3" />
-                            Type name → AI photo
-                          </div>
-                        )}
-                        {/* Upload from device */}
-                        <label className="flex-1 bg-stone-900 hover:bg-stone-800 text-white text-[9px] font-black uppercase tracking-wider py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm transition-colors">
-                          <Camera className="w-3.5 h-3.5" />
-                          Upload
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => setImageUrl(reader.result as string);
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-                      </div>
-                      {/* URL paste as subtle tertiary option */}
-                      <input
-                        type="text"
-                        placeholder="…or paste an image URL"
-                        value={imageUrl.startsWith("data:") ? "" : imageUrl}
-                        onChange={(e) => setImageUrl(e.target.value)}
-                        className="w-full max-w-xs bg-white/60 border border-orange-200/50 rounded-xl px-3 py-2 text-[10px] font-semibold text-stone-600 focus:outline-none focus:border-orange-400 placeholder-stone-400/60 text-center"
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => setImageUrl(reader.result as string);
+                            reader.readAsDataURL(file);
+                          }
+                        }}
                       />
-                    </div>
+                    </label>
                   )}
                 </div>
               </div>
-
 
               <div>
                 <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
