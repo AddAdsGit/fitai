@@ -1,3 +1,11 @@
+# Environment Variables
+
+This file contains the environment variables for the FitAI project.
+These are stored here for convenience, as this is a private repository.
+
+**DO NOT make this repository public.**
+
+```
 # FitAI Environment Variables
 # This file is committed to the private GitHub repo for easy setup on any machine.
 # DO NOT make this repo public while these keys are here.
@@ -28,3 +36,4 @@ VITE_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmF
 
 # --- Gemini AI ---
 VITE_GEMINI_API_KEY="AIzaSyDmKUslCcY-TjJ8jKqyi-FAZAfyu79H8bw"
+```
