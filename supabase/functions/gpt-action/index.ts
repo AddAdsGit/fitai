@@ -526,9 +526,10 @@ serve(async (req) => {
 
         // Check if the user has requested AI Photo refinement
         const refineFoodPics = profile.preferences?.includes("refine_food_pics") ?? false;
+        const disableEmptyImages = profile.preferences?.includes("disable_empty_images") ?? false;
 
         // If no valid image URL was resolved, generate a default food photo
-        if (!imageUrlToDownload) {
+        if (!imageUrlToDownload && !disableEmptyImages) {
           const searchQuery = encodeURIComponent(
             body.name.trim().replace(/[^a-z0-9 ]/gi, " ").trim()
           );

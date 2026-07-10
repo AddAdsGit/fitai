@@ -95,6 +95,7 @@ export const InsightsView = ({
       const protein = daysMeals.reduce((sum, m) => sum + m.protein, 0);
       const carbs = daysMeals.reduce((sum, m) => sum + m.carbs, 0);
       const fats = daysMeals.reduce((sum, m) => sum + m.fats, 0);
+      const fiber = daysMeals.reduce((sum, m) => sum + (m.fiber || 0), 0);
       
       let dayLabel = "";
       if (timeRange === "7D") {
@@ -111,6 +112,7 @@ export const InsightsView = ({
         protein,
         carbs,
         fats,
+        fiber,
         date: dateStr
       });
     }
@@ -449,6 +451,13 @@ export const InsightsView = ({
                   strokeWidth={3}
                   dot={false}
                 />
+                <Line
+                  type="monotone"
+                  dataKey="fiber"
+                  stroke="#10B981"
+                  strokeWidth={3}
+                  dot={false}
+                />
               </LineChart>
             )}
           </ResponsiveContainer>
@@ -471,6 +480,12 @@ export const InsightsView = ({
             <div className="w-2 h-2 rounded-full bg-[#FFB800]" />
             <span className="text-[10px] font-bold text-orange-950/60 uppercase">
               Fats
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-[#10B981]" />
+            <span className="text-[10px] font-bold text-orange-950/60 uppercase">
+              Fiber
             </span>
           </div>
         </div>

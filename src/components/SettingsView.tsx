@@ -699,6 +699,35 @@ export const SettingsView = ({
                 </button>
               </div>
 
+              <div className="flex items-center justify-between pt-3 border-t border-stone-50">
+                <div>
+                  <span className="text-[10px] font-bold text-stone-700 block">Generate Images for Text Logs</span>
+                  <span className="text-[9px] text-stone-400 font-medium block leading-tight">Create AI/Stock food photos automatically for text-only logs</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const isDisabled = profileData.preferences?.includes("disable_empty_images") ?? false;
+                    const updatedPrefs = isDisabled
+                      ? (profileData.preferences || []).filter((p: string) => p !== "disable_empty_images")
+                      : [...(profileData.preferences || []), "disable_empty_images"];
+                    setProfileData({
+                      ...profileData,
+                      preferences: updatedPrefs
+                    });
+                    triggerToast(isDisabled ? "🖼️ Image generation enabled!" : "🖼️ Image generation disabled");
+                  }}
+                  className={`w-10 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative flex items-center cursor-pointer ${
+                    !(profileData.preferences?.includes("disable_empty_images") ?? false) ? "bg-emerald-500" : "bg-stone-200"
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
+                      !(profileData.preferences?.includes("disable_empty_images") ?? false) ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+
               <div>
                 <span className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">Your Webhook API key</span>
                 <div className="flex gap-2">
