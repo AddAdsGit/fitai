@@ -2623,6 +2623,7 @@ const ManualLogModal = ({
   const [protein, setProtein] = useState(mealToEdit ? String(mealToEdit.protein) : "");
   const [carbs, setCarbs] = useState(mealToEdit ? String(mealToEdit.carbs) : "");
   const [fats, setFats] = useState(mealToEdit ? String(mealToEdit.fats) : "");
+  const [notes, setNotes] = useState((mealToEdit as any)?.notes || "");
   const [time, setTime] = useState(() => {
     if (mealToEdit?.time) return mealToEdit.time;
     const timeOptions: Intl.DateTimeFormatOptions = {
@@ -2633,6 +2634,7 @@ const ManualLogModal = ({
     return new Date().toLocaleTimeString("en-US", timeOptions);
   });
 
+  const isEditing = !!mealToEdit;
   const [segment, setSegment] = useState<"quick" | "detailed">(() => {
     if (mealToEdit) return "detailed";
     return "quick";
@@ -2806,27 +2808,29 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
           </button>
         </div>
 
-        {/* Tab Segment Switcher */}
-        <div className="flex bg-stone-100 rounded-xl p-1 shrink-0">
-          <button
-            onClick={() => setSegment("quick")}
-            className={cn(
-              "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-              segment === "quick" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
-            )}
-          >
-            Quick Log
-          </button>
-          <button
-            onClick={() => setSegment("detailed")}
-            className={cn(
-              "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-              segment === "detailed" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
-            )}
-          >
-            Detailed Log
-          </button>
-        </div>
+        {/* Tab Segment Switcher — hidden when editing an existing meal */}
+        {!isEditing && (
+          <div className="flex bg-stone-100 rounded-xl p-1 shrink-0">
+            <button
+              onClick={() => setSegment("quick")}
+              className={cn(
+                "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                segment === "quick" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
+              )}
+            >
+              Quick Log
+            </button>
+            <button
+              onClick={() => setSegment("detailed")}
+              className={cn(
+                "flex-1 py-1.5 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                segment === "detailed" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
+              )}
+            >
+              Detailed Log
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto pr-0.5 space-y-4 text-left">
           {segment === "quick" ? (
@@ -2945,80 +2949,140 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
           ) : (
             /* DETAILED EDIT TAB */
             <div className="space-y-4">
-              {/* Premium Full-bleed Cover Banner */}
-              <div className="h-32 w-[calc(100%+3rem)] -mx-6 -mt-6 relative overflow-hidden bg-stone-100 shrink-0 border-b border-stone-200/50">
-                {!hasNoGeneratedImage(imageUrl) ? (
-                  <img
-                    src={imageUrl}
-                    className="w-full h-full object-cover"
-                    alt={name || "Meal Cover"}
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#fffbfa] to-[#f9f6f3] flex items-center justify-center">
-                    <Utensils className="w-10 h-10 text-orange-500 opacity-20" />
-                  </div>
-                )}
-                {/* Subtle top shadow gradient overlay for aesthetics */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-transparent pointer-events-none" />
-
-                {/* Edit Photo Overlaid Button */}
-                <button
-                  onClick={() => setShowImagePanel(!showImagePanel)}
-                  className="absolute bottom-3 right-3 backdrop-blur-md bg-black/45 hover:bg-black/60 border border-white/10 text-white text-[8px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer z-25 shadow-sm shadow-black/10 active:scale-95"
+              {/* ── World-class Photo Zone ── */}
+              <div className="relative">
+                {/* Photo Preview / Upload Zone */}
+                <div
+                  className={`relative w-full rounded-3xl overflow-hidden transition-all duration-300 ${
+                    !hasNoGeneratedImage(imageUrl)
+                      ? "h-52 shadow-xl shadow-orange-100/40"
+                      : "h-44 border-2 border-dashed border-orange-200 bg-gradient-to-br from-orange-50/60 to-amber-50/40"
+                  }`}
                 >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>{showImagePanel ? "Close Edit" : "Edit Image"}</span>
-                </button>
-              </div>
+                  {/* Has Image */}
+                  {!hasNoGeneratedImage(imageUrl) ? (
+                    <>
+                      <img
+                        src={imageUrl}
+                        className="w-full h-full object-cover"
+                        alt={name || "Meal photo"}
+                      />
+                      {/* Dark gradient for legibility */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none" />
 
-              {/* Slide-down Image Editor Drawer */}
-              {showImagePanel && (
-                <div className="bg-stone-50 border border-stone-200/50 rounded-2xl p-3.5 space-y-3 animate-fade-in">
-                  <div className="flex items-center gap-1.5 text-[9px] font-black text-stone-500 uppercase tracking-wider">
-                    <Camera className="w-3.5 h-3.5 text-stone-500" />
-                    <span>Change Cover Image</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <input
-                      type="text"
-                      placeholder="Paste cover image link here..."
-                      value={imageUrl.startsWith("data:") ? "" : imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-900 focus:outline-none focus:border-orange-500 placeholder-stone-400"
-                    />
-                    <div className="flex gap-2 items-center">
-                      <div className="relative inline-block">
-                        <button className="bg-stone-900 hover:bg-stone-850 text-white text-[9px] font-black uppercase tracking-wider px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-3xs">
-                          Upload Photo
-                        </button>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setImageUrl(reader.result as string);
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                        />
-                      </div>
-                      {imageUrl && (
+                      {/* Overlay action pills */}
+                      <div className="absolute bottom-3 left-3 right-3 flex gap-2">
+                        {/* AI Generate */}
+                        {hasGeminiKey && name.trim() && (
+                          <button
+                            onClick={async () => {
+                              const key = localStorage.getItem("fitai_gemini_api_key") || (import.meta as any).env.VITE_GEMINI_API_KEY || "";
+                              if (!key || !name.trim()) return;
+                              setIsProcessing(true);
+                              try {
+                                const q = encodeURIComponent(name.trim().replace(/\s+/g, ","));
+                                setImageUrl(`https://image.pollinations.ai/prompt/gourmet,professional,food,photography,${q},plated,beautiful,restaurant?width=600&height=400&nologo=true&seed=${Date.now()}`);
+                              } finally { setIsProcessing(false); }
+                            }}
+                            disabled={isProcessing}
+                            className="flex-1 backdrop-blur-md bg-white/20 hover:bg-white/30 border border-white/30 text-white text-[9px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            <span>{isProcessing ? "Generating…" : "Regenerate"}</span>
+                          </button>
+                        )}
+                        {/* Upload */}
+                        <label className="flex-1 backdrop-blur-md bg-white/20 hover:bg-white/30 border border-white/30 text-white text-[9px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95">
+                          <Camera className="w-3 h-3" />
+                          <span>Change</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => setImageUrl(reader.result as string);
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                        {/* Remove */}
                         <button
                           onClick={() => setImageUrl("")}
-                          className="text-[9px] font-bold text-red-500 hover:text-red-650 ml-1.5 cursor-pointer"
+                          className="backdrop-blur-md bg-black/30 hover:bg-red-500/70 border border-white/10 text-white text-[9px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all flex items-center justify-center cursor-pointer active:scale-95"
                         >
-                          Remove Photo
+                          <X className="w-3 h-3" />
                         </button>
-                      )}
+                      </div>
+                    </>
+                  ) : (
+                    /* Empty state — big inviting upload area */
+                    <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
+                      <div className="w-14 h-14 rounded-2xl bg-orange-100/70 flex items-center justify-center shadow-inner">
+                        <Camera className="w-6 h-6 text-orange-400" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-black text-orange-800/60 tracking-wide">Add a food photo</p>
+                        <p className="text-[10px] text-orange-700/40 font-medium mt-0.5">Makes your log look 10× better</p>
+                      </div>
+                      <div className="flex gap-2 w-full max-w-xs">
+                        {/* AI Generate button (only if name typed) */}
+                        {hasGeminiKey && name.trim() ? (
+                          <button
+                            onClick={async () => {
+                              setIsProcessing(true);
+                              try {
+                                const q = encodeURIComponent(name.trim().replace(/\s+/g, ","));
+                                setImageUrl(`https://image.pollinations.ai/prompt/gourmet,professional,food,photography,${q},plated,beautiful,restaurant?width=600&height=400&nologo=true&seed=${Date.now()}`);
+                              } finally { setIsProcessing(false); }
+                            }}
+                            disabled={isProcessing}
+                            className="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 text-white text-[9px] font-black uppercase tracking-wider py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-md shadow-orange-200/50"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            {isProcessing ? "Generating…" : "AI Photo"}
+                          </button>
+                        ) : (
+                          <div className="flex-1 bg-orange-100/50 text-orange-400 text-[9px] font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 opacity-60">
+                            <Sparkles className="w-3 h-3" />
+                            Type name → AI photo
+                          </div>
+                        )}
+                        {/* Upload from device */}
+                        <label className="flex-1 bg-stone-900 hover:bg-stone-800 text-white text-[9px] font-black uppercase tracking-wider py-2.5 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-sm transition-colors">
+                          <Camera className="w-3.5 h-3.5" />
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => setImageUrl(reader.result as string);
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {/* URL paste as subtle tertiary option */}
+                      <input
+                        type="text"
+                        placeholder="…or paste an image URL"
+                        value={imageUrl.startsWith("data:") ? "" : imageUrl}
+                        onChange={(e) => setImageUrl(e.target.value)}
+                        className="w-full max-w-xs bg-white/60 border border-orange-200/50 rounded-xl px-3 py-2 text-[10px] font-semibold text-stone-600 focus:outline-none focus:border-orange-400 placeholder-stone-400/60 text-center"
+                      />
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
+
 
               <div>
                 <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1">
@@ -3099,33 +3163,47 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                 </div>
               </div>
 
-              {/* Minimalist AI Refinement Input */}
+              {/* Notes Field */}
+              <div>
+                <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1.5">
+                  📝 Notes (optional)
+                </label>
+                <textarea
+                  placeholder={`E.g. dry fruit seasoning, almond crunches, extra vanilla foam...`}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-orange-400 placeholder-stone-350 resize-none leading-relaxed"
+                />
+              </div>
+
+              {/* AI Refinement — bigger, more prominent */}
               {hasGeminiKey ? (
-                <div className="bg-[#fffbfa] border border-orange-100/50 rounded-2xl p-3.5 space-y-2 relative overflow-hidden">
-                  <div className="flex items-center gap-1.5 text-[9px] font-black text-orange-950/50 uppercase tracking-wider">
-                    <Sparkles className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
+                <div className="bg-gradient-to-br from-[#fffbf8] to-[#fff7f0] border border-orange-200/60 rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-sm">
+                  <div className="flex items-center gap-2 text-[10px] font-black text-orange-600 uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4 animate-pulse" />
                     <span>Adjust with AI</span>
+                    <span className="text-orange-300/80 font-normal normal-case tracking-normal text-[9px]">— let AI recalculate macros</span>
                   </div>
-                  <div className="flex gap-2 relative z-10">
-                    <input
-                      type="text"
-                      placeholder="E.g. 'double portion', 'add 1 egg'..."
-                      value={aiInstruction}
-                      onChange={(e) => setAiInstruction(e.target.value)}
-                      className="flex-1 bg-white border border-stone-200/60 rounded-xl px-3 py-2 text-xs font-semibold text-stone-900 focus:outline-none focus:border-orange-500 placeholder-stone-400"
-                    />
-                    <button
-                      onClick={handleRefineWithAi}
-                      disabled={isProcessing || !aiInstruction.trim()}
-                      className="bg-stone-950 hover:bg-stone-900 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-wider px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
-                    >
-                      {isProcessing ? "Refining..." : "Refine"}
-                    </button>
-                  </div>
+                  <textarea
+                    placeholder={`Describe any changes...\nE.g. "double portion", "add 1 egg", "swap rice for quinoa"`}
+                    value={aiInstruction}
+                    onChange={(e) => setAiInstruction(e.target.value)}
+                    rows={3}
+                    className="w-full bg-white border border-orange-200/50 rounded-xl px-3.5 py-3 text-xs font-semibold text-stone-900 focus:outline-none focus:border-orange-500 placeholder-stone-350 resize-none leading-relaxed shadow-inner"
+                  />
+                  <button
+                    onClick={handleRefineWithAi}
+                    disabled={isProcessing || !aiInstruction.trim()}
+                    className="w-full bg-stone-950 hover:bg-stone-900 disabled:opacity-40 text-white text-[11px] font-black uppercase tracking-widest py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {isProcessing ? "Calculating..." : "Refine with AI"}
+                  </button>
                 </div>
               ) : (
-                <div className="bg-stone-50 border border-stone-200/40 rounded-2xl p-3 text-center">
-                  <span className="text-[9px] font-bold text-stone-400">
+                <div className="bg-stone-50 border border-stone-200/40 rounded-2xl p-3.5 text-center">
+                  <span className="text-[10px] font-semibold text-stone-400">
                     ⚠️ Configure Gemini Key in Settings to unlock AI adjustments
                   </span>
                 </div>
@@ -3148,7 +3226,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                   fats: parseInt(fats) || 0,
                   type: mealToEdit?.type || "Manual Log",
                   time: time.trim(),
-                  image: imageUrl
+                  image: imageUrl,
+                  notes: notes.trim()
                 });
                 onClose();
               }}
@@ -3187,6 +3266,7 @@ export default function App() {
     return "home";
   });
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null);
+  const [mealPendingDelete, setMealPendingDelete] = useState<Meal | null>(null);
   const [isCameraFullScreen, setIsCameraFullScreen] = useState(false);
 
   // Custom world-class popup states
@@ -4121,6 +4201,12 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
   };
 
   const handleDeleteMeal = (meal: Meal) => {
+    setMealPendingDelete(meal);
+  };
+
+  const confirmDeleteMeal = (meal: Meal) => {
+    setMealPendingDelete(null);
+
     if (deleteTimeoutRef.current && lastDeletedMeal) {
       clearTimeout(deleteTimeoutRef.current);
       commitDeletion(lastDeletedMeal);
