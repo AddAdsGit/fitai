@@ -649,8 +649,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-stone-800 to-stone-950 flex items-center justify-center pointer-events-none">
-                        <Utensils className="w-9 h-9 text-white opacity-20" />
+                      <div className="absolute inset-0 bg-gradient-to-tr from-amber-50 to-orange-100 flex items-center justify-center pointer-events-none select-none">
+                        <span className="text-4xl">🍴</span>
                       </div>
                     )}
 
@@ -859,8 +859,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                             {meal.image && !hasNoGeneratedImage(meal.image) ? (
                               <img src={meal.image} className="w-full h-full object-cover" alt={meal.name} />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-stone-400">
-                                <Utensils className="w-4 h-4 text-stone-400" />
+                              <div className="w-full h-full bg-orange-50/50 flex items-center justify-center text-lg select-none">
+                                🍴
                               </div>
                             )}
                           </div>

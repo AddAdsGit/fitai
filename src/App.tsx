@@ -1309,10 +1309,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     };
     const formattedTime = newMealOrRecipe.time || new Date().toLocaleTimeString("en-US", timeOptions);
     
-    const defaultImage = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80";
     const finalImage = newMealOrRecipe.image && !newMealOrRecipe.image.includes("photo-1546069901-ba9599a7e63c")
       ? newMealOrRecipe.image
-      : defaultImage;
+      : "";
 
     if (newMealOrRecipe.id) {
       if (isSupabaseConfigured && profileData.api_key) {
@@ -2384,12 +2383,23 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                         onClick={() => handleEditMeal(meal)}
                         className="relative rounded-[32px] overflow-hidden aspect-[4/3] sm:aspect-video shadow-xl shadow-orange-200/30 group cursor-pointer"
                       >
-                        <img
-                          src={meal.image && !meal.image.includes("photo-1546069901-ba9599a7e63c") ? meal.image : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80"}
-                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-                          alt={meal.name}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
+                        {meal.image && !hasNoGeneratedImage(meal.image) ? (
+                          <img
+                            src={meal.image}
+                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                            alt={meal.name}
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-tr from-amber-50 to-orange-100/70 flex items-center justify-center">
+                            <span className="text-6xl sm:text-7xl group-hover:scale-110 transition-transform duration-700 select-none">🍴</span>
+                          </div>
+                        )}
+                        <div className={cn(
+                          "absolute inset-0 bg-gradient-to-t z-10 pointer-events-none",
+                          meal.image && !hasNoGeneratedImage(meal.image)
+                            ? "from-black/90 via-black/40 to-black/20"
+                            : "from-stone-900/80 via-stone-900/30 to-transparent"
+                        )} />
 
                         {/* Top Bar: Time, Calories, and Delete */}
                         <div className="absolute top-5 left-5 right-5 flex justify-between items-center z-20">
@@ -2429,7 +2439,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                         </div>
 
                         {/* Bottom Content: Name and Macros */}
-                        <div className="absolute bottom-5 left-5 right-5 text-left font-sans">
+                        <div className="absolute bottom-5 left-5 right-5 text-left font-sans z-20">
                           <h4 className="text-white text-xl sm:text-2xl font-black mb-1 leading-tight tracking-tight shadow-sm">
                             {meal.name}
                           </h4>
@@ -3259,7 +3269,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                           fiber: parseInt(editPopupFiber) || 0,
                           description: editPopupDescription.trim(),
                           tags: editPopupTags.length > 0 ? editPopupTags : ["Custom"],
-                          image: editPopupImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
+                          image: editPopupImage || "",
                           ingredients: finalIngredients,
                           instructions: editPopupInstructions.trim() || "Mix ingredients and serve fresh!",
                           micros: editPopupMicros,

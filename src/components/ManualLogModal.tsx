@@ -357,8 +357,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                         {/* Left Side: Preview & Name & Macros */}
                         <div className="flex items-center gap-3 min-w-0">
                           {isDefaultImage ? (
-                            <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0 border border-orange-100/50 shadow-inner">
-                              <Utensils className="w-5 h-5 text-orange-500" />
+                            <div className="w-12 h-12 rounded-xl bg-orange-50/70 flex items-center justify-center text-xl shrink-0 border border-orange-100/50 shadow-inner select-none">
+                              🍴
                             </div>
                           ) : (
                             <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs">
