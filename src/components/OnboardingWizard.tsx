@@ -435,10 +435,23 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
     setIsSubmitting(true);
     try {
       const completedState = await saveProfileData();
+      
+      // Fetch profile details for pre-filled welcome message
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('api_key, display_name')
+        .eq('id', activeProfileId)
+        .maybeSingle();
+
+      const displayName = profile?.display_name || metrics.name.trim() || "User";
+      
       onComplete(completedState);
       triggerToast("✨ Profile saved! Opening ChatGPT...");
+      
       setTimeout(() => {
-        window.open("https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai", "_blank");
+        const welcomePrompt = encodeURIComponent(`I just completed onboarding on FitAI! Please synchronize my account and welcome me (I am ${displayName}). Explain some quick shortcuts and use cases!`);
+        const chatgptUrl = `https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai?q=${welcomePrompt}`;
+        window.open(chatgptUrl, "_blank");
         setIsSubmitting(false);
       }, 800);
     } catch (err) {

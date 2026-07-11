@@ -22,17 +22,7 @@ export const OAuthConsentView = ({
   const redirectUri = params.get("redirect_uri") || "";
   const state = params.get("state") || "";
 
-  // Check if user is already logged in
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setCheckingSession(false);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-    });
-    return () => listener?.subscription.unsubscribe();
-  }, []);
+  // Session and auto-approve hook is loaded below handleApprove
 
   // Google login — passes current consent URL as redirectTo so params survive after login
   const handleGoogleLoginForConsent = async () => {
@@ -118,6 +108,39 @@ export const OAuthConsentView = ({
       window.location.href = `${redirectUri}?error=access_denied&state=${encodeURIComponent(state)}`;
     }, 1000);
   };
+
+  // Check if user is already logged in & auto-approve
+  useEffect(() => {
+    let isMounted = true;
+    
+    supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) return;
+      setSession(data.session);
+      setCheckingSession(false);
+      
+      // Silent OAuth Auto-Approval: Instantly redirect if already logged in!
+      if (data.session && clientId && redirectUri) {
+        setTimeout(() => {
+          if (isMounted) handleApprove();
+        }, 100);
+      }
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
+      if (!isMounted) return;
+      setSession(sess);
+      if (sess && clientId && redirectUri) {
+        setTimeout(() => {
+          if (isMounted) handleApprove();
+        }, 100);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      listener?.subscription.unsubscribe();
+    };
+  }, [clientId, redirectUri]);
 
   // Loading state while checking session
   if (checkingSession) {
