@@ -22,6 +22,7 @@ export interface Recipe {
   carbs: number;
   fats: number;
   fiber?: number;
+  description?: string;
   tags: string[];
   image: string;
   ingredients: string[];

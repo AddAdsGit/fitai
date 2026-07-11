@@ -89,6 +89,28 @@ export const OnboardingWizard = ({
     fiber: 30,
   });
 
+  const handleNext = () => {
+    if (step === 1 && !metrics.name.trim()) {
+      triggerToast("⚠️ Please enter your name to continue!");
+      return;
+    }
+    setStep(prev => Math.min(totalSteps, prev + 1));
+  };
+
+  const handleBack = () => {
+    setStep(prev => Math.max(1, prev - 1));
+  };
+
+  const togglePreference = (prefId: string) => {
+    setMetrics(prev => {
+      const isSelected = prev.preferences.includes(prefId);
+      const updated = isSelected
+        ? prev.preferences.filter(p => p !== prefId)
+        : [...prev.preferences, prefId];
+      return { ...prev, preferences: updated };
+    });
+  };
+
   // Sync initials from Google profile
   useEffect(() => {
     if (profileData?.imageUrl) {

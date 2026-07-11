@@ -740,7 +740,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
       {/* Log to Recipe Modal */}
       <AnimatePresence>
         {showLogsToRecipeModal && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center font-sans">
+          <div className="fixed inset-0 z-[100] flex items-end justify-center font-sans">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}

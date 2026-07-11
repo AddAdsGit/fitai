@@ -20,6 +20,7 @@ import {
   Utensils,
   Target,
   Bot,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "./lib/utils";
@@ -80,7 +81,9 @@ const INITIAL_RECIPES: Recipe[] = [
     protein: 34,
     carbs: 12,
     fats: 28,
+    fiber: 4,
     tags: ["Keto", "Gluten Free"],
+    description: "A high-protein ketogenic bowl featuring grilled salmon, fresh greens, and lemon vinaigrette.",
     image:
       "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
     ingredients: [
@@ -100,7 +103,9 @@ const INITIAL_RECIPES: Recipe[] = [
     protein: 16,
     carbs: 45,
     fats: 8,
+    fiber: 6,
     tags: ["Gluten Free", "Vegetarian"],
+    description: "Healthy gluten-free pancakes made with raw spinach, rolled oats, and almond milk.",
     image:
       "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
     ingredients: [
@@ -120,7 +125,9 @@ const INITIAL_RECIPES: Recipe[] = [
     protein: 22,
     carbs: 3,
     fats: 22,
+    fiber: 2,
     tags: ["Keto", "Low Carb"],
+    description: "A rich, cheesy omelette folded with fresh butter and sautéed baby spinach.",
     image:
       "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600&q=80",
     ingredients: [
@@ -140,7 +147,9 @@ const INITIAL_RECIPES: Recipe[] = [
     protein: 12,
     carbs: 48,
     fats: 10,
+    fiber: 9,
     tags: ["Vegan", "Vegetarian", "Gluten Free"],
+    description: "A refreshing, fiber-packed salad tossed with olives, diced cucumber, and lemon vinaigrette.",
     image:
       "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
     ingredients: [
@@ -151,6 +160,90 @@ const INITIAL_RECIPES: Recipe[] = [
     ],
     instructions:
       "Rinse chickpeas. Combine with chopped vegetables. Drizzle olive oil and squeeze fresh lemon.",
+  },
+  {
+    id: "rec-5",
+    name: "Steamed Idli with Sambar",
+    time: "10 mins",
+    calories: 220,
+    protein: 7,
+    carbs: 44,
+    fats: 1,
+    fiber: 5,
+    tags: ["Vegetarian", "Gluten Free"],
+    description: "Single serving of 2 soft steamed rice-and-lentil cakes served with mixed vegetable sambar.",
+    image:
+      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
+    ingredients: [
+      "2 pieces Steamed Idli",
+      "1 bowl Vegetable Sambar",
+      "1 tbsp Coconut Chutney",
+    ],
+    instructions:
+      "Steam idli batter. Heat sambar and serve with coconut chutney on the side.",
+  },
+  {
+    id: "rec-6",
+    name: "Masala Dosa",
+    time: "12 mins",
+    calories: 360,
+    protein: 6,
+    carbs: 54,
+    fats: 12,
+    fiber: 4,
+    tags: ["Vegetarian", "Gluten Free"],
+    description: "Thin, crispy fermented rice crepe stuffed with a spiced potato mash.",
+    image:
+      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
+    ingredients: [
+      "1 cup Dosa Batter",
+      "100g Spiced Potato Mash (Alooo Masala)",
+      "1 tbsp Butter or Ghee",
+    ],
+    instructions:
+      "Spread batter thin on hot tawa. Drizzle butter, place potato filling, fold and crisp.",
+  },
+  {
+    id: "rec-7",
+    name: "Plain Dosa",
+    time: "8 mins",
+    calories: 250,
+    protein: 4,
+    carbs: 42,
+    fats: 7,
+    fiber: 2,
+    tags: ["Vegetarian", "Gluten Free"],
+    description: "Crispy, golden fermented rice and lentil crepe served plain.",
+    image:
+      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
+    ingredients: [
+      "1 cup Dosa Batter",
+      "1 tsp Ghee or Oil",
+    ],
+    instructions:
+      "Spread batter in a circular motion on hot tawa. Drizzle ghee and cook until golden brown.",
+  },
+  {
+    id: "rec-8",
+    name: "South Indian Curd Rice",
+    time: "5 mins",
+    calories: 280,
+    protein: 6,
+    carbs: 40,
+    fats: 9,
+    fiber: 2,
+    tags: ["Vegetarian", "Gluten Free"],
+    description: "One bowl of comforting soft rice mixed with yogurt, tempered with spices.",
+    image:
+      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
+    ingredients: [
+      "1 cup Cooked Rice",
+      "1/2 cup Fresh Yogurt (Curd)",
+      "1 tsp Mustard seeds, Curry leaves, Ginger, Chili tempering",
+      "A few Pomegranate seeds for garnish",
+    ],
+    instructions:
+      "Mix cooled rice with yogurt. Heat oil and temper with mustard seeds, curry leaves, ginger. Combine and garnish.",
   },
 ];
 
@@ -180,6 +273,11 @@ export default function App() {
   const [editPopupProtein, setEditPopupProtein] = useState("");
   const [editPopupCarbs, setEditPopupCarbs] = useState("");
   const [editPopupFats, setEditPopupFats] = useState("");
+  const [editPopupDescription, setEditPopupDescription] = useState("");
+  const [editPopupFiber, setEditPopupFiber] = useState("");
+  const [isRecipeAiMode, setIsRecipeAiMode] = useState(false);
+  const [recipeAiPrompt, setRecipeAiPrompt] = useState("");
+  const [isRecipeAiGenerating, setIsRecipeAiGenerating] = useState(false);
   const [editPopupTags, setEditPopupTags] = useState<string[]>([]);
   const [editPopupIngredients, setEditPopupIngredients] = useState("");
   const [editPopupInstructions, setEditPopupInstructions] = useState("");
@@ -191,6 +289,13 @@ export default function App() {
   const [aiConfigMode, setAiConfigMode] = useState<"ai" | "manual">("ai");
   const [isAiCalculating, setIsAiCalculating] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
+
+  useEffect(() => {
+    if (!selectedRecipePopup) {
+      setIsRecipeAiMode(false);
+      setRecipeAiPrompt("");
+    }
+  }, [selectedRecipePopup]);
 
   type GoalPopupType = "dailyCalories" | "weightGoal" | null;
   const [activeGoalConfigPopup, setActiveGoalConfigPopup] =
@@ -683,6 +788,7 @@ export default function App() {
             carbs: r.carbs,
             fats: r.fats,
             fiber: r.fiber || 0,
+            description: r.description || "",
             tags: r.tags || [],
             image: r.image,
             ingredients: r.ingredients || [],
@@ -784,6 +890,86 @@ export default function App() {
 
   const showToast = (msg: React.ReactNode | string) => {
     setToastMessage(msg);
+  };
+
+  const handleRecipeAiPromptGenerate = async (promptText: string) => {
+    if (!promptText.trim()) {
+      showToast("⚠️ Please enter a recipe description prompt");
+      return;
+    }
+    
+    const key = localStorage.getItem("fitai_gemini_api_key") || 
+                (import.meta as any).env.VITE_GEMINI_API_KEY ||
+                "AIzaSyDPSqNMSeKaIxjR9ztMwErj2KhBhXCeHA4";
+
+    setIsRecipeAiGenerating(true);
+    try {
+      const prompt = `You are a professional dietitian. Create a single custom recipe based on the user's request prompt: "${promptText}".
+Verify details, calculate accurate calorie content, and establish healthy macros.
+Return a clean, valid JSON object containing the recipe details:
+{
+  "name": "Sleek Custom Dish Name",
+  "time": "Prep time (e.g. '15 mins')",
+  "calories": 350,
+  "protein": 25,
+  "carbs": 40,
+  "fats": 12,
+  "fiber": 6,
+  "description": "A brief 1-sentence teaser description of what this dish is.",
+  "tags": ["Vegetarian", "High Protein", ...],
+  "ingredients": ["exact ingredient 1 with quantity", "ingredient 2", ...],
+  "instructions": "Step-by-step description of how to prepare the recipe..."
+}
+Do not include any extra text, markdown styling, backticks, or "json" prefix. Just return the raw JSON string itself.`;
+
+      let rawText = "";
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase.functions.invoke("gemini", {
+          body: { prompt }
+        });
+        if (error) throw error;
+        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      } else {
+        let response = null;
+        for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
+          try {
+            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+            if (response.ok) break;
+          } catch (e) {}
+        }
+        if (response && response.ok) {
+          const data = await response.json();
+          rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        }
+      }
+
+      const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJson);
+
+      setEditPopupName(parsed.name || "Custom AI Dish");
+      setEditPopupTime(parsed.time || "15 mins");
+      setEditPopupCalories(parsed.calories ? String(parsed.calories) : "0");
+      setEditPopupProtein(parsed.protein ? String(parsed.protein) : "0");
+      setEditPopupCarbs(parsed.carbs ? String(parsed.carbs) : "0");
+      setEditPopupFats(parsed.fats ? String(parsed.fats) : "0");
+      setEditPopupFiber(parsed.fiber ? String(parsed.fiber) : "0");
+      setEditPopupDescription(parsed.description || "");
+      setEditPopupTags(parsed.tags || ["Custom"]);
+      setEditPopupIngredients((parsed.ingredients || []).join("\n"));
+      setEditPopupInstructions(parsed.instructions || "");
+      
+      setIsRecipeAiMode(false);
+      showToast("✨ AI generated recipe successfully!");
+    } catch (err) {
+      console.error(err);
+      showToast("❌ Failed to generate recipe with AI");
+    } finally {
+      setIsRecipeAiGenerating(false);
+    }
   };
 
   const handleGenerateAiRecipe = async () => {
@@ -1180,6 +1366,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     setEditPopupProtein(recipe.protein ? String(recipe.protein) : "");
     setEditPopupCarbs(recipe.carbs ? String(recipe.carbs) : "");
     setEditPopupFats(recipe.fats ? String(recipe.fats) : "");
+    setEditPopupDescription(recipe.description || "");
+    setEditPopupFiber(recipe.fiber ? String(recipe.fiber) : "");
     setEditPopupTags(recipe.tags || []);
     setEditPopupIngredients((recipe.ingredients || []).join("\n"));
     setEditPopupInstructions(recipe.instructions || "");
@@ -2182,7 +2370,12 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 )}
                 {!isEditingRecipe ? (
                   /* VIEW MODE */
-                  <div className="space-y-6 text-left">
+                  <div className="space-y-6 text-left font-sans">
+                    {selectedRecipePopup.description && (
+                      <p className="text-xs text-stone-500 font-semibold leading-relaxed bg-stone-50 border border-stone-200/50 rounded-2xl p-4 italic">
+                        "{selectedRecipePopup.description}"
+                      </p>
+                    )}
                     {/* Calories & Standard Macros HUD block */}
                     <div className="bg-white rounded-3xl p-5 border border-black/[0.04] shadow-sm space-y-4">
                       <div className="flex justify-between items-center pb-2 border-b border-black/[0.02]">
@@ -2275,6 +2468,44 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                       </div>
                     </div>
                   </div>
+                ) : isRecipeAiMode ? (
+                  /* AI RECIPE GENERATOR MODE */
+                  <div className="space-y-4 text-left font-sans animate-fadeIn">
+                    <div className="flex items-center gap-2 text-[10px] font-black text-orange-600 uppercase tracking-wider">
+                      <Sparkles className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
+                      <span>Generate Recipe with AI</span>
+                    </div>
+                    <div className="bg-white rounded-3xl p-5 border border-stone-200/40 shadow-sm space-y-4">
+                      <p className="text-[10px] text-stone-500 font-medium leading-relaxed font-sans">
+                        Describe the recipe you want to create (e.g. ingredients you have, dietary goals, or a dish name). Gemini will design the instructions, ingredients list, calories, and macros for you.
+                      </p>
+                      <textarea
+                        rows={6}
+                        placeholder='e.g., "A high-protein, low-carb spinach and mushroom quiche using egg whites, feta cheese, and oat flour for crust"'
+                        value={recipeAiPrompt}
+                        onChange={(e) => setRecipeAiPrompt(e.target.value)}
+                        className="w-full bg-stone-50/50 border border-stone-250 focus:border-orange-500 rounded-2xl px-4 py-3.5 text-xs font-semibold text-stone-900 focus:outline-none placeholder-stone-400 resize-none leading-relaxed font-sans"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRecipeAiPromptGenerate(recipeAiPrompt)}
+                        disabled={isRecipeAiGenerating}
+                        className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md border-none disabled:opacity-50 font-sans"
+                      >
+                        {isRecipeAiGenerating ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                            <span>Generating Recipe...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Bot className="w-4 h-4 text-white" />
+                            <span>Generate & Auto-Fill Form</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   /* EDIT / CREATE MODE */
                   <div className="space-y-6 text-left font-sans animate-none">
@@ -2289,6 +2520,19 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                           value={editPopupName}
                           onChange={(e) => setEditPopupName(e.target.value)}
                           placeholder="e.g. Avocado Spinach Superfood Crunch"
+                          className="w-full bg-white border border-stone-200/70 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/50 rounded-2xl px-4 py-3 text-xs font-bold text-orange-950 outline-none transition-all shadow-inner"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest block">
+                          Short Description
+                        </label>
+                        <input
+                          type="text"
+                          value={editPopupDescription}
+                          onChange={(e) => setEditPopupDescription(e.target.value)}
+                          placeholder="e.g. Spiced potato-filled crepe served with chutney"
                           className="w-full bg-white border border-stone-200/70 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/50 rounded-2xl px-4 py-3 text-xs font-bold text-orange-950 outline-none transition-all shadow-inner"
                         />
                       </div>
@@ -2575,6 +2819,17 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                               className="w-full bg-stone-50/50 border border-stone-200/50 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/30 rounded-xl px-3 py-2 text-xs font-mono font-bold text-orange-950 outline-none transition-all shadow-inner animate-none"
                             />
                           </div>
+                          <div className="space-y-1 col-span-2">
+                            <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
+                              Fiber (g)
+                            </label>
+                            <input
+                              type="number"
+                              value={editPopupFiber}
+                              onChange={(e) => setEditPopupFiber(e.target.value)}
+                              className="w-full bg-stone-50/50 border border-stone-200/50 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/30 rounded-xl px-3 py-2 text-xs font-mono font-bold text-orange-950 outline-none transition-all shadow-inner animate-none"
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2639,6 +2894,13 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                       Cancel
                     </button>
                     <button
+                      type="button"
+                      onClick={() => setIsRecipeAiMode(!isRecipeAiMode)}
+                      className="px-3.5 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-655 rounded-xl transition-all cursor-pointer border border-orange-100/55 flex items-center justify-center gap-1 font-black text-[10px] uppercase tracking-wider active:scale-95"
+                    >
+                      {isRecipeAiMode ? "✏️ Manual Form" : "🤖 AI Generator"}
+                    </button>
+                    <button
                       onClick={async () => {
                         // Validate
                         const finalName = editPopupName.trim() || "Unnamed Custom Dish";
@@ -2656,6 +2918,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                           protein: parseInt(editPopupProtein) || 0,
                           carbs: parseInt(editPopupCarbs) || 0,
                           fats: parseInt(editPopupFats) || 0,
+                          fiber: parseInt(editPopupFiber) || 0,
+                          description: editPopupDescription.trim(),
                           tags: editPopupTags.length > 0 ? editPopupTags : ["Custom"],
                           image: editPopupImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
                           ingredients: finalIngredients,
@@ -2673,6 +2937,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                               protein: updated.protein,
                               carbs: updated.carbs,
                               fats: updated.fats,
+                              fiber: updated.fiber,
+                              description: updated.description,
                               tags: updated.tags,
                               image: updated.image,
                               ingredients: updated.ingredients,
@@ -2699,6 +2965,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                                   protein: data.protein,
                                   carbs: data.carbs,
                                   fats: data.fats,
+                                  fiber: data.fiber,
+                                  description: data.description,
                                   tags: data.tags || [],
                                   image: data.image,
                                   ingredients: data.ingredients || [],
