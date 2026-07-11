@@ -47,7 +47,7 @@ serve(async (req) => {
     }
 
     // 3. Retrieve Gemini API Key (Priority: Remote Secret -> Central Backup)
-    const apiKey = Deno.env.get("GEMINI_API_KEY") || "AIzaSyDPSqNMSeKaIxjR9ztMwErj2KhBhXCeHA4";
+    const apiKey = Deno.env.get("GEMINI_API_KEY") || "";
 
     // 4. Fallback Model Loop
     let response = null;

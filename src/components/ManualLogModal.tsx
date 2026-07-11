@@ -43,12 +43,14 @@ export const ManualLogModal = ({
   mealToEdit,
   onNavigateToSettings,
   mealsState = [],
+  initialAiMode,
 }: {
   onClose: () => void;
   onAddMeal: (meal: any) => void;
   mealToEdit?: Meal | null;
   onNavigateToSettings: () => void;
   mealsState?: Meal[];
+  initialAiMode?: boolean;
 }) => {
   const [name, setName] = useState(mealToEdit?.name || "");
   const [calories, setCalories] = useState(mealToEdit ? String(mealToEdit.calories) : "");
@@ -70,6 +72,7 @@ export const ManualLogModal = ({
   const isEditing = !!mealToEdit;
   const [segment, setSegment] = useState<"quick" | "detailed">(() => {
     if (mealToEdit) return "detailed";
+    if (initialAiMode) return "detailed";
     return "quick";
   });
   const [searchQuery, setSearchQuery] = useState("");
@@ -77,7 +80,7 @@ export const ManualLogModal = ({
   const [imageUrl, setImageUrl] = useState(mealToEdit?.image || "");
   const [showImagePanel, setShowImagePanel] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showAiMode, setShowAiMode] = useState(false);
+  const [showAiMode, setShowAiMode] = useState(initialAiMode || false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const hasImage = imageUrl && !hasNoGeneratedImage(imageUrl);
@@ -135,7 +138,7 @@ export const ManualLogModal = ({
 
     const key = localStorage.getItem("fitai_gemini_api_key") ||
                 (import.meta as any).env.VITE_GEMINI_API_KEY ||
-                "AIzaSyDPSqNMSeKaIxjR9ztMwErj2KhBhXCeHA4";
+                "";
 
     setIsProcessing(true);
     setErrorMessage("");
@@ -149,6 +152,7 @@ Base meal:
 - Carbs: ${carbs || 0}g
 - Fats: ${fats || 0}g
 - Fiber: ${fiber || 0}g
+${mealDescription ? `- Description/Notes: "${mealDescription}"` : ""}
 
 Instruction: "${aiInstruction}"
 
@@ -159,7 +163,8 @@ Return a JSON object containing the updated values:
   "protein": updated_protein,
   "carbs": updated_carbs,
   "fats": updated_fats,
-  "fiber": updated_fiber
+  "fiber": updated_fiber,
+  "description": "updated description of the portion or extra toppings/side items"
 }
 Do not return any markdown formatting, backticks, or "json" prefix. Just return the raw JSON string itself.`
         : `You are a nutrition estimator. Estimate the nutritional content of this meal description.
@@ -172,7 +177,8 @@ Return a JSON object with estimated nutritional values:
   "protein": estimated_protein_grams,
   "carbs": estimated_carbs_grams,
   "fats": estimated_fats_grams,
-  "fiber": estimated_fiber_grams
+  "fiber": estimated_fiber_grams,
+  "description": "Brief description of serving size, preparation style, and sides"
 }
 Do not return any markdown formatting, backticks, or "json" prefix. Just return the raw JSON string itself.`;
 
@@ -180,15 +186,23 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
       let lastError = "";
       let rawText = "";
 
+      let edgeSuccess = false;
+
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase.functions.invoke("gemini", {
-          body: { prompt }
-        });
-        if (error) {
-          throw new Error(error.message || "Failed to contact Gemini Edge Function");
+        try {
+          const { data, error } = await supabase.functions.invoke("gemini", {
+            body: { prompt }
+          });
+          if (!error && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            rawText = data.candidates[0].content.parts[0].text;
+            edgeSuccess = true;
+          }
+        } catch (e) {
+          console.warn("Edge Function invoke error, falling back to direct API:", e);
         }
-        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      } else {
+      }
+
+      if (!edgeSuccess) {
         let response = null;
         let lastError = "";
 
@@ -236,6 +250,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
       if (result.carbs !== undefined) setCarbs(String(Math.max(0, parseInt(result.carbs) || 0)));
       if (result.fats !== undefined) setFats(String(Math.max(0, parseInt(result.fats) || 0)));
       if (result.fiber !== undefined) setFiber(String(Math.max(0, parseInt(result.fiber) || 0)));
+      if (result.description !== undefined) setMealDescription(result.description);
       setAiInstruction("");
       setShowAiMode(false);
     } catch (err: any) {
@@ -263,9 +278,11 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
         className="bg-white/85 backdrop-blur-xl border-t border-x border-white/60 rounded-t-[36px] w-full max-w-md p-6 space-y-6 relative z-10 shadow-2xl flex flex-col max-h-[90vh]"
       >
         <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] shrink-0">
-          <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1.5">
+          <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1.5 font-sans">
             <Utensils className="w-4 h-4 text-orange-500" />
-            {mealToEdit ? "Edit Meal Log" : "New Calorie Log"}
+            {showAiMode 
+              ? (mealToEdit || hasAnyValues ? "Edit Log with AI 🤖" : "Write Log with AI 🤖")
+              : (mealToEdit ? "Edit Meal Log" : "New Calorie Log")}
           </h4>
           <button
             onClick={onClose}
@@ -680,7 +697,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                       onClick={() => setShowAiMode(true)}
                       className="flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-white bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center shadow-md shadow-orange-500/10"
                     >
-                      AI Editor
+                      {mealToEdit || hasAnyValues ? "AI Editor" : "AI Logger"}
                     </button>
                   )}
                   <button

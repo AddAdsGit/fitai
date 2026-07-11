@@ -67,7 +67,7 @@ export const ProfileView = ({
   const handleGenerateRecipeFromMeal = async (meal: Meal) => {
     const key = localStorage.getItem("fitai_gemini_api_key") ||
                 (import.meta as any).env.VITE_GEMINI_API_KEY ||
-                "AIzaSyDPSqNMSeKaIxjR9ztMwErj2KhBhXCeHA4";
+                "";
 
     setIsGeneratingRecipe(true);
     try {
@@ -78,13 +78,15 @@ Logged Meal:
 - Protein: ${meal.protein}g
 - Carbs: ${meal.carbs}g
 - Fats: ${meal.fats}g
+${meal.meal_description ? `- Description/Notes: "${meal.meal_description}"` : ""}
 
 Please generate:
 1. A refined, gourmet recipe name (e.g., instead of "chicken rice", write "Herb-Marinated Chicken Breast with Jasmine Rice").
 2. Prep / cook time (e.g. "25 mins").
-3. A list of specific ingredients with quantities that would match the macros listed above.
+3. A list of specific ingredients with quantities that would match the macros listed above. Take the notes/description above into account when generating ingredients!
 4. Step-by-step cooking instructions.
 5. 2-3 micronutrients with estimated values (e.g. Iron, Vitamin C) in the format below.
+6. A brief description of the recipe.
 
 Return a JSON object matching this structure:
 {
@@ -92,6 +94,7 @@ Return a JSON object matching this structure:
   "time": "prep time (e.g. 20 mins)",
   "ingredients": ["ingredient 1 with quantity", "ingredient 2 with quantity"],
   "instructions": "Step-by-step instructions text with numbered steps",
+  "description": "Brief 1-sentence summary of the dish.",
   "micros": [
     {"name": "Iron", "target": 3, "unit": "mg"},
     {"name": "Vitamin C", "target": 15, "unit": "mg"}
@@ -101,15 +104,23 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
 
       let rawText = "";
 
+      let edgeSuccess = false;
+
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase.functions.invoke("gemini", {
-          body: { prompt }
-        });
-        if (error) {
-          throw new Error(error.message || "Failed to contact Gemini Edge Function");
+        try {
+          const { data, error } = await supabase.functions.invoke("gemini", {
+            body: { prompt }
+          });
+          if (!error && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            rawText = data.candidates[0].content.parts[0].text;
+            edgeSuccess = true;
+          }
+        } catch (e) {
+          console.warn("Edge Function invoke error, falling back to direct API:", e);
         }
-        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      } else {
+      }
+
+      if (!edgeSuccess) {
         let response = null;
         let lastError = "";
 
@@ -162,7 +173,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
         image: meal.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
         ingredients: result.ingredients || [],
         instructions: result.instructions || "No instructions generated.",
-        micros: result.micros || []
+        micros: result.micros || [],
+        description: result.description || meal.meal_description || ""
       };
 
       if (isSupabaseConfigured && activeProfileId) {
@@ -190,7 +202,9 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
           image: data.image,
           ingredients: data.ingredients || [],
           instructions: data.instructions,
-          micros: data.micros || []
+          micros: data.micros || [],
+          log_count: data.log_count || 0,
+          description: data.description || ""
         };
         setRecipes((prev: Recipe[]) => [mapped, ...prev]);
       } else {

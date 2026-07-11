@@ -12,6 +12,9 @@ export interface SharedItemPayload {
   ing?: string[];  // Ingredients (recipe only)
   ins?: string;    // Instructions (recipe only)
   tags?: string[]; // Tags (recipe only)
+  mls?: { n: string; c: number }[]; // Meals list for day summary
+  lc?: number;     // Log count (recipe only)
+  d?: string;      // Description (recipe description or meal description)
 }
 
 /**
@@ -27,6 +30,7 @@ export function compressMeal(meal: any): SharedItemPayload {
     fb: Number(meal.fiber || 0),
     img: meal.image || undefined,
     t: meal.time || undefined,
+    d: meal.meal_description || undefined,
   };
 }
 
@@ -43,6 +47,8 @@ export function compressRecipe(recipe: any): SharedItemPayload {
     ing: recipe.ingredients || undefined,
     ins: recipe.instructions || undefined,
     tags: recipe.tags || undefined,
+    lc: recipe.log_count || undefined,
+    d: recipe.description || undefined,
   };
 }
 
@@ -62,6 +68,7 @@ export function decompressToMeal(payload: SharedItemPayload, id?: string): any {
     time: payload.t || "12:00 PM",
     type: "Imported",
     date: new Date().toISOString().split("T")[0],
+    meal_description: payload.d || "",
   };
 }
 
@@ -80,6 +87,8 @@ export function decompressToRecipe(payload: SharedItemPayload, id?: string): any
     instructions: payload.ins || "",
     tags: payload.tags || ["Imported"],
     micros: [],
+    log_count: payload.lc || 0,
+    description: payload.d || "",
   };
 }
 
@@ -119,7 +128,7 @@ export function decodeBase64ToPayload(base64: string): SharedItemPayload | null 
  * Helper to build the share URL on fitpush.vercel.app
  */
 export function generateShareUrl(
-  type: "meal" | "recipe",
+  type: "meal" | "recipe" | "day",
   payload: SharedItemPayload,
   dbShareId?: string
 ): string {

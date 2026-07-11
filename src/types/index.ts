@@ -36,4 +36,5 @@ export interface Recipe {
   ingredients: string[];
   instructions: string;
   micros?: { name: string; value: number; unit: string }[];
+  log_count?: number;
 }

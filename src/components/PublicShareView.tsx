@@ -30,7 +30,7 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<SharedItemPayload | null>(null);
-  const [itemType, setItemType] = useState<"meal" | "recipe" | null>(null);
+  const [itemType, setItemType] = useState<"meal" | "recipe" | "day" | null>(null);
   
   // Interactive cooking checkbox list state for recipes
   const [checkedIngredients, setCheckedIngredients] = useState<Record<number, boolean>>({});
@@ -74,7 +74,7 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
         const decoded = decodeBase64ToPayload(shareDataParam);
         if (decoded) {
           setPayload(decoded);
-          setItemType(shareTypeParam as "meal" | "recipe");
+          setItemType(shareTypeParam as "meal" | "recipe" | "day");
           setLoading(false);
           return;
         }
@@ -94,10 +94,25 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
         const meal = decompressToMeal(payload);
         onImportMeal(meal);
         triggerToast(`🎉 Logged "${payload.n}" to your plate!`);
-      } else {
+      } else if (itemType === "recipe") {
         const recipe = decompressToRecipe(payload);
         await onImportRecipe(recipe);
         triggerToast(`🍲 Saved "${payload.n}" to your recipe collection!`);
+      } else if (itemType === "day") {
+        onImportMeal({
+          id: "day_" + Date.now(),
+          name: `Day Log: ${payload.n}`,
+          calories: payload.c,
+          protein: payload.p,
+          carbs: payload.cb,
+          fats: payload.f,
+          fiber: payload.fb || 0,
+          image: "",
+          time: "12:00 PM",
+          type: "Favorite",
+          date: new Date().toISOString().split("T")[0]
+        });
+        triggerToast(`🎉 Logged daily summary of ${payload.c} kcal to today's plate!`);
       }
       onNavigateToDashboard();
     } catch (err: any) {
@@ -201,7 +216,7 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
             </h1>
           </div>
           <span className="px-2.5 py-1 bg-stone-100 border border-stone-200 text-stone-600 rounded-full text-[9px] font-black uppercase tracking-wider">
-            {itemType === "meal" ? "Meal Card" : "Gourmet Recipe"}
+            {itemType === "meal" ? "Meal Card" : itemType === "day" ? "Day Summary" : "Gourmet Recipe"}
           </span>
         </header>
 
@@ -238,6 +253,11 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
                     ⏱️ LOGGED AT {payload.t}
                   </span>
                 )}
+                {payload.d && (
+                  <p className="text-[10px] text-stone-200/90 leading-relaxed font-bold bg-white/5 px-3 py-1.5 rounded-xl border border-white/5 line-clamp-3">
+                    📝 {payload.d}
+                  </p>
+                )}
                 <div>
                   <span className="text-6xl font-black tracking-tighter">{payload.c}</span>
                   <span className="text-[10px] font-bold text-stone-300 block tracking-widest mt-1">
@@ -266,6 +286,89 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
             <p className="text-[10px] text-stone-400 font-semibold tracking-wider uppercase mt-1">
               Shareable Infographic Snap
             </p>
+          </section>
+        )}
+
+        {/* ----------------- DAY SHOWCASE WEBPAGE VIEW ----------------- */}
+        {itemType === "day" && payload && (
+          <section className="flex flex-col gap-6 text-left">
+            {/* Top Date Header Banner */}
+            <div className="bg-gradient-to-br from-stone-900 to-stone-950 px-6 py-10 text-white relative overflow-hidden rounded-[32px] mx-4 mt-4 shadow-xl">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-orange-500/10 via-transparent to-transparent opacity-60" />
+              <span className="px-2.5 py-0.5 bg-orange-500 text-white rounded text-[8px] font-black uppercase tracking-widest">
+                Daily Log Summary
+              </span>
+              <h2 className="text-2xl font-black leading-tight tracking-tight mt-3 font-sans">
+                {payload.n}
+              </h2>
+              <p className="text-[10px] text-stone-400 font-extrabold uppercase tracking-widest mt-1">
+                fitpush.vercel.app
+              </p>
+            </div>
+
+            {/* Calories Ring / Widget Summary Card */}
+            <div className="px-6 mt-2">
+              <div className="bg-white border border-stone-200/50 rounded-[32px] p-6 shadow-xs flex flex-col items-center text-center gap-4">
+                <div className="w-32 h-32 rounded-full border-4 border-orange-500 flex flex-col items-center justify-center shrink-0">
+                  <span className="text-3xl font-black text-stone-900">{payload.c}</span>
+                  <span className="text-[9px] font-extrabold text-stone-400">LOGGED KCAL</span>
+                </div>
+                <div className="text-xs font-bold text-stone-600">
+                  Logged {payload.mls?.length || 0} meals on this date.
+                </div>
+              </div>
+            </div>
+
+            {/* Macros Summary Dashboard */}
+            <div className="px-6">
+              <div className="bg-white border border-stone-200/50 rounded-[32px] p-6 shadow-xs">
+                <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider mb-4">
+                  Macronutrient Summary
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Protein", val: payload.p, col: "bg-orange-500" },
+                    { label: "Carbs", val: payload.cb, col: "bg-blue-500" },
+                    { label: "Fats", val: payload.f, col: "bg-yellow-500" }
+                  ].map((m) => (
+                    <div key={m.label} className="p-3 bg-stone-50 border border-stone-100 rounded-2xl flex flex-col justify-between">
+                      <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest">{m.label}</span>
+                      <span className="text-sm font-black text-stone-900 mt-1">{m.val}g</span>
+                      <div className="w-full h-1 bg-stone-150 rounded-full mt-2 overflow-hidden">
+                        <div className={`h-full ${m.col}`} style={{ width: `${Math.min(100, (m.val / 100) * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Food timeline */}
+            <div className="px-6">
+              <div className="bg-white border border-stone-200/50 rounded-[32px] p-6 shadow-xs space-y-4">
+                <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5 font-sans">
+                  <Utensils className="w-4 h-4 text-orange-500" />
+                  <span>Logged Food Timeline</span>
+                </h3>
+                <div className="space-y-3">
+                  {payload.mls && payload.mls.length > 0 ? (
+                    payload.mls.map((meal, idx) => (
+                      <div key={idx} className="flex justify-between items-center py-2.5 border-b border-stone-50 last:border-none">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black text-stone-850">{meal.n}</span>
+                          <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest mt-0.5">Meal Logged</span>
+                        </div>
+                        <span className="text-xs font-black text-orange-600">+{meal.c} kcal</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs font-bold text-stone-400 py-2">
+                      No specific meal items logged on this day.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </section>
         )}
 
@@ -304,8 +407,14 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
                 <h2 className="text-white text-2xl font-black leading-tight tracking-tight drop-shadow-sm">
                   {payload.n}
                 </h2>
-                <p className="text-xs text-white/80 font-bold mt-1 flex items-center gap-1">
-                  ⏱️ Prep Time: {payload.t}
+                <p className="text-xs text-white/80 font-bold mt-1 flex items-center gap-1.5 flex-wrap font-sans">
+                  <span>⏱️ Prep Time: {payload.t}</span>
+                  {payload.lc !== undefined && (
+                    <>
+                      <span>•</span>
+                      <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider">🔥 Logged {payload.lc} times</span>
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -340,6 +449,20 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Recipe description */}
+            {payload.d && (
+              <div className="px-6 mt-6">
+                <div className="bg-white border border-stone-200/50 rounded-[32px] p-6 shadow-xs text-left font-sans">
+                  <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider mb-2">
+                    Recipe Notes
+                  </h3>
+                  <p className="text-xs font-semibold text-stone-700 italic leading-relaxed">
+                    "{payload.d}"
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Interactive checkable Cooking Checklist */}
             {payload.ing && payload.ing.length > 0 && (

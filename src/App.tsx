@@ -169,7 +169,7 @@ export default function App() {
     }
     return "home";
   });
-  const [shareItemPopup, setShareItemPopup] = useState<{ type: "meal" | "recipe", item: any } | null>(null);
+  const [shareItemPopup, setShareItemPopup] = useState<{ type: "meal" | "recipe" | "day", item: any } | null>(null);
   
   const handleShareMeal = (meal: Meal) => {
     setShareItemPopup({ type: "meal", item: meal });
@@ -177,6 +177,26 @@ export default function App() {
   
   const handleShareRecipe = (recipe: Recipe) => {
     setShareItemPopup({ type: "recipe", item: recipe });
+  };
+
+  const handleShareDay = () => {
+    const mealsForDay = mealsState.filter(m => m.date === selectedDate);
+    const dayCalories = mealsForDay.reduce((sum, m) => sum + (m.calories || 0), 0);
+    const dayProtein = mealsForDay.reduce((sum, m) => sum + (m.protein || 0), 0);
+    const dayCarbs = mealsForDay.reduce((sum, m) => sum + (m.carbs || 0), 0);
+    const dayFats = mealsForDay.reduce((sum, m) => sum + (m.fats || 0), 0);
+    const dayFiber = mealsForDay.reduce((sum, m) => sum + (m.fiber || 0), 0);
+
+    const dayObj = {
+      date: selectedDate,
+      meals: mealsForDay,
+      calories: dayCalories,
+      protein: dayProtein,
+      carbs: dayCarbs,
+      fats: dayFats,
+      fiber: dayFiber
+    };
+    setShareItemPopup({ type: "day", item: dayObj });
   };
 
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null);
@@ -211,6 +231,15 @@ export default function App() {
   const [aiConfigMode, setAiConfigMode] = useState<"ai" | "manual">("ai");
   const [isAiCalculating, setIsAiCalculating] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [manualLogInitialAiMode, setManualLogInitialAiMode] = useState(false);
+
+  useEffect(() => {
+    const savedKey = localStorage.getItem("fitai_gemini_api_key");
+    if (savedKey && savedKey.startsWith("AIzaSy")) {
+      localStorage.removeItem("fitai_gemini_api_key");
+    }
+  }, []);
 
   useEffect(() => {
     if (!selectedRecipePopup) {
@@ -609,23 +638,28 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      setIsSessionLoading(false);
+      return;
+    }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        handleUserAuthenticated(session.user);
+        await handleUserAuthenticated(session.user);
       }
+      setIsSessionLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user) {
-        handleUserAuthenticated(session.user);
+        await handleUserAuthenticated(session.user);
       } else {
         setActiveProfileId(null);
         localStorage.removeItem("fitai_active_profile_id");
       }
+      setIsSessionLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -635,21 +669,32 @@ export default function App() {
     if (!isSupabaseConfigured) return;
 
     const initSupabase = async () => {
-      const savedProfileId = localStorage.getItem("fitai_active_profile_id");
-      if (savedProfileId) {
-        const { data: existing, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', savedProfileId)
-          .maybeSingle();
-
-        if (!error && existing) {
-          setActiveProfileId(existing.id);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setActiveProfileId(session.user.id);
+          localStorage.setItem("fitai_active_profile_id", session.user.id);
           return;
         }
-      }
 
-      setActiveProfileId(null);
+        const savedProfileId = localStorage.getItem("fitai_active_profile_id");
+        if (savedProfileId) {
+          const { data: existing, error } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', savedProfileId)
+            .maybeSingle();
+
+          if (!error && existing) {
+            setActiveProfileId(existing.id);
+            return;
+          }
+        }
+
+        setActiveProfileId(null);
+      } finally {
+        setIsSessionLoading(false);
+      }
     };
 
     initSupabase();
@@ -796,9 +841,63 @@ export default function App() {
             image: r.image,
             ingredients: r.ingredients || [],
             instructions: r.instructions,
-            micros: r.micros || []
+            micros: r.micros || [],
+            log_count: r.log_count || 0
           }));
-          setRecipesState(mappedRecipes);
+
+          if (mappedRecipes.length === 0 && activeProfileId) {
+            // Seed the 3 default recipes for beginning flow
+            const seedPromises = INITIAL_RECIPES.map(r => 
+              supabase.from("recipes").insert({
+                profile_id: activeProfileId,
+                name: r.name,
+                time: r.time,
+                calories: r.calories,
+                protein: r.protein,
+                carbs: r.carbs,
+                fats: r.fats,
+                fiber: r.fiber,
+                description: r.description,
+                tags: r.tags,
+                image: r.image,
+                ingredients: r.ingredients,
+                instructions: r.instructions
+              }).select("*").single()
+            );
+
+            Promise.all(seedPromises).then(seededResults => {
+              const seededMapped = seededResults
+                .map(res => res.data)
+                .filter(Boolean)
+                .map(r => ({
+                  id: r.id,
+                  name: r.name,
+                  time: r.time,
+                  calories: r.calories,
+                  protein: r.protein,
+                  carbs: r.carbs,
+                  fats: r.fats,
+                  fiber: r.fiber || 0,
+                  description: r.description || "",
+                  tags: r.tags || [],
+                  image: r.image,
+                  ingredients: r.ingredients || [],
+                  instructions: r.instructions,
+                  micros: r.micros || [],
+                  log_count: r.log_count || 0
+                }));
+              if (seededMapped.length > 0) {
+                setRecipesState(seededMapped);
+              } else {
+                setRecipesState(INITIAL_RECIPES);
+              }
+            }).catch(err => {
+              console.error("Error seeding default recipes:", err);
+              setRecipesState(INITIAL_RECIPES);
+            });
+          } else {
+            setRecipesState(mappedRecipes);
+          }
         }
 
         if (mealsRes.error) {
@@ -924,11 +1023,43 @@ export default function App() {
     
     const key = localStorage.getItem("fitai_gemini_api_key") || 
                 (import.meta as any).env.VITE_GEMINI_API_KEY ||
-                "AIzaSyDPSqNMSeKaIxjR9ztMwErj2KhBhXCeHA4";
+                "";
 
     setIsRecipeAiGenerating(true);
     try {
-      const prompt = `You are a professional dietitian. Create a single custom recipe based on the user's request prompt: "${promptText}".
+      const isEditMode = selectedRecipePopup && selectedRecipePopup.id !== "new";
+      const prompt = isEditMode
+        ? `You are a professional dietitian. Modify the following base recipe according to this user instruction: "${promptText}".
+Base Recipe:
+- Name: "${editPopupName || selectedRecipePopup.name}"
+- Time: "${editPopupTime || selectedRecipePopup.time}"
+- Calories: ${editPopupCalories || selectedRecipePopup.calories} kcal
+- Protein: ${editPopupProtein || selectedRecipePopup.protein}g
+- Carbs: ${editPopupCarbs || selectedRecipePopup.carbs}g
+- Fats: ${editPopupFats || selectedRecipePopup.fats}g
+- Fiber: ${editPopupFiber || selectedRecipePopup.fiber || 0}g
+- Description: "${editPopupDescription || selectedRecipePopup.description || ""}"
+- Ingredients:
+${(editPopupIngredients ? editPopupIngredients.split("\n") : (selectedRecipePopup.ingredients || [])).map((i: string) => `- ${i}`).join("\n")}
+- Instructions:
+${editPopupInstructions || selectedRecipePopup.instructions || ""}
+
+Please return a clean, valid JSON object containing the updated recipe details:
+{
+  "name": "updated/refined recipe name",
+  "time": "updated prep time",
+  "calories": updated_calories,
+  "protein": updated_protein,
+  "carbs": updated_carbs,
+  "fats": updated_fats,
+  "fiber": updated_fiber,
+  "description": "updated teaser description",
+  "tags": ["Vegetarian", "High Protein", ...],
+  "ingredients": ["updated exact ingredient 1 with quantity", ...],
+  "instructions": "updated step-by-step instructions"
+}
+Do not include any extra text, markdown styling, backticks, or "json" prefix. Just return the raw JSON string itself.`
+        : `You are a professional dietitian. Create a single custom recipe based on the user's request prompt: "${promptText}".
 Verify details, calculate accurate calorie content, and establish healthy macros.
 Return a clean, valid JSON object containing the recipe details:
 {
@@ -947,13 +1078,23 @@ Return a clean, valid JSON object containing the recipe details:
 Do not include any extra text, markdown styling, backticks, or "json" prefix. Just return the raw JSON string itself.`;
 
       let rawText = "";
+      let edgeSuccess = false;
+
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase.functions.invoke("gemini", {
-          body: { prompt }
-        });
-        if (error) throw error;
-        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      } else {
+        try {
+          const { data, error } = await supabase.functions.invoke("gemini", {
+            body: { prompt }
+          });
+          if (!error && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            rawText = data.candidates[0].content.parts[0].text;
+            edgeSuccess = true;
+          }
+        } catch (e) {
+          console.warn("Edge Function invoke error, falling back to direct API:", e);
+        }
+      }
+
+      if (!edgeSuccess) {
         let response = null;
         for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
           try {
@@ -1000,7 +1141,7 @@ Do not include any extra text, markdown styling, backticks, or "json" prefix. Ju
     // 1. Check if Gemini key is available
     const key = localStorage.getItem("fitai_gemini_api_key") || 
                 (import.meta as any).env.VITE_GEMINI_API_KEY ||
-                "AIzaSyDPSqNMSeKaIxjR9ztMwErj2KhBhXCeHA4";
+                "";
 
     setIsGeneratingRecipe(true);
     try {
@@ -1062,15 +1203,23 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
       let rawText = "";
 
+      let edgeSuccess = false;
+
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase.functions.invoke("gemini", {
-          body: { prompt }
-        });
-        if (error) {
-          throw new Error(error.message || "Failed to contact Gemini Edge Function");
+        try {
+          const { data, error } = await supabase.functions.invoke("gemini", {
+            body: { prompt }
+          });
+          if (!error && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            rawText = data.candidates[0].content.parts[0].text;
+            edgeSuccess = true;
+          }
+        } catch (e) {
+          console.warn("Edge Function invoke error, falling back to direct API:", e);
         }
-        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      } else {
+      }
+
+      if (!edgeSuccess) {
         let response = null;
         let lastError = "";
 
@@ -1158,6 +1307,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       hour12: true,
     };
     const formattedTime = newMealOrRecipe.time || new Date().toLocaleTimeString("en-US", timeOptions);
+    
+    const defaultImage = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80";
+    const finalImage = newMealOrRecipe.image && !newMealOrRecipe.image.includes("photo-1546069901-ba9599a7e63c")
+      ? newMealOrRecipe.image
+      : defaultImage;
 
     if (newMealOrRecipe.id) {
       if (isSupabaseConfigured && profileData.api_key) {
@@ -1176,7 +1330,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               carbs: newMealOrRecipe.carbs,
               fats: newMealOrRecipe.fats,
               fiber: (newMealOrRecipe as any).fiber,
-              image: newMealOrRecipe.image,
+              image: finalImage,
               type: newMealOrRecipe.type,
               time: formattedTime,
               date: selectedDate,
@@ -1219,7 +1373,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         carbs: newMealOrRecipe.carbs,
         fats: newMealOrRecipe.fats,
         fiber: (newMealOrRecipe as any).fiber || m.fiber || 0,
-        image: newMealOrRecipe.image || m.image,
+        image: finalImage,
         meal_description: newMealOrRecipe.meal_description !== undefined ? newMealOrRecipe.meal_description : m.meal_description
       } : m));
       showToast("🍽️ Meal updated locally");
@@ -1242,7 +1396,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             carbs: newMealOrRecipe.carbs,
             fats: newMealOrRecipe.fats,
             fiber: (newMealOrRecipe as any).fiber,
-            image: newMealOrRecipe.image,
+            image: finalImage,
             type: newMealOrRecipe.type,
             time: formattedTime,
             date: selectedDate,
@@ -1262,7 +1416,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             carbs: data.meal.carbs,
             fats: data.meal.fats,
             fiber: data.meal.fiber || 0,
-            image: data.meal.image,
+            image: data.meal.image || finalImage,
             meal_description: data.meal.meal_description || "",
             date: data.meal.date
           };
@@ -1288,9 +1442,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       carbs: newMealOrRecipe.carbs,
       fats: newMealOrRecipe.fats,
       fiber: (newMealOrRecipe as any).fiber || 0,
-      image:
-        newMealOrRecipe.image ||
-        "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80",
+      image: finalImage,
       meal_description: newMealOrRecipe.meal_description || "",
       date: selectedDate,
     };
@@ -1345,6 +1497,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
   };
 
   const handleEditMeal = (meal: Meal) => {
+    setManualLogInitialAiMode(false);
     setMealToEdit(meal);
     setIsCameraFullScreen(true);
   };
@@ -1524,6 +1677,21 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
           localStorage.setItem("fitai_active_profile_id", userId);
         }}
       />
+    );
+  }
+
+  if (isSupabaseConfigured && isSessionLoading) {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center animate-pulse">
+            <Flame className="text-white w-9 h-9 fill-white" />
+          </div>
+          <span className="text-xs font-black text-orange-950 uppercase tracking-widest animate-pulse">
+            Loading FitAI...
+          </span>
+        </div>
+      </div>
     );
   }
 
@@ -1823,6 +1991,13 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                   >
                     <CalendarIcon className="w-4 h-4 text-stone-500" />
                   </button>
+                  <button
+                    onClick={handleShareDay}
+                    className="w-8 h-8 rounded-xl bg-white hover:bg-stone-50 border border-stone-200/60 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all"
+                    title="Share day summary"
+                  >
+                    <Share2 className="w-4 h-4 text-stone-500" />
+                  </button>
                 </div>
               </div>
 
@@ -2041,11 +2216,14 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 {selectedDate === todayStr && (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setIsCameraFullScreen(true)}
-                      className="text-orange-600 font-black uppercase text-[10px] tracking-[0.15em] flex items-center gap-1 group bg-orange-100/50 px-3.5 py-1.5 rounded-full border border-orange-200/30 hover:bg-orange-200/50 transition-colors cursor-pointer select-none active:scale-95"
+                      onClick={() => {
+                        setManualLogInitialAiMode(true);
+                        setIsCameraFullScreen(true);
+                      }}
+                      className="text-white font-black uppercase text-[9px] tracking-wider flex items-center gap-1.5 group bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 px-4 py-2 rounded-full hover:brightness-110 transition-all cursor-pointer select-none active:scale-95 shadow-sm shadow-orange-500/10 border-none font-sans"
                     >
-                      <span>Add</span>
-                      <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                      <Sparkles className="w-3.5 h-3.5 text-white fill-white group-hover:scale-110 transition-transform" />
+                      <span>AI Logger</span>
                     </button>
                   </div>
                 )}
@@ -2080,6 +2258,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                               <h4 className="text-xs font-black text-stone-850 truncate leading-tight">
                                 {meal.name}
                               </h4>
+                              {meal.meal_description && (
+                                <p className="text-[9px] text-stone-500 font-semibold mt-0.5 line-clamp-1">
+                                  {meal.meal_description}
+                                </p>
+                              )}
                               <span className="text-[8px] font-bold text-stone-400 block mt-0.5 uppercase tracking-wider">
                                 {meal.time}
                               </span>
@@ -2116,7 +2299,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                       );
                     }
 
-                    const hasImage = !hasNoGeneratedImage(meal.image);
+                    const hasImage = true;
 
                     if (!hasImage) {
                       const getMealEmoji = (typeStr: string) => {
@@ -2145,6 +2328,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                               <h4 className="text-xs font-black text-stone-850 truncate leading-tight">
                                 {meal.name}
                               </h4>
+                              {meal.meal_description && (
+                                <p className="text-[9px] text-stone-500 font-semibold mt-0.5 line-clamp-1">
+                                  {meal.meal_description}
+                                </p>
+                              )}
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
                                 <span className="text-[8px] font-bold text-stone-400 block uppercase tracking-wider">
                                   {meal.time}
@@ -2196,7 +2384,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                         className="relative rounded-[32px] overflow-hidden aspect-[4/3] sm:aspect-video shadow-xl shadow-orange-200/30 group cursor-pointer"
                       >
                         <img
-                          src={meal.image}
+                          src={meal.image && !meal.image.includes("photo-1546069901-ba9599a7e63c") ? meal.image : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80"}
                           className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                           alt={meal.name}
                         />
@@ -2240,10 +2428,15 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                         </div>
 
                         {/* Bottom Content: Name and Macros */}
-                        <div className="absolute bottom-5 left-5 right-5">
-                          <h4 className="text-white text-xl sm:text-2xl font-black mb-4 leading-tight tracking-tight shadow-sm">
+                        <div className="absolute bottom-5 left-5 right-5 text-left font-sans">
+                          <h4 className="text-white text-xl sm:text-2xl font-black mb-1 leading-tight tracking-tight shadow-sm">
                             {meal.name}
                           </h4>
+                          {meal.meal_description && (
+                            <p className="text-[10px] text-white/75 font-semibold italic mb-3 line-clamp-1 truncate">
+                              "{meal.meal_description}"
+                            </p>
+                          )}
 
                           <div className="flex gap-4">
                             {[
@@ -2429,8 +2622,14 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                   <h3 className="text-white text-base font-black leading-tight tracking-tight drop-shadow-sm font-sans">
                     {isEditingRecipe ? editPopupName || "Unnamed Recipe" : selectedRecipePopup.name}
                   </h3>
-                  <p className="text-[10px] text-white/70 font-bold font-sans mt-0.5 flex items-center gap-1">
-                    ⏱️ Prep time: {isEditingRecipe ? editPopupTime : selectedRecipePopup.time}
+                  <p className="text-[10px] text-white/70 font-bold font-sans mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <span>⏱️ Prep time: {isEditingRecipe ? editPopupTime : selectedRecipePopup.time}</span>
+                    {!isEditingRecipe && (
+                      <>
+                        <span>•</span>
+                        <span className="bg-white/10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">🔥 Logged {selectedRecipePopup.log_count || 0} times</span>
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -2988,6 +3187,18 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                           image: selectedRecipePopup.image,
                           type: "Favorite",
                         });
+                        
+                        // Increment recipe log count
+                        const newCount = (selectedRecipePopup.log_count || 0) + 1;
+                        setRecipesState(prev => prev.map(r => r.id === selectedRecipePopup.id ? { ...r, log_count: newCount } : r));
+                        if (isSupabaseConfigured) {
+                          supabase
+                            .from('recipes')
+                            .update({ log_count: newCount })
+                            .eq('id', selectedRecipePopup.id)
+                            .then();
+                        }
+
                         setToastMessage(`Successfully logged portion of "${selectedRecipePopup.name}" for today! 🍽️`);
                         setSelectedRecipePopup(null);
                       }}
@@ -3024,7 +3235,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                       onClick={() => setIsRecipeAiMode(!isRecipeAiMode)}
                       className="px-3.5 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-655 rounded-xl transition-all cursor-pointer border border-orange-100/55 flex items-center justify-center gap-1 font-black text-[10px] uppercase tracking-wider active:scale-95"
                     >
-                      {isRecipeAiMode ? "✏️ Manual Form" : "🤖 AI Generator"}
+                      {isRecipeAiMode ? "✏️ Manual Form" : (selectedRecipePopup.id === "new" ? "🤖 AI Generator" : "🤖 AI Editor")}
                     </button>
                     <button
                       onClick={async () => {
@@ -3383,6 +3594,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             mealToEdit={mealToEdit}
             onNavigateToSettings={() => setActiveTab("profile")}
             mealsState={mealsState}
+            initialAiMode={manualLogInitialAiMode}
           />
         )}
       </AnimatePresence>

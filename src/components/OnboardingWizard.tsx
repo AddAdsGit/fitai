@@ -11,7 +11,6 @@ import {
   ExternalLink,
   BookOpen
 } from "lucide-react";
-import { CalendarPickerModal } from "./CalendarPickerModal";
 
 import { DefaultAvatar } from "./DefaultAvatar";
 
@@ -19,7 +18,7 @@ interface BodyMetrics {
   name: string;
   avatar: string;
   gender: "Male" | "Female";
-  dob: string;
+  age: number;
   height: number;
   weight: number;
   goal: "Lose Weight" | "Maintain Weight" | "Build Muscle";
@@ -32,7 +31,7 @@ const DEFAULT_METRICS: BodyMetrics = {
   name: "",
   avatar: "",
   gender: "Male",
-  dob: "1998-05-15",
+  age: 28,
   height: 175,
   weight: 70,
   goal: "Lose Weight",
@@ -67,13 +66,31 @@ export const OnboardingWizard = ({
   triggerToast: (msg: string) => void;
 }) => {
   const [step, setStep] = useState(1);
-  const [metrics, setMetrics] = useState<BodyMetrics>(() => ({
-    ...DEFAULT_METRICS,
-    name: profileData?.name || "",
-    avatar: profileData?.imageUrl || "",
-  }));
+  const [metrics, setMetrics] = useState<BodyMetrics>(() => {
+    let initialAge = 28;
+    if (profileData?.dob) {
+      const birthDate = new Date(profileData.dob);
+      if (!isNaN(birthDate.getTime())) {
+        const today = new Date();
+        let ageVal = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          ageVal--;
+        }
+        initialAge = ageVal || 28;
+      }
+    }
+    return {
+      ...DEFAULT_METRICS,
+      name: profileData?.name || "",
+      avatar: profileData?.imageUrl || "",
+      age: initialAge,
+      height: profileData?.height || 175,
+      weight: profileData?.weight || 70,
+      targetWeight: profileData?.weight_goal || 65,
+    };
+  });
   const [avatarPreview, setAvatarPreview] = useState(profileData?.imageUrl || "");
-  const [isDobPickerOpen, setIsDobPickerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Custom GPT page preference toggles
@@ -122,31 +139,9 @@ export const OnboardingWizard = ({
     }
   }, [profileData]);
 
-  // Calculations: Age from DOB
-  const calculateAge = (dobString: string) => {
-    const today = new Date();
-    const birthDate = new Date(dobString);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age || 25;
-  };
-
-  const getFormattedDob = () => {
-    if (!metrics.dob) return "";
-    const d = new Date(metrics.dob + "T00:00:00");
-    return d.toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
   // Perform Mifflin-St Jeor calculation (used for default recommendations)
   const calculateRecommendedTargets = (currentMetrics: BodyMetrics) => {
-    const age = calculateAge(currentMetrics.dob);
+    const age = currentMetrics.age;
     let bmr = 0;
     
     if (currentMetrics.gender === "Male") {
@@ -201,7 +196,7 @@ export const OnboardingWizard = ({
   useEffect(() => {
     const recommended = calculateRecommendedTargets(metrics);
     setTargets(recommended);
-  }, [metrics.gender, metrics.dob, metrics.height, metrics.weight]);
+  }, [metrics.gender, metrics.age, metrics.height, metrics.weight]);
 
   // HIERARCHICAL REACTION HANDLERS:
 
@@ -308,7 +303,7 @@ export const OnboardingWizard = ({
 
   // Generate Gemini AI Bio silently in the background
   const generateAiBioSilently = async (p: number, c: number, f: number, cal: number, fib: number): Promise<string> => {
-    const age = calculateAge(metrics.dob);
+    const age = metrics.age;
     const goalText = metrics.goal === "Lose Weight" ? `lose weight (target: ${metrics.targetWeight}kg)` : metrics.goal === "Build Muscle" ? `build muscle (target: ${metrics.targetWeight}kg)` : "maintain weight";
     const dietPrefs = metrics.preferences.length > 0 ? metrics.preferences.join(", ") : "no specific food restrictions";
     
@@ -380,7 +375,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
         image_url: metrics.avatar || null,
         height: metrics.height,
         weight: metrics.weight,
-        dob: metrics.dob,
+        dob: `${new Date().getFullYear() - metrics.age}-01-01`,
         gender: metrics.gender,
         description: silentBio,
         preferences: updatedPrefs,
@@ -403,7 +398,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
       imageUrl: metrics.avatar || null,
       height: metrics.height,
       weight: metrics.weight,
-      dob: metrics.dob,
+      dob: `${new Date().getFullYear() - metrics.age}-01-01`,
       gender: metrics.gender,
       description: silentBio,
       preferences: updatedPrefs,
@@ -577,19 +572,36 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
               </div>
             </div>
 
-            {/* DOB Picker */}
-            <div className="space-y-1.5">
+            {/* Age stepper */}
+            <div className="space-y-1.5 animate-fadeIn">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Date of Birth
+                Age (years)
               </label>
-              <button
-                type="button"
-                onClick={() => setIsDobPickerOpen(true)}
-                className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 hover:border-orange-500 text-left shadow-sm transition-all flex items-center justify-between cursor-pointer"
-              >
-                <span>{metrics.dob ? getFormattedDob() : "Select Date of Birth"}</span>
-                <span className="text-stone-400">📅</span>
-              </button>
+              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setMetrics(prev => ({ ...prev, age: Math.max(10, prev.age - 1) }))}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center gap-0.5">
+                  <input
+                    type="number"
+                    value={metrics.age}
+                    onChange={(e) => setMetrics(prev => ({ ...prev, age: parseInt(e.target.value) || 28 }))}
+                    className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-[10px] font-bold text-stone-400">Yrs Old</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMetrics(prev => ({ ...prev, age: Math.min(120, prev.age + 1) }))}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Height/Weight steppers */}
@@ -988,16 +1000,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
         </div>
       )}
 
-      {/* Date of Birth Custom Picker */}
-      <CalendarPickerModal
-        isOpen={isDobPickerOpen}
-        onClose={() => setIsDobPickerOpen(false)}
-        selectedDate={metrics.dob}
-        onSelectDate={(dateStr) => setMetrics(prev => ({ ...prev, dob: dateStr }))}
-        title="Select Date of Birth"
-        minYear={1930}
-        maxYear={2026}
-      />
+      {/* Date of Birth Picker removed - replaced by age stepper */}
     </div>
   );
 };

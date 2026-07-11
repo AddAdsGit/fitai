@@ -1,5 +1,5 @@
 import React from "react";
-import { Camera, User, Smile, Scale, Ruler, Database, Info } from "lucide-react";
+import { Camera, User, Smile, Scale, Ruler, Database, Info, Plus, Minus } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -170,17 +170,44 @@ export const EditProfileView = ({
             </div>
             <div className="pt-2">
               <div className="flex justify-between items-center mb-1.5 px-1">
-                <label className="text-[9px] font-black text-[#9e9e9e] uppercase tracking-widest">Date of Birth</label>
-                <span className="text-[9px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md">
-                  {calculatedAge ? `${calculatedAge} Yrs Old` : "Set Date"}
-                </span>
+                <label className="text-[9px] font-black text-[#9e9e9e] uppercase tracking-widest">Age</label>
               </div>
-              <input
-                type="date"
-                value={profileData.dob}
-                onChange={(e) => setProfileData({ ...profileData, dob: e.target.value })}
-                className="w-full bg-[#f5f5f5] rounded-xl px-4 py-3 text-sm font-bold text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-orange-500/10"
-              />
+              <div className="flex items-center bg-[#f5f5f5]/65 border border-stone-200/50 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentAge = getAge(profileData.dob) || 28;
+                    const newAge = Math.max(10, currentAge - 1);
+                    setProfileData({ ...profileData, dob: `${new Date().getFullYear() - newAge}-01-01` });
+                  }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center gap-0.5">
+                  <input
+                    type="number"
+                    value={getAge(profileData.dob) || 28}
+                    onChange={(e) => {
+                      const newAge = parseInt(e.target.value) || 28;
+                      setProfileData({ ...profileData, dob: `${new Date().getFullYear() - newAge}-01-01` });
+                    }}
+                    className="bg-transparent border-none text-center text-xs font-bold text-[#1a1a1a] focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-[10px] font-bold text-stone-400">Yrs Old</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentAge = getAge(profileData.dob) || 28;
+                    const newAge = Math.min(120, currentAge + 1);
+                    setProfileData({ ...profileData, dob: `${new Date().getFullYear() - newAge}-01-01` });
+                  }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -193,54 +220,72 @@ export const EditProfileView = ({
                 </div>
                 <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">Vitals & Biometrics</span>
               </div>
-              <span className="text-[8px] font-black uppercase tracking-widest text-stone-400">Bi-directional slider sync</span>
+              <span className="text-[8px] font-black uppercase tracking-widest text-stone-400">Interactive Stepper Config</span>
             </div>
 
             {/* Weight */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-3 shadow-2xs">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Scale className="w-4 h-4 text-orange-500" />
-                  <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Body Weight</span>
-                </div>
-                <div className="flex items-center gap-1 bg-white border border-stone-200 rounded-xl px-2.5 py-1">
+            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Scale className="w-4 h-4 text-orange-500" />
+                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Body Weight</span>
+              </div>
+              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setProfileData({ ...profileData, weight: Math.max(30, (profileData.weight || 70) - 1) })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
                     value={profileData.weight || ""}
                     onChange={(e) => setProfileData({ ...profileData, weight: parseInt(e.target.value) || 0 })}
-                    className="w-10 text-center text-xs font-black text-stone-800 focus:outline-none"
+                    className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-14 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-[10px] font-bold text-stone-400">kg</span>
+                  <span className="text-xs font-bold text-stone-400">kg</span>
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setProfileData({ ...profileData, weight: Math.max(30, (profileData.weight || 70) - 1) })} className="w-7 h-7 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-600 font-bold hover:bg-stone-100 active:scale-95 transition-all shadow-sm text-xs">-</button>
-                <input type="range" min="30" max="160" value={profileData.weight || 70} onChange={(e) => setProfileData({ ...profileData, weight: parseInt(e.target.value) })} className="flex-1 accent-orange-500 h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer" />
-                <button type="button" onClick={() => setProfileData({ ...profileData, weight: Math.min(160, (profileData.weight || 70) + 1) })} className="w-7 h-7 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-600 font-bold hover:bg-stone-100 active:scale-95 transition-all shadow-sm text-xs">+</button>
+                <button
+                  type="button"
+                  onClick={() => setProfileData({ ...profileData, weight: Math.min(300, (profileData.weight || 70) + 1) })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
             {/* Height */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-3 shadow-2xs">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Ruler className="w-4 h-4 text-orange-500" />
-                  <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Height</span>
-                </div>
-                <div className="flex items-center gap-1 bg-white border border-stone-200 rounded-xl px-2.5 py-1">
+            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Ruler className="w-4 h-4 text-orange-500" />
+                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Height</span>
+              </div>
+              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setProfileData({ ...profileData, height: Math.max(100, (profileData.height || 170) - 1) })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
                     value={profileData.height || ""}
                     onChange={(e) => setProfileData({ ...profileData, height: parseInt(e.target.value) || 0 })}
-                    className="w-10 text-center text-xs font-black text-stone-800 focus:outline-none"
+                    className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-14 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-[10px] font-bold text-stone-400">cm</span>
+                  <span className="text-xs font-bold text-stone-400">cm</span>
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setProfileData({ ...profileData, height: Math.max(100, (profileData.height || 170) - 1) })} className="w-7 h-7 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-600 font-bold hover:bg-stone-100 active:scale-95 transition-all shadow-sm text-xs">-</button>
-                <input type="range" min="100" max="220" value={profileData.height || 170} onChange={(e) => setProfileData({ ...profileData, height: parseInt(e.target.value) })} className="flex-1 accent-orange-500 h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer" />
-                <button type="button" onClick={() => setProfileData({ ...profileData, height: Math.min(220, (profileData.height || 170) + 1) })} className="w-7 h-7 rounded-full bg-white border border-stone-200 flex items-center justify-center text-stone-600 font-bold hover:bg-stone-100 active:scale-95 transition-all shadow-sm text-xs">+</button>
+                <button
+                  type="button"
+                  onClick={() => setProfileData({ ...profileData, height: Math.min(250, (profileData.height || 170) + 1) })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 

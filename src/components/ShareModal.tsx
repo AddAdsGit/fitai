@@ -5,8 +5,8 @@ import { SharedItemPayload, generateShareUrl } from "../utils/shareUtils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
 interface ShareModalProps {
-  type: "meal" | "recipe";
-  item: any; // Meal or Recipe object
+  type: "meal" | "recipe" | "day";
+  item: any; // Meal, Recipe, or Day object
   profileData: any; // User profile containing username
   onClose: () => void;
   triggerToast: (msg: string) => void;
@@ -30,21 +30,33 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentTemplate = templates[currentIndex];
 
-  const handleStr = profileData?.username
-    ? `@${profileData.username}`
-    : profileData?.name
-    ? `@${profileData.name.toLowerCase().replace(/\s+/g, "")}`
-    : "@mk";
+  const handleStr = profileData.username ? `@${profileData.username}` : "@user";
 
   const isMeal = type === "meal";
-  const name = item.name || "Unnamed Item";
+  const isRecipe = type === "recipe";
+  const isDay = type === "day";
+
+  // Date formatting helper for day titles
+  const formatDateTitle = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr + "T00:00:00");
+      return d.toLocaleDateString("en-US", { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase();
+    } catch (_) {
+      return dateStr;
+    }
+  };
+
+  const name = isDay ? formatDateTitle(item.date) : item.name || "Unnamed Item";
   const calories = Number(item.calories || 0);
   const protein = Number(item.protein || 0);
   const carbs = Number(item.carbs || 0);
   const fats = Number(item.fats || 0);
   const fiber = Number(item.fiber || 0);
-  const time = item.time || (isMeal ? "12:00 PM" : "15 mins");
-  const image = item.image || "";
+  
+  const time = isDay ? "" : item.time || (isMeal ? "12:00 PM" : "15 mins");
+  const image = isDay ? "" : item.image || "";
+  const ingredients = isDay ? [] : item.ingredients || [];
+  const mealsList = isDay ? item.meals || [] : [];
 
   const payload: SharedItemPayload = {
     n: name,
@@ -53,8 +65,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     cb: carbs,
     f: fats,
     fb: fiber,
-    t: time,
+    t: time || undefined,
     img: image || undefined,
+    ing: isRecipe ? ingredients : undefined,
+    mls: isDay ? mealsList.map((m: any) => ({ n: m.name, c: m.calories })) : undefined,
   };
 
   useEffect(() => {
@@ -133,6 +147,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     const runTemplateDraw = (loadedImg: HTMLImageElement | null) => {
       ctx.clearRect(0, 0, 1080, 1080);
       
+      const isDark = currentTemplate === "obsidian";
+      const isSunset = currentTemplate === "sunset";
+      let bgColor = isDark ? "#1C1917" : "#FAF9F6";
+      let txtColor = isDark ? "#FAF9F6" : "#1C1917";
+      let subTxtColor = isDark ? "#A8A29E" : "#78716C";
+
       if (currentTemplate === "obsidian") {
         // ================= TEMPLATE 1: OBSIDIAN DARK (PHOTO OR DARK SOLID) =================
         if (loadedImg) {
@@ -180,22 +200,108 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         ctx.fillText(handleStr, 875, 108);
         ctx.textAlign = "left";
 
-        // Title Food Name
+        // Title Name / Date
         const finalY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 68px Inter, system-ui, sans-serif");
 
-        // Calories
-        ctx.fillStyle = accentColor;
-        ctx.font = "black 28px Inter, system-ui, sans-serif";
-        ctx.fillText(`⏱️ TRACKED AT ${time}`, 80, finalY + 70);
+        // Subtitle & List Block
+        if (isDay) {
+          ctx.fillStyle = accentColor;
+          ctx.font = "black 28px Inter, system-ui, sans-serif";
+          ctx.fillText("📅 ALL MEALS RECORDED", 80, finalY + 70);
 
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "black 170px Inter, system-ui, sans-serif";
-        const calY = finalY + 235;
-        ctx.fillText(`${calories}`, 80, calY);
+          const boxY = finalY + 100;
+          ctx.fillStyle = "rgba(255,255,255,0.06)";
+          ctx.beginPath();
+          ctx.roundRect(80, boxY, 920, 280, 24);
+          ctx.fill();
 
-        ctx.fillStyle = "#A8A29E";
-        ctx.font = "bold 32px Inter, system-ui, sans-serif";
-        ctx.fillText("TOTAL KCAL", 85, calY + 60);
+          ctx.fillStyle = "#FAF9F6";
+          ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
+          ctx.fillText("DAILY FOOD TIMELINE", 120, boxY + 50);
+
+          ctx.font = "bold 24px Inter, system-ui, sans-serif";
+          const topMeals = mealsList.slice(0, 3);
+          
+          if (topMeals.length === 0) {
+            ctx.fillStyle = "#A8A29E";
+            ctx.fillText("No meals logged on this day.", 120, boxY + 130);
+          } else {
+            topMeals.forEach((meal: any, idx: number) => {
+              ctx.fillStyle = accentColor;
+              ctx.beginPath();
+              ctx.arc(130, boxY + 110 + idx * 55, 6, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = "#FAF9F6";
+              ctx.fillText(meal.name || "Logged Meal", 160, boxY + 118 + idx * 55);
+
+              ctx.fillStyle = "#A8A29E";
+              ctx.font = "black 24px Inter, system-ui, sans-serif";
+              ctx.fillText(`+${meal.calories} kcal`, 820, boxY + 118 + idx * 55);
+            });
+            if (mealsList.length > 3) {
+              ctx.fillStyle = "#A8A29E";
+              ctx.font = "italic 20px Inter, system-ui, sans-serif";
+              ctx.fillText(`+ ${mealsList.length - 3} more meals logged`, 120, boxY + 245);
+            }
+          }
+
+          ctx.fillStyle = "#FAF9F6";
+          ctx.font = "black 76px Inter, system-ui, sans-serif";
+          ctx.fillText(`${calories} kcal`, 80, boxY + 415);
+
+        } else if (isRecipe) {
+          ctx.fillStyle = accentColor;
+          ctx.font = "black 28px Inter, system-ui, sans-serif";
+          ctx.fillText(`🍳 ${time} PREP • LOGGED ${item.log_count || 0} TIMES`, 80, finalY + 60);
+
+          const boxY = finalY + 90;
+          ctx.fillStyle = "rgba(255,255,255,0.06)";
+          ctx.beginPath();
+          ctx.roundRect(80, boxY, 920, 280, 24);
+          ctx.fill();
+
+          ctx.fillStyle = "#FAF9F6";
+          ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
+          ctx.fillText("INGREDIENTS CHECKLIST", 120, boxY + 50);
+
+          ctx.font = "bold 24px Inter, system-ui, sans-serif";
+          const topIngredients = ingredients.slice(0, 3);
+          topIngredients.forEach((ing: string, idx: number) => {
+            ctx.fillStyle = accentColor;
+            ctx.beginPath();
+            ctx.arc(130, boxY + 110 + idx * 55, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#FAF9F6";
+            ctx.fillText(ing, 160, boxY + 118 + idx * 55);
+          });
+
+          if (ingredients.length > 3) {
+            ctx.fillStyle = "#A8A29E";
+            ctx.font = "italic 20px Inter, system-ui, sans-serif";
+            ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + 245);
+          }
+
+          ctx.fillStyle = "#FAF9F6";
+          ctx.font = "black 76px Inter, system-ui, sans-serif";
+          ctx.fillText(`${calories} kcal`, 80, boxY + 415);
+
+        } else {
+          // Standard Meal Log
+          ctx.fillStyle = accentColor;
+          ctx.font = "black 28px Inter, system-ui, sans-serif";
+          ctx.fillText(`⚡ LOGGED AT ${time}`, 80, finalY + 70);
+
+          ctx.fillStyle = "#FAF9F6";
+          ctx.font = "black 170px Inter, system-ui, sans-serif";
+          const calY = finalY + 235;
+          ctx.fillText(`${calories}`, 80, calY);
+
+          ctx.fillStyle = "#A8A29E";
+          ctx.font = "bold 32px Inter, system-ui, sans-serif";
+          ctx.fillText("TOTAL KCAL", 85, calY + 60);
+        }
 
         // Macros Row
         const macroY = 820;
@@ -226,7 +332,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.fillText(m.val, startX + 60, macroY + 80);
         });
 
-        // Footer
+        // Footer line
         ctx.strokeStyle = "rgba(255,255,255,0.1)";
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -281,13 +387,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         const circleX = 540;
         const circleY = 440;
 
-        if (loadedImg) {
+        if (loadedImg && !isDay) {
           // Circular Image Polaroid
           ctx.save();
           ctx.beginPath();
           ctx.arc(circleX, circleY, 170, 0, Math.PI * 2);
           ctx.clip();
-          // Draw Image scaled & centered
           const scale = Math.max(340 / loadedImg.width, 340 / loadedImg.height);
           const xOffset = circleX - (loadedImg.width * scale) / 2;
           const yOffset = circleY - (loadedImg.height * scale) / 2;
@@ -301,7 +406,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.arc(circleX, circleY, 170, 0, Math.PI * 2);
           ctx.stroke();
 
-          // Calorie Badge overlapping bottom
+          // Calorie Badge
           ctx.fillStyle = accentColor;
           ctx.beginPath();
           ctx.roundRect(circleX - 90, circleY + 130, 180, 56, 16);
@@ -336,8 +441,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.textAlign = "left";
         }
 
-        // Food Title below ring
-        const titleY = loadedImg ? 735 : 715;
+        // Title below ring
+        const titleY = (loadedImg && !isDay) ? 735 : 715;
         wrapText(name, 80, titleY, 920, 68, "#1C1917", "black 48px Inter, system-ui, sans-serif");
 
         // Macros text Row
@@ -363,23 +468,20 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
       } else if (currentTemplate === "emerald") {
         // ================= TEMPLATE 3: EMERALD SOLID GREEN (NUTRITION FOCUS) =================
-        ctx.fillStyle = "#064E3B"; // Rich solid green
+        ctx.fillStyle = "#064E3B";
         ctx.fillRect(0, 0, 1080, 1080);
 
-        if (loadedImg) {
-          // Left Split Image Column
+        if (loadedImg && !isDay) {
           ctx.save();
           ctx.beginPath();
           ctx.rect(0, 0, 480, 1080);
           ctx.clip();
-          // Draw Image
           const scale = Math.max(480 / loadedImg.width, 1080 / loadedImg.height);
           const xOffset = 240 - (loadedImg.width * scale) / 2;
           const yOffset = 540 - (loadedImg.height * scale) / 2;
           ctx.drawImage(loadedImg, xOffset, yOffset, loadedImg.width * scale, loadedImg.height * scale);
           ctx.restore();
 
-          // Split division line
           ctx.strokeStyle = "rgba(250,249,246,0.15)";
           ctx.lineWidth = 4;
           ctx.beginPath();
@@ -388,10 +490,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.stroke();
         }
 
-        // Adjust text positioning depending on split layout
-        const textOffset = loadedImg ? 540 : 80;
-        const textMaxW = loadedImg ? 460 : 500;
-        const statsOffset = loadedImg ? 540 : 640;
+        const textOffset = (loadedImg && !isDay) ? 540 : 80;
+        const textMaxW = (loadedImg && !isDay) ? 460 : 500;
+        const statsOffset = (loadedImg && !isDay) ? 540 : 640;
 
         // Logo
         ctx.fillStyle = "#FAF9F6";
@@ -425,10 +526,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         ctx.fillText(handleStr, 875, 108);
         ctx.textAlign = "left";
 
-        // Food Name Wrap
         const nameY = wrapText(name, textOffset, 240, textMaxW + 80, 68, "#FAF9F6", "black 50px Inter, system-ui, sans-serif");
 
-        // Calorie Output
         ctx.fillStyle = "#10B981";
         ctx.font = "black 120px Inter, system-ui, sans-serif";
         ctx.fillText(`${calories}`, textOffset, nameY + 130);
@@ -443,7 +542,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           { label: "FATS", val: `${fats}g`, bar: fats / 70 }
         ];
 
-        const barWidth = loadedImg ? 460 : 360;
+        const barWidth = (loadedImg && !isDay) ? 460 : 360;
 
         mStats.forEach((stat, i) => {
           const itemY = 560 + i * 130;
@@ -455,13 +554,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.font = "black 36px Inter, system-ui, sans-serif";
           ctx.fillText(stat.val, statsOffset, itemY + 36);
 
-          // Progress bar background
           ctx.fillStyle = "rgba(250,249,246,0.1)";
           ctx.beginPath();
           ctx.roundRect(statsOffset, itemY + 54, barWidth, 10, 5);
           ctx.fill();
 
-          // Progress bar value
           ctx.fillStyle = "#10B981";
           ctx.beginPath();
           ctx.roundRect(statsOffset, itemY + 54, Math.min(barWidth, Math.max(10, barWidth * stat.bar)), 10, 5);
@@ -485,7 +582,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
       } else if (currentTemplate === "sunset") {
         // ================= TEMPLATE 4: SUNSET GLOW (GRADIENT + PHOTO OVERLAY) =================
-        if (loadedImg) {
+        if (loadedImg && !isDay) {
           ctx.drawImage(loadedImg, 0, 0, 1080, 1080);
           const sunsetGradOverlay = ctx.createLinearGradient(0, 0, 1080, 1080);
           sunsetGradOverlay.addColorStop(0, "rgba(255, 78, 80, 0.45)");
@@ -588,7 +685,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       }
     };
 
-    if (hasImage) {
+    if (hasImage && !isDay) {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.src = payload.img || "";
@@ -706,18 +803,18 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 else if (info.offset.x < -80) handleNext();
               }}
               style={
-                (currentTemplate === "obsidian" || currentTemplate === "sunset") && hasImage
+                (currentTemplate === "obsidian" || currentTemplate === "sunset") && hasImage && !isDay
                   ? { backgroundImage: `url(${payload.img})`, backgroundSize: 'cover', backgroundPosition: 'center' }
                   : {}
               }
               className={`w-full h-full rounded-[28px] p-6 flex flex-col justify-between shadow-xl relative overflow-hidden select-none cursor-grab active:cursor-grabbing border ${
-                (currentTemplate === "obsidian" || currentTemplate === "sunset") && hasImage
+                (currentTemplate === "obsidian" || currentTemplate === "sunset") && hasImage && !isDay
                   ? "text-white border-transparent"
                   : currentTemplate === "obsidian"
                   ? "bg-stone-900 text-stone-100 border-stone-850"
                   : currentTemplate === "cream"
                   ? "bg-[#FAF9F6] text-stone-950 border-stone-200"
-                  : currentTemplate === "emerald" && hasImage
+                  : currentTemplate === "emerald" && hasImage && !isDay
                   ? "bg-[#064E3B] text-[#FAF9F6] border-transparent p-0 flex-col overflow-hidden"
                   : currentTemplate === "emerald"
                   ? "bg-[#064E3B] text-[#FAF9F6] border-transparent"
@@ -725,23 +822,23 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               }`}
             >
               {/* Obsidian/Sunset Image Overlay */}
-              {((currentTemplate === "obsidian" || currentTemplate === "sunset") && hasImage) && (
+              {((currentTemplate === "obsidian" || currentTemplate === "sunset") && hasImage && !isDay) && (
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 z-0 pointer-events-none" />
               )}
 
-              {/* Logo block (Only rendered for non-split template views; split view has its own logo inside) */}
-              {!(currentTemplate === "emerald" && hasImage) && (
+              {/* Logo block */}
+              {!(currentTemplate === "emerald" && hasImage && !isDay) && (
                 <div className="flex justify-between items-center z-10">
                   <div className="flex items-center gap-1.5">
                     <div className={`w-6 h-6 rounded-lg flex items-center justify-center shadow-md ${
-                      currentTemplate === "sunset" || (currentTemplate === "obsidian" && hasImage) ? "bg-white text-orange-500" : "bg-orange-500 text-white"
+                      currentTemplate === "sunset" || (currentTemplate === "obsidian" && hasImage && !isDay) ? "bg-white text-orange-500" : "bg-orange-500 text-white"
                     }`}>
                       <Flame className="w-3.5 h-3.5" />
                     </div>
                     <span className="text-xs font-black tracking-tight">FitAI</span>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-[9px] font-black tracking-wider ${
-                    currentTemplate === "sunset" || (currentTemplate === "obsidian" && hasImage)
+                    currentTemplate === "sunset" || (currentTemplate === "obsidian" && hasImage && !isDay)
                       ? "bg-white/20 text-white"
                       : currentTemplate === "obsidian"
                       ? "bg-stone-800 text-stone-300"
@@ -756,9 +853,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
               {/* Layout Content Rendering based on template */}
               {currentTemplate === "cream" ? (
-                // ================= CREAM LAYOUT (CENTERED RING OR POLAROID BADGE) =================
+                // ================= CREAM LAYOUT =================
                 <div className="my-auto flex flex-col items-center gap-4 z-10 text-center">
-                  {hasImage ? (
+                  {hasImage && !isDay ? (
                     <div className="w-32 h-32 rounded-full border-[5px] border-orange-500 overflow-hidden relative shadow-md bg-stone-100 flex items-center justify-center shrink-0">
                       <img src={payload.img} className="w-full h-full object-cover" />
                       <div className="absolute bottom-1 bg-orange-500 text-white text-[8px] font-black px-2.5 py-1 rounded-full shadow-2xs">
@@ -774,24 +871,29 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   <h3 className="text-base font-black leading-tight tracking-tight mt-1 text-stone-950 line-clamp-2">
                     {name}
                   </h3>
-                  <div className="text-[10px] font-extrabold text-stone-600">
-                    PROTEIN: {protein}g  •  CARBS: {carbs}g  •  FATS: {fats}g
-                  </div>
+                  {isDay ? (
+                    <div className="text-[10px] font-extrabold text-stone-600 space-y-0.5">
+                      <div>Logged {mealsList.length} meals today</div>
+                      <div>PRO: {protein}g • CARB: {carbs}g • FAT: {fats}g</div>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] font-extrabold text-stone-600">
+                      PROTEIN: {protein}g  •  CARBS: {carbs}g  •  FATS: {fats}g
+                    </div>
+                  )}
                 </div>
-              ) : currentTemplate === "emerald" && hasImage ? (
-                // ================= EMERALD LAYOUT (SPLIT WITH IMAGE) =================
+              ) : currentTemplate === "emerald" && hasImage && !isDay ? (
+                // ================= EMERALD SPLIT LAYOUT WITH IMAGE =================
                 <div className="w-full h-full flex flex-col text-left">
                   <div className="w-full h-[42%] relative overflow-hidden border-b border-white/10 shrink-0">
                     <img src={payload.img} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#064E3B]/80 to-transparent" />
-                    {/* Logo block inside image */}
                     <div className="absolute top-4 left-4 flex items-center gap-1.5 text-white">
                       <div className="w-5 h-5 rounded bg-orange-500 text-white flex items-center justify-center shadow-md">
                         <Flame className="w-3 h-3" />
                       </div>
                       <span className="text-[10px] font-black tracking-tight">FitAI</span>
                     </div>
-                    {/* Handle inside image */}
                     <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[8px] font-black tracking-wider text-white">
                       {handleStr}
                     </div>
@@ -827,7 +929,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   </div>
                 </div>
               ) : currentTemplate === "emerald" ? (
-                // ================= EMERALD LAYOUT (SPLIT SOLID GREEN) =================
+                // ================= EMERALD SPLIT SOLID GREEN =================
                 <div className="my-auto grid grid-cols-2 gap-4 text-left z-10">
                   <div className="space-y-3">
                     <h3 className="text-sm font-black leading-tight tracking-tight line-clamp-3">
@@ -835,7 +937,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     </h3>
                     <div>
                       <span className="text-4xl font-black text-[#10B981]">{calories}</span>
-                      <span className="text-[8px] font-bold text-[#A7F3D0] block tracking-wider mt-0.5">KCAL LOGGED</span>
+                      <span className="text-[8px] font-bold text-[#A7F3D0] block tracking-wider mt-0.5">
+                        {isDay ? "TOTAL KCAL" : "KCAL LOGGED"}
+                      </span>
                     </div>
                   </div>
                   <div className="space-y-2 border-l border-emerald-800/40 pl-3">
@@ -853,7 +957,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 </div>
               ) : currentTemplate === "sunset" ? (
                 // ================= SUNSET GLASS PANELS =================
-                <div className="my-auto p-4 rounded-2xl bg-white/10 backdrop-blur-md text-left z-10 space-y-3">
+                <div className="my-auto p-4 rounded-2xl bg-white/10 backdrop-blur-md text-left z-10 space-y-3 w-full">
                   <h3 className="text-base font-black leading-tight tracking-tight line-clamp-2">
                     {name}
                   </h3>
@@ -861,6 +965,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     <span className="text-5xl font-black tracking-tight">{calories}</span>
                     <span className="text-[8px] font-bold text-white/70 block tracking-widest mt-0.5">TOTAL KCAL</span>
                   </div>
+                  {isDay && (
+                    <div className="text-[10px] text-white/80 font-bold bg-white/5 p-2 rounded-lg">
+                      🍱 Logged: {mealsList.map((m: any) => m.name).join(" • ")}
+                    </div>
+                  )}
                   <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10">
                     {[
                       { l: "Pro", v: `${protein}g` },
@@ -876,15 +985,32 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 </div>
               ) : (
                 // ================= OBSIDIAN ATHLETIC LAYOUT =================
-                <div className="my-auto space-y-3.5 text-left z-10">
+                <div className="my-auto space-y-3.5 text-left z-10 w-full">
                   <h3 className="text-lg font-black leading-tight tracking-tight mt-2 line-clamp-2">
                     {name}
                   </h3>
                   <span className={`text-[10px] font-black uppercase tracking-wider block ${
-                    hasImage ? "text-white" : "text-orange-500"
+                    hasImage && !isDay ? "text-white" : "text-orange-500"
                   }`}>
-                    ⏱️ LOGGED AT {time}
+                    {isDay ? "📅 FULL-DAY SUMMARY" : `⏱️ LOGGED AT ${time}`}
                   </span>
+                  
+                  {isDay && mealsList.length > 0 && (
+                    <div className="space-y-1.5 my-3 bg-stone-850 p-3 rounded-xl border border-stone-800 text-[10px] font-bold text-stone-300">
+                      {mealsList.slice(0, 3).map((m: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center">
+                          <span className="truncate pr-2">• {m.name}</span>
+                          <span className="text-orange-500 shrink-0">+{m.calories} kcal</span>
+                        </div>
+                      ))}
+                      {mealsList.length > 3 && (
+                        <div className="text-[8.5px] opacity-60 italic text-stone-400">
+                          + {mealsList.length - 3} more meals logged
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="py-1">
                     <span className="text-4xl font-black tracking-tight">{calories}</span>
                     <span className="text-[8px] font-bold text-stone-400 block tracking-widest mt-0.5">
@@ -895,9 +1021,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               )}
 
               {/* Obsidian/Default Bottom Macros Grid */}
-              {currentTemplate !== "cream" && !(currentTemplate === "emerald" && hasImage) && currentTemplate !== "emerald" && currentTemplate !== "sunset" && (
+              {currentTemplate !== "cream" && !(currentTemplate === "emerald" && hasImage && !isDay) && currentTemplate !== "emerald" && currentTemplate !== "sunset" && (
                 <div className={`grid grid-cols-3 gap-2 border-t pt-4 z-10 ${
-                  hasImage ? "border-white/15" : "border-stone-200/20"
+                  hasImage && !isDay ? "border-white/15" : "border-stone-200/20"
                 }`}>
                   {[
                     { label: "Pro", val: protein },
@@ -907,7 +1033,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     <div
                       key={m.label}
                       className={`p-2 rounded-xl text-center border ${
-                        hasImage
+                        hasImage && !isDay
                           ? "bg-white/10 border-transparent text-white"
                           : "bg-stone-850 border-stone-800 text-stone-200"
                       }`}
@@ -963,7 +1089,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-100 active:scale-98 transition-all"
           >
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? "Copied!" : "Copy Shareable Link"}</span>
+            <span>{copied ? "Copied!" : isDay ? "Copy Day Share Link" : "Copy Shareable Link"}</span>
           </button>
 
           <div className="grid grid-cols-2 gap-2.5 w-full">
