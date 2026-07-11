@@ -1,5 +1,5 @@
 import React from "react";
-import { Camera, User, Smile, Scale, Ruler, Database, Info, Plus, Minus } from "lucide-react";
+import { Camera, User, Smile, Scale, Ruler, Target, Info, Plus, Minus } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -322,31 +322,143 @@ export const EditProfileView = ({
             </div>
           </div>
 
-          {/* Card 4: Agent Memory */}
+          {/* Card 4: Goals & Targets */}
           <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4">
-            <div className="flex justify-between items-center border-b border-stone-150 pb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
-                  <Database className="w-4 h-4" />
-                </div>
-                <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">Agent Memory</span>
+            <div className="flex items-center gap-2 pb-2 border-b border-stone-50">
+              <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
+                <Target className="w-4 h-4" />
               </div>
-              <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                GPT Sync Active
-              </span>
+              <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">Goals & Targets</span>
             </div>
-            <div>
-              <div className="flex justify-between items-center mb-1 px-1">
-                <label className="text-[9px] font-black text-[#9e9e9e] uppercase tracking-widest">Memory Slots (One item per line)</label>
-                <span className="text-[8px] font-bold text-stone-400">↘ Drag corner to expand</span>
+
+            {/* Daily Calories Goal */}
+            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Daily Calorie Target</span>
+                <span className="text-[9px] font-black text-stone-400 uppercase">kcal</span>
               </div>
-              <textarea
-                value={profileData.memories.join("\n")}
-                onChange={(e) => setProfileData({ ...profileData, memories: e.target.value.split("\n") })}
-                placeholder="List memories (e.g. Likes eggs, allergic to shellfish)..."
-                className="w-full bg-[#f5f5f5] rounded-xl px-4 py-3 text-xs font-bold text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-orange-500/10 resize-y min-h-[120px] border border-transparent hover:border-stone-200 focus:border-transparent transition-colors"
-              />
+              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setProfileData({
+                    ...profileData,
+                    goals: { ...profileData.goals, dailyCalories: Math.max(800, (profileData.goals?.dailyCalories || 2000) - 50) }
+                  })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center">
+                  <input
+                    type="number"
+                    value={profileData.goals?.dailyCalories || ""}
+                    onChange={(e) => setProfileData({
+                      ...profileData,
+                      goals: { ...profileData.goals, dailyCalories: parseInt(e.target.value) || 0 }
+                    })}
+                    className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileData({
+                    ...profileData,
+                    goals: { ...profileData.goals, dailyCalories: Math.min(10000, (profileData.goals?.dailyCalories || 2000) + 50) }
+                  })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Target Weight Goal */}
+            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Target Weight</span>
+                <span className="text-[9px] font-black text-stone-400 uppercase">kg</span>
+              </div>
+              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setProfileData({
+                    ...profileData,
+                    goals: { ...profileData.goals, weightGoal: Math.max(30, (profileData.goals?.weightGoal || 70) - 1) }
+                  })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center">
+                  <input
+                    type="number"
+                    value={profileData.goals?.weightGoal || ""}
+                    onChange={(e) => setProfileData({
+                      ...profileData,
+                      goals: { ...profileData.goals, weightGoal: parseFloat(e.target.value) || 0 }
+                    })}
+                    className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileData({
+                    ...profileData,
+                    goals: { ...profileData.goals, weightGoal: Math.min(300, (profileData.goals?.weightGoal || 70) + 1) }
+                  })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Macros Grid */}
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Macro Split Targets</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-655 bg-orange-50/15" },
+                  { label: "Carbs (g)", key: "carbs", color: "border-[#90E0EF] text-[#0077B6] bg-[#CAF0F8]/10" },
+                  { label: "Fats (g)", key: "fats", color: "border-yellow-200 text-yellow-600 bg-yellow-50/15" },
+                  { label: "Fiber (g)", key: "fiber", color: "border-emerald-200 text-emerald-700 bg-emerald-50/10" },
+                ].map((m) => (
+                  <div key={m.label} className={`border rounded-2xl p-3 flex flex-col justify-between shadow-2xs ${m.color}`}>
+                    <span className="text-[9px] font-black uppercase tracking-wider opacity-90">{m.label}</span>
+                    <div className="flex items-center justify-between mt-2 gap-1 bg-white/95 border border-black/[0.04] rounded-xl px-1.5 py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setProfileData({
+                          ...profileData,
+                          macros: { ...profileData.macros, [m.key]: Math.max(0, (profileData.macros[m.key] || 0) - 5) }
+                        })}
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <input
+                        type="number"
+                        value={profileData.macros[m.key] || 0}
+                        onChange={(e) => setProfileData({
+                          ...profileData,
+                          macros: { ...profileData.macros, [m.key]: parseInt(e.target.value) || 0 }
+                        })}
+                        className="flex-1 bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setProfileData({
+                          ...profileData,
+                          macros: { ...profileData.macros, [m.key]: Math.min(500, (profileData.macros[m.key] || 0) + 5) }
+                        })}
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

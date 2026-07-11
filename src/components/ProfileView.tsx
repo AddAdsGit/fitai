@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   BookOpen, BarChart2, Target, Search, Filter, X, Utensils,
   Plus, Sparkles, Check, Info, Scale, Ruler, Database, Camera,
@@ -40,7 +40,25 @@ export const ProfileView = ({
   currentStreak: number;
   mealsState: Meal[];
 }) => {
-  const [profileTab, setProfileTab] = useState<"meals" | "insights" | "goals">("meals");
+  const [profileTab, setProfileTab] = useState<"meals" | "insights" | "memory">("meals");
+  
+  const memoriesText = (profileData.memories || []).join("\n");
+  const [draftMemories, setDraftMemories] = useState(memoriesText);
+  const [isEditingMemory, setIsEditingMemory] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const saveTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setDraftMemories((profileData.memories || []).join("\n"));
+  }, [profileData.memories]);
+
+  useEffect(() => {
+    if (isEditingMemory && textareaRef.current) {
+      textareaRef.current.focus();
+      const len = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(len, len);
+    }
+  }, [isEditingMemory]);
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [showLogsToRecipeModal, setShowLogsToRecipeModal] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
@@ -378,15 +396,15 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
           <BarChart2 className="w-6 h-6" />
         </button>
         <button
-          onClick={() => setProfileTab("goals")}
+          onClick={() => setProfileTab("memory")}
           className={cn(
             "flex-1 py-3 flex justify-center border-b-[3px] transition-colors",
-            profileTab === "goals"
+            profileTab === "memory"
               ? "border-[#1a1a1a] text-[#1a1a1a]"
               : "border-transparent text-[#9e9e9e]",
           )}
         >
-          <Target className="w-6 h-6" />
+          <Database className="w-6 h-6" />
         </button>
       </div>
 
@@ -663,88 +681,77 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
           </div>
         )}
 
-        {profileTab === "goals" && (
+        {profileTab === "memory" && (
           <div className="p-6 max-w-[calc(448px)] mx-auto space-y-6">
-            {/* Goals */}
-            <div className="bg-white rounded-[28px] p-6 shadow-sm border border-black/5">
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest">
-                  Core Goals
-                </h4>
-                <span className="text-[8px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
-                  Tap to Configure
+            <div className="bg-white rounded-[28px] p-6 shadow-sm border border-black/5 space-y-4">
+              <div className="flex justify-between items-center border-b border-stone-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
+                    <Database className="w-4 h-4" />
+                  </div>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">AI Personal Memory Journal</span>
+                </div>
+                <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Live Companion Sync
                 </span>
               </div>
-              <div className="flex gap-4">
-                <motion.div
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => openGoalConfig("dailyCalories")}
-                  className="flex-1 bg-gradient-to-br from-orange-500/5 to-orange-500/10 hover:from-orange-500/10 hover:to-orange-500/15 rounded-2xl p-4 border border-orange-500/15 relative cursor-pointer group transition-colors text-left"
-                >
-                  <div className="text-[9px] font-black text-orange-600 uppercase tracking-widest mb-1 flex justify-between items-center">
-                    <span>Daily Intake</span>
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
-                  </div>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-2xl font-black text-orange-950 tracking-tight">
-                      {profileData.goals.dailyCalories.toLocaleString()}
-                    </span>{" "}
-                    <span className="text-[8px] font-black text-orange-950/40 uppercase">
-                      kcal
-                    </span>
-                  </div>
-                </motion.div>
 
-                <motion.div
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => openGoalConfig("weightGoal")}
-                  className="flex-1 bg-gradient-to-br from-blue-500/5 to-blue-500/10 hover:from-blue-500/10 hover:to-blue-500/15 rounded-2xl p-4 border border-blue-500/15 relative cursor-pointer group transition-colors text-left"
-                >
-                  <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1 flex justify-between items-center">
-                    <span>Weight Goal</span>
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
-                  </div>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-2xl font-black text-blue-950 tracking-tight">
-                      {profileData.goals.weightGoal}
-                    </span>{" "}
-                    <span className="text-[8px] font-black text-blue-950/40 uppercase">
-                      kg
-                    </span>
-                  </div>
-                </motion.div>
+              <div className="text-[9px] font-bold text-stone-500 leading-normal uppercase tracking-wider bg-stone-50 p-3 rounded-2xl border border-stone-200/40">
+                💡 Tell the AI what you like, what you avoid, your diet limits, or routines. It syncs directly to your ChatGPT voice companion!
               </div>
-            </div>
 
-            {/* Macro Limits */}
-            <div className="bg-white rounded-[28px] p-6 shadow-sm border border-black/5">
-              <h4 className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest mb-4">
-                Macro Targets
-              </h4>
-              <div className="space-y-3">
-                {Object.entries(profileData.macros).map(([key, val]) => (
+              {/* notepad styled area */}
+              <div className="w-full min-h-[220px] flex flex-col justify-start bg-[#FAF9F6] border border-stone-200/60 rounded-2xl p-4.5 shadow-2xs relative">
+                {isEditingMemory ? (
+                  <textarea
+                    ref={textareaRef}
+                    value={draftMemories}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDraftMemories(val);
+                      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                      saveTimeoutRef.current = window.setTimeout(() => {
+                        setProfileData({
+                          ...profileData,
+                          memories: val.split("\n").map(l => l.trim()).filter(l => l.length > 0)
+                        });
+                      }, 1000);
+                    }}
+                    onBlur={() => {
+                      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                      setProfileData({
+                        ...profileData,
+                        memories: draftMemories.split("\n").map(l => l.trim()).filter(l => l.length > 0)
+                      });
+                      setIsEditingMemory(false);
+                    }}
+                    placeholder="Enter what AI should remember (one item per line, e.g.)&#13;• Allergic to peanuts&#13;• Prefers high-protein low-carb dinners&#13;• Gym routine is Mon/Wed/Fri mornings"
+                    className="w-full bg-transparent border-0 outline-none ring-0 focus:ring-0 focus:outline-none p-0 text-xs font-semibold text-stone-850 placeholder-stone-400 resize-none min-h-[180px] leading-relaxed transition-all"
+                  />
+                ) : (
                   <div
-                    key={key}
-                    className="flex justify-between items-center text-sm font-medium bg-gray-50/50 p-2 rounded-lg"
+                    onClick={() => setIsEditingMemory(true)}
+                    className="text-xs leading-relaxed min-h-[180px] py-0.5 cursor-text whitespace-pre-line text-left"
                   >
-                    <span className="capitalize text-gray-500">{key}</span>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        value={val as number}
-                        onChange={(e) =>
-                          updateMacro(key, parseInt(e.target.value) || 0)
-                        }
-                        className="w-16 bg-white px-2 py-1 rounded-md shadow-sm border border-gray-100 font-bold text-orange-950 text-right focus:outline-none"
-                      />
-                      <span className="text-orange-950/50 text-xs font-bold leading-none">
-                        g
+                    {draftMemories ? (
+                      draftMemories.split("\n").map((line, idx) => (
+                        <div key={idx} className="flex items-start gap-1.5 py-0.5 text-stone-800 font-semibold">
+                          <span className="text-orange-500">•</span>
+                          <span>{line}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="font-medium text-stone-450 italic">
+                        Tap here to write down things for the AI to remember...
                       </span>
-                    </div>
+                    )}
                   </div>
-                ))}
+                )}
+              </div>
+              <div className="flex justify-between items-center text-[7px] font-black uppercase text-stone-400 tracking-widest px-1">
+                <span>Auto-saves instantly</span>
+                <span>{draftMemories.split("\n").filter(l => l.trim().length > 0).length} Memory Slots Active</span>
               </div>
             </div>
           </div>
