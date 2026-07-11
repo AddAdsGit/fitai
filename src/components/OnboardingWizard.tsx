@@ -17,6 +17,7 @@ import { ChatGPTIcon } from "./ChatGPTIcon";
 
 interface BodyMetrics {
   name: string;
+  username: string;
   avatar: string;
   gender: "Male" | "Female";
   age: number;
@@ -30,6 +31,7 @@ interface BodyMetrics {
 
 const DEFAULT_METRICS: BodyMetrics = {
   name: "",
+  username: "",
   avatar: "",
   gender: "Male",
   age: 28,
@@ -108,9 +110,15 @@ export const OnboardingWizard = ({
   });
 
   const handleNext = () => {
-    if (step === 1 && !metrics.name.trim()) {
-      triggerToast("⚠️ Please enter your name to continue!");
-      return;
+    if (step === 1) {
+      if (!metrics.name.trim()) {
+        triggerToast("⚠️ Please enter your name to continue!");
+        return;
+      }
+      if (!metrics.username.trim()) {
+        triggerToast("⚠️ Please choose a username to continue!");
+        return;
+      }
     }
     setStep(prev => Math.min(totalSteps, prev + 1));
   };
@@ -129,7 +137,7 @@ export const OnboardingWizard = ({
     });
   };
 
-  // Sync initials from Google profile
+  // Sync initials from Google/supabase profile
   useEffect(() => {
     if (profileData?.imageUrl) {
       setAvatarPreview(profileData.imageUrl);
@@ -137,6 +145,9 @@ export const OnboardingWizard = ({
     }
     if (profileData?.name) {
       setMetrics(prev => ({ ...prev, name: profileData.name }));
+    }
+    if (profileData?.username) {
+      setMetrics(prev => ({ ...prev, username: profileData.username }));
     }
   }, [profileData]);
 
@@ -351,6 +362,22 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
   };
 
   const saveProfileData = async () => {
+    const cleanUsername = metrics.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (!cleanUsername) {
+      throw new Error("Please enter a valid username!");
+    }
+
+    const { data: duplicate } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', cleanUsername)
+      .neq('id', activeProfileId)
+      .maybeSingle();
+
+    if (duplicate) {
+      throw new Error("This username is already taken. Please choose another one!");
+    }
+
     const silentBio = await generateAiBioSilently(
       targets.protein,
       targets.carbs,
@@ -369,6 +396,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
     const { error } = await supabase
       .from('profiles')
       .update({
+        username: cleanUsername,
         display_name: metrics.name.trim(),
         image_url: metrics.avatar || null,
         height: metrics.height,
@@ -420,9 +448,9 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
       const completedState = await saveProfileData();
       onComplete(completedState);
       triggerToast("✨ Welcome to FitAI! Setup complete.");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      triggerToast("❌ Failed to save onboarding targets");
+      triggerToast(err.message || "❌ Failed to save onboarding targets");
     } finally {
       setIsSubmitting(false);
     }
@@ -513,6 +541,27 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                 required
                 className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
               />
+            </div>
+
+            {/* Username input */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Username
+              </label>
+              <div className="relative flex items-center">
+                <span className="absolute left-4 text-xs font-bold text-stone-400">@</span>
+                <input
+                  type="text"
+                  placeholder="username"
+                  value={metrics.username}
+                  onChange={(e) => {
+                    const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "");
+                    setMetrics(prev => ({ ...prev, username: cleaned }));
+                  }}
+                  required
+                  className="w-full bg-white border border-stone-200 rounded-2xl pl-8 pr-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
+                />
+              </div>
             </div>
           </div>
         )}
