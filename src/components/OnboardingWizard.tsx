@@ -960,29 +960,37 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
             </div>
 
             {/* Scrollable Terms box */}
-            <div className="bg-white rounded-2xl p-4.5 border border-stone-200/50 shadow-2xs max-h-[36vh] overflow-y-auto space-y-3.5 scrollbar-thin text-left">
+            <div className="bg-white rounded-2xl p-4.5 border border-stone-200/50 shadow-2xs max-h-[42vh] overflow-y-auto space-y-3.5 scrollbar-thin text-left">
               <h4 className="text-[10px] font-black text-stone-850 uppercase tracking-wide">
                 FitAI Terms of Service & Privacy Policy
               </h4>
-              <div className="space-y-2 text-[8px] text-stone-450 font-bold leading-normal">
-                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 1: Acceptance of Terms</p>
+              <div className="space-y-2.5 text-[8px] text-stone-450 font-bold leading-normal">
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 1: Agreement & Introduction</p>
                 <p>
-                  By checking the agreement box and continuing, you agree to comply with and be bound by the FitAI Terms of Service. If you do not agree, you are not authorized to use the application.
+                  These Terms of Service ("Terms") govern your access to and use of the FitAI mobile application, web properties, and synchronization widgets (collectively, the "Service"). By creating an account or accessing the Service, you signify your irrevocable consent to be bound by these Terms, including all updates, policies, and community guidelines published from time to time.
                 </p>
-                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 2: Health & Nutritional Advice Disclaimer</p>
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 2: Health, Diet & Medical Disclaimer</p>
                 <p>
-                  FitAI provides dietary calculations, AI meal logging services, and conversational nutrition responses. These materials are generated automatically by third-party artificial intelligence engines (OpenAI & Google Gemini) and are designed strictly for educational and self-monitoring purposes.
+                  YOU EXPLICITLY ACKNOWLEDGE AND AGREE THAT FITAI IS AN ARTIFICIAL INTELLIGENCE NUTRITIONAL ASSISTANT AND NOT A MEDICAL PROFESSIONAL. THE SERVICE, INCLUDING BUT NOT LIMITED TO BOT RESPONSES, CHATGPT SYNCS, CALORIE PRESETS, MACRONUTRIENT RATIOS, AND MEAL LOG SUGGESTIONS, DOES NOT CONSTITUTE MEDICAL ADVICE, DIAGNOSIS, TREATMENT PLANS, OR PREVENTATIVE HEALTH PROTOCOLS.
                 </p>
                 <p>
-                  FITAI IS NOT A LICENSED MEDICAL HEALTHCARE PROVIDER. The calculations, suggestions, and responses are not diagnostic tools or medical protocols. You should consult a medical doctor or qualified health specialist before adopting any suggestions.
+                  All estimations and outputs are calculated using general mathematical baseline formulas (such as the Mifflin-St Jeor equation) and automated heuristic analysis. These calculations are not tailored to special health conditions, underlying illnesses, eating disorders, pregnancy, lactation, or customized pediatric/geriatric metabolic profiles. You must consult a licensed medical doctor (MD), registered dietitian (RD), or endocrinologist before starting any program.
                 </p>
-                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 3: Third-Party Integrations</p>
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 3: Privacy, Data Processing & Third-Party Sharing</p>
                 <p>
-                  You agree that details, including food logs, bio-metrics, and memories, may be shared with third-party platforms (Notion, Telegram, OpenAI ChatGPT, Google) to enable live widget sync and automation services. Refer to individual terms of those platforms.
+                  By using FitAI Sync, you consent to the storage and transit of your personal inputs, weight logs, gender profiles, Telegram messages, Notion database rows, and custom memories across server integrations. You acknowledge that AI queries are processed through third-party platforms (OpenAI LLC, Google Cloud platform Services, Supabase Database Services). We do not guarantee the absolute privacy of data routed via third-party webhooks.
                 </p>
-                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 4: Limitation of Liability</p>
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 4: Limitation of Liability & Indemnification</p>
                 <p>
-                  Under no legal theory (contract, tort, or otherwise) shall FitAI or its developers be liable to you or any third party for any direct, indirect, incidental, special, or consequential damages resulting from the use or inability to use this software.
+                  TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL FITAI, ITS DEVELOPERS, CORE DIRECTORS, SUBSIDIARIES, OR CODE CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, PUNITIVE, SPECIAL, OR CONSEQUENTIAL HEALTH COMPLICATIONS, METABOLIC SIDE EFFECTS, PHYSICAL DAMAGES, DATA LOSSES, OR FINANCIAL LIABILITIES RESULTING FROM YOUR INTERACTION WITH THE SERVICE.
+                </p>
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 5: Intellectual Property and User Licensing</p>
+                <p>
+                  FitAI grants you a limited, non-exclusive, non-transferable, revocable license to access the codebase. All custom styles, logic scripts, AI prompts, graphics, and backend database schemas remain the proprietary intellectual property of FitAI. You may not copy, reverse-engineer, decompile, or host unauthorized instances of this software.
+                </p>
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 6: Governing Law and Severability</p>
+                <p>
+                  These terms shall be governed, construed, and enforced in accordance with the laws of the operating jurisdiction, without regard to conflict of law principles. If any provision of these Terms is deemed invalid or unenforceable by a court of competent jurisdiction, the remaining provisions of these Terms will remain in full force and effect.
                 </p>
               </div>
             </div>
