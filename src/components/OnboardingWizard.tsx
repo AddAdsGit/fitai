@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
+import { ChatGPTIcon } from "./ChatGPTIcon";
 
 interface BodyMetrics {
   name: string;
@@ -200,13 +201,35 @@ export const OnboardingWizard = ({
 
   // HIERARCHICAL REACTION HANDLERS:
 
-  // 1. Goal change: Updates target weight, TDEE calories, and auto-balances macros
-  const handleGoalChange = (goal: "Lose Weight" | "Maintain Weight" | "Build Muscle") => {
-    let newTargetWeight = metrics.weight;
-    if (goal === "Lose Weight") {
-      newTargetWeight = Math.max(35, Math.round(metrics.weight - 5));
-    } else if (goal === "Build Muscle") {
-      newTargetWeight = Math.round(metrics.weight + 5);
+  // 1. Current weight change handler (synchronizes targetWeight & goal if they match)
+  const handleCurrentWeightChange = (newWeight: number) => {
+    let goal: "Lose Weight" | "Maintain Weight" | "Build Muscle" = "Maintain Weight";
+    let newTargetWeight = metrics.targetWeight;
+    
+    if (metrics.targetWeight === metrics.weight) {
+      newTargetWeight = newWeight;
+    }
+
+    if (newTargetWeight < newWeight) {
+      goal = "Lose Weight";
+    } else if (newTargetWeight > newWeight) {
+      goal = "Build Muscle";
+    }
+
+    const updatedMetrics = { ...metrics, weight: newWeight, targetWeight: newTargetWeight, goal };
+    setMetrics(updatedMetrics);
+
+    const recommended = calculateRecommendedTargets(updatedMetrics);
+    setTargets(recommended);
+  };
+
+  // 2. Target weight change: Automatically determines goal under-the-hood and recalculates baseline targets
+  const handleTargetWeightChange = (newTargetWeight: number) => {
+    let goal: "Lose Weight" | "Maintain Weight" | "Build Muscle" = "Maintain Weight";
+    if (newTargetWeight < metrics.weight) {
+      goal = "Lose Weight";
+    } else if (newTargetWeight > metrics.weight) {
+      goal = "Build Muscle";
     }
 
     const updatedMetrics = { ...metrics, goal, targetWeight: newTargetWeight };
@@ -214,11 +237,6 @@ export const OnboardingWizard = ({
 
     const recommended = calculateRecommendedTargets(updatedMetrics);
     setTargets(recommended);
-  };
-
-  // 2. Target weight change: Stepper update
-  const handleTargetWeightChange = (newTargetWeight: number) => {
-    setMetrics(prev => ({ ...prev, targetWeight: newTargetWeight }));
   };
 
   // 3. Activity Level change: Updates baseline calories and balances macros
@@ -230,40 +248,20 @@ export const OnboardingWizard = ({
     setTargets(recommended);
   };
 
-  // 4. Calorie Target change: Automatically recalculates and balances macro split
+  // 4. Calorie Target change: ONLY updates calories, no dynamic macro shifts
   const handleCaloriesChange = (newCalories: number) => {
-    let proteinMultiplier = 1.8;
-    if (metrics.goal === "Lose Weight") {
-      proteinMultiplier = 2.0;
-    } else if (metrics.goal === "Build Muscle") {
-      proteinMultiplier = 2.2;
-    } else {
-      proteinMultiplier = 1.8;
-    }
-
-    const proteinGrams = Math.round(metrics.weight * proteinMultiplier);
-    const fatGrams = Math.max(30, Math.round((newCalories * 0.25) / 9));
-    const remainingCalories = newCalories - (proteinGrams * 4) - (fatGrams * 9);
-    const carbGrams = Math.max(30, Math.round(remainingCalories / 4));
-
     setTargets(prev => ({
       ...prev,
-      calories: newCalories,
-      protein: proteinGrams,
-      fats: fatGrams,
-      carbs: carbGrams
+      calories: newCalories
     }));
   };
 
-  // 5. Macro (Protein, Carbs, Fats) change: Automatically recalculates total calories (Thermodynamic Sync)
+  // 5. Macro (Protein, Carbs, Fats) change: ONLY updates that macro, no confusing calorie recalculations
   const handleMacroChange = (key: "protein" | "carbs" | "fats" | "fiber", val: number) => {
-    setTargets(prev => {
-      const updated = { ...prev, [key]: val };
-      if (key !== "fiber") {
-        updated.calories = (updated.protein * 4) + (updated.carbs * 4) + (updated.fats * 9);
-      }
-      return updated;
-    });
+    setTargets(prev => ({
+      ...prev,
+      [key]: val
+    }));
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -430,38 +428,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
     }
   };
 
-  const handleConnectGptClick = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const completedState = await saveProfileData();
-      
-      // Fetch profile details for pre-filled welcome message
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('api_key, display_name')
-        .eq('id', activeProfileId)
-        .maybeSingle();
-
-      const displayName = profile?.display_name || metrics.name.trim() || "User";
-      
-      onComplete(completedState);
-      triggerToast("✨ Profile saved! Opening ChatGPT...");
-      
-      setTimeout(() => {
-        const welcomePrompt = encodeURIComponent(`I just completed onboarding on FitAI! Please synchronize my account and welcome me (I am ${displayName}). Explain some quick shortcuts and use cases!`);
-        const chatgptUrl = `https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai?q=${welcomePrompt}`;
-        window.open(chatgptUrl, "_blank");
-        setIsSubmitting(false);
-      }, 800);
-    } catch (err) {
-      console.error(err);
-      triggerToast("❌ Failed to save profile before opening ChatGPT");
-      setIsSubmitting(false);
-    }
-  };
-
-  const totalSteps = 4;
+  const totalSteps = 3;
   const progressPercent = (step / totalSteps) * 100;
 
   return (
@@ -654,7 +621,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                 <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
                   <button
                     type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, weight: Math.max(30, prev.weight - 1) }))}
+                    onClick={() => handleCurrentWeightChange(Math.max(30, metrics.weight - 1))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Minus className="w-3.5 h-3.5" />
@@ -662,12 +629,12 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                   <input
                     type="number"
                     value={metrics.weight}
-                    onChange={(e) => setMetrics(prev => ({ ...prev, weight: parseFloat(e.target.value) || 70 }))}
+                    onChange={(e) => handleCurrentWeightChange(parseFloat(e.target.value) || 70)}
                     className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
                     type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, weight: Math.min(300, prev.weight + 1) }))}
+                    onClick={() => handleCurrentWeightChange(Math.min(300, metrics.weight + 1))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -690,29 +657,29 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
               </p>
             </div>
 
-            {/* Goal Selector */}
+            {/* Activity Level Selector */}
             <div className="space-y-1">
               <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Primary Goal
+                Activity Level
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-1.5">
                 {[
-                  { id: "Lose Weight", label: "🔥 Lose", subtitle: "Deficit" },
-                  { id: "Maintain Weight", label: "⚡ Stay", subtitle: "Balance" },
-                  { id: "Build Muscle", label: "💪 Bulk", subtitle: "Growth" },
-                ].map((g) => (
+                  { id: "Sedentary", label: "🟢 Sedentary" },
+                  { id: "Lightly Active", label: "🟡 Light" },
+                  { id: "Moderately Active", label: "🟠 Moderate" },
+                  { id: "Very Active", label: "🔴 Active" },
+                ].map((act) => (
                   <button
-                    key={g.id}
+                    key={act.id}
                     type="button"
-                    onClick={() => handleGoalChange(g.id as any)}
-                    className={`py-2 px-1 rounded-xl border flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
-                      metrics.goal === g.id
+                    onClick={() => handleActivityLevelChange(act.id as any)}
+                    className={`py-2 px-1 rounded-xl border text-center text-[10px] font-black uppercase tracking-tight cursor-pointer ${
+                      metrics.activityLevel === act.id
                         ? "bg-orange-500 border-orange-500 text-white shadow-sm"
                         : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
                     }`}
                   >
-                    <span className="text-xs font-black uppercase tracking-tight">{g.label}</span>
-                    <span className="text-[7px] font-bold opacity-60 uppercase">{g.subtitle}</span>
+                    {act.label}
                   </button>
                 ))}
               </div>
@@ -742,34 +709,6 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              </div>
-            </div>
-
-            {/* Activity Level Selector */}
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Activity Level
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {[
-                  { id: "Sedentary", label: "🟢 Sedentary" },
-                  { id: "Lightly Active", label: "🟡 Light" },
-                  { id: "Moderately Active", label: "🟠 Moderate" },
-                  { id: "Very Active", label: "🔴 Active" },
-                ].map((act) => (
-                  <button
-                    key={act.id}
-                    type="button"
-                    onClick={() => handleActivityLevelChange(act.id as any)}
-                    className={`py-2 px-1 rounded-xl border text-center text-[10px] font-black uppercase tracking-tight cursor-pointer ${
-                      metrics.activityLevel === act.id
-                        ? "bg-orange-500 border-orange-500 text-white shadow-sm"
-                        : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
-                    }`}
-                  >
-                    {act.label}
-                  </button>
-                ))}
               </div>
             </div>
 
@@ -846,169 +785,21 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                 ))}
               </div>
             </div>
-
-            {/* Food preferences */}
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Preferences & Exclusions
-              </label>
-              <div className="flex flex-wrap gap-1.5 py-1">
-                {DIET_ALLERGY_OPTIONS.map((opt) => {
-                  const isSelected = metrics.preferences.includes(opt.id);
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => togglePreference(opt.id)}
-                      className={`px-3 py-1 text-[10px] font-bold rounded-full border transition-all cursor-pointer active:scale-95 ${
-                        isSelected
-                          ? "bg-orange-50 text-orange-600 border-orange-400 shadow-sm"
-                          : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: DEDICATED CUSTOM GPT LANDING PAGE WITH DOCS AND SKIPS */}
-        {step === 4 && (
-          <div className="space-y-5 animate-fadeIn text-center">
-            
-            {/* Header section */}
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-stone-900 flex items-center justify-center shadow-lg">
-                <Bot className="w-7 h-7 text-white" />
-              </div>
-              <h2 className="text-xl font-black tracking-tight text-stone-900 mt-2">
-                Integrate Voice Logging
-              </h2>
-              <p className="text-[9px] text-stone-400 font-bold uppercase tracking-wider">
-                Pair with ChatGPT Companion for hands-free tracking.
-              </p>
-            </div>
-
-            {/* Documentation Explanation section (Landing page style) */}
-            <div className="bg-white rounded-3xl p-5 border border-stone-200/50 shadow-2xs space-y-4 text-left max-w-sm mx-auto">
-              <div className="flex items-center gap-2 text-stone-850 font-black uppercase text-[10px] tracking-wider pb-2 border-b border-stone-100">
-                <HelpCircle className="w-4 h-4 text-orange-500" />
-                <span>How Voice Logging Works</span>
-              </div>
-              
-              <ul className="space-y-3">
-                <li className="flex gap-2.5 items-start">
-                  <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] font-black shrink-0">1</span>
-                  <div className="space-y-0.5">
-                    <h4 className="text-[11px] font-black text-stone-800">Launch ChatGPT Link</h4>
-                    <p className="text-[9px] text-stone-500 leading-normal">Tapping the button below opens the Custom GPT companion in a new tab with a pre-filled welcome message.</p>
-                  </div>
-                </li>
-                <li className="flex gap-2.5 items-start">
-                  <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] font-black shrink-0">2</span>
-                  <div className="space-y-0.5">
-                    <h4 className="text-[11px] font-black text-stone-800">Approve Connection (Instant)</h4>
-                    <p className="text-[9px] text-stone-500 leading-normal">Click **Sign In** inside ChatGPT. The popup window will auto-authenticate and connect your account in less than a second!</p>
-                  </div>
-                </li>
-                <li className="flex gap-2.5 items-start">
-                  <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] font-black shrink-0">3</span>
-                  <div className="space-y-0.5">
-                    <h4 className="text-[11px] font-black text-stone-800">Talk to Log</h4>
-                    <p className="text-[9px] text-stone-500 leading-normal">Start chatting or use shortcuts (e.g. <em>"I had 2 idlis for breakfast"</em>) to log meals to your dashboard instantly.</p>
-                  </div>
-                </li>
-              </ul>
-
-              {/* Fresh Window Documentation Link */}
-              <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
-                <span className="text-[8px] font-black text-stone-400 uppercase tracking-wider">Need more details?</span>
-                <a
-                  href="https://github.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] font-black text-orange-500 hover:text-orange-655 uppercase tracking-wider flex items-center gap-1.5 cursor-pointer no-underline select-none"
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>Read Docs</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-            </div>
-
-            {/* Quick Preference toggles */}
-            <div className="bg-stone-50 border border-stone-200/80 rounded-3xl p-4.5 space-y-3.5 text-left max-w-sm mx-auto shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-stone-850 uppercase tracking-tight">Show Floating GPT Widget</span>
-                  <span className="text-[8px] text-stone-400 font-bold uppercase mt-0.5">Adds button to home dashboard</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEnableGptWidget(!enableGptWidget)}
-                  className={`w-10 h-6 rounded-full transition-all cursor-pointer border-none flex items-center px-0.5 ${
-                    enableGptWidget ? "bg-emerald-500 justify-end" : "bg-stone-300 justify-start"
-                  }`}
-                >
-                  <span className="w-5 h-5 rounded-full bg-white shadow-sm" />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-stone-200/60 pt-3">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-stone-850 uppercase tracking-tight">Confirm Voice Logs</span>
-                  <span className="text-[8px] text-stone-400 font-bold uppercase mt-0.5">Prompt to review before updating</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setRequireGptConfirmation(!requireGptConfirmation)}
-                  className={`w-10 h-6 rounded-full transition-all cursor-pointer border-none flex items-center px-0.5 ${
-                    requireGptConfirmation ? "bg-emerald-500 justify-end" : "bg-stone-300 justify-start"
-                  }`}
-                >
-                  <span className="w-5 h-5 rounded-full bg-white shadow-sm" />
-                </button>
-              </div>
-            </div>
-
-            {/* Connect & Skip options */}
-            <div className="space-y-3 pt-2 max-w-sm mx-auto">
-              <button
-                type="button"
-                onClick={handleConnectGptClick}
-                className="w-full bg-stone-900 hover:bg-stone-850 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md text-center border-none"
-              >
-                <Bot className="w-4.5 h-4.5 text-white" />
-                Link ChatGPT Companion
-              </button>
-
-              <button
-                type="button"
-                onClick={handleFinish}
-                className="text-[11px] font-black text-stone-400 hover:text-stone-600 uppercase tracking-wider cursor-pointer border-none bg-none py-1 select-none hover:underline"
-              >
-                Skip & Complete Setup
-              </button>
-            </div>
-
           </div>
         )}
 
       </div>
 
-      {/* Navigation Footer (only active for steps 1-3) */}
-      {step < totalSteps && (
+      {/* Navigation Footer (active for all steps) */}
+      {step <= totalSteps && (
         <div className="w-full pt-4 border-t border-stone-200/50 flex gap-4">
           <button
             type="button"
-            onClick={handleNext}
+            onClick={step === totalSteps ? handleFinish : handleNext}
             className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-100 flex items-center justify-center gap-2 cursor-pointer border-none"
           >
-            <span>Continue</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>{step === totalSteps ? "Start Tracking 🚀" : "Continue"}</span>
+            {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
           </button>
         </div>
       )}

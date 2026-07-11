@@ -42,6 +42,7 @@ import { CalendarPickerModal } from "./components/CalendarPickerModal";
 import { DefaultAvatar } from "./components/DefaultAvatar";
 import { ShareModal } from "./components/ShareModal";
 import { PublicShareView } from "./components/PublicShareView";
+import { ChatGPTIcon } from "./components/ChatGPTIcon";
 
 
 // Import types & helpers
@@ -3624,10 +3625,10 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             onClick={() => {
               window.open("https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai", "_blank");
             }}
-            className="fixed bottom-28 right-6 w-12 h-12 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-[0_8px_25px_rgba(16,185,129,0.35)] z-40 border border-emerald-400/30 cursor-pointer"
+            className="fixed bottom-28 right-6 w-12 h-12 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white flex items-center justify-center shadow-[0_8px_25px_rgba(249,115,22,0.35)] z-40 border border-orange-400/30 cursor-pointer transition-all hover:scale-105 active:scale-95"
             title="Open FitAI Custom GPT"
           >
-            <Bot className="w-5 h-5 text-white" />
+            <ChatGPTIcon className="w-5.5 h-5.5 text-white" />
           </motion.button>
         )}
       </AnimatePresence>

@@ -3,6 +3,7 @@ import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check } from "lucide-
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProUpgradeModal } from "./ProUpgradeModal";
+import { ChatGPTIcon } from "./ChatGPTIcon";
 
 const getOpenApiYaml = (edgeFunctionUrl: string) => `openapi: 3.1.0
 info:
@@ -663,9 +664,9 @@ export const SettingsView = ({
               href="https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai"
               target="_blank"
               rel="noreferrer"
-              className="w-full flex items-center justify-center gap-2 bg-stone-950 hover:bg-stone-900 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl transition-all cursor-pointer shadow-md shadow-stone-950/10 active:scale-99 text-center select-none"
+              className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl transition-all cursor-pointer shadow-md shadow-orange-100/50 active:scale-99 text-center select-none border-none"
             >
-              <Bot className="w-4 h-4 text-white" />
+              <ChatGPTIcon className="w-4 h-4 text-white" />
               <span>Open FitAI Custom GPT ↗</span>
             </a>
 

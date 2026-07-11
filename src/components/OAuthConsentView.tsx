@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Sparkles, Bot, Check } from "lucide-react";
 import { motion } from "motion/react";
 import { supabase } from "../lib/supabaseClient";
+import { ChatGPTIcon } from "./ChatGPTIcon";
 
 export const OAuthConsentView = ({
   setActiveTab,
@@ -174,8 +175,8 @@ export const OAuthConsentView = ({
               <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
               <div className="h-0.5 w-10 bg-gradient-to-r from-orange-500 to-stone-400" />
             </div>
-            <div className="w-14 h-14 rounded-2xl bg-stone-900 shadow-lg flex items-center justify-center shrink-0">
-              <Bot className="text-white w-7 h-7" />
+            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg flex items-center justify-center shrink-0 shadow-orange-100/50">
+              <ChatGPTIcon className="text-white w-7 h-7" />
             </div>
           </div>
 
@@ -232,8 +233,8 @@ export const OAuthConsentView = ({
             <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
             <div className="h-0.5 w-10 bg-gradient-to-r from-orange-500 to-stone-400" />
           </div>
-          <div className="w-14 h-14 rounded-2xl bg-stone-900 shadow-lg flex items-center justify-center shrink-0">
-            <Bot className="text-white w-7 h-7" />
+          <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg flex items-center justify-center shrink-0 shadow-orange-100/50">
+            <ChatGPTIcon className="text-white w-7 h-7" />
           </div>
         </div>
 
