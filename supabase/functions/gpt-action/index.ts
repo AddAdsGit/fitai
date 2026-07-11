@@ -571,49 +571,6 @@ serve(async (req) => {
 
         let finalImageUrl = imageUrlToDownload;
 
-        // Download the resolved external image and save to Supabase Storage
-        // so it's permanently hosted and doesn't break when source URLs expire
-        if (imageUrlToDownload && imageUrlToDownload.startsWith("http")) {
-          try {
-            // Ensure the public bucket exists (ignore errors if already exists)
-            await supabase.storage.createBucket("meal-images", {
-              public: true,
-              fileSizeLimit: 10485760, // 10MB
-              allowedMimeTypes: ["image/png", "image/jpeg", "image/gif", "image/webp"]
-            });
-          } catch (e) {
-            // Bucket already exists
-          }
-
-          try {
-            const response = await fetch(imageUrlToDownload);
-            if (response.ok) {
-              const contentType = response.headers.get("content-type") || "image/jpeg";
-              const blob = await response.blob();
-              const fileExtension = contentType.split("/")[1]?.split(";")[0] || "jpg";
-              const filename = `${profile.id}/${Date.now()}.${fileExtension}`;
-
-              const { data: uploadData, error: uploadError } = await supabase.storage
-                .from("meal-images")
-                .upload(filename, blob, { contentType, upsert: true });
-
-              if (!uploadError) {
-                const { data: urlData } = supabase.storage
-                  .from("meal-images")
-                  .getPublicUrl(filename);
-                finalImageUrl = urlData.publicUrl;
-                console.log(`[image] Saved to Supabase Storage: ${finalImageUrl}`);
-              } else {
-                console.error("[image] Supabase storage upload error:", uploadError);
-              }
-            } else {
-              console.warn(`[image] Could not fetch image URL (${response.status}): ${imageUrlToDownload}`);
-            }
-          } catch (err) {
-            console.error("[image] Failed to download external image URL:", err);
-          }
-        }
-
         // Resolve time using user-supplied value, body.timezone, or timezoneOffset header
         let resolvedTime = body.time;
         if (!resolvedTime) {
@@ -659,7 +616,7 @@ serve(async (req) => {
           carbs: parseInt(body.carbs || 0),
           fats: parseInt(body.fats || 0),
           fiber: parseInt(body.fiber || 0),
-          image: finalImageUrl,
+          image: imageUrlToDownload, // Use external URL as initial placeholder
           date: resolvedDate
         };
 
@@ -676,65 +633,117 @@ serve(async (req) => {
           });
         }
 
-        // --- Real-time Integrations Sync Trigger ---
-        
-        // 1. Notion Sync
-        if (profile.notion_api_key && profile.notion_database_id) {
+        // --- Asynchronous Background Worker ---
+        // Fire-and-forget: we do NOT await this promise, allowing the function
+        // to return a response to ChatGPT immediately (within 100ms)
+        (async () => {
           try {
-            console.log(`[sync] Syncing meal "${newMeal.name}" to Notion Database...`);
-            const notionRes = await fetch("https://api.notion.com/v1/pages", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${profile.notion_api_key}`,
-                "Notion-Version": "2022-06-28",
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                parent: { database_id: profile.notion_database_id },
-                properties: {
-                  "Name": { title: [{ text: { content: newMeal.name } }] },
-                  "Calories": { number: newMeal.calories },
-                  "Protein (g)": { number: newMeal.protein },
-                  "Carbs (g)": { number: newMeal.carbs },
-                  "Fats (g)": { number: newMeal.fats },
-                  "Date": { date: { start: newMeal.date } },
-                  "Time": { rich_text: [{ text: { content: newMeal.time } }] }
-                }
-              })
-            });
-            if (!notionRes.ok) {
-              const errTxt = await notionRes.text();
-              console.error(`[sync] Notion Sync error: Status ${notionRes.status} - ${errTxt}`);
-            } else {
-              console.log("[sync] Notion Sync completed successfully.");
-            }
-          } catch (notionErr) {
-            console.error("[sync] Exception during Notion sync: ", notionErr);
-          }
-        }
+            let finalImageUrl = imageUrlToDownload;
 
-        // 2. Google Sheets Webhook Sync
-        if (profile.google_sheets_webhook_url) {
-          try {
-            console.log(`[sync] Syncing meal "${newMeal.name}" to Google Sheets Webhook...`);
-            const sheetsRes = await fetch(profile.google_sheets_webhook_url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                username: profile.username,
-                display_name: profile.display_name,
-                ...newMeal
-              })
-            });
-            if (!sheetsRes.ok) {
-              console.error(`[sync] Google Sheets Webhook error: Status ${sheetsRes.status}`);
-            } else {
-              console.log("[sync] Google Sheets Sync completed successfully.");
+            // 1. Download & upload image to Supabase Storage in the background
+            if (imageUrlToDownload && imageUrlToDownload.startsWith("http")) {
+              try {
+                // Ensure the public bucket exists (ignore errors if already exists)
+                await supabase.storage.createBucket("meal-images", {
+                  public: true,
+                  fileSizeLimit: 10485760, // 10MB
+                  allowedMimeTypes: ["image/png", "image/jpeg", "image/gif", "image/webp"]
+                });
+              } catch (_) {
+                // Bucket already exists
+              }
+
+              try {
+                const response = await fetch(imageUrlToDownload);
+                if (response.ok) {
+                  const contentType = response.headers.get("content-type") || "image/jpeg";
+                  const blob = await response.blob();
+                  const fileExtension = contentType.split("/")[1]?.split(";")[0] || "jpg";
+                  const filename = `${profile.id}/${Date.now()}.${fileExtension}`;
+
+                  const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from("meal-images")
+                    .upload(filename, blob, { contentType, upsert: true });
+
+                  if (!uploadError) {
+                    const { data: urlData } = supabase.storage
+                      .from("meal-images")
+                      .getPublicUrl(filename);
+                    finalImageUrl = urlData.publicUrl;
+                    
+                    // Update database row with permanent storage URL
+                    await supabase
+                      .from("meals")
+                      .update({ image: finalImageUrl })
+                      .eq("id", newMeal.id);
+                    console.log(`[bg-processing] Saved image to Supabase Storage & updated database: ${finalImageUrl}`);
+                  } else {
+                    console.error("[bg-processing] Supabase storage upload error:", uploadError);
+                  }
+                }
+              } catch (err) {
+                console.error("[bg-processing] Failed to download/upload external image:", err);
+              }
             }
-          } catch (sheetsErr) {
-            console.error("[sync] Exception during Google Sheets sync: ", sheetsErr);
+
+            // 2. Notion Sync
+            if (profile.notion_api_key && profile.notion_database_id) {
+              try {
+                console.log(`[bg-processing] Syncing meal "${newMeal.name}" to Notion Database...`);
+                const notionRes = await fetch("https://api.notion.com/v1/pages", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${profile.notion_api_key}`,
+                    "Notion-Version": "2022-06-28",
+                    "Content-Type": "application/json"
+                  },
+                  body: JSON.stringify({
+                    parent: { database_id: profile.notion_database_id },
+                    properties: {
+                      "Name": { title: [{ text: { content: newMeal.name } }] },
+                      "Calories": { number: newMeal.calories },
+                      "Protein (g)": { number: newMeal.protein },
+                      "Carbs (g)": { number: newMeal.carbs },
+                      "Fats (g)": { number: newMeal.fats },
+                      "Date": { date: { start: newMeal.date } },
+                      "Time": { rich_text: [{ text: { content: newMeal.time } }] }
+                    }
+                  })
+                });
+                if (!notionRes.ok) {
+                  const errTxt = await notionRes.text();
+                  console.error(`[bg-processing] Notion Sync error: ${errTxt}`);
+                } else {
+                  console.log("[bg-processing] Notion Sync completed successfully.");
+                }
+              } catch (notionErr) {
+                console.error("[bg-processing] Exception during Notion sync: ", notionErr);
+              }
+            }
+
+            // 3. Google Sheets Webhook Sync
+            if (profile.google_sheets_webhook_url) {
+              try {
+                console.log(`[bg-processing] Syncing meal "${newMeal.name}" to Google Sheets Webhook...`);
+                await fetch(profile.google_sheets_webhook_url, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    username: profile.username,
+                    display_name: profile.display_name,
+                    ...newMeal,
+                    image: finalImageUrl // Pass the updated URL if successfully uploaded
+                  })
+                });
+                console.log("[bg-processing] Google Sheets Sync completed successfully.");
+              } catch (sheetsErr) {
+                console.error("[bg-processing] Exception during Google Sheets sync: ", sheetsErr);
+              }
+            }
+          } catch (err) {
+            console.error("[bg-processing] Background execution error:", err);
           }
-        }
+        })();
 
         return new Response(JSON.stringify({ message: "Meal logged successfully", meal: newMeal }), {
           status: 201,

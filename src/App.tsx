@@ -34,6 +34,7 @@ import { EditProfileView } from "./components/EditProfileView";
 import { SettingsView } from "./components/SettingsView";
 import { OAuthConsentView } from "./components/OAuthConsentView";
 import { OnboardingWizard } from "./components/OnboardingWizard";
+import { CalendarPickerModal } from "./components/CalendarPickerModal";
 
 // Import types & helpers
 import type { Meal, Recipe } from "./types";
@@ -255,26 +256,32 @@ export default function App() {
       };
     });
   });
-  const [isConfiguringDate, setIsConfiguringDate] = useState(false);
-  const [configuringDateIndex, setConfiguringDateIndex] = useState<number | null>(null);
-  const [tempFullDate, setTempFullDate] = useState(todayStr);
-
-  const updateDayAtIndex = (index: number, newDateString: string) => {
+  const recenterDaysList = (dateString: string) => {
     const daysOfWeek = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-    const d = new Date(newDateString + "T00:00:00");
-    const updatedDay = {
-      day: daysOfWeek[d.getDay()],
-      date: d.getDate(),
-      fullDate: newDateString
-    };
-
-    setDaysList((prev) => {
-      const copy = [...prev];
-      copy[index] = updatedDay;
-      return copy;
+    const d = new Date(dateString + "T00:00:00");
+    const newList = Array.from({ length: 6 }, (_, i) => {
+      const tempD = new Date(d);
+      tempD.setDate(d.getDate() + (i - 2));
+      return {
+        day: daysOfWeek[tempD.getDay()],
+        date: tempD.getDate(),
+        fullDate: formatDateStr(tempD),
+      };
     });
-    setSelectedDate(newDateString);
+    setDaysList(newList);
   };
+
+  const getFormattedSelectedDate = () => {
+    if (!selectedDate) return "";
+    const d = new Date(selectedDate + "T00:00:00");
+    return d.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   const [profileData, setProfileDataState] = useState(INITIAL_PROFILE_STATE);
   const [mealsState, setMealsState] = useState<Meal[]>([]);
@@ -1246,8 +1253,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         <div className="my-auto space-y-8 py-12">
           {/* Logo */}
           <div className="flex flex-col items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center rotate-6">
-              <Sparkles className="text-white w-8 h-8 -rotate-6 fill-white" />
+            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center">
+              <Sparkles className="text-white w-8 h-8 fill-white" />
             </div>
             <h1 className="text-3xl font-black tracking-tight text-center mt-2">
               Fit<span className="text-orange-500">AI</span>
@@ -1400,6 +1407,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       <OnboardingWizard
         activeProfileId={activeProfileId}
         supabase={supabase}
+        profileData={profileData}
         onComplete={(completedData) => {
           setProfileDataState(completedData);
         }}
@@ -1443,8 +1451,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         className="px-6 pt-8 flex items-center justify-between relative z-10"
       >
         <div id="brand-logo" className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-orange-500 shadow-lg shadow-orange-200 flex items-center justify-center rotate-3">
-            <Flame className="text-white w-5 h-5 -rotate-3" />
+          <div className="w-9 h-9 rounded-xl bg-orange-500 shadow-lg shadow-orange-200 flex items-center justify-center">
+            <Flame className="text-white w-5 h-5" />
           </div>
           <h1 className="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-orange-400">
             FitAI
@@ -1483,7 +1491,35 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             transition={{ duration: 0.3 }}
           >
             {/* Calendar Strip */}
-            <div id="calendar-strip" className="px-6 mt-8 relative z-10">
+            <div id="calendar-strip" className="px-6 mt-8 relative z-10 space-y-4">
+              {/* Date Selector & Snap-to-Today Header */}
+              <div className="flex justify-between items-center px-1">
+                <span className="text-xs font-black uppercase tracking-widest text-stone-500">
+                  {getFormattedSelectedDate()}
+                </span>
+                <div className="flex items-center gap-2">
+                  {selectedDate !== todayStr && (
+                    <button
+                      onClick={() => {
+                        setSelectedDate(todayStr);
+                        recenterDaysList(todayStr);
+                      }}
+                      className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl shadow-md active:scale-95 transition-all cursor-pointer border-none flex items-center gap-1 shrink-0"
+                    >
+                      Shift to Today
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsDatePickerOpen(true)}
+                    className="w-8 h-8 rounded-xl bg-white hover:bg-stone-50 border border-stone-200/60 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all border-none"
+                    title="Choose Date"
+                  >
+                    <CalendarIcon className="w-4 h-4 text-stone-500" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Day Strips */}
               <div className="flex justify-between items-center overflow-x-auto pb-4 scrollbar-hide gap-3">
                 {daysList.map((day, idx) => {
                   const isActive = day.fullDate === selectedDate;
@@ -1496,12 +1532,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                       whileTap={{ scale: 0.95 }}
                       onClick={() => {
                         setSelectedDate(day.fullDate);
-                        setConfiguringDateIndex(idx);
-                        setTempFullDate(day.fullDate);
-                        setIsConfiguringDate(true);
                       }}
                       className={cn(
-                        "flex flex-col items-center justify-center min-w-[58px] py-3.5 rounded-2xl transition-all duration-300 shadow-sm grow cursor-pointer",
+                        "flex flex-col items-center justify-center min-w-[58px] py-3.5 rounded-2xl transition-all duration-300 shadow-sm grow cursor-pointer shrink-0",
                         isActive
                           ? "bg-orange-500 text-white shadow-lg shadow-orange-200 ring-4 ring-orange-50"
                           : "bg-white/60 backdrop-blur-sm text-gray-500 border border-orange-50/50 hover:bg-white/90",
@@ -2713,179 +2746,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         )}
       </AnimatePresence>
 
-      {/* Date Configuration Popup (Precise Date Tracker) */}
-      <AnimatePresence>
-        {isConfiguringDate && configuringDateIndex !== null && (() => {
-          const [yStr, mStr, dStr] = (tempFullDate || "2026-07-08").split("-");
-          const selYear = parseInt(yStr) || 2026;
-          const selMonth = parseInt(mStr) || 7;
-          const selDay = parseInt(dStr) || 8;
-
-          const daysInMonth = new Date(selYear, selMonth, 0).getDate();
-          const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-          const monthsArray = [
-            { val: 1, label: "Jan" },
-            { val: 2, label: "Feb" },
-            { val: 3, label: "Mar" },
-            { val: 4, label: "Apr" },
-            { val: 5, label: "May" },
-            { val: 6, label: "Jun" },
-            { val: 7, label: "Jul" },
-            { val: 8, label: "Aug" },
-            { val: 9, label: "Sep" },
-            { val: 10, label: "Oct" },
-            { val: 11, label: "Nov" },
-            { val: 12, label: "Dec" },
-          ];
-          const yearsArray = Array.from({ length: 11 }, (_, i) => 2020 + i);
-
-          const changeDatePart = (newY: number, newM: number, newD: number) => {
-            const maxDays = new Date(newY, newM, 0).getDate();
-            const safeD = newD > maxDays ? maxDays : newD;
-            const formattedM = String(newM).padStart(2, "0");
-            const formattedD = String(safeD).padStart(2, "0");
-            const updatedFullDate = `${newY}-${formattedM}-${formattedD}`;
-            setTempFullDate(updatedFullDate);
-            updateDayAtIndex(configuringDateIndex, updatedFullDate);
-          };
-
-          const dayMeals = mealsState.filter((m) => m.date === tempFullDate);
-          const logFound = dayMeals.length > 0;
-
-          return (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/65 backdrop-blur-md z-[200] flex items-end justify-center font-sans"
-            >
-              {/* Backdrop click to close */}
-              <div
-                className="absolute inset-0"
-                onClick={() => setIsConfiguringDate(false)}
-              />
-
-              {/* Bottom Sheet Modal */}
-              <motion.div
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="bg-white rounded-t-[36px] w-full max-w-md overflow-hidden flex flex-col shadow-2xl p-6 space-y-6 relative z-10"
-              >
-                {/* Header block */}
-                <div className="flex justify-between items-center pb-2 border-b border-black/[0.04]">
-                  <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1.5">
-                    <CalendarIcon className="w-4 h-4 text-orange-500" />
-                    Configure Date
-                  </h4>
-                  <button
-                    onClick={() => setIsConfiguringDate(false)}
-                    className="w-8 h-8 rounded-full bg-stone-100/80 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Form Input: Day, Month, Year simple picker */}
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-3">
-                    {/* Day Selector */}
-                    <div className="text-left">
-                      <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1.5">
-                        Day
-                      </label>
-                      <select
-                        value={selDay}
-                        onChange={(e) => changeDatePart(selYear, selMonth, parseInt(e.target.value))}
-                        className="w-full bg-stone-50 border border-stone-200/60 rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none focus:border-orange-400 transition-all font-sans cursor-pointer"
-                      >
-                        {daysArray.map((dayNum) => (
-                          <option key={dayNum} value={dayNum}>
-                            {dayNum}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Month Selector */}
-                    <div className="text-left">
-                      <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1.5">
-                        Month
-                      </label>
-                      <select
-                        value={selMonth}
-                        onChange={(e) => changeDatePart(selYear, parseInt(e.target.value), selDay)}
-                        className="w-full bg-stone-50 border border-stone-200/60 rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none focus:border-orange-400 transition-all font-sans cursor-pointer"
-                      >
-                        {monthsArray.map((mObj) => (
-                          <option key={mObj.val} value={mObj.val}>
-                            {mObj.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Year Selector */}
-                    <div className="text-left">
-                      <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block mb-1.5">
-                        Year
-                      </label>
-                      <select
-                        value={selYear}
-                        onChange={(e) => changeDatePart(parseInt(e.target.value), selMonth, selDay)}
-                        className="w-full bg-stone-50 border border-stone-200/60 rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none focus:border-orange-400 transition-all font-sans cursor-pointer"
-                      >
-                        {yearsArray.map((yrNum) => (
-                          <option key={yrNum} value={yrNum}>
-                            {yrNum}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Logged Portion Status Tracker */}
-                  {logFound ? (
-                    <div className="bg-emerald-50/70 border border-emerald-100/50 p-4 rounded-2xl text-left space-y-1">
-                      <div className="flex items-center gap-1.5 text-[9px] font-black text-emerald-800 uppercase tracking-widest">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Log found
-                      </div>
-                      <div className="flex justify-between items-center text-xs font-bold text-stone-800">
-                        <span>{dayMeals.length} meals logged</span>
-                        <span className="text-emerald-700 font-extrabold">
-                          {dayMeals.reduce((sum, m) => sum + m.calories, 0)} kcal
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-stone-50 border border-stone-200/50 p-4 rounded-2xl text-left space-y-1">
-                      <div className="flex items-center gap-1.5 text-[9px] font-black text-stone-400 uppercase tracking-widest">
-                        <span className="w-1.5 h-1.5 rounded-full bg-stone-300" />
-                        No log found
-                      </div>
-                      <p className="text-[10px] text-stone-400 font-medium">
-                        0 calories • No meals tracked yet.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Done Button */}
-                <div className="pt-2">
-                  <button
-                    onClick={() => setIsConfiguringDate(false)}
-                    className="w-full bg-[#1a1a1a] hover:bg-[#2c2c2c] text-white text-[10px] py-3 rounded-xl font-black uppercase tracking-widest text-center shadow-md transition-colors cursor-pointer"
-                  >
-                    Done
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          );
-        })()}
-      </AnimatePresence>
 
       {/* Dynamic World-Class Goals Dial Sliders Picker Popups */}
       <AnimatePresence>
@@ -3208,6 +3068,17 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
           </div>
         </nav>
       )}
+
+      {/* Custom Premium Calendar Date Picker Modal */}
+      <CalendarPickerModal
+        isOpen={isDatePickerOpen}
+        onClose={() => setIsDatePickerOpen(false)}
+        selectedDate={selectedDate}
+        onSelectDate={(dateStr) => {
+          setSelectedDate(dateStr);
+          recenterDaysList(dateStr);
+        }}
+      />
     </div>
   );
 }

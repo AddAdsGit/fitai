@@ -144,14 +144,14 @@ export const OAuthConsentView = ({
 
           {/* Header */}
           <div className="flex items-center justify-center gap-6 relative z-10 py-4">
-            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg shadow-orange-150 flex items-center justify-center rotate-3 shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg shadow-orange-150 flex items-center justify-center shrink-0">
               <Sparkles className="text-white w-7 h-7 fill-white" />
             </div>
             <div className="flex flex-col gap-1 items-center justify-center">
               <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
               <div className="h-0.5 w-10 bg-gradient-to-r from-orange-500 to-stone-400" />
             </div>
-            <div className="w-14 h-14 rounded-2xl bg-stone-900 shadow-lg flex items-center justify-center -rotate-3 shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-stone-900 shadow-lg flex items-center justify-center shrink-0">
               <Bot className="text-white w-7 h-7" />
             </div>
           </div>
@@ -202,14 +202,14 @@ export const OAuthConsentView = ({
 
         {/* Integration Header */}
         <div className="flex items-center justify-center gap-6 relative z-10 py-4">
-          <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg shadow-orange-150 flex items-center justify-center rotate-3 shrink-0">
+          <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg shadow-orange-150 flex items-center justify-center shrink-0">
             <Sparkles className="text-white w-7 h-7 fill-white" />
           </div>
           <div className="flex flex-col gap-1 items-center justify-center">
             <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
             <div className="h-0.5 w-10 bg-gradient-to-r from-orange-500 to-stone-400" />
           </div>
-          <div className="w-14 h-14 rounded-2xl bg-stone-900 shadow-lg flex items-center justify-center -rotate-3 shrink-0">
+          <div className="w-14 h-14 rounded-2xl bg-stone-900 shadow-lg flex items-center justify-center shrink-0">
             <Bot className="text-white w-7 h-7" />
           </div>
         </div>
