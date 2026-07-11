@@ -689,16 +689,16 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                   <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
                     <Database className="w-4 h-4" />
                   </div>
-                  <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">AI Personal Memory Journal</span>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">AI Memory</span>
                 </div>
                 <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Live Companion Sync
+                  Live Sync
                 </span>
               </div>
 
-              <div className="text-[9px] font-bold text-stone-500 leading-normal uppercase tracking-wider bg-stone-50 p-3 rounded-2xl border border-stone-200/40">
-                💡 Tell the AI what you like, what you avoid, your diet limits, or routines. It syncs directly to your ChatGPT voice companion!
+              <div className="text-[9.5px] font-bold text-stone-500 leading-relaxed bg-stone-50 p-3 rounded-2xl border border-stone-200/40 text-left">
+                ChatGPT will utilize this AI memory to personalize responses and send personalized reminders via Telegram from our scheduled reminders feature.
               </div>
 
               {/* notepad styled area */}
