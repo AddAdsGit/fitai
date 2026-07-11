@@ -904,21 +904,21 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                   <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] font-black shrink-0">1</span>
                   <div className="space-y-0.5">
                     <h4 className="text-[11px] font-black text-stone-800">Launch ChatGPT Link</h4>
-                    <p className="text-[9px] text-stone-500 leading-normal">Tapping the connect button opens our Custom GPT companion in a new tab.</p>
+                    <p className="text-[9px] text-stone-500 leading-normal">Tapping the button below opens the Custom GPT companion in a new tab with a pre-filled welcome message.</p>
                   </div>
                 </li>
                 <li className="flex gap-2.5 items-start">
                   <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] font-black shrink-0">2</span>
                   <div className="space-y-0.5">
-                    <h4 className="text-[11px] font-black text-stone-800">Authorize Bridge</h4>
-                    <p className="text-[9px] text-stone-500 leading-normal">The secure OAuth flow pairs your account in 1 click (no manual keys needed).</p>
+                    <h4 className="text-[11px] font-black text-stone-800">Approve Connection (Instant)</h4>
+                    <p className="text-[9px] text-stone-500 leading-normal">Click **Sign In** inside ChatGPT. The popup window will auto-authenticate and connect your account in less than a second!</p>
                   </div>
                 </li>
                 <li className="flex gap-2.5 items-start">
                   <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[10px] font-black shrink-0">3</span>
                   <div className="space-y-0.5">
-                    <h4 className="text-[11px] font-black text-stone-800">Speak Naturally to Log</h4>
-                    <p className="text-[9px] text-stone-500 leading-normal">Send a voice note like <em>"I had 2 scrambled eggs and black coffee"</em> to instantly sync with your dashboard.</p>
+                    <h4 className="text-[11px] font-black text-stone-800">Talk to Log</h4>
+                    <p className="text-[9px] text-stone-500 leading-normal">Start chatting or use shortcuts (e.g. <em>"I had 2 idlis for breakfast"</em>) to log meals to your dashboard instantly.</p>
                   </div>
                 </li>
               </ul>
@@ -982,7 +982,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                 className="w-full bg-stone-900 hover:bg-stone-850 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md text-center border-none"
               >
                 <Bot className="w-4.5 h-4.5 text-white" />
-                Connect Custom GPT (1-Click)
+                Link ChatGPT Companion
               </button>
 
               <button
