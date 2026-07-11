@@ -10,6 +10,7 @@ import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import type { Meal, Recipe } from "../types";
 import { hasNoGeneratedImage } from "../utils/helpers";
 import { InsightsView } from "./InsightsView";
+import { DefaultAvatar } from "./DefaultAvatar";
 
 export const ProfileView = ({
   profileData,
@@ -254,11 +255,15 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
       <div className="px-6 space-y-6">
         <div className="flex gap-6 items-center px-1 pt-2">
           <div className="relative w-24 h-24 rounded-full border-[3px] border-orange-500 p-1 overflow-hidden shrink-0">
-            <img
-              src={profileData.imageUrl}
-              alt="User"
-              className="w-full h-full object-cover rounded-full pointer-events-none"
-            />
+            {profileData.imageUrl ? (
+              <img
+                src={profileData.imageUrl}
+                alt="User"
+                className="w-full h-full object-cover rounded-full pointer-events-none"
+              />
+            ) : (
+              <DefaultAvatar />
+            )}
           </div>
           <div className="flex-1 flex justify-around">
             <div className="flex flex-col items-center">

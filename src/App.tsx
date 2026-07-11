@@ -35,6 +35,7 @@ import { SettingsView } from "./components/SettingsView";
 import { OAuthConsentView } from "./components/OAuthConsentView";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { CalendarPickerModal } from "./components/CalendarPickerModal";
+import { DefaultAvatar } from "./components/DefaultAvatar";
 
 // Import types & helpers
 import type { Meal, Recipe } from "./types";
@@ -198,8 +199,7 @@ export default function App() {
 
   const INITIAL_PROFILE_STATE = {
     name: "John Doe",
-    imageUrl:
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=60",
+    imageUrl: "",
     description:
       "Fitness enthusiast & tech geek. Building a sustainable, high-protein lifestyle. Always optimizing! ✨ Adding more text here to test out the expansion feature and see how it works when the description gets fairly long.",
     height: 183,
@@ -1470,13 +1470,17 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
           <button
             id="profile-avatar"
             onClick={() => setActiveTab("profile")}
-            className="w-10 h-10 rounded-full border-2 border-orange-500 p-0.5 overflow-hidden shadow-md cursor-pointer hover:scale-105 transition-transform"
+            className="w-10 h-10 rounded-full border-2 border-orange-500 p-0.5 overflow-hidden shadow-md cursor-pointer hover:scale-105 transition-transform flex items-center justify-center bg-stone-100"
           >
-            <img
-              src={profileData.imageUrl || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=60"}
-              alt="User"
-              className="w-full h-full object-cover rounded-full pointer-events-none"
-            />
+            {profileData.imageUrl ? (
+              <img
+                src={profileData.imageUrl}
+                alt="User"
+                className="w-full h-full object-cover rounded-full pointer-events-none"
+              />
+            ) : (
+              <DefaultAvatar />
+            )}
           </button>
         </div>
       </header>

@@ -13,14 +13,7 @@ import {
 } from "lucide-react";
 import { CalendarPickerModal } from "./CalendarPickerModal";
 
-// Outline SVG Placeholder avatar for premium feel
-const DefaultAvatarSVG = () => (
-  <div className="w-full h-full bg-gradient-to-tr from-stone-200 to-stone-100 flex items-center justify-center text-stone-400">
-    <svg className="w-12 h-12" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-    </svg>
-  </div>
-);
+import { DefaultAvatar } from "./DefaultAvatar";
 
 interface BodyMetrics {
   name: string;
@@ -491,7 +484,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                   {avatarPreview ? (
                     <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
-                    <DefaultAvatarSVG />
+                    <DefaultAvatar />
                   )}
                 </div>
                 <label className="absolute bottom-0 right-0 w-8 h-8 bg-stone-900 text-white rounded-full border-2 border-white flex items-center justify-center cursor-pointer shadow-md hover:bg-stone-800 active:scale-95 transition-all">

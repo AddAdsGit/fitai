@@ -2,6 +2,7 @@ import React from "react";
 import { Camera, User, Smile, Scale, Ruler, Database, Info } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
+import { DefaultAvatar } from "./DefaultAvatar";
 
 export const EditProfileView = ({
   profileData,
@@ -88,7 +89,7 @@ export const EditProfileView = ({
                   {profileData.imageUrl ? (
                     <img src={profileData.imageUrl} alt="Avatar Preview" className="w-full h-full object-cover" />
                   ) : (
-                    <User className="w-8 h-8 text-stone-400" />
+                    <DefaultAvatar />
                   )}
                 </div>
                 <label className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-95 border border-white">
