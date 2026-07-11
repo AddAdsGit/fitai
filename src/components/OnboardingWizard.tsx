@@ -96,9 +96,6 @@ export const OnboardingWizard = ({
     fiber: 30,
   });
 
-  // Track if user has manually adjusted a value (stops auto-overwriting recommendations)
-  const [hasManuallyEdited, setHasManuallyEdited] = useState(false);
-
   // Sync initials from Google profile
   useEffect(() => {
     if (profileData?.imageUrl) {
@@ -133,14 +130,14 @@ export const OnboardingWizard = ({
   };
 
   // Perform Mifflin-St Jeor calculation (used for default recommendations)
-  const calculateRecommendedTargets = () => {
-    const age = calculateAge(metrics.dob);
+  const calculateRecommendedTargets = (currentMetrics: BodyMetrics) => {
+    const age = calculateAge(currentMetrics.dob);
     let bmr = 0;
     
-    if (metrics.gender === "Male") {
-      bmr = 10 * metrics.weight + 6.25 * metrics.height - 5 * age + 5;
+    if (currentMetrics.gender === "Male") {
+      bmr = 10 * currentMetrics.weight + 6.25 * currentMetrics.height - 5 * age + 5;
     } else {
-      bmr = 10 * metrics.weight + 6.25 * metrics.height - 5 * age - 161;
+      bmr = 10 * currentMetrics.weight + 6.25 * currentMetrics.height - 5 * age - 161;
     }
 
     const activityMultipliers = {
@@ -150,22 +147,31 @@ export const OnboardingWizard = ({
       "Very Active": 1.725,
     };
 
-    const multiplier = activityMultipliers[metrics.activityLevel] || 1.2;
+    const multiplier = activityMultipliers[currentMetrics.activityLevel] || 1.2;
     const tdee = bmr * multiplier;
 
     let targetCalories = Math.round(tdee);
-    if (metrics.goal === "Lose Weight") {
+    if (currentMetrics.goal === "Lose Weight") {
       targetCalories = Math.round(tdee - 500);
       if (targetCalories < 1200) targetCalories = 1200;
-    } else if (metrics.goal === "Build Muscle") {
+    } else if (currentMetrics.goal === "Build Muscle") {
       targetCalories = Math.round(tdee + 300);
     }
 
-    const proteinGrams = Math.round(metrics.weight * 2.0);
-    const fatGrams = Math.round((targetCalories * 0.25) / 9);
+    let proteinMultiplier = 1.8;
+    if (currentMetrics.goal === "Lose Weight") {
+      proteinMultiplier = 2.0; // Higher protein to preserve lean muscle in deficit
+    } else if (currentMetrics.goal === "Build Muscle") {
+      proteinMultiplier = 2.2; // Extra protein to support muscle synthesis
+    } else {
+      proteinMultiplier = 1.8; // Maintenance protein
+    }
+
+    const proteinGrams = Math.round(currentMetrics.weight * proteinMultiplier);
+    const fatGrams = Math.max(30, Math.round((targetCalories * 0.25) / 9));
     const remainingCalories = targetCalories - (proteinGrams * 4) - (fatGrams * 9);
-    const carbGrams = Math.max(20, Math.round(remainingCalories / 4));
-    const fiberGrams = metrics.gender === "Male" ? 30 : 25;
+    const carbGrams = Math.max(30, Math.round(remainingCalories / 4));
+    const fiberGrams = currentMetrics.gender === "Male" ? 30 : 25;
 
     return {
       calories: targetCalories,
@@ -176,46 +182,77 @@ export const OnboardingWizard = ({
     };
   };
 
-  // Recalculate defaults when biological metrics change, unless user has overridden
+  // Initialize targets once when biological metrics are completed
   useEffect(() => {
-    if (!hasManuallyEdited) {
-      const recommended = calculateRecommendedTargets();
-      setTargets(recommended);
-    }
-  }, [metrics.gender, metrics.dob, metrics.height, metrics.weight, metrics.activityLevel, metrics.goal]);
+    const recommended = calculateRecommendedTargets(metrics);
+    setTargets(recommended);
+  }, [metrics.gender, metrics.dob, metrics.height, metrics.weight]);
 
-  // Sync target weight default when goal or current weight changes
-  useEffect(() => {
-    if (metrics.goal === "Maintain Weight") {
-      setMetrics(prev => ({ ...prev, targetWeight: prev.weight }));
-    } else if (metrics.goal === "Lose Weight" && metrics.targetWeight >= metrics.weight) {
-      setMetrics(prev => ({ ...prev, targetWeight: Math.max(35, prev.weight - 5) }));
-    } else if (metrics.goal === "Build Muscle" && metrics.targetWeight <= metrics.weight) {
-      setMetrics(prev => ({ ...prev, targetWeight: Math.min(250, prev.weight + 5) }));
-    }
-  }, [metrics.goal, metrics.weight]);
+  // HIERARCHICAL REACTION HANDLERS:
 
-  const handleNext = () => {
-    if (step === 1 && !metrics.name.trim()) {
-      triggerToast("⚠️ Please enter your name to continue");
-      return;
+  // 1. Goal change: Updates target weight, TDEE calories, and auto-balances macros
+  const handleGoalChange = (goal: "Lose Weight" | "Maintain Weight" | "Build Muscle") => {
+    let newTargetWeight = metrics.weight;
+    if (goal === "Lose Weight") {
+      newTargetWeight = Math.max(35, Math.round(metrics.weight - 5));
+    } else if (goal === "Build Muscle") {
+      newTargetWeight = Math.round(metrics.weight + 5);
     }
-    setStep(step + 1);
+
+    const updatedMetrics = { ...metrics, goal, targetWeight: newTargetWeight };
+    setMetrics(updatedMetrics);
+
+    const recommended = calculateRecommendedTargets(updatedMetrics);
+    setTargets(recommended);
   };
 
-  const handleBack = () => {
-    if (step > 1) setStep(step - 1);
+  // 2. Target weight change: Stepper update
+  const handleTargetWeightChange = (newTargetWeight: number) => {
+    setMetrics(prev => ({ ...prev, targetWeight: newTargetWeight }));
   };
 
-  const togglePreference = (pref: string) => {
-    setMetrics(prev => {
-      const exists = prev.preferences.includes(pref);
-      return {
-        ...prev,
-        preferences: exists 
-          ? prev.preferences.filter(p => p !== pref)
-          : [...prev.preferences, pref]
-      };
+  // 3. Activity Level change: Updates baseline calories and balances macros
+  const handleActivityLevelChange = (activityLevel: "Sedentary" | "Lightly Active" | "Moderately Active" | "Very Active") => {
+    const updatedMetrics = { ...metrics, activityLevel };
+    setMetrics(updatedMetrics);
+
+    const recommended = calculateRecommendedTargets(updatedMetrics);
+    setTargets(recommended);
+  };
+
+  // 4. Calorie Target change: Automatically recalculates and balances macro split
+  const handleCaloriesChange = (newCalories: number) => {
+    let proteinMultiplier = 1.8;
+    if (metrics.goal === "Lose Weight") {
+      proteinMultiplier = 2.0;
+    } else if (metrics.goal === "Build Muscle") {
+      proteinMultiplier = 2.2;
+    } else {
+      proteinMultiplier = 1.8;
+    }
+
+    const proteinGrams = Math.round(metrics.weight * proteinMultiplier);
+    const fatGrams = Math.max(30, Math.round((newCalories * 0.25) / 9));
+    const remainingCalories = newCalories - (proteinGrams * 4) - (fatGrams * 9);
+    const carbGrams = Math.max(30, Math.round(remainingCalories / 4));
+
+    setTargets(prev => ({
+      ...prev,
+      calories: newCalories,
+      protein: proteinGrams,
+      fats: fatGrams,
+      carbs: carbGrams
+    }));
+  };
+
+  // 5. Macro (Protein, Carbs, Fats) change: Automatically recalculates total calories (Thermodynamic Sync)
+  const handleMacroChange = (key: "protein" | "carbs" | "fats" | "fiber", val: number) => {
+    setTargets(prev => {
+      const updated = { ...prev, [key]: val };
+      if (key !== "fiber") {
+        updated.calories = (updated.protein * 4) + (updated.carbs * 4) + (updated.fats * 9);
+      }
+      return updated;
     });
   };
 
@@ -399,11 +436,6 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
       triggerToast("❌ Failed to save profile before opening ChatGPT");
       setIsSubmitting(false);
     }
-  };
-
-  const handleTargetChange = (key: keyof typeof targets, val: number) => {
-    setHasManuallyEdited(true);
-    setTargets(prev => ({ ...prev, [key]: val }));
   };
 
   const totalSteps = 4;
@@ -632,7 +664,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                   <button
                     key={g.id}
                     type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, goal: g.id as any }))}
+                    onClick={() => handleGoalChange(g.id as any)}
                     className={`py-2 px-1 rounded-xl border flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
                       metrics.goal === g.id
                         ? "bg-orange-500 border-orange-500 text-white shadow-sm"
@@ -656,7 +688,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, targetWeight: Math.max(35, prev.targetWeight - 1) }))}
+                    onClick={() => handleTargetWeightChange(Math.max(35, metrics.targetWeight - 1))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Minus className="w-3.5 h-3.5" />
@@ -664,7 +696,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                   <span className="text-xs font-black text-stone-850 w-16 text-center">{metrics.targetWeight} kg</span>
                   <button
                     type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, targetWeight: Math.min(250, prev.targetWeight + 1) }))}
+                    onClick={() => handleTargetWeightChange(Math.min(250, metrics.targetWeight + 1))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -688,7 +720,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                   <button
                     key={act.id}
                     type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, activityLevel: act.id as any }))}
+                    onClick={() => handleActivityLevelChange(act.id as any)}
                     className={`py-2 px-1 rounded-xl border text-center text-[10px] font-black uppercase tracking-tight cursor-pointer ${
                       metrics.activityLevel === act.id
                         ? "bg-orange-500 border-orange-500 text-white shadow-sm"
@@ -701,7 +733,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
               </div>
             </div>
 
-            {/* REDESIGNED: Premium Calorie & Macro Target Editor */}
+            {/* Premium Calorie & Macro Target Editor */}
             <div className="space-y-3.5">
               <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
                 Nutrition protocol goals
@@ -716,7 +748,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => handleTargetChange("calories", Math.max(800, targets.calories - 50))}
+                    onClick={() => handleCaloriesChange(Math.max(800, targets.calories - 50))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 cursor-pointer border-none shadow-2xs active:scale-90 transition-transform"
                   >
                     <Minus className="w-3.5 h-3.5" />
@@ -724,12 +756,12 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                   <input
                     type="number"
                     value={targets.calories}
-                    onChange={(e) => handleTargetChange("calories", parseInt(e.target.value) || 0)}
+                    onChange={(e) => handleCaloriesChange(parseInt(e.target.value) || 0)}
                     className="w-16 bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
                     type="button"
-                    onClick={() => handleTargetChange("calories", Math.min(10000, targets.calories + 50))}
+                    onClick={() => handleCaloriesChange(Math.min(10000, targets.calories + 50))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 cursor-pointer border-none shadow-2xs active:scale-90 transition-transform"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -738,7 +770,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                 </div>
               </div>
 
-              {/* Macros Grid adjustments */}
+              {/* Macros Grid adjustments (No 'g' suffix inside steppers, grams unit in card label headers) */}
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-655 bg-orange-50/15" },
@@ -751,7 +783,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                     <div className="flex items-center justify-between mt-2.5 gap-1 bg-white/95 border border-black/[0.04] rounded-xl px-1.5 py-0.5">
                       <button
                         type="button"
-                        onClick={() => handleTargetChange(m.key as any, Math.max(0, targets[m.key as keyof typeof targets] - 5))}
+                        onClick={() => handleMacroChange(m.key as any, Math.max(0, targets[m.key as keyof typeof targets] - 5))}
                         className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
                       >
                         <Minus className="w-3 h-3" />
@@ -759,15 +791,15 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                       <input
                         type="number"
                         value={targets[m.key as keyof typeof targets]}
-                        onChange={(e) => handleTargetChange(m.key as any, parseInt(e.target.value) || 0)}
+                        onChange={(e) => handleMacroChange(m.key as any, parseInt(e.target.value) || 0)}
                         className="flex-1 bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button
                         type="button"
-                        onClick={() => handleTargetChange(m.key as any, Math.min(500, targets[m.key as keyof typeof targets] + 5))}
+                        onClick={() => handleMacroChange(m.key as any, Math.min(500, targets[m.key as keyof typeof targets] + 5))}
                         className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
                       >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
