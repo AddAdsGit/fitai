@@ -11,6 +11,7 @@ import type { Meal, Recipe } from "../types";
 import { hasNoGeneratedImage } from "../utils/helpers";
 import { InsightsView } from "./InsightsView";
 import { DefaultAvatar } from "./DefaultAvatar";
+import { FoodIllustration } from "./FoodIllustration";
 
 export const ProfileView = ({
   profileData,
@@ -650,7 +651,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                       />
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-tr from-amber-50 to-orange-100 flex items-center justify-center pointer-events-none select-none">
-                        <span className="text-4xl">🍴</span>
+                        <FoodIllustration className="w-16 h-16 text-orange-500/80" />
                       </div>
                     )}
 
@@ -859,8 +860,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                             {meal.image && !hasNoGeneratedImage(meal.image) ? (
                               <img src={meal.image} className="w-full h-full object-cover" alt={meal.name} />
                             ) : (
-                              <div className="w-full h-full bg-orange-50/50 flex items-center justify-center text-lg select-none">
-                                🍴
+                              <div className="w-full h-full bg-orange-50/55 flex items-center justify-center p-2.5 select-none">
+                                <FoodIllustration className="w-full h-full text-orange-500/80" />
                               </div>
                             )}
                           </div>

@@ -43,6 +43,7 @@ import { DefaultAvatar } from "./components/DefaultAvatar";
 import { ShareModal } from "./components/ShareModal";
 import { PublicShareView } from "./components/PublicShareView";
 import { ChatGPTIcon } from "./components/ChatGPTIcon";
+import { FoodIllustration } from "./components/FoodIllustration";
 
 
 // Import types & helpers
@@ -2391,7 +2392,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                           />
                         ) : (
                           <div className="absolute inset-0 bg-gradient-to-tr from-amber-50 to-orange-100/70 flex items-center justify-center">
-                            <span className="text-6xl sm:text-7xl group-hover:scale-110 transition-transform duration-700 select-none">🍴</span>
+                            <FoodIllustration className="w-24 h-24 text-orange-500/70 group-hover:scale-105 transition-transform duration-700" />
                           </div>
                         )}
                         <div className={cn(
