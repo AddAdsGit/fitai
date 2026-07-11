@@ -35,10 +35,10 @@ const DEFAULT_METRICS: BodyMetrics = {
   avatar: "",
   gender: "Male",
   age: 28,
-  height: 175,
-  weight: 70,
-  goal: "Lose Weight",
-  targetWeight: 65,
+  height: 0,
+  weight: 0,
+  goal: "Maintain Weight",
+  targetWeight: 0,
   activityLevel: "Moderately Active",
   preferences: [],
 };
@@ -102,12 +102,81 @@ export const OnboardingWizard = ({
 
   // Targets state (configured on Step 3)
   const [targets, setTargets] = useState({
-    calories: 2000,
-    protein: 150,
-    carbs: 150,
-    fats: 60,
-    fiber: 30,
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fats: 0,
+    fiber: 0,
   });
+
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [usernameError, setUsernameError] = useState("");
+
+  // Debounced Supabase validation check for username availability
+  useEffect(() => {
+    const cleanUsername = metrics.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (!cleanUsername) {
+      setUsernameStatus("idle");
+      setUsernameError("");
+      return;
+    }
+
+    setUsernameStatus("checking");
+    setUsernameError("");
+
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const { data: duplicate, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', cleanUsername)
+          .neq('id', activeProfileId)
+          .maybeSingle();
+
+        if (error) {
+          console.error(error);
+          setUsernameStatus("idle");
+          return;
+        }
+
+        if (duplicate) {
+          setUsernameStatus("taken");
+          setUsernameError("This username is already taken!");
+        } else {
+          setUsernameStatus("available");
+        }
+      } catch (err) {
+        console.error(err);
+        setUsernameStatus("idle");
+      }
+    }, 400); // 400ms debounce
+
+    return () => clearTimeout(delayDebounce);
+  }, [metrics.username, activeProfileId]);
+
+  const isStepValid = () => {
+    if (step === 1) {
+      return (
+        metrics.name.trim() !== "" &&
+        metrics.username.trim() !== "" &&
+        usernameStatus === "available"
+      );
+    }
+    if (step === 2) {
+      return (
+        metrics.height > 0 &&
+        metrics.weight > 0 &&
+        metrics.age > 0
+      );
+    }
+    if (step === 3) {
+      return (
+        metrics.targetWeight > 0 &&
+        targets.calories > 0
+      );
+    }
+    return true;
+  };
 
   const handleNext = () => {
     if (step === 1) {
@@ -153,6 +222,16 @@ export const OnboardingWizard = ({
 
   // Perform Mifflin-St Jeor calculation (used for default recommendations)
   const calculateRecommendedTargets = (currentMetrics: BodyMetrics) => {
+    if (currentMetrics.height <= 0 || currentMetrics.weight <= 0) {
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0,
+      };
+    }
+
     const age = currentMetrics.age;
     let bmr = 0;
     
@@ -559,9 +638,24 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                     setMetrics(prev => ({ ...prev, username: cleaned }));
                   }}
                   required
-                  className="w-full bg-white border border-stone-200 rounded-2xl pl-8 pr-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
+                  className="w-full bg-white border border-stone-200 rounded-2xl pl-8 pr-10 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
                 />
+                {usernameStatus === "checking" && (
+                  <div className="absolute right-4 w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                )}
+                {usernameStatus === "available" && (
+                  <span className="absolute right-4 text-xs text-emerald-500 font-bold">✓</span>
+                )}
+                {usernameStatus === "taken" && (
+                  <span className="absolute right-4 text-xs text-red-500 font-bold">✗</span>
+                )}
               </div>
+              {usernameStatus === "available" && (
+                <p className="text-[8px] text-emerald-600 font-extrabold uppercase tracking-wider px-1">✨ Username available!</p>
+              )}
+              {usernameStatus === "taken" && (
+                <p className="text-[8px] text-red-500 font-extrabold uppercase tracking-wider px-1">⚠️ This username is already taken.</p>
+              )}
             </div>
           </div>
         )}
@@ -845,7 +939,10 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
           <button
             type="button"
             onClick={step === totalSteps ? handleFinish : handleNext}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-100 flex items-center justify-center gap-2 cursor-pointer border-none"
+            disabled={!isStepValid() || isSubmitting}
+            className={`w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border-none ${
+              (!isStepValid() || isSubmitting) ? "opacity-50 cursor-not-allowed shadow-none" : "shadow-lg shadow-orange-100 active:scale-[0.98]"
+            }`}
           >
             <span>{step === totalSteps ? "Start Tracking 🚀" : "Continue"}</span>
             {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
