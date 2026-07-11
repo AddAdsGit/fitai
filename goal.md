@@ -5,7 +5,12 @@ This document serves as the project memory for future AI coding assistants. It o
 ---
 
 ## 🎯 Core Project Goal
-FitAI is a minimalist, premium, low-friction daily calorie and macronutrient tracker designed to keep logging time to a absolute minimum. It operates as a web-based dashboard and integrates deeply with a **ChatGPT Custom GPT** to enable natural-language voice and text logging.
+FitAI is a minimalist, premium, low-friction daily calorie and macronutrient tracker designed to keep logging time to an absolute minimum. It operates as a web-based dashboard and integrates deeply with a **ChatGPT Custom GPT** to enable natural-language voice and text logging.
+
+### 🌟 Product Vision & Mascot Avatar
+*   **Non-Social by Design**: FitAI is a private personal tracker rather than a social app. There are no feeds, friends lists, or comment sections.
+*   **Organic Reach via Infographics**: To drive acquisition, FitAI provides users with gorgeous, shareable infographic templates (Midnight, Sunset, Sand) for their meals, recipes, and daily logs. Shared URLs open a public landing page with interactive import options.
+*   **Mascot-Driven Engagement (Duolingo-style)**: The core engagement loops and coaching are powered by an interactive **mascot avatar** (similar to the Duolingo bird). This mascot resides on the dashboard, visually reacting to the user's calorie tracking, streak, and daily wellness logs to encourage, push, and keep them accountable.
 
 ---
 

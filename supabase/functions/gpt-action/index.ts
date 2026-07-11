@@ -409,6 +409,48 @@ serve(async (req) => {
       return { dateStr, timeStr };
     };
 
+    const getDailyRemaining = async (profileId: string, dateStr: string) => {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("daily_calories_goal, protein_goal, carbs_goal, fats_goal, fiber_goal")
+        .eq("id", profileId)
+        .single();
+
+      if (!prof) return null;
+
+      const { data: meals } = await supabase
+        .from("meals")
+        .select("calories, protein, carbs, fats, fiber")
+        .eq("profile_id", profileId)
+        .eq("date", dateStr);
+
+      const totals = {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0
+      };
+
+      if (meals) {
+        meals.forEach((m: any) => {
+          totals.calories += m.calories || 0;
+          totals.protein += m.protein || 0;
+          totals.carbs += m.carbs || 0;
+          totals.fats += m.fats || 0;
+          totals.fiber += m.fiber || 0;
+        });
+      }
+
+      return {
+        calories: Math.max(0, (prof.daily_calories_goal || 2000) - totals.calories),
+        protein: Math.max(0, (prof.protein_goal || 150) - totals.protein),
+        carbs: Math.max(0, (prof.carbs_goal || 150) - totals.carbs),
+        fats: Math.max(0, (prof.fats_goal || 60) - totals.fats),
+        fiber: Math.max(0, (prof.fiber_goal || 30) - totals.fiber)
+      };
+    };
+
     console.log(`[gpt-action] Request: ${method} ${path} for user: ${profile.username} (timezoneOffset: ${timezoneOffset})`);
 
     // 4. API Router
@@ -463,6 +505,61 @@ serve(async (req) => {
       }
     }
 
+    // --- DAILY WELLNESS ENDPOINTS ---
+    if (path.endsWith("/daily-wellness")) {
+      if (method === "GET") {
+        const queryDate = url.searchParams.get("date") || getLocalTimeAndDate().dateStr;
+        
+        const { data: record, error: fetchError } = await supabase
+          .from("daily_wellness")
+          .select("*")
+          .eq("profile_id", profile.id)
+          .eq("date", queryDate)
+          .maybeSingle();
+
+        if (fetchError) {
+          return new Response(JSON.stringify({ error: "Failed to retrieve daily wellness notes", details: fetchError }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ date: queryDate, notes: record ? record.notes : "" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else if (method === "POST" || method === "PATCH") {
+        const body = await req.json();
+        const targetDate = body.date || getLocalTimeAndDate().dateStr;
+        const notesContent = body.notes || "";
+
+        const { data: record, error: upsertError } = await supabase
+          .from("daily_wellness")
+          .upsert(
+            {
+              profile_id: profile.id,
+              date: targetDate,
+              notes: notesContent,
+            },
+            { onConflict: "profile_id,date" }
+          )
+          .select("*")
+          .single();
+
+        if (upsertError) {
+          return new Response(JSON.stringify({ error: "Failed to save daily wellness notes", details: upsertError }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ message: "Daily wellness notes saved successfully", record }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // --- MEALS ENDPOINTS ---
     if (path.endsWith("/meals")) {
       if (method === "GET") {
@@ -481,7 +578,8 @@ serve(async (req) => {
           });
         }
 
-        return new Response(JSON.stringify({ date: queryDate, meals }), {
+        const remaining = await getDailyRemaining(profile.id, queryDate);
+        return new Response(JSON.stringify({ date: queryDate, meals, daily_remaining: remaining }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -617,6 +715,7 @@ serve(async (req) => {
           fats: parseInt(body.fats || 0),
           fiber: parseInt(body.fiber || 0),
           image: imageUrlToDownload, // Use external URL as initial placeholder
+          meal_description: body.meal_description || null,
           date: resolvedDate
         };
 
@@ -745,7 +844,8 @@ serve(async (req) => {
           }
         })();
 
-        return new Response(JSON.stringify({ message: "Meal logged successfully", meal: newMeal }), {
+        const remaining = await getDailyRemaining(profile.id, resolvedDate);
+        return new Response(JSON.stringify({ message: "Meal logged successfully", meal: newMeal, daily_remaining: remaining }), {
           status: 201,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -780,7 +880,8 @@ serve(async (req) => {
           });
         }
 
-        return new Response(JSON.stringify({ message: "Meal deleted successfully", meal: deletedMeal }), {
+        const remaining = await getDailyRemaining(profile.id, deletedMeal.date);
+        return new Response(JSON.stringify({ message: "Meal deleted successfully", meal: deletedMeal, daily_remaining: remaining }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -806,6 +907,7 @@ serve(async (req) => {
         if (body.time !== undefined) updateData.time = body.time;
         if (body.date !== undefined) updateData.date = body.date;
         if (body.image !== undefined) updateData.image = body.image;
+        if (body.meal_description !== undefined) updateData.meal_description = body.meal_description;
 
         const { data: updatedMeal, error: updateError } = await supabase
           .from("meals")
@@ -829,7 +931,9 @@ serve(async (req) => {
           });
         }
 
-        return new Response(JSON.stringify({ message: "Meal updated successfully", meal: updatedMeal }), {
+        const targetDate = updatedMeal.date || getLocalTimeAndDate().dateStr;
+        const remaining = await getDailyRemaining(profile.id, targetDate);
+        return new Response(JSON.stringify({ message: "Meal updated successfully", meal: updatedMeal, daily_remaining: remaining }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

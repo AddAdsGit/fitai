@@ -114,6 +114,30 @@ paths:
       responses:
         '200':
           description: Logged meals retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  meals:
+                    type: array
+                    items:
+                      type: object
+                  daily_remaining:
+                    type: object
+                    properties:
+                      calories:
+                        type: integer
+                      protein:
+                        type: integer
+                      carbs:
+                        type: integer
+                      fats:
+                        type: integer
+                      fiber:
+                        type: integer
     post:
       x-openai-isConsequential: false
       summary: Log a new meal
@@ -155,10 +179,16 @@ paths:
                   description: Target date in YYYY-MM-DD format. Defaults to today.
                 image:
                   type: string
-                  description: Optional public web image URL of this food item. You can search the web (e.g. Unsplash or open food databases) to find a high-quality relevant picture link matching this food.
+                  description: >-
+                    Leave this field EMPTY. Do NOT pass any image URL here — not from the user's upload, not from a web search.
+                    The server automatically fetches a real matching food photo for every meal using the meal name.
+                    Only pass a value here if the user explicitly provides a direct public image URL themselves.
                 timezone:
                   type: string
                   description: The user's timezone identifier (e.g., "America/New_York", "Asia/Kolkata"). If provided, it is used to resolve the current local date and time if they are not explicitly specified.
+                meal_description:
+                  type: string
+                  description: Optional detailed notes or description of the meal (e.g., ingredients, prep style).
                 openaiFileIdRefs:
                   type: array
                   description: References to images or files uploaded by the user to the chat session. The backend will download these.
@@ -176,6 +206,28 @@ paths:
       responses:
         '201':
           description: Meal logged successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  meal:
+                    type: object
+                  daily_remaining:
+                    type: object
+                    properties:
+                      calories:
+                        type: integer
+                      protein:
+                        type: integer
+                      carbs:
+                        type: integer
+                      fats:
+                        type: integer
+                      fiber:
+                        type: integer
     delete:
       x-openai-isConsequential: false
       summary: Delete a logged meal
@@ -191,6 +243,28 @@ paths:
       responses:
         '200':
           description: Meal deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  meal:
+                    type: object
+                  daily_remaining:
+                    type: object
+                    properties:
+                      calories:
+                        type: integer
+                      protein:
+                        type: integer
+                      carbs:
+                        type: integer
+                      fats:
+                        type: integer
+                      fiber:
+                        type: integer
         '400':
           description: Missing ID parameter
         '404':
@@ -232,13 +306,84 @@ paths:
                   type: string
                 image:
                   type: string
+                meal_description:
+                  type: string
+                  description: Optional detailed notes or description of the meal (e.g., ingredients, prep style).
       responses:
         '200':
           description: Meal updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  meal:
+                    type: object
+                  daily_remaining:
+                    type: object
+                    properties:
+                      calories:
+                        type: integer
+                      protein:
+                        type: integer
+                      carbs:
+                        type: integer
+                      fats:
+                        type: integer
+                      fiber:
+                        type: integer
         '400':
           description: Missing ID or invalid parameters
         '404':
           description: Meal not found
+  /daily-wellness:
+    get:
+      summary: Get daily wellness notes
+      description: Retrieve wellness and health notes for a specific date.
+      operationId: getDailyWellness
+      parameters:
+        - name: date
+          in: query
+          description: The target date in YYYY-MM-DD format. Defaults to today's date.
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wellness notes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  notes:
+                    type: string
+    post:
+      summary: Save daily wellness notes
+      description: Create or update (overwrite/append) the wellness or health notes for a specific date.
+      operationId: saveDailyWellness
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date:
+                  type: string
+                  description: Optional target date in YYYY-MM-DD format. Defaults to today.
+                notes:
+                  type: string
+                  description: The text content of the daily wellness or health note.
+              required:
+                - notes
+      responses:
+        '200':
+          description: Daily wellness notes saved successfully
   /recipes:
     get:
       summary: List user recipes

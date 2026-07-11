@@ -57,6 +57,7 @@ create table public.meals (
   fats integer not null,
   fiber integer default 0 not null,
   image text,
+  meal_description text,
   date date not null, -- E.g., "2026-07-08"
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -117,3 +118,43 @@ alter table public.oauth_codes enable row level security;
 -- Policies for oauth_codes
 create policy "Allow service_role to manage oauth codes" on public.oauth_codes
   for all using (true) with check (true);
+
+-- DAILY WELLNESS NOTES TABLE
+create table public.daily_wellness (
+  id uuid default gen_random_uuid() primary key,
+  profile_id uuid references public.profiles(id) on delete cascade not null,
+  date date not null,
+  notes text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique(profile_id, date)
+);
+
+-- Enable RLS
+alter table public.daily_wellness enable row level security;
+
+-- Policies for daily_wellness
+create policy "Users can perform all actions on their own daily wellness notes" on public.daily_wellness
+  for all using (auth.uid() = profile_id) with check (auth.uid() = profile_id);
+
+-- Create index for performance
+create index daily_wellness_profile_id_date_idx on public.daily_wellness(profile_id, date);
+
+-- SHARES TABLE FOR PUBLIC SHARABLES
+create table public.shares (
+  id uuid default gen_random_uuid() primary key,
+  type text not null, -- 'meal' or 'recipe'
+  data jsonb not null, -- payload data
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable RLS
+alter table public.shares enable row level security;
+
+-- Policies for public.shares
+create policy "Anyone can view shared items" on public.shares
+  for select using (true);
+
+create policy "Authenticated users can create shares" on public.shares
+  for insert with check (auth.role() = 'authenticated');
+
+

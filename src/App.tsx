@@ -21,6 +21,9 @@ import {
   Target,
   Bot,
   Loader2,
+  BookOpen,
+  Edit2,
+  Share2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "./lib/utils";
@@ -37,10 +40,14 @@ import { OAuthConsentView } from "./components/OAuthConsentView";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { CalendarPickerModal } from "./components/CalendarPickerModal";
 import { DefaultAvatar } from "./components/DefaultAvatar";
+import { ShareModal } from "./components/ShareModal";
+import { PublicShareView } from "./components/PublicShareView";
+
 
 // Import types & helpers
-import type { Meal, Recipe } from "./types";
+import type { Meal, Recipe, DailyWellness } from "./types";
 import { hasNoGeneratedImage, formatDateStr } from "./utils/helpers";
+import { generateShareUrl } from "./utils/shareUtils";
 
 
 const INITIAL_MEALS: Meal[] = [
@@ -75,51 +82,49 @@ const INITIAL_MEALS: Meal[] = [
 const INITIAL_RECIPES: Recipe[] = [
   {
     id: "rec-1",
-    name: "Avocado Salmon Protein Bowl",
-    time: "15 mins",
-    calories: 420,
-    protein: 34,
-    carbs: 12,
-    fats: 28,
-    fiber: 4,
-    tags: ["Keto", "Gluten Free"],
-    description: "A high-protein ketogenic bowl featuring grilled salmon, fresh greens, and lemon vinaigrette.",
+    name: "Steamed Idli with Sambar",
+    time: "10 mins",
+    calories: 220,
+    protein: 7,
+    carbs: 44,
+    fats: 1,
+    fiber: 5,
+    tags: ["Vegetarian", "Gluten Free"],
+    description: "Soft, steamed rice-and-lentil cakes served with mixed vegetable sambar.",
     image:
-      "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
+      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
     ingredients: [
-      "150g Grilled Salmon",
-      "1/2 Ripe Avocado",
-      "50g Salad Greens",
-      "Lemon Vinaigrette",
+      "2 pieces Steamed Idli",
+      "1 bowl Vegetable Sambar",
+      "1 tbsp Coconut Chutney",
     ],
     instructions:
-      "Grill salmon. Slice avocado. Toss salad greens with vinaigrette. Combine in a premium bowl.",
+      "Steam idli batter. Heat sambar and serve with coconut chutney on the side.",
   },
   {
     id: "rec-2",
-    name: "Spinach Oat Pancakes",
+    name: "Crispy Masala Dosa",
     time: "12 mins",
-    calories: 310,
-    protein: 16,
-    carbs: 45,
-    fats: 8,
-    fiber: 6,
-    tags: ["Gluten Free", "Vegetarian"],
-    description: "Healthy gluten-free pancakes made with raw spinach, rolled oats, and almond milk.",
+    calories: 360,
+    protein: 6,
+    carbs: 54,
+    fats: 12,
+    fiber: 4,
+    tags: ["Vegetarian", "Gluten Free"],
+    description: "Thin, crispy fermented rice crepe stuffed with a spiced potato mash.",
     image:
-      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80",
+      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
     ingredients: [
-      "1 cup Gluten Free Oats",
-      "1 cup Unsweetened Almond Milk",
-      "1 Egg",
-      "Handful Spinach",
+      "1 cup Dosa Batter",
+      "100g Spiced Potato Mash (Alloo Masala)",
+      "1 tbsp Butter or Ghee",
     ],
     instructions:
-      "Blend ingredients until smooth. Bake on a hot non-stick skillet for 3 mins each side.",
+      "Spread batter thin on hot tawa. Drizzle butter, place potato filling, fold and crisp.",
   },
   {
     id: "rec-3",
-    name: "Keto Spinach & Cheese Omelette",
+    name: "Spinach & Cheese Omelette",
     time: "10 mins",
     calories: 290,
     protein: 22,
@@ -139,117 +144,24 @@ const INITIAL_RECIPES: Recipe[] = [
     instructions:
       "Whisk eggs. Melt butter. Sauté spinach. Add eggs, cook through and fold over melted cheese.",
   },
-  {
-    id: "rec-4",
-    name: "Mediterranean Chickpea Salad",
-    time: "8 mins",
-    calories: 340,
-    protein: 12,
-    carbs: 48,
-    fats: 10,
-    fiber: 9,
-    tags: ["Vegan", "Vegetarian", "Gluten Free"],
-    description: "A refreshing, fiber-packed salad tossed with olives, diced cucumber, and lemon vinaigrette.",
-    image:
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80",
-    ingredients: [
-      "1 can Chickpeas",
-      "Cucumber & Tomato dice",
-      "Kalamata olives",
-      "Olive oil & Lemon juice",
-    ],
-    instructions:
-      "Rinse chickpeas. Combine with chopped vegetables. Drizzle olive oil and squeeze fresh lemon.",
-  },
-  {
-    id: "rec-5",
-    name: "Steamed Idli with Sambar",
-    time: "10 mins",
-    calories: 220,
-    protein: 7,
-    carbs: 44,
-    fats: 1,
-    fiber: 5,
-    tags: ["Vegetarian", "Gluten Free"],
-    description: "Single serving of 2 soft steamed rice-and-lentil cakes served with mixed vegetable sambar.",
-    image:
-      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
-    ingredients: [
-      "2 pieces Steamed Idli",
-      "1 bowl Vegetable Sambar",
-      "1 tbsp Coconut Chutney",
-    ],
-    instructions:
-      "Steam idli batter. Heat sambar and serve with coconut chutney on the side.",
-  },
-  {
-    id: "rec-6",
-    name: "Masala Dosa",
-    time: "12 mins",
-    calories: 360,
-    protein: 6,
-    carbs: 54,
-    fats: 12,
-    fiber: 4,
-    tags: ["Vegetarian", "Gluten Free"],
-    description: "Thin, crispy fermented rice crepe stuffed with a spiced potato mash.",
-    image:
-      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
-    ingredients: [
-      "1 cup Dosa Batter",
-      "100g Spiced Potato Mash (Alooo Masala)",
-      "1 tbsp Butter or Ghee",
-    ],
-    instructions:
-      "Spread batter thin on hot tawa. Drizzle butter, place potato filling, fold and crisp.",
-  },
-  {
-    id: "rec-7",
-    name: "Plain Dosa",
-    time: "8 mins",
-    calories: 250,
-    protein: 4,
-    carbs: 42,
-    fats: 7,
-    fiber: 2,
-    tags: ["Vegetarian", "Gluten Free"],
-    description: "Crispy, golden fermented rice and lentil crepe served plain.",
-    image:
-      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
-    ingredients: [
-      "1 cup Dosa Batter",
-      "1 tsp Ghee or Oil",
-    ],
-    instructions:
-      "Spread batter in a circular motion on hot tawa. Drizzle ghee and cook until golden brown.",
-  },
-  {
-    id: "rec-8",
-    name: "South Indian Curd Rice",
-    time: "5 mins",
-    calories: 280,
-    protein: 6,
-    carbs: 40,
-    fats: 9,
-    fiber: 2,
-    tags: ["Vegetarian", "Gluten Free"],
-    description: "One bowl of comforting soft rice mixed with yogurt, tempered with spices.",
-    image:
-      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
-    ingredients: [
-      "1 cup Cooked Rice",
-      "1/2 cup Fresh Yogurt (Curd)",
-      "1 tsp Mustard seeds, Curry leaves, Ginger, Chili tempering",
-      "A few Pomegranate seeds for garnish",
-    ],
-    instructions:
-      "Mix cooled rice with yogurt. Heat oil and temper with mustard seeds, curry leaves, ginger. Combine and garnish.",
-  },
 ];
 
 // Components and helper utilities extracted to ./components and ./utils
 
 export default function App() {
+  const [shareId, setShareId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("shareId");
+  });
+  const [shareTypeParam, setShareTypeParam] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("share");
+  });
+  const [shareDataParam, setShareDataParam] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("data");
+  });
+
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("page") === "oauth-consent") {
@@ -257,6 +169,16 @@ export default function App() {
     }
     return "home";
   });
+  const [shareItemPopup, setShareItemPopup] = useState<{ type: "meal" | "recipe", item: any } | null>(null);
+  
+  const handleShareMeal = (meal: Meal) => {
+    setShareItemPopup({ type: "meal", item: meal });
+  };
+  
+  const handleShareRecipe = (recipe: Recipe) => {
+    setShareItemPopup({ type: "recipe", item: recipe });
+  };
+
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null);
   const [mealPendingDelete, setMealPendingDelete] = useState<Meal | null>(null);
   const [isCameraFullScreen, setIsCameraFullScreen] = useState(false);
@@ -333,7 +255,7 @@ export default function App() {
       { name: "Vitamin A", target: 900, unit: "mcg" },
     ],
     api_key: "",
-    username: "",
+    username: "mk",
     notionApiKey: "",
     notionDatabaseId: "",
     googleSheetsWebhookUrl: "",
@@ -389,8 +311,30 @@ export default function App() {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
   const [profileData, setProfileDataState] = useState(INITIAL_PROFILE_STATE);
-  const [mealsState, setMealsState] = useState<Meal[]>([]);
+  const [mealsState, setMealsState] = useState<Meal[]>(() => {
+    try {
+      const saved = localStorage.getItem("fitai_meals");
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
   const [recipes, setRecipesState] = useState<Recipe[]>([]);
+
+  useEffect(() => {
+    localStorage.setItem("fitai_meals", JSON.stringify(mealsState));
+  }, [mealsState]);
+  const [dailyNotes, setDailyNotes] = useState<DailyWellness[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("fitai_daily_notes") || "[]");
+    } catch (_) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("fitai_daily_notes", JSON.stringify(dailyNotes));
+  }, [dailyNotes]);
 
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [loginUsername, setLoginUsername] = useState("");
@@ -717,10 +661,11 @@ export default function App() {
     const loadUserData = async () => {
       setIsDataLoading(true);
       try {
-        const [profileRes, recipesRes, mealsRes] = await Promise.all([
+        const [profileRes, recipesRes, mealsRes, wellnessRes] = await Promise.all([
           supabase.from('profiles').select('*').eq('id', activeProfileId).single(),
           supabase.from('recipes').select('*').eq('profile_id', activeProfileId).order('name', { ascending: true }),
-          supabase.from('meals').select('*').eq('profile_id', activeProfileId).order('created_at', { ascending: false })
+          supabase.from('meals').select('*').eq('profile_id', activeProfileId).order('created_at', { ascending: false }),
+          supabase.from('daily_wellness').select('*').eq('profile_id', activeProfileId)
         ]);
 
         if (profileRes.error) {
@@ -773,6 +718,64 @@ export default function App() {
             timezone: profile.timezone || "UTC"
           });
 
+          // Load daily wellness notes if table query was successful
+          let initialNotesList: DailyWellness[] = [];
+          if (wellnessRes && !wellnessRes.error && wellnessRes.data) {
+            initialNotesList = wellnessRes.data;
+            setDailyNotes(wellnessRes.data);
+          }
+
+          // Run one-time legacy notes migration from profile memories
+          const legacyNotes = (profile.memories || []).filter((m: string) => m.startsWith("[") && m.includes("Note]"));
+          if (legacyNotes.length > 0) {
+            console.log("Migrating legacy daily notes from profile memories...", legacyNotes);
+            const remainingMemories = (profile.memories || []).filter((m: string) => !(m.startsWith("[") && m.includes("Note]")));
+            
+            const migratedNotes: DailyWellness[] = [];
+            for (const noteStr of legacyNotes) {
+              const match = noteStr.match(/^\[(\d{4}-\d{2}-\d{2})\s+Note\]\s*(.*)$/i);
+              if (match) {
+                const dateVal = match[1];
+                const contentVal = match[2];
+                migratedNotes.push({
+                  date: dateVal,
+                  notes: contentVal
+                });
+              }
+            }
+
+            if (migratedNotes.length > 0) {
+              // Merge with existing
+              const mergedNotesMap = new Map(initialNotesList.map(n => [n.date, n]));
+              migratedNotes.forEach(n => mergedNotesMap.set(n.date, n));
+              const mergedList = Array.from(mergedNotesMap.values());
+              
+              setDailyNotes(mergedList);
+              initialNotesList = mergedList;
+
+              // Save to database
+              const rowsToInsert = migratedNotes.map(n => ({
+                profile_id: activeProfileId,
+                date: n.date,
+                notes: n.notes
+              }));
+              supabase.from("daily_wellness").upsert(rowsToInsert, { onConflict: "profile_id,date" }).then((res) => {
+                if (res.error) console.error("Failed to insert migrated wellness notes:", res.error);
+              });
+            }
+
+            // Save cleaned memories back to profile
+            supabase.from("profiles").update({ memories: remainingMemories }).eq("id", profile.id).then((res) => {
+              if (res.error) console.error("Failed to clean up memories array:", res.error);
+            });
+            
+            // Update local profile state in profileData
+            setProfileDataState(prev => ({
+              ...prev,
+              memories: remainingMemories
+            }));
+          }
+
           // Onboarding states removed, handled by OnboardingWizard
         }
 
@@ -812,6 +815,7 @@ export default function App() {
             fats: m.fats,
             fiber: m.fiber || 0,
             image: m.image,
+            meal_description: m.meal_description || "",
             date: m.date
           }));
           setMealsState(mappedMeals);
@@ -826,12 +830,12 @@ export default function App() {
     loadUserData();
   }, [activeProfileId]);
 
-  // Real-time subscription: auto-refresh meals when ChatGPT logs a new meal
+  // Real-time subscription: auto-refresh meals and daily wellness notes when updated
   useEffect(() => {
     if (!isSupabaseConfigured || !activeProfileId) return;
 
     const channel = supabase
-      .channel(`meals-realtime-${activeProfileId}`)
+      .channel(`db-realtime-${activeProfileId}`)
       .on(
         'postgres_changes',
         {
@@ -859,9 +863,29 @@ export default function App() {
               fats: m.fats,
               fiber: m.fiber || 0,
               image: m.image,
+              meal_description: m.meal_description || "",
               date: m.date,
             }));
             setMealsState(mappedMeals);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'daily_wellness',
+          filter: `profile_id=eq.${activeProfileId}`,
+        },
+        async () => {
+          // Refetch all daily wellness notes when any change happens
+          const { data, error } = await supabase
+            .from('daily_wellness')
+            .select('*')
+            .eq('profile_id', activeProfileId);
+          if (!error && data) {
+            setDailyNotes(data);
           }
         }
       )
@@ -1126,6 +1150,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     image?: string;
     type?: string;
     time?: string;
+    meal_description?: string;
   }) => {
     const timeOptions: Intl.DateTimeFormatOptions = {
       hour: "numeric",
@@ -1154,7 +1179,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               image: newMealOrRecipe.image,
               type: newMealOrRecipe.type,
               time: formattedTime,
-              date: selectedDate
+              date: selectedDate,
+              meal_description: newMealOrRecipe.meal_description
             })
           });
 
@@ -1171,6 +1197,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               fats: data.meal.fats,
               fiber: data.meal.fiber || 0,
               image: data.meal.image,
+              meal_description: data.meal.meal_description || "",
               date: data.meal.date
             };
             setMealsState((prev) => prev.map(m => m.id === mapped.id ? mapped : m));
@@ -1192,7 +1219,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         carbs: newMealOrRecipe.carbs,
         fats: newMealOrRecipe.fats,
         fiber: (newMealOrRecipe as any).fiber || m.fiber || 0,
-        image: newMealOrRecipe.image || m.image
+        image: newMealOrRecipe.image || m.image,
+        meal_description: newMealOrRecipe.meal_description !== undefined ? newMealOrRecipe.meal_description : m.meal_description
       } : m));
       showToast("🍽️ Meal updated locally");
       return;
@@ -1217,7 +1245,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             image: newMealOrRecipe.image,
             type: newMealOrRecipe.type,
             time: formattedTime,
-            date: selectedDate
+            date: selectedDate,
+            meal_description: newMealOrRecipe.meal_description
           })
         });
 
@@ -1234,6 +1263,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             fats: data.meal.fats,
             fiber: data.meal.fiber || 0,
             image: data.meal.image,
+            meal_description: data.meal.meal_description || "",
             date: data.meal.date
           };
           setMealsState((prev) => [mapped, ...prev]);
@@ -1261,11 +1291,42 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       image:
         newMealOrRecipe.image ||
         "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80",
+      meal_description: newMealOrRecipe.meal_description || "",
       date: selectedDate,
     };
 
     setMealsState((prev) => [meal, ...prev]);
     showToast(`🍽️ Logged: "${newMealOrRecipe.name}" (+${newMealOrRecipe.calories} kcal)`);
+  };
+
+  const handleSaveDailyNote = async (dateStr: string, text: string) => {
+    const updatedNotes = [...dailyNotes.filter(n => n.date !== dateStr)];
+    const textTrimmed = text.trim();
+    
+    if (textTrimmed) {
+      updatedNotes.push({
+        date: dateStr,
+        notes: textTrimmed
+      });
+    }
+    setDailyNotes(updatedNotes);
+
+    if (isSupabaseConfigured && activeProfileId) {
+      try {
+        if (textTrimmed) {
+          await supabase.from("daily_wellness").upsert({
+            profile_id: activeProfileId,
+            date: dateStr,
+            notes: textTrimmed
+          }, { onConflict: "profile_id,date" });
+        } else {
+          // Delete note if cleared
+          await supabase.from("daily_wellness").delete().eq("profile_id", activeProfileId).eq("date", dateStr);
+        }
+      } catch (err) {
+        console.error("Error saving daily wellness notes:", err);
+      }
+    }
   };
 
   const [lastDeletedMeal, setLastDeletedMeal] = useState<Meal | null>(null);
@@ -1411,6 +1472,60 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
     return streak;
   })();
+
+  const isViewingShare = shareId || (shareTypeParam && shareDataParam);
+
+  if (isViewingShare) {
+    return (
+      <PublicShareView
+        shareId={shareId}
+        shareTypeParam={shareTypeParam}
+        shareDataParam={shareDataParam}
+        activeProfileId={activeProfileId}
+        onImportMeal={onAddMeal}
+        onImportRecipe={async (newRecipe) => {
+          if (isSupabaseConfigured && activeProfileId) {
+            const { data, error } = await supabase
+              .from("recipes")
+              .insert({
+                profile_id: activeProfileId,
+                name: newRecipe.name,
+                time: newRecipe.time,
+                calories: newRecipe.calories,
+                protein: newRecipe.protein,
+                carbs: newRecipe.carbs,
+                fats: newRecipe.fats,
+                fiber: newRecipe.fiber,
+                tags: newRecipe.tags,
+                image: newRecipe.image,
+                ingredients: newRecipe.ingredients,
+                instructions: newRecipe.instructions
+              })
+              .select("*")
+              .single();
+            if (error) throw error;
+            if (data) {
+              setRecipesState(prev => [data, ...prev]);
+            }
+          } else {
+            setRecipesState(prev => [newRecipe, ...prev]);
+          }
+        }}
+        onNavigateToDashboard={() => {
+          const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+          window.history.pushState({ path: newUrl }, "", newUrl);
+          setShareId(null);
+          setShareTypeParam(null);
+          setShareDataParam(null);
+        }}
+        triggerToast={showToast}
+        onAuthSuccess={(userId) => {
+          setActiveProfileId(userId);
+          localStorage.setItem("fitai_active_profile_id", userId);
+        }}
+      />
+    );
+  }
 
   if (isSupabaseConfigured && !activeProfileId) {
     return (
@@ -1979,6 +2094,16 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                handleShareMeal(meal);
+                              }}
+                              className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-orange-50 text-stone-400 hover:text-orange-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40 shrink-0"
+                              title="Share meal"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 handleDeleteMeal(meal);
                               }}
                               className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40 shrink-0"
@@ -1994,71 +2119,69 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                     const hasImage = !hasNoGeneratedImage(meal.image);
 
                     if (!hasImage) {
+                      const getMealEmoji = (typeStr: string) => {
+                        const t = typeStr?.toLowerCase() || "";
+                        if (t.includes("breakfast") || t.includes("morning")) return "🥞";
+                        if (t.includes("lunch") || t.includes("afternoon")) return "🥗";
+                        if (t.includes("dinner") || t.includes("night") || t.includes("evening")) return "🥩";
+                        if (t.includes("snack") || t.includes("bite") || t.includes("tea")) return "🍎";
+                        return "🍽️";
+                      };
+                      const mealEmoji = getMealEmoji(meal.type);
+
                       return (
                         <motion.div
                           key={meal.id}
-                          whileHover={{ y: -4, scale: 1.01 }}
-                          whileTap={{ scale: 0.98 }}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
                           onClick={() => handleEditMeal(meal)}
-                          className="relative rounded-[32px] overflow-hidden aspect-[4/3] sm:aspect-video shadow-xl shadow-stone-200/10 group cursor-pointer border border-stone-200/40 bg-gradient-to-br from-[#fffbfa] to-[#f9f6f3]"
+                          className="bg-white/80 backdrop-blur-md rounded-2xl border border-white/90 p-4 shadow-3xs flex items-center justify-between gap-4 relative z-10 cursor-pointer"
                         >
-                          {/* Centered Watermark Utensils Badge */}
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03]">
-                            <Utensils className="w-40 h-40 text-stone-900" />
-                          </div>
-
-                          {/* Top Bar: Time, Calories, and Delete */}
-                          <div className="absolute top-5 left-5 right-5 flex justify-between items-center z-20">
-                            <div className="bg-stone-100/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/40">
-                              <span className="text-[10px] font-black uppercase tracking-[0.1em] text-stone-600">
-                                {meal.time}
-                              </span>
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="w-9 h-9 rounded-xl bg-stone-100/60 flex items-center justify-center text-sm shrink-0 border border-stone-200/20">
+                              {mealEmoji}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-full font-black flex items-center gap-1 shadow-md">
-                                <span className="text-sm">{meal.calories}</span>
-                                <span className="text-[9px] uppercase tracking-wider opacity-90">
-                                  Kcal
+                            <div className="text-left min-w-0">
+                              <h4 className="text-xs font-black text-stone-850 truncate leading-tight">
+                                {meal.name}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
+                                <span className="text-[8px] font-bold text-stone-400 block uppercase tracking-wider">
+                                  {meal.time}
+                                </span>
+                                <span className="text-[8px] text-stone-300 font-bold">•</span>
+                                <span className="text-[8px] font-extrabold text-stone-500 uppercase tracking-wide block">
+                                  P: {meal.protein}g • C: {meal.carbs}g • F: {meal.fats}g
                                 </span>
                               </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteMeal(meal);
-                                }}
-                                className="w-8 h-8 rounded-full bg-stone-100 hover:bg-red-50 hover:text-red-500 border border-stone-200 flex items-center justify-center text-stone-500 cursor-pointer transition-colors"
-                                title="Delete log"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
                             </div>
                           </div>
-
-                          {/* Bottom Content: Name and Macros */}
-                          <div className="absolute bottom-5 left-5 right-5 text-left">
-                            <h4 className="text-stone-900 text-xl sm:text-2xl font-black mb-4 leading-tight tracking-tight">
-                              {meal.name}
-                            </h4>
-
-                            <div className="flex gap-4">
-                              {[
-                                { l: "Protein", v: meal.protein },
-                                { l: "Carbs", v: meal.carbs },
-                                { l: "Fats", v: meal.fats },
-                              ].map((m) => (
-                                <div key={m.l} className="flex items-center gap-1.5">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-stone-300 shadow-3xs" />
-                                  <div className="flex items-baseline gap-1">
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-stone-400">
-                                      {m.l}
-                                    </span>
-                                    <span className="text-sm font-bold text-stone-850">
-                                      {m.v}g
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="text-right mr-1">
+                              <span className="text-xs font-black text-stone-700 block">
+                                +{meal.calories} kcal
+                              </span>
                             </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShareMeal(meal);
+                              }}
+                              className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-orange-50 text-stone-400 hover:text-orange-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40"
+                              title="Share meal"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteMeal(meal);
+                              }}
+                              className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40"
+                              title="Delete log"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </motion.div>
                       );
@@ -2096,9 +2219,19 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
+                                handleShareMeal(meal);
+                              }}
+                              className="w-8 h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-orange-500/80 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
+                              title="Share meal"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 handleDeleteMeal(meal);
                               }}
-                              className="w-8 h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-red-500/80 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
+                              className="w-8 h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-red-550/85 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
                               title="Delete log"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -2138,54 +2271,27 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 )}
               </div>
             </section>
-            {/* Minimal Favorite Recipes Section (Below Today's Consumption) */}
-            {recipes.length > 0 && (
-              <div className="px-6 mt-8 mb-20 relative z-10 space-y-2">
-                <div className="flex justify-between items-center px-1">
-                  <h4 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
-                    Quick Log Favorites
-                  </h4>
-                </div>
-                <div className="grid grid-cols-2 gap-3 w-full">
-                  {recipes.slice(0, 6).map((rec) => (
-                    <motion.button
-                      key={rec.id}
-                      whileHover={{ y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => {
-                        onAddMeal({
-                          name: rec.name,
-                          calories: rec.calories,
-                          protein: rec.protein,
-                          carbs: rec.carbs,
-                          fats: rec.fats,
-                          image: rec.image,
-                          type: "Favorite",
-                        });
-                      }}
-                      className="flex items-center gap-3 px-3 py-2.5 bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-3xs transition-all select-none cursor-pointer text-left w-full"
-                    >
-                      <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow-3xs border border-white">
-                        <img
-                          src={rec.image}
-                          className="w-full h-full object-cover"
-                          alt={rec.name}
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-                      <div className="font-sans flex-1 min-w-0">
-                        <div className="text-[10px] font-black text-stone-850 truncate leading-tight">
-                          {rec.name}
-                        </div>
-                        <div className="text-[9px] font-black text-orange-600 mt-0.5">
-                          {rec.calories} kcal
-                        </div>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
+
+            {/* Daily Wellness Journal Section */}
+            <section className="px-6 mt-10 mb-28 relative z-10">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-orange-500" />
+                  <span>{selectedDate === todayStr ? "Today's Notes" : "Logged Notes"}</span>
+                </h3>
+                {selectedDate && (
+                  <span className="text-[9px] font-bold text-stone-400">
+                    {new Date(selectedDate + "T00:00:00").toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </span>
+                )}
               </div>
-            )}
+              <WellnessJournal
+                selectedDate={selectedDate}
+                dailyNotes={dailyNotes}
+                handleSaveDailyNote={handleSaveDailyNote}
+                todayStr={todayStr}
+              />
+            </section>
           </motion.div>
         )}
         {activeTab === "settings" && (
@@ -2289,12 +2395,23 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                   <span className="px-3 py-1 bg-black/55 backdrop-blur-sm rounded-full text-[9px] font-black uppercase text-orange-400 tracking-wider font-sans">
                     {isEditingRecipe ? "Editing Mode" : "Recipe Dossier"}
                   </span>
-                  <button
-                    onClick={() => setSelectedRecipePopup(null)}
-                    className="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="flex gap-2">
+                    {!isEditingRecipe && selectedRecipePopup.id !== "new" && (
+                      <button
+                        onClick={() => handleShareRecipe(selectedRecipePopup)}
+                        className="w-8 h-8 rounded-full bg-black/60 hover:bg-orange-500/80 text-white flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 cursor-pointer"
+                        title="Share recipe"
+                      >
+                        <Share2 className="w-4 h-4 text-white" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedRecipePopup(null)}
+                      className="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Overlaid Title */}
@@ -2881,6 +2998,15 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                   </div>
                 ) : (
                   <div className="flex gap-2 font-sans">
+                    {selectedRecipePopup.id !== "new" && (
+                      <button
+                        onClick={() => handleDeleteRecipe(selectedRecipePopup.id)}
+                        className="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-650 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 border border-red-100"
+                        title="Delete recipe"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-550" />
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         if (selectedRecipePopup.id === "new") {
@@ -3261,6 +3387,19 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         )}
       </AnimatePresence>
 
+      {/* Visual Share Modal Overlay */}
+      <AnimatePresence>
+        {shareItemPopup && (
+          <ShareModal
+            type={shareItemPopup.type}
+            item={shareItemPopup.item}
+            profileData={profileData}
+            onClose={() => setShareItemPopup(null)}
+            triggerToast={showToast}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Floating ChatGPT Action Widget */}
       <AnimatePresence>
         {profileData.preferences?.includes("show_gpt_widget") && (activeTab === "home" || activeTab === "profile") && (
@@ -3393,5 +3532,101 @@ function NavButton({
         {label}
       </span>
     </button>
+  );
+}
+
+interface WellnessJournalProps {
+  selectedDate: string;
+  dailyNotes: DailyWellness[];
+  handleSaveDailyNote: (dateStr: string, text: string) => Promise<void>;
+  todayStr: string;
+}
+
+function WellnessJournal({
+  selectedDate,
+  dailyNotes,
+  handleSaveDailyNote,
+  todayStr
+}: WellnessJournalProps) {
+  const activeNoteObj = dailyNotes.find(n => n.date === selectedDate);
+  const activeNoteText = activeNoteObj ? activeNoteObj.notes : "";
+
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [draftNote, setDraftNote] = useState(activeNoteText);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const saveTimeoutRef = useRef<number | null>(null);
+
+  // Sync draft when database value or selected date changes
+  useEffect(() => {
+    setDraftNote(activeNoteText);
+  }, [activeNoteText, selectedDate]);
+
+  // Debounced auto-save effect
+  const triggerAutoSave = (newVal: string) => {
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = window.setTimeout(() => {
+      handleSaveDailyNote(selectedDate, newVal);
+    }, 1000);
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setDraftNote(val);
+    triggerAutoSave(val);
+  };
+
+  const handleBlur = () => {
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+    }
+    handleSaveDailyNote(selectedDate, draftNote);
+    setIsEditingNote(false);
+  };
+
+  // Auto focus when entering edit mode
+  useEffect(() => {
+    if (isEditingNote && textareaRef.current) {
+      textareaRef.current.focus();
+      // Move cursor to the end of the text
+      const len = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(len, len);
+    }
+  }, [isEditingNote]);
+
+  const isReadOnly = selectedDate !== todayStr;
+
+  return (
+    <div className="flex flex-col gap-4 text-left w-full relative select-none">
+      {/* Editorial Note Area */}
+      <div className="w-full min-h-[80px] flex flex-col justify-start">
+        {isEditingNote && !isReadOnly ? (
+          <textarea
+            ref={textareaRef}
+            value={draftNote}
+            onChange={handleTextareaChange}
+            onBlur={handleBlur}
+            placeholder="Tap here to write down how you felt, symptoms, water intake, or notes about today..."
+            className="w-full bg-transparent border-0 outline-none ring-0 focus:ring-0 focus:outline-none p-0 text-sm font-semibold text-stone-800 placeholder-stone-400 resize-none min-h-[90px] leading-relaxed transition-all"
+          />
+        ) : (
+          <div
+            onClick={() => {
+              if (!isReadOnly) setIsEditingNote(true);
+            }}
+            className={cn(
+              "text-sm leading-relaxed min-h-[90px] py-0.5 transition-colors duration-200 select-text whitespace-pre-line",
+              !isReadOnly ? "cursor-text" : "cursor-default",
+              activeNoteText
+                ? "font-semibold text-stone-800"
+                : "font-medium text-stone-400 italic"
+            )}
+          >
+            {activeNoteText || (isReadOnly ? "No notes recorded for this date." : "Tap here to write down how you felt, symptoms, water intake, or notes about today...")}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

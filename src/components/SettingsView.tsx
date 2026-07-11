@@ -815,26 +815,7 @@ export const SettingsView = ({
                 )}
               </div>
 
-              <div>
-                <span className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">Your Webhook API key</span>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={profileData.api_key || "No key generated"}
-                    className="flex-1 bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-[9px] font-bold text-stone-605 focus:outline-none cursor-text select-all"
-                  />
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(profileData.api_key);
-                      triggerToast("📋 Copied API Key to clipboard!");
-                    }}
-                    className="bg-stone-900 text-white text-[9px] font-black uppercase tracking-wider px-3 rounded-xl cursor-pointer"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
+              {/* Webhook API key removed from UI for security */}
             </div>
           </div>
         </div>
@@ -886,7 +867,7 @@ export const SettingsView = ({
               </div>
             </div>
 
-            {/* Notion */}
+            {/* Notion Integration commented out for now
             <div
               onClick={() => setActiveSubView("notion")}
               className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group"
@@ -911,6 +892,7 @@ export const SettingsView = ({
                 <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
+            */}
 
             {/* Telegram */}
             <div
@@ -968,39 +950,7 @@ export const SettingsView = ({
             </button>
           </div>
         </div>
-
-        {/* Subscription */}
-        <div>
-          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
-            Subscription
-          </h3>
-          <div className="bg-white rounded-[24px] p-2 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-            <div
-              className="flex justify-between items-center py-3 px-4 hover:bg-[#f5f5f5] rounded-[16px] transition-colors cursor-pointer group"
-              onClick={() => setShowPro(true)}
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-[18px] h-[18px] text-[#4a4a4a] flex items-center justify-center font-bold">
-                  ✨
-                </div>
-                <div>
-                  <div className="font-medium text-[#1a1a1a]">FitAI Free</div>
-                  <div className="text-[11px] text-[#9e9e9e] mt-0.5 font-medium">
-                    Upgrade to Pro for limitless insights
-                  </div>
-                </div>
-              </div>
-              <span className="text-[10px] font-semibold text-white bg-orange-500 px-3 py-1 rounded-full uppercase tracking-wider">
-                Upgrade
-              </span>
-            </div>
-          </div>
-        </div>
-
       </motion.div>
-      <AnimatePresence>
-        {showPro && <ProUpgradeModal onClose={() => setShowPro(false)} />}
-      </AnimatePresence>
     </>
   );
 };

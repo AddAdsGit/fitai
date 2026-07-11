@@ -10,7 +10,15 @@ export interface Meal {
   image: string;
   date: string;
   fiber?: number;
-  notes?: string;
+  meal_description?: string;
+}
+
+export interface DailyWellness {
+  id?: string;
+  profile_id?: string;
+  date: string;
+  notes: string;
+  created_at?: string;
 }
 
 export interface Recipe {

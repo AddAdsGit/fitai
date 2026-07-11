@@ -33,7 +33,7 @@ interface QuickLogItem {
   fats: number;
   image: string;
   type?: string;
-  notes?: string;
+  meal_description?: string;
   fiber?: number;
 }
 
@@ -56,7 +56,7 @@ export const ManualLogModal = ({
   const [carbs, setCarbs] = useState(mealToEdit ? String(mealToEdit.carbs) : "");
   const [fats, setFats] = useState(mealToEdit ? String(mealToEdit.fats) : "");
   const [fiber, setFiber] = useState(mealToEdit && (mealToEdit as any).fiber ? String((mealToEdit as any).fiber) : "");
-  const [notes, setNotes] = useState((mealToEdit as any)?.notes || "");
+  const [mealDescription, setMealDescription] = useState((mealToEdit as any)?.meal_description || "");
   const [time, setTime] = useState(() => {
     if (mealToEdit?.time) return mealToEdit.time;
     const timeOptions: Intl.DateTimeFormatOptions = {
@@ -103,7 +103,7 @@ export const ManualLogModal = ({
             fats: item.fats,
             image: item.image || "",
             type: item.type,
-            notes: (item as any).notes || "",
+            meal_description: (item as any).meal_description || "",
             fiber: (item as any).fiber || 0
           });
         }
@@ -126,7 +126,7 @@ export const ManualLogModal = ({
     const q = searchQuery.toLowerCase();
     return quickLogItems.filter(item => 
       item.name.toLowerCase().includes(q) || 
-      (item.notes || "").toLowerCase().includes(q)
+      (item.meal_description || "").toLowerCase().includes(q)
     );
   }, [quickLogItems, searchQuery]);
 
@@ -357,9 +357,9 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                             <h5 className="text-[11px] font-black text-stone-900 truncate leading-snug">
                               {item.name}
                             </h5>
-                            {item.notes && (
-                              <p className="text-[9px] text-stone-400 font-medium truncate leading-tight mt-0.5" title={item.notes}>
-                                {item.notes}
+                            {item.meal_description && (
+                              <p className="text-[9px] text-stone-400 font-medium truncate leading-tight mt-0.5" title={item.meal_description}>
+                                {item.meal_description}
                               </p>
                             )}
                             <div className="text-[9px] font-bold text-stone-505 mt-1 flex flex-wrap gap-x-1.5 items-center">
@@ -385,7 +385,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                               setCarbs(String(item.carbs));
                               setFats(String(item.fats));
                               setFiber(String((item as any).fiber || 0));
-                              setNotes(item.notes || "");
+                              setMealDescription(item.meal_description || "");
                               setSegment("detailed");
                             }}
                             className="w-8 h-8 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40"
@@ -405,7 +405,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                                 fats: item.fats,
                                 type: item.type || "Meal",
                                 image: item.image,
-                                notes: item.notes || ""
+                                meal_description: item.meal_description || ""
                               });
                               onClose();
                             }}
@@ -443,7 +443,6 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                       ) : (
                         <div className="w-full h-full bg-gradient-to-tr from-orange-500/10 via-amber-500/5 to-stone-100 flex flex-col items-center justify-center p-4">
                           <Camera className="w-6 h-6 text-stone-300" />
-                          <p className="text-[9px] text-stone-400 font-bold mt-1.5 uppercase tracking-wider">No food photo added</p>
                         </div>
                       )}
 
@@ -512,8 +511,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                       </label>
                       <textarea
                         placeholder="E.g. South Indian meals with dal, curd, salad, and Coke..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
+                        value={mealDescription}
+                        onChange={(e) => setMealDescription(e.target.value)}
                         rows={2}
                         className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-orange-400 placeholder-stone-350 resize-none leading-relaxed"
                       />
@@ -699,7 +698,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                         type: mealToEdit?.type || "Manual Log",
                         time: time.trim(),
                         image: imageUrl,
-                        notes: notes.trim()
+                        meal_description: mealDescription.trim()
                       });
                       onClose();
                     }}

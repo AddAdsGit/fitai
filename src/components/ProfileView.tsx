@@ -60,7 +60,7 @@ export const ProfileView = ({
       (meal) =>
         meal.name.toLowerCase().includes(q) ||
         (meal.type || "").toLowerCase().includes(q) ||
-        (meal.notes || "").toLowerCase().includes(q)
+        (meal.meal_description || "").toLowerCase().includes(q)
     );
   }, [mealsState, logSearchQuery]);
 
@@ -845,9 +845,9 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                           </div>
                           <div className="min-w-0">
                             <h5 className="text-[11px] font-black text-stone-900 truncate leading-snug">{meal.name}</h5>
-                            {meal.notes && (
-                              <p className="text-[9px] text-stone-400 font-medium truncate leading-tight mt-0.5" title={meal.notes}>
-                                {meal.notes}
+                            {meal.meal_description && (
+                              <p className="text-[9px] text-stone-400 font-medium truncate leading-tight mt-0.5" title={meal.meal_description}>
+                                {meal.meal_description}
                               </p>
                             )}
                             <div className="text-[8px] text-stone-405 font-bold mt-1">
