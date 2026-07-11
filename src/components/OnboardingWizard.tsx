@@ -109,6 +109,9 @@ export const OnboardingWizard = ({
     fiber: 0,
   });
 
+  const [showAdvancedMacros, setShowAdvancedMacros] = useState(false);
+  const [disclaimerAgreed, setDisclaimerAgreed] = useState(false);
+
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [usernameError, setUsernameError] = useState("");
 
@@ -174,6 +177,9 @@ export const OnboardingWizard = ({
         metrics.targetWeight > 0 &&
         targets.calories > 0
       );
+    }
+    if (step === 4) {
+      return disclaimerAgreed;
     }
     return true;
   };
@@ -535,7 +541,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
     }
   };
 
-  const totalSteps = 3;
+  const totalSteps = 4;
   const progressPercent = (step / totalSteps) * 100;
 
   return (
@@ -892,42 +898,98 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                 </div>
               </div>
 
-              {/* Macros Grid adjustments (No 'g' suffix inside steppers, grams unit in card label headers) */}
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-655 bg-orange-50/15" },
-                  { label: "Carbs (g)", key: "carbs", color: "border-[#90E0EF] text-[#0077B6] bg-[#CAF0F8]/10" },
-                  { label: "Fats (g)", key: "fats", color: "border-yellow-200 text-yellow-600 bg-yellow-50/15" },
-                  { label: "Fiber (g)", key: "fiber", color: "border-emerald-200 text-emerald-700 bg-emerald-50/10" },
-                ].map((m) => (
-                  <div key={m.label} className={`border rounded-2xl p-3 flex flex-col justify-between shadow-2xs ${m.color}`}>
-                    <span className="text-[9px] font-black uppercase tracking-wider opacity-90">{m.label}</span>
-                    <div className="flex items-center justify-between mt-2.5 gap-1 bg-white/95 border border-black/[0.04] rounded-xl px-1.5 py-0.5">
-                      <button
-                        type="button"
-                        onClick={() => handleMacroChange(m.key as any, Math.max(0, targets[m.key as keyof typeof targets] - 5))}
-                        className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <input
-                        type="number"
-                        value={targets[m.key as keyof typeof targets]}
-                        onChange={(e) => handleMacroChange(m.key as any, parseInt(e.target.value) || 0)}
-                        className="flex-1 bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleMacroChange(m.key as any, Math.min(500, targets[m.key as keyof typeof targets] + 5))}
-                        className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
+              {/* Collapsible advanced macro panel toggle */}
+              <button
+                type="button"
+                onClick={() => setShowAdvancedMacros(!showAdvancedMacros)}
+                className="w-full flex items-center justify-between py-3 px-4 bg-stone-100 hover:bg-stone-200/85 rounded-2xl text-stone-700 text-[10px] font-black uppercase tracking-wider border-none cursor-pointer transition-colors shadow-2xs select-none mt-2 active:scale-[0.99]"
+              >
+                <span>{showAdvancedMacros ? "Hide Advanced Macro Splits" : "🔧 Adjust Macro Split (Advanced)"}</span>
+                <span className="text-[10px] font-black">{showAdvancedMacros ? "▲" : "▼"}</span>
+              </button>
+
+              {showAdvancedMacros && (
+                <div className="grid grid-cols-2 gap-3 animate-fadeIn mt-2">
+                  {[
+                    { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-655 bg-orange-50/15" },
+                    { label: "Carbs (g)", key: "carbs", color: "border-[#90E0EF] text-[#0077B6] bg-[#CAF0F8]/10" },
+                    { label: "Fats (g)", key: "fats", color: "border-yellow-200 text-yellow-600 bg-yellow-50/15" },
+                    { label: "Fiber (g)", key: "fiber", color: "border-emerald-200 text-emerald-700 bg-emerald-50/10" },
+                  ].map((m) => (
+                    <div key={m.label} className={`border rounded-2xl p-3 flex flex-col justify-between shadow-2xs ${m.color}`}>
+                      <span className="text-[9px] font-black uppercase tracking-wider opacity-90">{m.label}</span>
+                      <div className="flex items-center justify-between mt-2.5 gap-1 bg-white/95 border border-black/[0.04] rounded-xl px-1.5 py-0.5">
+                        <button
+                          type="button"
+                          onClick={() => handleMacroChange(m.key as any, Math.max(0, targets[m.key as keyof typeof targets] - 5))}
+                          className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <input
+                          type="number"
+                          value={targets[m.key as keyof typeof targets]}
+                          onChange={(e) => handleMacroChange(m.key as any, parseInt(e.target.value) || 0)}
+                          className="flex-1 bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleMacroChange(m.key as any, Math.min(500, targets[m.key as keyof typeof targets] + 5))}
+                          className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
+        )}
+        {/* STEP 4: MEDICAL DISCLAIMER & TERMS */}
+        {step === 4 && (
+          <div className="space-y-4 animate-fadeIn">
+            <div className="text-center space-y-1">
+              <h2 className="text-xl font-black tracking-tight text-stone-900">
+                Medical Disclaimer
+              </h2>
+              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
+                Please review and approve before starting.
+              </p>
+            </div>
+
+            {/* Scrollable Terms box */}
+            <div className="bg-white rounded-2xl p-4.5 border border-stone-200/50 shadow-2xs max-h-[36vh] overflow-y-auto space-y-3 scrollbar-thin">
+              <h4 className="text-[10px] font-black text-stone-850 uppercase tracking-wide">
+                FitAI Terms of Service & Health Waiver
+              </h4>
+              <p className="text-[9px] text-stone-500 font-bold leading-normal">
+                FitAI is a personalized nutritional assistant powered by Artificial Intelligence (Google Gemini & OpenAI ChatGPT). By proceeding, you acknowledge that FitAI does not provide medical, diagnostic, or clinical advice, nor does it create a doctor-patient relationship.
+              </p>
+              <p className="text-[9px] text-stone-500 font-bold leading-normal">
+                Any estimations for calorie budgets, weight tracking goals, and nutritional limits are calculated using baseline formulas (like Mifflin-St Jeor) and are intended for general educational and wellness purposes only.
+              </p>
+              <p className="text-[9px] text-stone-500 font-bold leading-normal">
+                Always consult a licensed healthcare professional, medical doctor, or registered dietitian before starting any new dietary protocols or exercise routines.
+              </p>
+              <p className="text-[9px] text-stone-500 font-bold leading-normal">
+                Under no circumstances shall FitAI, its creators, or its affiliates be liable for any health complications or damages arising from the use of this software.
+              </p>
+            </div>
+
+            {/* Checkbox agreement */}
+            <label className="flex items-start gap-3 bg-stone-50 border border-stone-200/80 rounded-2xl p-4 cursor-pointer select-none active:scale-[0.99] transition-transform">
+              <input
+                type="checkbox"
+                checked={disclaimerAgreed}
+                onChange={(e) => setDisclaimerAgreed(e.target.checked)}
+                className="w-4.5 h-4.5 rounded text-orange-500 focus:ring-orange-200 cursor-pointer border-stone-300 mt-0.5"
+              />
+              <span className="text-[10px] text-stone-600 font-bold leading-relaxed">
+                I read, understand, and agree to the Medical Disclaimer & Terms of Service.
+              </span>
+            </label>
           </div>
         )}
 
