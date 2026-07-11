@@ -952,30 +952,39 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
           <div className="space-y-4 animate-fadeIn">
             <div className="text-center space-y-1">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Medical Disclaimer
+                Terms & Agreement
               </h2>
               <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
-                Please review and approve before starting.
+                Please accept the terms to initialize tracking.
               </p>
             </div>
 
             {/* Scrollable Terms box */}
-            <div className="bg-white rounded-2xl p-4.5 border border-stone-200/50 shadow-2xs max-h-[36vh] overflow-y-auto space-y-3 scrollbar-thin">
+            <div className="bg-white rounded-2xl p-4.5 border border-stone-200/50 shadow-2xs max-h-[36vh] overflow-y-auto space-y-3.5 scrollbar-thin text-left">
               <h4 className="text-[10px] font-black text-stone-850 uppercase tracking-wide">
-                FitAI Terms of Service & Health Waiver
+                FitAI Terms of Service & Privacy Policy
               </h4>
-              <p className="text-[9px] text-stone-500 font-bold leading-normal">
-                FitAI is a personalized nutritional assistant powered by Artificial Intelligence (Google Gemini & OpenAI ChatGPT). By proceeding, you acknowledge that FitAI does not provide medical, diagnostic, or clinical advice, nor does it create a doctor-patient relationship.
-              </p>
-              <p className="text-[9px] text-stone-500 font-bold leading-normal">
-                Any estimations for calorie budgets, weight tracking goals, and nutritional limits are calculated using baseline formulas (like Mifflin-St Jeor) and are intended for general educational and wellness purposes only.
-              </p>
-              <p className="text-[9px] text-stone-500 font-bold leading-normal">
-                Always consult a licensed healthcare professional, medical doctor, or registered dietitian before starting any new dietary protocols or exercise routines.
-              </p>
-              <p className="text-[9px] text-stone-500 font-bold leading-normal">
-                Under no circumstances shall FitAI, its creators, or its affiliates be liable for any health complications or damages arising from the use of this software.
-              </p>
+              <div className="space-y-2 text-[8px] text-stone-450 font-bold leading-normal">
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 1: Acceptance of Terms</p>
+                <p>
+                  By checking the agreement box and continuing, you agree to comply with and be bound by the FitAI Terms of Service. If you do not agree, you are not authorized to use the application.
+                </p>
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 2: Health & Nutritional Advice Disclaimer</p>
+                <p>
+                  FitAI provides dietary calculations, AI meal logging services, and conversational nutrition responses. These materials are generated automatically by third-party artificial intelligence engines (OpenAI & Google Gemini) and are designed strictly for educational and self-monitoring purposes.
+                </p>
+                <p>
+                  FITAI IS NOT A LICENSED MEDICAL HEALTHCARE PROVIDER. The calculations, suggestions, and responses are not diagnostic tools or medical protocols. You should consult a medical doctor or qualified health specialist before adopting any suggestions.
+                </p>
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 3: Third-Party Integrations</p>
+                <p>
+                  You agree that details, including food logs, bio-metrics, and memories, may be shared with third-party platforms (Notion, Telegram, OpenAI ChatGPT, Google) to enable live widget sync and automation services. Refer to individual terms of those platforms.
+                </p>
+                <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">Section 4: Limitation of Liability</p>
+                <p>
+                  Under no legal theory (contract, tort, or otherwise) shall FitAI or its developers be liable to you or any third party for any direct, indirect, incidental, special, or consequential damages resulting from the use or inability to use this software.
+                </p>
+              </div>
             </div>
 
             {/* Checkbox agreement */}
@@ -986,8 +995,8 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
                 onChange={(e) => setDisclaimerAgreed(e.target.checked)}
                 className="w-4.5 h-4.5 rounded text-orange-500 focus:ring-orange-200 cursor-pointer border-stone-300 mt-0.5"
               />
-              <span className="text-[10px] text-stone-600 font-bold leading-relaxed">
-                I read, understand, and agree to the Medical Disclaimer & Terms of Service.
+              <span className="text-[10px] text-stone-600 font-bold leading-relaxed text-left">
+                I read, understand, and agree to the FitAI Terms of Service and Privacy Policy.
               </span>
             </label>
           </div>
