@@ -44,6 +44,7 @@ export const ManualLogModal = ({
   onNavigateToSettings,
   mealsState = [],
   initialAiMode,
+  profileData,
 }: {
   onClose: () => void;
   onAddMeal: (meal: any) => void;
@@ -51,6 +52,7 @@ export const ManualLogModal = ({
   onNavigateToSettings: () => void;
   mealsState?: Meal[];
   initialAiMode?: boolean;
+  profileData?: any;
 }) => {
   const [name, setName] = useState(mealToEdit?.name || "");
   const [calories, setCalories] = useState(mealToEdit ? String(mealToEdit.calories) : "");
@@ -82,12 +84,25 @@ export const ManualLogModal = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAiMode, setShowAiMode] = useState(initialAiMode || false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
 
-  const hasImage = imageUrl && !hasNoGeneratedImage(imageUrl);
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setUploadedImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const hasImage = (imageUrl && !hasNoGeneratedImage(imageUrl)) || !!uploadedImage;
   // True if the user has entered any macro/name data (determines Write vs Edit label)
   const hasAnyValues = !!(name.trim() || calories || protein || carbs || fats);
 
-  const hasGeminiKey = true;
+  const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+  const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
+  const hasGeminiKey = !!preferenceGeminiKey;
 
   const quickLogItems = useMemo(() => {
     const itemsMap = new Map<string, QuickLogItem>();
@@ -134,17 +149,76 @@ export const ManualLogModal = ({
   }, [quickLogItems, searchQuery]);
 
   const handleRefineWithAi = async () => {
-    if (!aiInstruction.trim()) return;
+    if (!aiInstruction.trim() && !uploadedImage) return;
 
-    const key = localStorage.getItem("fitai_gemini_api_key") ||
+    const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+    const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
+    const key = preferenceGeminiKey ||
+                localStorage.getItem("fitai_gemini_api_key") ||
                 (import.meta as any).env.VITE_GEMINI_API_KEY ||
                 "";
 
     setIsProcessing(true);
     setErrorMessage("");
     try {
-      const prompt = hasAnyValues
-        ? `You are a nutrition calculator. You are modifying a meal log based on an instruction.
+      let rawText = "";
+      
+      if (uploadedImage) {
+        if (!key) {
+          throw new Error("Gemini API key is required for plate scanning. Please configure it in Settings.");
+        }
+        
+        // Extract base64 components
+        const commaIndex = uploadedImage.indexOf(",");
+        const mimeType = uploadedImage.substring(5, uploadedImage.indexOf(";base64"));
+        const base64Data = uploadedImage.substring(commaIndex + 1);
+        
+        const imagePrompt = `Analyze the food plate shown in this image. Estimate the meal name, calorie count, protein, carbs, fats, fiber, and description. 
+User description/notes if any: "${aiInstruction || "estimate this food plate"}"
+Return a clean, valid JSON object containing these details, with no markdown, backticks, or other text:
+{
+  "name": "Clean meal name",
+  "calories": estimated_calories,
+  "protein": estimated_protein_grams,
+  "carbs": estimated_carbs_grams,
+  "fats": estimated_fats_grams,
+  "fiber": estimated_fiber_grams,
+  "description": "Brief description of servings and sides observed."
+}`;
+        
+        // Use gemini-2.5-flash for multimodal image analysis
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: imagePrompt },
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: base64Data
+                    }
+                  }
+                ]
+              }
+            ]
+          })
+        });
+        
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP ${response.status} Error`);
+        }
+        
+        const data = await response.json();
+        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        setImageUrl(uploadedImage); // Save the actual photo!
+      } else {
+        // Standard text analysis flow
+        const prompt = hasAnyValues
+          ? `You are a nutrition calculator. You are modifying a meal log based on an instruction.
 Base meal:
 - Name: "${name || "Meal"}"
 - Calories: ${calories || 0} kcal
@@ -167,7 +241,7 @@ Return a JSON object containing the updated values:
   "description": "updated description of the portion or extra toppings/side items"
 }
 Do not return any markdown formatting, backticks, or "json" prefix. Just return the raw JSON string itself.`
-        : `You are a nutrition estimator. Estimate the nutritional content of this meal description.
+          : `You are a nutrition estimator. Estimate the nutritional content of this meal description.
 Meal description: "${aiInstruction}"
 
 Return a JSON object with estimated nutritional values:
@@ -182,60 +256,56 @@ Return a JSON object with estimated nutritional values:
 }
 Do not return any markdown formatting, backticks, or "json" prefix. Just return the raw JSON string itself.`;
 
-      let response = null;
-      let lastError = "";
-      let rawText = "";
-
-      let edgeSuccess = false;
-
-      if (isSupabaseConfigured) {
-        try {
-          const { data, error } = await supabase.functions.invoke("gemini", {
-            body: { prompt }
-          });
-          if (!error && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            rawText = data.candidates[0].content.parts[0].text;
-            edgeSuccess = true;
-          }
-        } catch (e) {
-          console.warn("Edge Function invoke error, falling back to direct API:", e);
-        }
-      }
-
-      if (!edgeSuccess) {
-        let response = null;
-        let lastError = "";
-
-        for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
+        let edgeSuccess = false;
+        if (isSupabaseConfigured) {
           try {
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-              })
+            const { data, error } = await supabase.functions.invoke("gemini", {
+              body: { prompt }
             });
-
-            if (response.ok) {
-              lastError = "";
-              break;
-            } else {
-              const errData = await response.json().catch(() => ({}));
-              lastError = errData.error?.message || `HTTP ${response.status} Error`;
+            if (!error && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+              rawText = data.candidates[0].content.parts[0].text;
+              edgeSuccess = true;
             }
-          } catch (err: any) {
-            lastError = err.message || "Connection failed";
+          } catch (e) {
+            console.warn("Edge Function invoke error, falling back to direct API:", e);
           }
         }
 
-        if (!response || !response.ok) {
-          throw new Error(lastError || "Failed to contact Gemini API");
-        }
+        if (!edgeSuccess) {
+          let response = null;
+          let lastError = "";
 
-        const data = await response.json();
-        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
+            try {
+              response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }]
+                })
+              });
+
+              if (response.ok) {
+                lastError = "";
+                break;
+              } else {
+                const errData = await response.json().catch(() => ({}));
+                lastError = errData.error?.message || `HTTP ${response.status} Error`;
+              }
+            } catch (err: any) {
+              lastError = err.message || "Connection failed";
+            }
+          }
+
+          if (!response || !response.ok) {
+            throw new Error(lastError || "Failed to contact Gemini API");
+          }
+
+          const data = await response.json();
+          rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        }
       }
 
       let cleaned = rawText.trim();
@@ -633,18 +703,76 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                         ⚠️ {errorMessage}
                       </div>
                     )}
-                    <textarea
+                     <textarea
                       placeholder={hasAnyValues
                         ? `Describe changes... e.g. "double the portion", "swap rice for quinoa", "add 1 egg"`
                         : `Describe your meal... e.g. "200g grilled chicken with steamed broccoli and brown rice"`}
                       value={aiInstruction}
                       onChange={(e) => setAiInstruction(e.target.value)}
-                      rows={6}
+                      rows={4}
                       autoFocus
                       className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-4 py-3.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-orange-400 placeholder-stone-350 resize-none leading-relaxed"
                     />
+
+                    {/* Multimodal Camera Scan Controls */}
+                    {hasGeminiKey ? (
+                      <div className="flex flex-col gap-3 py-1 text-left">
+                        <div className="flex gap-2">
+                          <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-stone-50 border border-stone-200 hover:bg-stone-100/70 rounded-xl text-[10px] font-black uppercase text-stone-600 cursor-pointer transition-all select-none active:scale-[0.98]">
+                            <Camera className="w-3.5 h-3.5 text-stone-500" />
+                            <span>Scan Plate</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={handleImageFileChange}
+                              className="hidden"
+                            />
+                          </label>
+                          <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-stone-50 border border-stone-200 hover:bg-stone-100/70 rounded-xl text-[10px] font-black uppercase text-stone-600 cursor-pointer transition-all select-none active:scale-[0.98]">
+                            <svg className="w-3.5 h-3.5 text-stone-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                              <circle cx="8.5" cy="8.5" r="1.5"/>
+                              <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                            <span>Upload Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageFileChange}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                        {uploadedImage && (
+                          <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-stone-200 shadow-2xs group shrink-0">
+                            <img src={uploadedImage} className="w-full h-full object-cover" alt="Preview" />
+                            <button
+                              type="button"
+                              onClick={() => setUploadedImage(null)}
+                              className="absolute top-1 right-1 w-4 h-4 bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] hover:bg-black font-sans font-bold"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        onClick={onNavigateToSettings}
+                        className="border border-dashed border-stone-200 rounded-xl p-3 text-center cursor-pointer hover:bg-stone-50/50 transition-all select-none group text-left"
+                      >
+                        <span className="text-[10px] font-black text-stone-400 group-hover:text-orange-500 transition-colors uppercase tracking-wider block">
+                          🔒 Unlock Real-Time Camera Scanning
+                        </span>
+                        <span className="text-[8.5px] font-bold text-stone-300 group-hover:text-stone-450 transition-colors block mt-0.5 leading-none">
+                          Link your free Gemini key in Settings to scan plates
+                        </span>
+                      </div>
+                    )}
+
                     <p className="text-[9px] text-stone-400 font-medium leading-relaxed">
-                      AI will {hasAnyValues ? "recalculate macros based on your changes" : "estimate calories and macros from your description"}.
+                      AI will {hasAnyValues ? "recalculate macros based on your changes" : "estimate calories and macros from your description or photo"}.
                     </p>
                   </motion.div>
                 )}
@@ -676,7 +804,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                   <button
                     type="button"
                     onClick={handleRefineWithAi}
-                    disabled={!aiInstruction.trim() || isProcessing}
+                    disabled={(!aiInstruction.trim() && !uploadedImage) || isProcessing}
                     className="flex-1 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 disabled:opacity-40 text-white text-xs py-3 rounded-2xl font-black uppercase tracking-widest text-center shadow-md shadow-orange-500/10 active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center select-none"
                   >
                     {isProcessing ? "Calculating..." : "Generate"}

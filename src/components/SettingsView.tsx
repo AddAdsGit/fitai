@@ -391,8 +391,33 @@ export const SettingsView = ({
           <h2 className="text-xl font-black text-[#1a1a1a]">Google Gemini API</h2>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-[20px] p-4 text-xs font-bold text-amber-800 leading-relaxed">
-          💡 FitAI can use Google AI Studio's <strong>Gemini 2.5 Flash Image (Nano Banana)</strong> model via your own free tier API key. The free rate limits (15 requests/minute) are more than enough for logging.
+        <div className="bg-orange-50/50 border border-orange-100 rounded-[24px] p-5 space-y-3.5 text-left">
+          <span className="text-[10px] font-black uppercase text-orange-600 tracking-wider">
+            Premium Features Unlocked with your API Key:
+          </span>
+          <ul className="space-y-2.5 text-xs font-semibold text-stone-700">
+            <li className="flex items-start gap-2">
+              <span className="text-orange-500">📷</span>
+              <div>
+                <strong className="text-stone-900 block text-[11px] font-black leading-none mb-1">Ultra-Realistic Food Photos</strong>
+                Generates high-definition, photorealistic culinary photography for your daily logs.
+              </div>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-orange-500">🧠</span>
+              <div>
+                <strong className="text-stone-900 block text-[11px] font-black leading-none mb-1">Peak Reasoning Engine</strong>
+                Unlocks Google's flagship reasoning models for highly precise nutritional analyses and macro calculations.
+              </div>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-orange-500">🔍</span>
+              <div>
+                <strong className="text-stone-900 block text-[11px] font-black leading-none mb-1">In-App Camera & Scan</strong>
+                Unlocks the ability to upload or capture photos of your real food plates to log macros instantly!
+              </div>
+            </li>
+          </ul>
         </div>
 
         <div className="space-y-4">
@@ -407,7 +432,7 @@ export const SettingsView = ({
               onChange={(e) => setGeminiKey(e.target.value)}
               className="w-full bg-white border border-stone-200 rounded-[18px] px-4 py-3.5 text-xs font-bold text-[#1a1a1a] shadow-xs outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 transition-all placeholder:text-stone-300"
             />
-            <p className="text-[9px] text-[#9e9e9e] font-semibold leading-relaxed mt-2.5">
+            <p className="text-[9px] text-[#9e9e9e] font-semibold leading-relaxed mt-2.5 font-sans">
               Get your free key in 30 seconds from{" "}
               <a
                 href="https://aistudio.google.com/"
@@ -419,10 +444,7 @@ export const SettingsView = ({
               </a>.
             </p>
           </div>
-
-          <div className="bg-stone-50 border border-stone-150 rounded-[20px] p-4 text-[10px] text-stone-600 leading-relaxed">
-            ℹ️ If left empty, FitAI automatically falls back to our free built-in <strong>Pollinations.ai (FLUX)</strong> generator as a zero-setup backup.
-          </div>
+        </div>
 
           <button
             onClick={handleSaveGemini}
@@ -430,8 +452,7 @@ export const SettingsView = ({
           >
             Save Connection Settings
           </button>
-        </div>
-      </motion.div>
+        </motion.div>
     );
   }
 

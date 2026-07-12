@@ -3808,6 +3808,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             onNavigateToSettings={() => setActiveTab("profile")}
             mealsState={mealsState}
             initialAiMode={manualLogInitialAiMode}
+            profileData={profileData}
           />
         )}
       </AnimatePresence>
