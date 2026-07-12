@@ -1131,7 +1131,10 @@ export default function App() {
       return;
     }
     
-    const key = localStorage.getItem("fitai_gemini_api_key") || 
+    const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+    const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
+    const key = preferenceGeminiKey ||
+                localStorage.getItem("fitai_gemini_api_key") || 
                 (import.meta as any).env.VITE_GEMINI_API_KEY ||
                 "";
 
@@ -1249,7 +1252,10 @@ Do not include any extra text, markdown styling, backticks, or "json" prefix. Ju
 
   const handleGenerateAiRecipe = async () => {
     // 1. Check if Gemini key is available
-    const key = localStorage.getItem("fitai_gemini_api_key") || 
+    const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+    const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
+    const key = preferenceGeminiKey ||
+                localStorage.getItem("fitai_gemini_api_key") || 
                 (import.meta as any).env.VITE_GEMINI_API_KEY ||
                 "";
 
