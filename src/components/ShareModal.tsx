@@ -416,7 +416,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       } else if (currentTemplate === "cream") {
         // ================= TEMPLATE 2: CREAM LIGHT (MENU CARD SOLID) =================
         ctx.fillStyle = "#FAF9F6";
-        ctx.fillRect(0, 0, 1080, 1080);
+        ctx.fillRect(0, 0, 1080, canvas.height);
 
         // Logo Left
         ctx.fillStyle = accentColor;
@@ -535,16 +535,16 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       } else if (currentTemplate === "emerald") {
         // ================= TEMPLATE 3: EMERALD SOLID GREEN (NUTRITION FOCUS) =================
         ctx.fillStyle = "#064E3B";
-        ctx.fillRect(0, 0, 1080, 1080);
+        ctx.fillRect(0, 0, 1080, canvas.height);
 
         if (loadedImg && !isDay) {
           ctx.save();
           ctx.beginPath();
-          ctx.rect(0, 0, 480, 1080);
+          ctx.rect(0, 0, 480, canvas.height);
           ctx.clip();
-          const scale = Math.max(480 / loadedImg.width, 1080 / loadedImg.height);
+          const scale = Math.max(480 / loadedImg.width, canvas.height / loadedImg.height);
           const xOffset = 240 - (loadedImg.width * scale) / 2;
-          const yOffset = 540 - (loadedImg.height * scale) / 2;
+          const yOffset = (canvas.height / 2) - (loadedImg.height * scale) / 2;
           ctx.drawImage(loadedImg, xOffset, yOffset, loadedImg.width * scale, loadedImg.height * scale);
           ctx.restore();
 
@@ -552,7 +552,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.moveTo(480, 0);
-          ctx.lineTo(480, 1080);
+          ctx.lineTo(480, canvas.height);
           ctx.stroke();
         }
 
@@ -649,18 +649,21 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       } else if (currentTemplate === "sunset") {
         // ================= TEMPLATE 4: SUNSET GLOW (GRADIENT + PHOTO OVERLAY) =================
         if (loadedImg && !isDay) {
-          ctx.drawImage(loadedImg, 0, 0, 1080, 1080);
-          const sunsetGradOverlay = ctx.createLinearGradient(0, 0, 1080, 1080);
+          const scale = Math.max(1080 / loadedImg.width, canvas.height / loadedImg.height);
+          const xOffset = 540 - (loadedImg.width * scale) / 2;
+          const yOffset = (canvas.height / 2) - (loadedImg.height * scale) / 2;
+          ctx.drawImage(loadedImg, xOffset, yOffset, loadedImg.width * scale, loadedImg.height * scale);
+          const sunsetGradOverlay = ctx.createLinearGradient(0, 0, 0, canvas.height);
           sunsetGradOverlay.addColorStop(0, "rgba(255, 78, 80, 0.45)");
           sunsetGradOverlay.addColorStop(1, "rgba(249, 212, 35, 0.45)");
           ctx.fillStyle = sunsetGradOverlay;
-          ctx.fillRect(0, 0, 1080, 1080);
+          ctx.fillRect(0, 0, 1080, canvas.height);
         } else {
-          const grad = ctx.createLinearGradient(0, 0, 1080, 1080);
+          const grad = ctx.createLinearGradient(0, 0, 1080, canvas.height);
           grad.addColorStop(0, "#FF4E50");
           grad.addColorStop(1, "#F9D423");
           ctx.fillStyle = grad;
-          ctx.fillRect(0, 0, 1080, 1080);
+          ctx.fillRect(0, 0, 1080, canvas.height);
         }
 
         // Logo Left
