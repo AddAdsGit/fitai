@@ -95,19 +95,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       if (!isSupabaseConfigured) return;
       setLoadingUrl(true);
       try {
-        const { data: existing } = await supabase
-          .from("shares")
-          .select("id")
-          .eq("type", type)
-          .eq("data", payload)
-          .limit(1)
-          .maybeSingle();
-
-        if (existing) {
-          setShortUrl(generateShareUrl(type, payload, existing.id));
-          return;
-        }
-
         const { data: inserted } = await supabase
           .from("shares")
           .insert({ type, data: payload })
@@ -123,8 +110,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         setLoadingUrl(false);
       }
     }
+
     getOrCreateShortLink();
-  }, [type, name]);
+  }, [type, payload]);
 
   const finalLink = shortUrl || generateShareUrl(type, payload);
 
@@ -822,9 +810,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const handleNativeShare = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    try {
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      try {
         const file = new File([blob], `${name.replace(/\s+/g, "_").toLowerCase()}_card.png`, { type: "image/png" });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -841,10 +829,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             url: finalLink,
           });
         }
-      });
-    } catch (err) {
-      handleCopyLink();
-    }
+      } catch (err) {
+        // Suppress dialog cancellation abort error
+        if (err instanceof Error && err.name !== "AbortError") {
+          handleCopyLink();
+        }
+      }
+    });
   };
 
   const hasImage = !!payload.img;
