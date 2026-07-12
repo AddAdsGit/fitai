@@ -456,7 +456,11 @@ export default function App() {
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [authLoading, setAuthLoading] = useState(false);
 
+  const isAuthenticatingRef = useRef(false);
+
   const handleUserAuthenticated = async (user: any) => {
+    if (isAuthenticatingRef.current) return;
+    isAuthenticatingRef.current = true;
     try {
       const { data: existing, error } = await supabase
         .from('profiles')
@@ -474,14 +478,26 @@ export default function App() {
         localStorage.setItem("fitai_active_profile_id", existing.id);
       } else {
         const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
-        const username = user.email ? user.email.split('@')[0] : "user_" + Math.random().toString(36).substring(7);
+        const baseUsername = user.email ? user.email.split('@')[0] : "user_" + Math.random().toString(36).substring(7);
         
-        const googleName = user.user_metadata?.full_name || username;
+        // Ensure username uniqueness
+        let resolvedUsername = baseUsername;
+        const { data: dupCheck } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', baseUsername)
+          .maybeSingle();
+
+        if (dupCheck) {
+          resolvedUsername = `${baseUsername}_${Math.random().toString(36).substring(7)}`;
+        }
+
+        const googleName = user.user_metadata?.full_name || resolvedUsername;
         const googleAvatar = user.user_metadata?.avatar_url || null;
 
         const newProfile = {
           id: user.id,
-          username,
+          username: resolvedUsername,
           display_name: googleName,
           image_url: googleAvatar,
           height: 175,
@@ -507,11 +523,13 @@ export default function App() {
         } else {
           setActiveProfileId(user.id);
           localStorage.setItem("fitai_active_profile_id", user.id);
-          showToast(`✨ Profile created for @${username}!`);
+          showToast(`✨ Profile created for @${resolvedUsername}!`);
         }
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      isAuthenticatingRef.current = false;
     }
   };
 
@@ -590,60 +608,51 @@ export default function App() {
     const username = loginUsername.toLowerCase().trim();
     if (!username) return;
     
+    setAuthLoading(true);
     try {
-      const { data: existing, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('username', username)
-        .maybeSingle();
+      const email = `${username}@fitpush.app`;
+      const password = `BypassPassword123!`;
 
-      if (error) {
-        console.error("Error looking up profile:", error);
-        showToast("❌ Database connection error");
+      // 1. Try to sign in
+      let { data, error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      // 2. If user doesn't exist, sign up
+      if (signInErr) {
+        const { error: signUpErr } = await supabase.auth.signUp({
+          email,
+          password
+        });
+        if (signUpErr) {
+          console.error("Bypass sign up error:", signUpErr);
+          showToast(`❌ Failed to bypass: ${signUpErr.message}`);
+          setAuthLoading(false);
+          return;
+        }
+        // Sign in after sign up
+        const res = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        data = res.data;
+        signInErr = res.error;
+      }
+
+      if (signInErr || !data.session?.user) {
+        console.error("Bypass sign in error:", signInErr);
+        showToast("❌ Failed to bypass auth");
+        setAuthLoading(false);
         return;
       }
 
-      if (existing) {
-        setActiveProfileId(existing.id);
-        localStorage.setItem("fitai_active_profile_id", existing.id);
-        showToast(`✨ Welcome back, @${username}!`);
-      } else {
-        const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
-        const newProfile = {
-          username,
-          display_name: username.charAt(0).toUpperCase() + username.slice(1),
-          height: 175,
-          weight: 70,
-          dob: "1998-05-15",
-          gender: "Male",
-          preferences: [],
-          daily_calories_goal: 2000,
-          weight_goal: 70.0,
-          protein_goal: 150,
-          carbs_goal: 150,
-          fats_goal: 60,
-          fiber_goal: 30,
-          api_key: newKey
-        };
-
-        const { data: created, error: createErr } = await supabase
-          .from('profiles')
-          .insert(newProfile)
-          .select('id')
-          .single();
-
-        if (createErr) {
-          console.error("Error creating new profile:", createErr);
-          showToast("❌ Failed to create profile");
-        } else if (created) {
-          setActiveProfileId(created.id);
-          localStorage.setItem("fitai_active_profile_id", created.id);
-          showToast(`✨ Created isolated profile for @${username}!`);
-        }
-      }
-    } catch (err) {
+      showToast(`✨ Authenticated bypass for @${username}!`);
+    } catch (err: any) {
       console.error(err);
-      showToast("❌ Unexpected error occurred");
+      showToast("❌ Unexpected error during bypass");
+    } finally {
+      setAuthLoading(false);
     }
   };
 
