@@ -2799,7 +2799,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 {/* Header buttons */}
                 <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
                   <span className="px-3 py-1 bg-black/55 backdrop-blur-sm rounded-full text-[9px] font-black uppercase text-orange-400 tracking-wider font-sans">
-                    {isEditingRecipe ? "Editing Mode" : "Recipe Dossier"}
+                    {isEditingRecipe 
+                      ? "Editing Mode" 
+                      : (selectedRecipePopup.id === "new" || selectedRecipePopup.id?.toString().startsWith("new-ai-") 
+                          ? "New Recipe" 
+                          : `Logged ${selectedRecipePopup.log_count || 0} time${(selectedRecipePopup.log_count || 0) === 1 ? "" : "s"}`)}
                   </span>
                   <div className="flex gap-2">
                     {!isEditingRecipe && selectedRecipePopup.id !== "new" && (
@@ -2837,12 +2841,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                   </h3>
                   <p className="text-[10px] text-white/70 font-bold font-sans mt-0.5 flex items-center gap-1.5 flex-wrap">
                     <span>⏱️ Prep time: {isEditingRecipe ? editPopupTime : selectedRecipePopup.time}</span>
-                    {!isEditingRecipe && (
-                      <>
-                        <span>•</span>
-                        <span className="bg-white/10 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">🔥 Logged {selectedRecipePopup.log_count || 0} times</span>
-                      </>
-                    )}
                   </p>
                 </div>
               </div>
