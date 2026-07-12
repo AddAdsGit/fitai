@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { X, Copy, Download, Share2, Flame, Check, ChevronLeft, ChevronRight, Utensils } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { SharedItemPayload, generateShareUrl } from "../utils/shareUtils";
+import { SharedItemPayload, generateShareUrl, compressMeal, compressRecipe } from "../utils/shareUtils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { cn } from "../lib/utils";
 
 interface ShareModalProps {
   type: "meal" | "recipe" | "day";
@@ -26,6 +27,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [cardFormat, setCardFormat] = useState<"square" | "portrait" | "story">("square");
+  const [previewTab, setPreviewTab] = useState<"card" | "webpage">("card");
   
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentTemplate = templates[currentIndex];
@@ -58,18 +61,23 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const ingredients = isDay ? [] : item.ingredients || [];
   const mealsList = isDay ? item.meals || [] : [];
 
-  const payload: SharedItemPayload = {
-    n: name,
-    c: calories,
-    p: protein,
-    cb: carbs,
-    f: fats,
-    fb: fiber,
-    t: time || undefined,
-    img: image || undefined,
-    ing: isRecipe ? ingredients : undefined,
-    mls: isDay ? mealsList.map((m: any) => ({ n: m.name, c: m.calories })) : undefined,
-  };
+  const payload: SharedItemPayload = useMemo(() => {
+    if (type === "recipe") {
+      return compressRecipe(item);
+    } else if (type === "meal") {
+      return compressMeal(item);
+    } else {
+      return {
+        n: name,
+        c: calories,
+        p: protein,
+        cb: carbs,
+        f: fats,
+        fb: fiber,
+        mls: mealsList.map((m: any) => ({ n: m.name, c: m.calories }))
+      };
+    }
+  }, [type, item, name, calories, protein, carbs, fats, fiber, mealsList]);
 
   useEffect(() => {
     async function getOrCreateShortLink() {
@@ -117,7 +125,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     if (!ctx) return;
 
     canvas.width = 1080;
-    canvas.height = 1080;
+    if (cardFormat === "story") {
+      canvas.height = 1920;
+    } else if (cardFormat === "portrait") {
+      canvas.height = 1440;
+    } else {
+      canvas.height = 1080;
+    }
 
     const accentColor = "#F97316";
 
@@ -145,7 +159,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     };
 
     const runTemplateDraw = (loadedImg: HTMLImageElement | null) => {
-      ctx.clearRect(0, 0, 1080, 1080);
+      ctx.clearRect(0, 0, 1080, canvas.height);
       
       const isDark = currentTemplate === "obsidian";
       const isSunset = currentTemplate === "sunset";
@@ -156,16 +170,19 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       if (currentTemplate === "obsidian") {
         // ================= TEMPLATE 1: OBSIDIAN DARK (PHOTO OR DARK SOLID) =================
         if (loadedImg) {
-          ctx.drawImage(loadedImg, 0, 0, 1080, 1080);
-          const overlay = ctx.createLinearGradient(0, 0, 0, 1080);
+          const scale = Math.max(1080 / loadedImg.width, canvas.height / loadedImg.height);
+          const xOffset = 540 - (loadedImg.width * scale) / 2;
+          const yOffset = (canvas.height / 2) - (loadedImg.height * scale) / 2;
+          ctx.drawImage(loadedImg, xOffset, yOffset, loadedImg.width * scale, loadedImg.height * scale);
+          const overlay = ctx.createLinearGradient(0, 0, 0, canvas.height);
           overlay.addColorStop(0, "rgba(0,0,0,0.3)");
           overlay.addColorStop(0.5, "rgba(0,0,0,0.45)");
           overlay.addColorStop(1, "rgba(0,0,0,0.85)");
           ctx.fillStyle = overlay;
-          ctx.fillRect(0, 0, 1080, 1080);
+          ctx.fillRect(0, 0, 1080, canvas.height);
         } else {
           ctx.fillStyle = "#1C1917";
-          ctx.fillRect(0, 0, 1080, 1080);
+          ctx.fillRect(0, 0, 1080, canvas.height);
         }
 
         // Draw FitAI Logo Left
@@ -291,6 +308,30 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.font = "black 76px Inter, system-ui, sans-serif";
           ctx.fillText(`${calories} kcal`, 80, boxY + 360);
 
+          if (cardFormat !== "square") {
+            const instructionsY = boxY + 270;
+            const boxH = cardFormat === "story" ? 640 : 250;
+            ctx.fillStyle = "rgba(255,255,255,0.06)";
+            ctx.beginPath();
+            ctx.roundRect(80, instructionsY, 920, boxH, 24);
+            ctx.fill();
+
+            ctx.fillStyle = "#FAF9F6";
+            ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
+            ctx.fillText("PREPARATION STEPS", 120, instructionsY + 50);
+
+            const instructionsText = item.instructions || "Enjoy this healthy custom portion immediately!";
+            wrapText(
+              instructionsText,
+              120,
+              instructionsY + 95,
+              840,
+              34,
+              "#FAF9F6",
+              "medium 21px Inter, system-ui, sans-serif"
+            );
+          }
+
         } else {
           // Standard Meal Log
           ctx.fillStyle = accentColor;
@@ -308,7 +349,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         }
 
         // Macros Row
-        const macroY = 820;
+        const macroY = canvas.height - 260;
         const macros = [
           { name: "Protein", val: `${protein}g`, color: "#F97316" },
           { name: "Carbs", val: `${carbs}g`, color: "#0891B2" },
@@ -337,18 +378,19 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         });
 
         // Footer line
+        const footerY = canvas.height - 110;
         ctx.strokeStyle = "rgba(255,255,255,0.1)";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(80, 970);
-        ctx.lineTo(1000, 970);
+        ctx.moveTo(80, footerY);
+        ctx.lineTo(1000, footerY);
         ctx.stroke();
 
         ctx.fillStyle = "#A8A29E";
         ctx.font = "bold 22px Inter, system-ui, sans-serif";
-        ctx.fillText("FITAI • CALORIE ENGINE", 80, 1015);
+        ctx.fillText("FITAI • CALORIE ENGINE", 80, footerY + 45);
         ctx.textAlign = "right";
-        ctx.fillText("fitpush.vercel.app", 1000, 1015);
+        ctx.fillText("fitpush.vercel.app", 1000, footerY + 45);
         ctx.textAlign = "left";
 
       } else if (currentTemplate === "cream") {
@@ -706,7 +748,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   useEffect(() => {
     drawCanvas();
-  }, [currentIndex]);
+  }, [currentIndex, cardFormat]);
 
   const handleNext = () => {
     setCurrentIndex((prev) => (prev + 1) % templates.length);
@@ -790,34 +832,178 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </button>
         </div>
 
-        {/* Carousel Container */}
-        <div className="relative w-full aspect-square flex items-center justify-center">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentTemplate}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.4}
-              onDragEnd={(_, info) => {
-                if (info.offset.x > 80) handlePrev();
-                else if (info.offset.x < -80) handleNext();
-              }}
-              className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#1C1917]"
-            >
-              <canvas
-                ref={canvasRef}
-                className="w-full h-full object-contain block"
-              />
-            </motion.div>
-          </AnimatePresence>
+        {/* Preview toggle tabs */}
+        <div className="flex bg-stone-100 p-1 rounded-xl gap-1 w-full select-none font-sans shrink-0">
+          <button
+            type="button"
+            onClick={() => setPreviewTab("card")}
+            className={cn(
+              "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
+              previewTab === "card" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
+            )}
+          >
+            🖼️ Image Card
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewTab("webpage")}
+            className={cn(
+              "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
+              previewTab === "webpage" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
+            )}
+          >
+            🌐 Web Link
+          </button>
         </div>
 
+        {/* Preview Container */}
+        {previewTab === "card" ? (
+          <div className="relative w-full aspect-square flex flex-col items-center justify-center">
+            <div className="relative w-full h-full">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentTemplate}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.4}
+                  onDragEnd={(_, info) => {
+                    if (info.offset.x > 80) handlePrev();
+                    else if (info.offset.x < -80) handleNext();
+                  }}
+                  className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#1C1917]"
+                >
+                  <canvas
+                    ref={canvasRef}
+                    className="w-full h-full object-contain block"
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+        ) : (
+          /* Web Link View Mockup */
+          <div className="w-full aspect-square bg-[#FAF9F6] rounded-[28px] border border-stone-200 shadow-xl overflow-y-auto p-4.5 text-left font-sans flex flex-col gap-3.5 no-scrollbar">
+            {/* Simulate PublicShareView Header */}
+            <div className="flex items-center justify-between border-b border-stone-200 pb-2.5">
+              <div className="flex items-center gap-1.5">
+                <div className="w-5.5 h-5.5 rounded-lg bg-orange-500 flex items-center justify-center shadow-xs">
+                  <Flame className="text-white w-3 h-3 fill-white" />
+                </div>
+                <span className="text-[10px] font-black text-stone-700 tracking-tight">FitAI Shared View</span>
+              </div>
+              <span className="text-[7.5px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none">
+                Webpage Link
+              </span>
+            </div>
+
+            {/* Cover Card */}
+            <div className="w-full aspect-video rounded-xl relative overflow-hidden bg-stone-900 flex flex-col justify-end p-3 border border-stone-200/40 shrink-0">
+              {payload.img ? (
+                <img src={payload.img} className="absolute inset-0 w-full h-full object-cover opacity-60" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center opacity-10">
+                  <Utensils className="w-12 h-12 text-white" />
+                </div>
+              )}
+              <div className="relative z-10 space-y-0.5">
+                <h4 className="text-white text-xs font-black drop-shadow-xs truncate">{name}</h4>
+                <p className="text-[8px] text-white/80 font-bold flex items-center gap-1">
+                  <span>⏱️ {time || "15 mins"}</span>
+                  {type === "recipe" && (
+                    <>
+                      <span>•</span>
+                      <span>🔥 Logged {item.log_count || 0} times by {handleStr}</span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Description */}
+            {item.description && (
+              <div className="bg-stone-50 border border-stone-100 rounded-xl p-2.5 text-[9.5px] text-stone-600 font-bold leading-relaxed">
+                📝 {item.description}
+              </div>
+            )}
+
+            {/* Macros Ring summary */}
+            <div className="grid grid-cols-4 gap-1.5 shrink-0">
+              {[
+                { label: "Kcal", val: calories, color: "text-orange-600" },
+                { label: "Protein", val: `${protein}g`, color: "text-stone-700" },
+                { label: "Carbs", val: `${carbs}g`, color: "text-stone-700" },
+                { label: "Fats", val: `${fats}g`, color: "text-stone-700" }
+              ].map((stat) => (
+                <div key={stat.label} className="bg-white border border-stone-100/70 p-1.5 rounded-xl text-center shadow-3xs">
+                  <span className="text-[6.5px] text-stone-400 block uppercase font-black">{stat.label}</span>
+                  <span className={cn("text-[9.5px] font-black mt-0.5 block", stat.color)}>{stat.val}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Ingredients Checklist */}
+            {type === "recipe" && ingredients.length > 0 && (
+              <div className="space-y-1">
+                <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">Ingredients checklist</span>
+                <div className="bg-white border border-stone-150 rounded-xl p-3 space-y-1.5">
+                  {ingredients.slice(0, 3).map((ing, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-[9px] font-semibold text-stone-700">
+                      <input type="checkbox" defaultChecked className="rounded border-stone-300 text-orange-500 focus:ring-orange-500 w-2.5 h-2.5 cursor-pointer" />
+                      <span className="truncate">{ing}</span>
+                    </div>
+                  ))}
+                  {ingredients.length > 3 && (
+                    <span className="text-[7.5px] text-stone-400 font-semibold italic pl-4 block">+ {ingredients.length - 3} more ingredients</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Instructions */}
+            {type === "recipe" && item.instructions && (
+              <div className="space-y-1">
+                <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">Preparation Steps</span>
+                <div className="bg-white border border-stone-150 rounded-xl p-3 text-[9px] font-semibold text-stone-600 leading-relaxed whitespace-pre-line max-h-[80px] overflow-y-auto no-scrollbar">
+                  {item.instructions}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Card Format Selector (Only when previewTab is card) */}
+        {previewTab === "card" && (
+          <div className="flex justify-center gap-1.5 select-none w-full mt-1.5">
+            {[
+              { id: "square", label: "Square 1:1", icon: "▢" },
+              { id: "portrait", label: "Portrait 3:4", icon: "▭" },
+              { id: "story", label: "Story 9:16", icon: "📱" }
+            ].map((fmt) => (
+              <button
+                key={fmt.id}
+                type="button"
+                onClick={() => setCardFormat(fmt.id as any)}
+                className={cn(
+                  "flex-1 py-1.5 rounded-xl text-[8.5px] font-black uppercase tracking-wider border transition-all cursor-pointer flex items-center justify-center gap-1",
+                  cardFormat === fmt.id
+                    ? "bg-orange-50 border-orange-200 text-orange-600 shadow-3xs"
+                    : "bg-white border-stone-200 text-stone-500 hover:text-stone-700"
+                )}
+              >
+                <span>{fmt.icon}</span>
+                <span>{fmt.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Pagination & Navigation Row */}
-        <div className="flex items-center gap-6 select-none mt-1">
+        {previewTab === "card" && (
+          <div className="flex items-center gap-6 select-none mt-1">
           <button
             onClick={handlePrev}
             className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
@@ -846,6 +1032,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+        )}
 
         {/* Buttons */}
         <div className="flex flex-col gap-2.5 w-full">
