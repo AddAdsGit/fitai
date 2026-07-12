@@ -893,30 +893,21 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         {/* Preview Container */}
         {previewTab === "card" ? (
           <div className="relative w-full aspect-square flex flex-col items-center justify-center">
-            <div className="relative w-full h-full">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentVar.id}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                  drag="x"
-                  dragConstraints={{ left: 0, right: 0 }}
-                  dragElastic={0.4}
-                  onDragEnd={(_, info) => {
-                    if (info.offset.x > 80) handlePrev();
-                    else if (info.offset.x < -80) handleNext();
-                  }}
-                  className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#1C1917]"
-                >
-                  <canvas
-                    ref={canvasRef}
-                    className="w-full h-full object-contain block"
-                  />
-                </motion.div>
-              </AnimatePresence>
-            </div>
+            <motion.div
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.4}
+              onDragEnd={(_, info) => {
+                if (info.offset.x > 80) handlePrev();
+                else if (info.offset.x < -80) handleNext();
+              }}
+              className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#1C1917]"
+            >
+              <canvas
+                ref={canvasRef}
+                className="w-full h-full object-contain block"
+              />
+            </motion.div>
           </div>
         ) : (
           /* Web Link View Mockup */
