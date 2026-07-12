@@ -272,14 +272,23 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.font = "black 28px Inter, system-ui, sans-serif";
           ctx.fillText(`🍳 ${time} PREP • LOGGED ${item.log_count || 0} TIMES BY ${handleStr.toUpperCase()}`, 80, finalY + 60);
 
-          // Draw short description
-          const descText = item.description || "A custom recipe generated and tracked on FitAI.";
-          const descY = wrapText(descText, 80, finalY + 115, 920, 36, "#FAF9F6", "medium 23px Inter, system-ui, sans-serif");
+          let boxY = finalY + 90;
+          let boxH = 280;
+          let ingOffset = 55;
+          let calOffset = 415;
 
-          const boxY = descY + 45;
+          if (cardFormat !== "square") {
+            const descText = item.description || "A custom recipe generated and tracked on FitAI.";
+            const descY = wrapText(descText, 80, finalY + 115, 920, 36, "#FAF9F6", "medium 23px Inter, system-ui, sans-serif");
+            boxY = descY + 45;
+            boxH = 240;
+            ingOffset = 48;
+            calOffset = 360;
+          }
+
           ctx.fillStyle = "rgba(255,255,255,0.06)";
           ctx.beginPath();
-          ctx.roundRect(80, boxY, 920, 240, 24);
+          ctx.roundRect(80, boxY, 920, boxH, 24);
           ctx.fill();
 
           ctx.fillStyle = "#FAF9F6";
@@ -291,29 +300,29 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           topIngredients.forEach((ing: string, idx: number) => {
             ctx.fillStyle = accentColor;
             ctx.beginPath();
-            ctx.arc(130, boxY + 100 + idx * 48, 6, 0, Math.PI * 2);
+            ctx.arc(130, boxY + 100 + idx * ingOffset, 6, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.fillStyle = "#FAF9F6";
-            ctx.fillText(ing, 160, boxY + 107 + idx * 48);
+            ctx.fillText(ing, 160, boxY + 107 + idx * ingOffset);
           });
 
           if (ingredients.length > 3) {
             ctx.fillStyle = "#A8A29E";
             ctx.font = "italic 20px Inter, system-ui, sans-serif";
-            ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + 205);
+            ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + boxH - 35);
           }
 
           ctx.fillStyle = "#FAF9F6";
           ctx.font = "black 76px Inter, system-ui, sans-serif";
-          ctx.fillText(`${calories} kcal`, 80, boxY + 360);
+          ctx.fillText(`${calories} kcal`, 80, boxY + calOffset);
 
           if (cardFormat !== "square") {
             const instructionsY = boxY + 270;
-            const boxH = cardFormat === "story" ? 640 : 250;
+            const instructionsBoxH = cardFormat === "story" ? 640 : 250;
             ctx.fillStyle = "rgba(255,255,255,0.06)";
             ctx.beginPath();
-            ctx.roundRect(80, instructionsY, 920, boxH, 24);
+            ctx.roundRect(80, instructionsY, 920, instructionsBoxH, 24);
             ctx.fill();
 
             ctx.fillStyle = "#FAF9F6";
