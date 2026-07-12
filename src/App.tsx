@@ -43,12 +43,11 @@ import { DefaultAvatar } from "./components/DefaultAvatar";
 import { ShareModal } from "./components/ShareModal";
 import { PublicShareView } from "./components/PublicShareView";
 import { ChatGPTIcon } from "./components/ChatGPTIcon";
-import { FoodIllustration } from "./components/FoodIllustration";
 
 
 // Import types & helpers
 import type { Meal, Recipe, DailyWellness } from "./types";
-import { hasNoGeneratedImage, formatDateStr } from "./utils/helpers";
+import { hasNoGeneratedImage, formatDateStr, getMealEmoji } from "./utils/helpers";
 import { generateShareUrl } from "./utils/shareUtils";
 
 
@@ -68,6 +67,18 @@ const INITIAL_MEALS: Meal[] = [
   },
   {
     id: "2",
+    name: "Double Espresso Macchiato",
+    time: "9:15 AM",
+    type: "Drink",
+    calories: 30,
+    protein: 1,
+    carbs: 4,
+    fats: 1,
+    image: "",
+    date: new Date().toISOString().split('T')[0],
+  },
+  {
+    id: "3",
     name: "Quinoa Power Bowl",
     time: "1:15 PM",
     type: "Lunch",
@@ -77,6 +88,30 @@ const INITIAL_MEALS: Meal[] = [
     fats: 15,
     image:
       "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=60",
+    date: new Date().toISOString().split('T')[0],
+  },
+  {
+    id: "4",
+    name: "Fresh Strawberry & Blueberry Mix",
+    time: "4:00 PM",
+    type: "Snack",
+    calories: 110,
+    protein: 2,
+    carbs: 24,
+    fats: 0,
+    image: "",
+    date: new Date().toISOString().split('T')[0],
+  },
+  {
+    id: "5",
+    name: "Grilled Chicken Breast",
+    time: "7:30 PM",
+    type: "Dinner",
+    calories: 280,
+    protein: 36,
+    carbs: 0,
+    fats: 14,
+    image: "",
     date: new Date().toISOString().split('T')[0],
   },
 ];
@@ -149,6 +184,35 @@ const INITIAL_RECIPES: Recipe[] = [
 ];
 
 // Components and helper utilities extracted to ./components and ./utils
+
+const TimelineImage = ({ src, alt, fallbackEmoji }: { src: string; alt: string; fallbackEmoji: string }) => {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  return (
+    <div className="absolute inset-0 w-full h-full">
+      {/* Fallback Emoji/Placeholder rendered always in the background */}
+      <div className="absolute inset-0 bg-[#F4F3EF]/90 flex items-center justify-center select-none z-0">
+        <span className="text-7xl sm:text-8xl group-hover:scale-110 transition-transform duration-700 opacity-[0.85] filter drop-shadow-xs">
+          {fallbackEmoji}
+        </span>
+      </div>
+      {/* Actual Image on top, fading in when loaded */}
+      {!error && (
+        <img
+          src={src}
+          alt={alt}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+          className={cn(
+            "absolute inset-0 w-full h-full object-cover transition-all duration-700 group-hover:scale-105 z-10",
+            loaded ? "opacity-100" : "opacity-0"
+          )}
+        />
+      )}
+    </div>
+  );
+};
 
 export default function App() {
   const [shareId, setShareId] = useState<string | null>(() => {
@@ -915,7 +979,55 @@ export default function App() {
             meal_description: m.meal_description || "",
             date: m.date
           }));
-          setMealsState(mappedMeals);
+
+          if (mappedMeals.length === 0 && profile.username === "johndoe") {
+            const seedPromises = INITIAL_MEALS.map(m =>
+              supabase.from("meals").insert({
+                profile_id: activeProfileId,
+                name: m.name,
+                time: m.time,
+                type: m.type,
+                calories: m.calories,
+                protein: m.protein,
+                carbs: m.carbs,
+                fats: m.fats,
+                fiber: m.fiber || 0,
+                image: m.image,
+                meal_description: m.meal_description || "",
+                date: m.date
+              }).select("*").single()
+            );
+
+            Promise.all(seedPromises).then(seededResults => {
+              const seededMapped = seededResults
+                .map(res => res.data)
+                .filter(Boolean)
+                .map(m => ({
+                  id: m.id,
+                  name: m.name,
+                  time: m.time,
+                  type: m.type,
+                  calories: m.calories,
+                  protein: m.protein,
+                  carbs: m.carbs,
+                  fats: m.fats,
+                  fiber: m.fiber || 0,
+                  image: m.image,
+                  meal_description: m.meal_description || "",
+                  date: m.date
+                }));
+              if (seededMapped.length > 0) {
+                setMealsState(seededMapped);
+              } else {
+                setMealsState(INITIAL_MEALS);
+              }
+            }).catch(err => {
+              console.error("Error seeding default meals for johndoe:", err);
+              setMealsState(INITIAL_MEALS);
+            });
+          } else {
+            setMealsState(mappedMeals);
+          }
         }
       } catch (err) {
         console.error("Unexpected error loading user data:", err);
@@ -1306,9 +1418,15 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     };
     const formattedTime = newMealOrRecipe.time || new Date().toLocaleTimeString("en-US", timeOptions);
     
-    const finalImage = newMealOrRecipe.image && !newMealOrRecipe.image.includes("photo-1546069901-ba9599a7e63c")
-      ? newMealOrRecipe.image
-      : "";
+    let finalImage = "";
+    if (newMealOrRecipe.image && !hasNoGeneratedImage(newMealOrRecipe.image)) {
+      finalImage = newMealOrRecipe.image;
+    } else {
+      const cleanName = newMealOrRecipe.name.trim();
+      const prompt = `gourmet professional food photography of ${cleanName}. Crisp food separation with distinct ingredients clearly visible and neatly arranged. High detail textures, photorealistic, macro culinary shot, top-down view, clean bright studio lighting, sharp focus, volumetric depth, no blending or bleeding between food elements.`;
+      const seed = Math.floor(Math.random() * 1000000);
+      finalImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true&seed=${seed}`;
+    }
 
     if (newMealOrRecipe.id) {
       if (isSupabaseConfigured && profileData.api_key) {
@@ -2386,21 +2504,23 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                         className="relative rounded-[32px] overflow-hidden aspect-[4/3] sm:aspect-video shadow-xl shadow-orange-200/30 group cursor-pointer"
                       >
                         {meal.image && !hasNoGeneratedImage(meal.image) ? (
-                          <img
+                          <TimelineImage
                             src={meal.image}
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                             alt={meal.name}
+                            fallbackEmoji={getMealEmoji(meal.name, meal.type)}
                           />
                         ) : (
-                          <div className="absolute inset-0 bg-gradient-to-tr from-amber-50 to-orange-100/70 flex items-center justify-center">
-                            <FoodIllustration className="w-24 h-24 text-orange-500/70 group-hover:scale-105 transition-transform duration-700" />
+                          <div className="absolute inset-0 bg-[#F4F3EF]/90 flex items-center justify-center select-none">
+                            <span className="text-7xl sm:text-8xl group-hover:scale-110 transition-transform duration-700 opacity-[0.85] filter drop-shadow-xs">
+                              {getMealEmoji(meal.name, meal.type)}
+                            </span>
                           </div>
                         )}
                         <div className={cn(
                           "absolute inset-0 bg-gradient-to-t z-10 pointer-events-none",
                           meal.image && !hasNoGeneratedImage(meal.image)
                             ? "from-black/90 via-black/40 to-black/20"
-                            : "from-stone-900/80 via-stone-900/30 to-transparent"
+                            : "from-stone-900/75 via-stone-900/25 to-transparent"
                         )} />
 
                         {/* Top Bar: Time, Calories, and Delete */}

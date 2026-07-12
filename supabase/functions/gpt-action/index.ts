@@ -661,9 +661,11 @@ serve(async (req) => {
             imageUrlToDownload = `https://image.pollinations.ai/p/${stylePrompt},of,${searchQuery}?width=600&height=400&nologo=true`;
             console.log(`[image-refinement] Generating styled AI fallback [${styleKey}] for text log: ${imageUrlToDownload}`);
           } else {
-            // Standard Unsplash stock fallback
-            imageUrlToDownload = `https://source.unsplash.com/600x400/?food,${searchQuery}`;
-            console.log(`[image-refinement] Using stock fallback for text log: ${imageUrlToDownload}`);
+            const cleanName = body.name.trim();
+            const prompt = `gourmet professional food photography of ${cleanName}. Crisp food separation with distinct ingredients clearly visible and neatly arranged. High detail textures, photorealistic, macro culinary shot, top-down view, clean bright studio lighting, sharp focus, volumetric depth, no blending or bleeding between food elements.`;
+            const seed = Math.floor(Math.random() * 1000000);
+            imageUrlToDownload = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true&seed=${seed}`;
+            console.log(`[image-refinement] Resolved image fallback: ${imageUrlToDownload}`);
           }
         }
 

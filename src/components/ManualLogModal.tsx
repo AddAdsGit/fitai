@@ -12,9 +12,8 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import type { Meal } from "../types";
-import { hasNoGeneratedImage } from "../utils/helpers";
+import { hasNoGeneratedImage, getMealEmoji } from "../utils/helpers";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
-import { FoodIllustration } from "./FoodIllustration";
 
 // Initial default food items for quick log
 const QUICK_LOG_DEFAULTS = [
@@ -358,8 +357,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                         {/* Left Side: Preview & Name & Macros */}
                         <div className="flex items-center gap-3 min-w-0">
                           {isDefaultImage ? (
-                            <div className="w-12 h-12 rounded-xl bg-orange-50/70 flex items-center justify-center p-2 shrink-0 border border-orange-100/50 shadow-inner select-none">
-                              <FoodIllustration className="w-full h-full text-orange-500/80" />
+                            <div className="w-12 h-12 rounded-xl bg-orange-50/70 flex items-center justify-center text-xl shrink-0 border border-orange-100/50 shadow-inner select-none">
+                              {getMealEmoji(item.name, item.type)}
                             </div>
                           ) : (
                             <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs">

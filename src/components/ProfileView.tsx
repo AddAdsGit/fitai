@@ -8,10 +8,34 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import type { Meal, Recipe } from "../types";
-import { hasNoGeneratedImage } from "../utils/helpers";
+import { hasNoGeneratedImage, getMealEmoji } from "../utils/helpers";
 import { InsightsView } from "./InsightsView";
 import { DefaultAvatar } from "./DefaultAvatar";
-import { FoodIllustration } from "./FoodIllustration";
+
+const RecipeImage = ({ src, alt, fallbackEmoji }: { src: string; alt: string; fallbackEmoji: string }) => {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  return (
+    <div className="absolute inset-0 w-full h-full">
+      <div className="absolute inset-0 bg-[#F4F3EF]/90 flex items-center justify-center select-none z-0">
+        <span className="text-4xl filter drop-shadow-xs opacity-[0.85]">{fallbackEmoji}</span>
+      </div>
+      {!error && (
+        <img
+          src={src}
+          alt={alt}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+          className={cn(
+            "w-full h-full object-cover pointer-events-none transition-all duration-700 z-10",
+            loaded ? "opacity-100" : "opacity-0"
+          )}
+        />
+      )}
+    </div>
+  );
+};
 
 export const ProfileView = ({
   profileData,
@@ -643,15 +667,14 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                     className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150 border border-white/5"
                   >
                     {!hasNoGeneratedImage(recipe.image) ? (
-                      <img
+                      <RecipeImage
                         src={recipe.image}
-                        className="w-full h-full object-cover pointer-events-none"
                         alt={recipe.name}
-                        referrerPolicy="no-referrer"
+                        fallbackEmoji={getMealEmoji(recipe.name)}
                       />
                     ) : (
-                      <div className="absolute inset-0 bg-gradient-to-tr from-amber-50 to-orange-100 flex items-center justify-center pointer-events-none select-none">
-                        <FoodIllustration className="w-16 h-16 text-orange-500/80" />
+                      <div className="absolute inset-0 bg-[#F4F3EF]/90 flex items-center justify-center pointer-events-none select-none">
+                        <span className="text-4xl filter drop-shadow-xs opacity-[0.85]">{getMealEmoji(recipe.name)}</span>
                       </div>
                     )}
 
@@ -860,8 +883,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                             {meal.image && !hasNoGeneratedImage(meal.image) ? (
                               <img src={meal.image} className="w-full h-full object-cover" alt={meal.name} />
                             ) : (
-                              <div className="w-full h-full bg-orange-50/55 flex items-center justify-center p-2.5 select-none">
-                                <FoodIllustration className="w-full h-full text-orange-500/80" />
+                              <div className="w-full h-full bg-orange-50/55 flex items-center justify-center text-lg select-none">
+                                {getMealEmoji(meal.name, meal.type)}
                               </div>
                             )}
                           </div>
