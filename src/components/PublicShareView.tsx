@@ -469,7 +469,7 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
               <div className="px-6 mt-6">
                 <div className="bg-white border border-stone-200/50 rounded-[32px] p-6 shadow-xs text-left font-sans">
                   <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider mb-2">
-                    Recipe Notes
+                    Recipe Description
                   </h3>
                   <p className="text-xs font-semibold text-stone-700 italic leading-relaxed">
                     "{payload.d}"
