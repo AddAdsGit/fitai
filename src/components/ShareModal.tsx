@@ -253,12 +253,16 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         } else if (isRecipe) {
           ctx.fillStyle = accentColor;
           ctx.font = "black 28px Inter, system-ui, sans-serif";
-          ctx.fillText(`🍳 ${time} PREP • LOGGED ${item.log_count || 0} TIMES`, 80, finalY + 60);
+          ctx.fillText(`🍳 ${time} PREP • LOGGED ${item.log_count || 0} TIMES BY ${handleStr.toUpperCase()}`, 80, finalY + 60);
 
-          const boxY = finalY + 90;
+          // Draw short description
+          const descText = item.description || "A custom recipe generated and tracked on FitAI.";
+          const descY = wrapText(descText, 80, finalY + 115, 920, 36, "#FAF9F6", "medium 23px Inter, system-ui, sans-serif");
+
+          const boxY = descY + 45;
           ctx.fillStyle = "rgba(255,255,255,0.06)";
           ctx.beginPath();
-          ctx.roundRect(80, boxY, 920, 280, 24);
+          ctx.roundRect(80, boxY, 920, 240, 24);
           ctx.fill();
 
           ctx.fillStyle = "#FAF9F6";
@@ -270,28 +274,28 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           topIngredients.forEach((ing: string, idx: number) => {
             ctx.fillStyle = accentColor;
             ctx.beginPath();
-            ctx.arc(130, boxY + 110 + idx * 55, 6, 0, Math.PI * 2);
+            ctx.arc(130, boxY + 100 + idx * 48, 6, 0, Math.PI * 2);
             ctx.fill();
 
             ctx.fillStyle = "#FAF9F6";
-            ctx.fillText(ing, 160, boxY + 118 + idx * 55);
+            ctx.fillText(ing, 160, boxY + 107 + idx * 48);
           });
 
           if (ingredients.length > 3) {
             ctx.fillStyle = "#A8A29E";
             ctx.font = "italic 20px Inter, system-ui, sans-serif";
-            ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + 245);
+            ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + 205);
           }
 
           ctx.fillStyle = "#FAF9F6";
           ctx.font = "black 76px Inter, system-ui, sans-serif";
-          ctx.fillText(`${calories} kcal`, 80, boxY + 415);
+          ctx.fillText(`${calories} kcal`, 80, boxY + 360);
 
         } else {
           // Standard Meal Log
           ctx.fillStyle = accentColor;
           ctx.font = "black 28px Inter, system-ui, sans-serif";
-          ctx.fillText(`⚡ LOGGED AT ${time}`, 80, finalY + 70);
+          ctx.fillText(`⚡ LOGGED AT ${time} BY ${handleStr.toUpperCase()}`, 80, finalY + 70);
 
           ctx.fillStyle = "#FAF9F6";
           ctx.font = "black 170px Inter, system-ui, sans-serif";
@@ -802,250 +806,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 if (info.offset.x > 80) handlePrev();
                 else if (info.offset.x < -80) handleNext();
               }}
-              style={
-                (currentTemplate === "obsidian" || currentTemplate === "sunset") && hasImage && !isDay
-                  ? { backgroundImage: `url(${payload.img})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                  : {}
-              }
-              className={`w-full h-full rounded-[28px] p-6 flex flex-col justify-between shadow-xl relative overflow-hidden select-none cursor-grab active:cursor-grabbing border ${
-                (currentTemplate === "obsidian" || currentTemplate === "sunset") && hasImage && !isDay
-                  ? "text-white border-transparent"
-                  : currentTemplate === "obsidian"
-                  ? "bg-stone-900 text-stone-100 border-stone-850"
-                  : currentTemplate === "cream"
-                  ? "bg-[#FAF9F6] text-stone-950 border-stone-200"
-                  : currentTemplate === "emerald" && hasImage && !isDay
-                  ? "bg-[#064E3B] text-[#FAF9F6] border-transparent p-0 flex-col overflow-hidden"
-                  : currentTemplate === "emerald"
-                  ? "bg-[#064E3B] text-[#FAF9F6] border-transparent"
-                  : "bg-gradient-to-br from-[#FF4E50] to-[#F9D423] text-white border-transparent"
-              }`}
+              className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#1C1917]"
             >
-              {/* Obsidian/Sunset Image Overlay */}
-              {((currentTemplate === "obsidian" || currentTemplate === "sunset") && hasImage && !isDay) && (
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 z-0 pointer-events-none" />
-              )}
-
-              {/* Logo block */}
-              {!(currentTemplate === "emerald" && hasImage && !isDay) && (
-                <div className="flex justify-between items-center z-10">
-                  <div className="flex items-center gap-1.5">
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shadow-md ${
-                      currentTemplate === "sunset" || (currentTemplate === "obsidian" && hasImage && !isDay) ? "bg-white text-orange-500" : "bg-orange-500 text-white"
-                    }`}>
-                      <Flame className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-black tracking-tight">FitAI</span>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[9px] font-black tracking-wider ${
-                    currentTemplate === "sunset" || (currentTemplate === "obsidian" && hasImage && !isDay)
-                      ? "bg-white/20 text-white"
-                      : currentTemplate === "obsidian"
-                      ? "bg-stone-800 text-stone-300"
-                      : currentTemplate === "emerald"
-                      ? "bg-[#10B981]/25 text-[#A7F3D0]"
-                      : "bg-stone-200 text-stone-750"
-                  }`}>
-                    {handleStr}
-                  </span>
-                </div>
-              )}
-
-              {/* Layout Content Rendering based on template */}
-              {currentTemplate === "cream" ? (
-                // ================= CREAM LAYOUT =================
-                <div className="my-auto flex flex-col items-center gap-4 z-10 text-center">
-                  {hasImage && !isDay ? (
-                    <div className="w-32 h-32 rounded-full border-[5px] border-orange-500 overflow-hidden relative shadow-md bg-stone-100 flex items-center justify-center shrink-0">
-                      <img src={payload.img} className="w-full h-full object-cover" />
-                      <div className="absolute bottom-1 bg-orange-500 text-white text-[8px] font-black px-2.5 py-1 rounded-full shadow-2xs">
-                        {calories} KCAL
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="w-32 h-32 rounded-full border-4 border-orange-500 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-black text-stone-900">{calories}</span>
-                      <span className="text-[8px] font-bold text-stone-500">KCAL</span>
-                    </div>
-                  )}
-                  <h3 className="text-base font-black leading-tight tracking-tight mt-1 text-stone-950 line-clamp-2">
-                    {name}
-                  </h3>
-                  {isDay ? (
-                    <div className="text-[10px] font-extrabold text-stone-600 space-y-0.5">
-                      <div>Logged {mealsList.length} meals today</div>
-                      <div>PRO: {protein}g • CARB: {carbs}g • FAT: {fats}g</div>
-                    </div>
-                  ) : (
-                    <div className="text-[10px] font-extrabold text-stone-600">
-                      PROTEIN: {protein}g  •  CARBS: {carbs}g  •  FATS: {fats}g
-                    </div>
-                  )}
-                </div>
-              ) : currentTemplate === "emerald" && hasImage && !isDay ? (
-                // ================= EMERALD SPLIT LAYOUT WITH IMAGE =================
-                <div className="w-full h-full flex flex-col text-left">
-                  <div className="w-full h-[42%] relative overflow-hidden border-b border-white/10 shrink-0">
-                    <img src={payload.img} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#064E3B]/80 to-transparent" />
-                    <div className="absolute top-4 left-4 flex items-center gap-1.5 text-white">
-                      <div className="w-5 h-5 rounded bg-orange-500 text-white flex items-center justify-center shadow-md">
-                        <Flame className="w-3 h-3" />
-                      </div>
-                      <span className="text-[10px] font-black tracking-tight">FitAI</span>
-                    </div>
-                    <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[8px] font-black tracking-wider text-white">
-                      {handleStr}
-                    </div>
-                  </div>
-                  <div className="p-4 flex-1 flex flex-col justify-between bg-[#064E3B]">
-                    <div>
-                      <h3 className="text-xs font-black leading-tight tracking-tight text-white line-clamp-2">
-                        {name}
-                      </h3>
-                      <div className="mt-2 flex items-baseline gap-1">
-                        <span className="text-2xl font-black text-[#10B981]">{calories}</span>
-                        <span className="text-[7.5px] font-bold text-[#A7F3D0] tracking-wider uppercase">KCAL LOGGED</span>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1.5 mt-2">
-                      {[
-                        { label: "Protein", val: `${protein}g`, bar: protein / 150 },
-                        { label: "Carbs", val: `${carbs}g`, bar: carbs / 200 },
-                        { label: "Fats", val: `${fats}g`, bar: fats / 70 }
-                      ].map((macro) => (
-                        <div key={macro.label} className="text-left">
-                          <div className="flex justify-between items-center text-[7.5px] font-bold text-[#A7F3D0] uppercase tracking-wider">
-                            <span>{macro.label}</span>
-                            <span className="text-white">{macro.val}</span>
-                          </div>
-                          <div className="w-full h-1 bg-white/10 rounded-full mt-0.5 overflow-hidden">
-                            <div className="h-full bg-[#10B981] rounded-full" style={{ width: `${Math.min(100, Math.max(5, macro.bar * 100))}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : currentTemplate === "emerald" ? (
-                // ================= EMERALD SPLIT SOLID GREEN =================
-                <div className="my-auto grid grid-cols-2 gap-4 text-left z-10">
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-black leading-tight tracking-tight line-clamp-3">
-                      {name}
-                    </h3>
-                    <div>
-                      <span className="text-4xl font-black text-[#10B981]">{calories}</span>
-                      <span className="text-[8px] font-bold text-[#A7F3D0] block tracking-wider mt-0.5">
-                        {isDay ? "TOTAL KCAL" : "KCAL LOGGED"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-2 border-l border-emerald-800/40 pl-3">
-                    {[
-                      { label: "Protein", val: `${protein}g` },
-                      { label: "Carbs", val: `${carbs}g` },
-                      { label: "Fats", val: `${fats}g` }
-                    ].map((macro) => (
-                      <div key={macro.label}>
-                        <span className="text-[7.5px] font-bold text-[#A7F3D0] uppercase tracking-wider block">{macro.label}</span>
-                        <span className="text-sm font-black text-white">{macro.val}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : currentTemplate === "sunset" ? (
-                // ================= SUNSET GLASS PANELS =================
-                <div className="my-auto p-4 rounded-2xl bg-white/10 backdrop-blur-md text-left z-10 space-y-3 w-full">
-                  <h3 className="text-base font-black leading-tight tracking-tight line-clamp-2">
-                    {name}
-                  </h3>
-                  <div>
-                    <span className="text-5xl font-black tracking-tight">{calories}</span>
-                    <span className="text-[8px] font-bold text-white/70 block tracking-widest mt-0.5">TOTAL KCAL</span>
-                  </div>
-                  {isDay && (
-                    <div className="text-[10px] text-white/80 font-bold bg-white/5 p-2 rounded-lg">
-                      🍱 Logged: {mealsList.map((m: any) => m.name).join(" • ")}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10">
-                    {[
-                      { l: "Pro", v: `${protein}g` },
-                      { l: "Carb", v: `${carbs}g` },
-                      { l: "Fat", v: `${fats}g` }
-                    ].map((m) => (
-                      <div key={m.l} className="bg-white/10 rounded-lg p-1.5 text-center">
-                        <span className="text-[7px] text-white/70 block uppercase tracking-wider">{m.l}</span>
-                        <span className="text-xs font-extrabold">{m.v}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                // ================= OBSIDIAN ATHLETIC LAYOUT =================
-                <div className="my-auto space-y-3.5 text-left z-10 w-full">
-                  <h3 className="text-lg font-black leading-tight tracking-tight mt-2 line-clamp-2">
-                    {name}
-                  </h3>
-                  <span className={`text-[10px] font-black uppercase tracking-wider block ${
-                    hasImage && !isDay ? "text-white" : "text-orange-500"
-                  }`}>
-                    {isDay ? "📅 FULL-DAY SUMMARY" : `⏱️ LOGGED AT ${time}`}
-                  </span>
-                  
-                  {isDay && mealsList.length > 0 && (
-                    <div className="space-y-1.5 my-3 bg-stone-850 p-3 rounded-xl border border-stone-800 text-[10px] font-bold text-stone-300">
-                      {mealsList.slice(0, 3).map((m: any, idx: number) => (
-                        <div key={idx} className="flex justify-between items-center">
-                          <span className="truncate pr-2">• {m.name}</span>
-                          <span className="text-orange-500 shrink-0">+{m.calories} kcal</span>
-                        </div>
-                      ))}
-                      {mealsList.length > 3 && (
-                        <div className="text-[8.5px] opacity-60 italic text-stone-400">
-                          + {mealsList.length - 3} more meals logged
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="py-1">
-                    <span className="text-4xl font-black tracking-tight">{calories}</span>
-                    <span className="text-[8px] font-bold text-stone-400 block tracking-widest mt-0.5">
-                      TOTAL KCAL
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Obsidian/Default Bottom Macros Grid */}
-              {currentTemplate !== "cream" && !(currentTemplate === "emerald" && hasImage && !isDay) && currentTemplate !== "emerald" && currentTemplate !== "sunset" && (
-                <div className={`grid grid-cols-3 gap-2 border-t pt-4 z-10 ${
-                  hasImage && !isDay ? "border-white/15" : "border-stone-200/20"
-                }`}>
-                  {[
-                    { label: "Pro", val: protein },
-                    { label: "Carb", val: carbs },
-                    { label: "Fat", val: fats }
-                  ].map((m) => (
-                    <div
-                      key={m.label}
-                      className={`p-2 rounded-xl text-center border ${
-                        hasImage && !isDay
-                          ? "bg-white/10 border-transparent text-white"
-                          : "bg-stone-850 border-stone-800 text-stone-200"
-                      }`}
-                    >
-                      <span className="text-[7.5px] font-black text-stone-400 block uppercase tracking-wider">
-                        {m.label}
-                      </span>
-                      <span className="text-xs font-extrabold mt-0.5 block">{m.val}g</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <canvas
+                ref={canvasRef}
+                className="w-full h-full object-contain block"
+              />
             </motion.div>
           </AnimatePresence>
         </div>
@@ -1110,7 +876,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </div>
         </div>
 
-        <canvas ref={canvasRef} style={{ display: "none" }} />
       </motion.div>
     </motion.div>
   );
