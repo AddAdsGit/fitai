@@ -3,6 +3,7 @@ import { Flame, ArrowRight, BookOpen, User, AlertCircle, RefreshCw, Sparkles, Ch
 import { motion, AnimatePresence } from "motion/react";
 import { SharedItemPayload, decodeBase64ToPayload, decompressToMeal, decompressToRecipe } from "../utils/shareUtils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { hasNoGeneratedImage, getMealEmoji } from "../utils/helpers";
 
 interface PublicShareViewProps {
   shareId: string | null;
@@ -200,7 +201,7 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
     );
   }
 
-  const hasImage = !!payload.img;
+  const hasImage = !!payload.img && !hasNoGeneratedImage(payload.img);
 
   return (
     <main className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 pb-24 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
@@ -226,20 +227,31 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
             {/* Infographic Preview Card (High Fidelity full bleed style matching dashboard) */}
             <div
               style={hasImage ? { backgroundImage: `url(${payload.img})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
-              className="w-full aspect-square rounded-[32px] p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden bg-stone-900 text-stone-100 border border-stone-850"
+              className={cn(
+                "w-full aspect-square rounded-[32px] p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden border transition-colors duration-300",
+                hasImage 
+                  ? "bg-stone-900 text-stone-100 border-stone-850" 
+                  : "bg-[#F4F3EF] text-stone-850 border-stone-200/50"
+              )}
             >
-              {hasImage && (
+              {hasImage ? (
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 z-0 pointer-events-none" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+                  <span className="text-[120px] opacity-[0.12] filter drop-shadow-sm">
+                    {getMealEmoji(payload.n)}
+                  </span>
+                </div>
               )}
               
               <div className="flex justify-between items-center z-10">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-6 h-6 rounded-lg bg-white text-orange-500 flex items-center justify-center">
-                    <Flame className="w-3.5 h-3.5 fill-orange-500" />
+                  <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center", hasImage ? "bg-white text-orange-500" : "bg-orange-500 text-white shadow-xs")}>
+                    <Flame className="w-3.5 h-3.5 fill-current" />
                   </div>
-                  <span className="text-xs font-black tracking-tight">FitAI</span>
+                  <span className={cn("text-xs font-black tracking-tight", hasImage ? "text-stone-100" : "text-stone-800")}>FitAI</span>
                 </div>
-                <span className="px-2 py-0.5 bg-white/20 text-white rounded text-[7px] font-black tracking-wider uppercase">
+                <span className={cn("px-2 py-0.5 rounded text-[7px] font-black tracking-wider uppercase", hasImage ? "bg-white/20 text-white" : "bg-stone-200 text-stone-600")}>
                   MEAL LOGGED
                 </span>
               </div>
@@ -249,32 +261,32 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
                   {payload.n}
                 </h2>
                 {payload.t && (
-                  <span className="text-xs font-black text-orange-400 block uppercase tracking-wider">
+                  <span className="text-xs font-black text-orange-500 block uppercase tracking-wider">
                     ⏱️ LOGGED AT {payload.t}
                   </span>
                 )}
                 {payload.d && (
-                  <p className="text-[10px] text-stone-200/90 leading-relaxed font-bold bg-white/5 px-3 py-1.5 rounded-xl border border-white/5 line-clamp-3">
+                  <p className={cn("text-[10px] leading-relaxed font-bold px-3 py-1.5 rounded-xl border line-clamp-3", hasImage ? "text-stone-200/90 bg-white/5 border-white/5" : "text-stone-650 bg-stone-100/50 border-stone-200/30")}>
                     📝 {payload.d}
                   </p>
                 )}
                 <div>
                   <span className="text-6xl font-black tracking-tighter">{payload.c}</span>
-                  <span className="text-[10px] font-bold text-stone-300 block tracking-widest mt-1">
+                  <span className={cn("text-[10px] font-bold block tracking-widest mt-1", hasImage ? "text-stone-300" : "text-stone-400")}>
                     TOTAL KCAL
                   </span>
                 </div>
               </div>
 
               {/* Macros */}
-              <div className="grid grid-cols-3 gap-3 border-t pt-6 border-white/20 z-10">
+              <div className={cn("grid grid-cols-3 gap-3 border-t pt-6 z-10", hasImage ? "border-white/20" : "border-stone-200/60")}>
                 {[
                   { label: "Protein", val: payload.p, col: "bg-orange-500" },
                   { label: "Carbs", val: payload.cb, col: "bg-cyan-500" },
                   { label: "Fats", val: payload.f, col: "bg-yellow-500" }
                 ].map((m) => (
-                  <div key={m.label} className="p-2.5 rounded-2xl text-center bg-white/10 border border-white/10">
-                    <span className="text-[9px] font-black text-stone-300 block uppercase tracking-wider">
+                  <div key={m.label} className={cn("p-2.5 rounded-2xl text-center border", hasImage ? "bg-white/10 border-white/10" : "bg-white border-stone-200/40 shadow-2xs")}>
+                    <span className={cn("text-[9px] font-black block uppercase tracking-wider", hasImage ? "text-stone-300" : "text-stone-400")}>
                       {m.label}
                     </span>
                     <span className="text-sm font-extrabold mt-1 block">{m.val}g</span>
@@ -384,8 +396,10 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
                   alt={payload.n}
                 />
               ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-stone-850 to-stone-950 flex items-center justify-center">
-                  <Utensils className="w-12 h-12 text-white opacity-20" />
+                <div className="absolute inset-0 bg-[#F4F3EF] flex items-center justify-center">
+                  <span className="text-8xl opacity-[0.85] filter drop-shadow-xs">
+                    {getMealEmoji(payload.n)}
+                  </span>
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-900/35 to-black/10 pointer-events-none" />
