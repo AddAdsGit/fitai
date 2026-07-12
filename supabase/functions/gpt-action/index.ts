@@ -668,9 +668,52 @@ serve(async (req) => {
               southIndianContext = " Plated on a traditional green banana leaf, accompanied by small individual metal bowls of sambar and coconut/peanut chutney.";
             }
             const prompt = `gourmet professional food photography of ${cleanName}.${southIndianContext} Crisp food separation with distinct ingredients clearly visible and neatly arranged. High detail textures, photorealistic, macro culinary shot, top-down view, clean bright studio lighting, sharp focus, volumetric depth, no blending or bleeding between food elements.`;
-            const seed = Math.floor(Math.random() * 1000000);
-            imageUrlToDownload = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true&seed=${seed}&model=flux`;
-            console.log(`[image-refinement] Resolved image fallback: ${imageUrlToDownload}`);
+            
+            // Extract Gemini API key from preferences array
+            const geminiKeyTag = (profile.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+            const geminiKey = geminiKeyTag.split(":")[1] || "";
+            
+            let generatedImage = "";
+            if (geminiKey) {
+              try {
+                // Set a 6-second timeout for the Gemini request
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`;
+                const response = await fetch(geminiUrl, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  signal: controller.signal,
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { responseModalities: ["IMAGE"] }
+                  })
+                });
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                  const data = await response.json();
+                  const imagePart = data.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+                  if (imagePart?.inlineData?.data) {
+                    generatedImage = `data:${imagePart.inlineData.mimeType || "image/png"};base64,${imagePart.inlineData.data}`;
+                    console.log(`[image-refinement] Successfully generated image using Gemini 2.5 Flash Image`);
+                  }
+                } else {
+                  console.warn(`[image-refinement] Gemini API returned error: ${response.status}`);
+                }
+              } catch (err) {
+                console.warn("[image-refinement] Failed to generate with Gemini, falling back to Pollinations.ai:", err);
+              }
+            }
+            
+            if (!generatedImage) {
+              const seed = Math.floor(Math.random() * 1000000);
+              generatedImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true&seed=${seed}&model=flux`;
+              console.log(`[image-refinement] Resolved Pollinations.ai backup image fallback: ${generatedImage}`);
+            }
+            
+            imageUrlToDownload = generatedImage;
           }
         }
 

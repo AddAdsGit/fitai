@@ -1429,8 +1429,48 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         southIndianContext = " Plated on a traditional green banana leaf, accompanied by small individual metal bowls of sambar and coconut/peanut chutney.";
       }
       const prompt = `gourmet professional food photography of ${cleanName}.${southIndianContext} Crisp food separation with distinct ingredients clearly visible and neatly arranged. High detail textures, photorealistic, macro culinary shot, top-down view, clean bright studio lighting, sharp focus, volumetric depth, no blending or bleeding between food elements.`;
-      const seed = Math.floor(Math.random() * 1000000);
-      finalImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true&seed=${seed}&model=flux`;
+      
+      // Extract Gemini API key from preferences array
+      const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+      const geminiKey = geminiKeyTag.split(":")[1] || "";
+      
+      let generatedImage = "";
+      if (geminiKey) {
+        try {
+          // Set a 6-second timeout for the Gemini request
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`;
+          const response = await fetch(geminiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseModalities: ["IMAGE"] }
+            })
+          });
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            const data = await response.json();
+            const imagePart = data.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+            if (imagePart?.inlineData?.data) {
+              generatedImage = `data:${imagePart.inlineData.mimeType || "image/png"};base64,${imagePart.inlineData.data}`;
+            }
+          }
+        } catch (err) {
+          console.warn("[gemini-image] Failed to generate, falling back to Pollinations.ai:", err);
+        }
+      }
+      
+      if (!generatedImage) {
+        const seed = Math.floor(Math.random() * 1000000);
+        generatedImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true&seed=${seed}&model=flux`;
+      }
+      
+      finalImage = generatedImage;
     }
 
     if (newMealOrRecipe.id) {

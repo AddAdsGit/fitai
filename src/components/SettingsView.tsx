@@ -250,6 +250,27 @@ export const SettingsView = ({
   const [userTimezone, setUserTimezone] = useState(profileData.timezone || "UTC");
   const [isTestingTg, setIsTestingTg] = useState(false);
 
+  // --- Gemini API States ---
+  const initialGeminiKey = useMemo(() => {
+    const keyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+    return keyTag.split(":")[1] || "";
+  }, [profileData.preferences]);
+
+  const [geminiKey, setGeminiKey] = useState(initialGeminiKey);
+
+  const handleSaveGemini = () => {
+    const filteredPrefs = (profileData.preferences || []).filter((p: string) => !p.startsWith("gemini_api_key:"));
+    if (geminiKey.trim()) {
+      filteredPrefs.push(`gemini_api_key:${geminiKey.trim()}`);
+    }
+    setProfileData({
+      ...profileData,
+      preferences: filteredPrefs
+    });
+    triggerToast(geminiKey.trim() ? "💾 Saved Gemini API Key!" : "💾 Disabled Gemini image generation");
+    setActiveSubView(null);
+  };
+
   const openApiYaml = useMemo(() => getOpenApiYaml(edgeFunctionUrl), [edgeFunctionUrl]);
 
   // Notion Validations & Save
@@ -351,6 +372,68 @@ export const SettingsView = ({
   };
 
   // Render Sub-Views
+
+  if (activeSubView === "gemini") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
+      >
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveSubView(null)}
+            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <h2 className="text-xl font-black text-[#1a1a1a]">Google Gemini API</h2>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-[20px] p-4 text-xs font-bold text-amber-800 leading-relaxed">
+          💡 FitAI can use Google AI Studio's <strong>Gemini 2.5 Flash Image (Nano Banana)</strong> model via your own free tier API key. The free rate limits (15 requests/minute) are more than enough for logging.
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-black text-stone-400 uppercase tracking-wider mb-2">
+              Gemini API Key
+            </label>
+            <input
+              type="password"
+              placeholder="AIzaSy..."
+              value={geminiKey}
+              onChange={(e) => setGeminiKey(e.target.value)}
+              className="w-full bg-white border border-stone-200 rounded-[18px] px-4 py-3.5 text-xs font-bold text-[#1a1a1a] shadow-xs outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 transition-all placeholder:text-stone-300"
+            />
+            <p className="text-[9px] text-[#9e9e9e] font-semibold leading-relaxed mt-2.5">
+              Get your free key in 30 seconds from{" "}
+              <a
+                href="https://aistudio.google.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-orange-500 underline font-black"
+              >
+                Google AI Studio
+              </a>.
+            </p>
+          </div>
+
+          <div className="bg-stone-50 border border-stone-150 rounded-[20px] p-4 text-[10px] text-stone-600 leading-relaxed">
+            ℹ️ If left empty, FitAI automatically falls back to our free built-in <strong>Pollinations.ai (FLUX)</strong> generator as a zero-setup backup.
+          </div>
+
+          <button
+            onClick={handleSaveGemini}
+            className="w-full bg-stone-900 text-white hover:bg-stone-850 text-xs font-black uppercase tracking-wider py-4 rounded-[18px] transition-all active:scale-98 shadow-sm cursor-pointer"
+          >
+            Save Connection Settings
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
 
   if (activeSubView === "notion") {
     return (
@@ -898,7 +981,7 @@ export const SettingsView = ({
             {/* Telegram */}
             <div
               onClick={() => setActiveSubView("telegram")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] rounded-b-[18px] transition-colors cursor-pointer group"
+              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group"
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-550 shrink-0">
@@ -918,6 +1001,32 @@ export const SettingsView = ({
                   <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
                 ) : (
                   <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Off</span>
+                )}
+                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+
+            {/* Google Gemini API */}
+            <div
+              onClick={() => setActiveSubView("gemini")}
+              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] rounded-b-[18px] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shrink-0">
+                  <Sparkles className="w-4 h-4 text-orange-500 fill-orange-100" />
+                </div>
+                <div>
+                  <div className="font-bold text-[#1a1a1a] text-xs">Google Gemini Image API</div>
+                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
+                    Use your free Gemini API key for premium food photos
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
+                {geminiKey.trim() ? (
+                  <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Linked</span>
+                ) : (
+                  <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Flux Backup</span>
                 )}
                 <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
