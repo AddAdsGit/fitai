@@ -28,7 +28,7 @@ const RecipeImage = ({ src, alt, fallbackEmoji }: { src: string; alt: string; fa
           onLoad={() => setLoaded(true)}
           onError={() => setError(true)}
           className={cn(
-            "w-full h-full object-cover pointer-events-none transition-all duration-700 z-10",
+            "absolute inset-0 w-full h-full object-cover pointer-events-none transition-all duration-700 z-10",
             loaded ? "opacity-100" : "opacity-0"
           )}
         />
