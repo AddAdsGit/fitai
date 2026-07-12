@@ -432,8 +432,8 @@ export const SettingsView = ({
               onChange={(e) => setGeminiKey(e.target.value)}
               className="w-full bg-white border border-stone-200 rounded-[18px] px-4 py-3.5 text-xs font-bold text-[#1a1a1a] shadow-xs outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 transition-all placeholder:text-stone-300"
             />
-            <p className="text-[9px] text-[#9e9e9e] font-semibold leading-relaxed mt-2.5 font-sans">
-              Get your free key in 30 seconds from{" "}
+            <p className="text-[9.5px] text-stone-500 font-bold leading-relaxed mt-2.5 font-sans">
+              ⏱️ <strong>1 min setup for unmatched quality.</strong> Get your free key from{" "}
               <a
                 href="https://aistudio.google.com/"
                 target="_blank"
