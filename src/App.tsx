@@ -645,61 +645,53 @@ export default function App() {
       return;
     }
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        await handleUserAuthenticated(session.user);
-      }
-      setIsSessionLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session?.user) {
-        await handleUserAuthenticated(session.user);
-      } else {
-        setActiveProfileId(null);
-        localStorage.removeItem("fitai_active_profile_id");
-      }
-      setIsSessionLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured) return;
-
-    const initSupabase = async () => {
+    const initAuth = async () => {
+      setIsSessionLoading(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
         if (session?.user) {
-          setActiveProfileId(session.user.id);
-          localStorage.setItem("fitai_active_profile_id", session.user.id);
-          return;
-        }
+          await handleUserAuthenticated(session.user);
+        } else {
+          // Check username-only fallback
+          const savedProfileId = localStorage.getItem("fitai_active_profile_id");
+          if (savedProfileId) {
+            const { data: existing, error } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('id', savedProfileId)
+              .maybeSingle();
 
-        const savedProfileId = localStorage.getItem("fitai_active_profile_id");
-        if (savedProfileId) {
-          const { data: existing, error } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', savedProfileId)
-            .maybeSingle();
-
-          if (!error && existing) {
-            setActiveProfileId(existing.id);
-            return;
+            if (!error && existing) {
+              setActiveProfileId(existing.id);
+            } else {
+              setActiveProfileId(null);
+              localStorage.removeItem("fitai_active_profile_id");
+            }
+          } else {
+            setActiveProfileId(null);
           }
         }
-
-        setActiveProfileId(null);
+      } catch (err) {
+        console.error("Auth initialization error:", err);
       } finally {
         setIsSessionLoading(false);
       }
     };
 
-    initSupabase();
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      if (session?.user) {
+        await handleUserAuthenticated(session.user);
+      } else if (event === "SIGNED_OUT") {
+        setActiveProfileId(null);
+        localStorage.removeItem("fitai_active_profile_id");
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -728,6 +720,10 @@ export default function App() {
             const updatedPrefs = [...currentPrefs.filter((p: string) => !p.startsWith("tz_")), tzPref];
             supabase.from('profiles').update({ preferences: updatedPrefs }).eq('id', profile.id).then();
             profile.preferences = updatedPrefs;
+          }
+
+          if (profile.preferences?.includes("onboarded")) {
+            localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
           }
 
           setProfileDataState({
@@ -1872,7 +1868,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
-  const isOnboarded = profileData.preferences?.includes("onboarded");
+  const localOnboardedKey = activeProfileId ? `fitai_onboarded_${activeProfileId}` : null;
+  const localOnboarded = localOnboardedKey ? localStorage.getItem(localOnboardedKey) === "true" : false;
+  const isOnboarded = localOnboarded || profileData.preferences?.includes("onboarded");
 
   if (isSupabaseConfigured && activeProfileId && !isOnboarded) {
     return (
@@ -1881,6 +1879,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         supabase={supabase}
         profileData={profileData}
         onComplete={(completedData) => {
+          if (activeProfileId) {
+            localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
+          }
           setProfileDataState(completedData);
         }}
         triggerToast={showToast}
@@ -2507,6 +2508,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             triggerToast={(msg) => setToastMessage(msg)}
             session={session}
             onLogout={async () => {
+              if (activeProfileId) {
+                localStorage.removeItem(`fitai_onboarded_${activeProfileId}`);
+              }
               await supabase.auth.signOut();
               localStorage.removeItem("fitai_active_profile_id");
               setActiveProfileId(null);
