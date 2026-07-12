@@ -1244,7 +1244,20 @@ Do not include any extra text, markdown styling, backticks, or "json" prefix. Ju
       showToast("✨ AI generated recipe successfully!");
     } catch (err) {
       console.error(err);
-      showToast("❌ Failed to generate recipe with AI");
+      const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+      const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
+      if (!preferenceGeminiKey) {
+        showToast(
+          <div className="text-left font-sans">
+            <span className="font-bold text-stone-900 block text-xs">❌ Generation Failed</span>
+            <span className="text-[10px] text-stone-500 font-semibold block leading-tight mt-1">
+              Central AI credits are low. Configure your own free Gemini key in <strong className="text-orange-500">Settings</strong> to unlock uninterrupted generations!
+            </span>
+          </div>
+        );
+      } else {
+        showToast("❌ Failed to generate recipe. Please check your Gemini API key.");
+      }
     } finally {
       setIsRecipeAiGenerating(false);
     }
@@ -1398,7 +1411,20 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       showToast("✨ AI generated a custom recipe matching your macros!");
     } catch (err: any) {
       console.error(err);
-      alert(`AI Recipe Generation Error: ${err.message || "Could not generate recipe"}`);
+      const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+      const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
+      if (!preferenceGeminiKey) {
+        showToast(
+          <div className="text-left font-sans">
+            <span className="font-bold text-stone-900 block text-xs">❌ Generation Failed</span>
+            <span className="text-[10px] text-stone-500 font-semibold block leading-tight mt-1">
+              Central AI credits are low. Configure your own free Gemini key in <strong className="text-orange-500">Settings</strong> to unlock uninterrupted generations!
+            </span>
+          </div>
+        );
+      } else {
+        showToast("❌ Failed to generate recipe. Please check your Gemini API key.");
+      }
     } finally {
       setIsGeneratingRecipe(false);
     }
