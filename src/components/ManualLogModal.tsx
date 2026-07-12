@@ -15,15 +15,7 @@ import type { Meal } from "../types";
 import { hasNoGeneratedImage, getMealEmoji } from "../utils/helpers";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 
-// Initial default food items for quick log
-const QUICK_LOG_DEFAULTS = [
-  { name: "Morning Avocado Toast", calories: 320, protein: 12, carbs: 35, fats: 18, image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=60", type: "Breakfast" },
-  { name: "Quinoa Power Bowl", calories: 450, protein: 22, carbs: 55, fats: 15, image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=60", type: "Lunch" },
-  { name: "Avocado Salmon Protein Bowl", calories: 420, protein: 34, carbs: 12, fats: 28, image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80", type: "Meal" },
-  { name: "Spinach Oat Pancakes", calories: 310, protein: 16, carbs: 45, fats: 8, image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80", type: "Breakfast" },
-  { name: "Keto Spinach & Cheese Omelette", calories: 290, protein: 22, carbs: 3, fats: 22, image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600&q=80", type: "Breakfast" },
-  { name: "Mediterranean Chickpea Salad", calories: 340, protein: 12, carbs: 48, fats: 10, image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&q=80", type: "Lunch" },
-];
+const QUICK_LOG_DEFAULTS: any[] = [];
 
 interface QuickLogItem {
   name: string;
@@ -35,6 +27,8 @@ interface QuickLogItem {
   type?: string;
   meal_description?: string;
   fiber?: number;
+  logCount?: number;
+  source: "recipe" | "recent";
 }
 
 export const ManualLogModal = ({
@@ -43,6 +37,7 @@ export const ManualLogModal = ({
   mealToEdit,
   onNavigateToSettings,
   mealsState = [],
+  recipesState = [],
   initialAiMode,
   profileData,
 }: {
@@ -51,6 +46,7 @@ export const ManualLogModal = ({
   mealToEdit?: Meal | null;
   onNavigateToSettings: () => void;
   mealsState?: Meal[];
+  recipesState?: any[];
   initialAiMode?: boolean;
   profileData?: any;
 }) => {
@@ -108,6 +104,15 @@ export const ManualLogModal = ({
     const itemsMap = new Map<string, QuickLogItem>();
     const getKey = (n: string) => n.trim().toLowerCase();
 
+    // Calculate count of each meal logged in history
+    const mealCounts = new Map<string, number>();
+    if (mealsState) {
+      mealsState.forEach(item => {
+        const key = getKey(item.name);
+        mealCounts.set(key, (mealCounts.get(key) || 0) + 1);
+      });
+    }
+
     // 1. Add user history items first (most recent)
     if (mealsState) {
       mealsState.forEach(item => {
@@ -120,24 +125,51 @@ export const ManualLogModal = ({
             carbs: item.carbs,
             fats: item.fats,
             image: item.image || "",
-            type: item.type,
+            type: item.type || "Meal",
             meal_description: (item as any).meal_description || "",
-            fiber: (item as any).fiber || 0
+            fiber: (item as any).fiber || 0,
+            logCount: mealCounts.get(key) || 1,
+            source: "recent"
           });
         }
       });
     }
 
-    // 2. Add system defaults
+    // 2. Add recipes
+    if (recipesState) {
+      recipesState.forEach(recipe => {
+        const key = getKey(recipe.name);
+        if (!itemsMap.has(key)) {
+          itemsMap.set(key, {
+            name: recipe.name,
+            calories: recipe.calories,
+            protein: recipe.protein,
+            carbs: recipe.carbs,
+            fats: recipe.fats,
+            image: recipe.image || "",
+            type: "Recipe",
+            meal_description: recipe.description || "",
+            fiber: recipe.fiber || 0,
+            logCount: 0,
+            source: "recipe"
+          });
+        }
+      });
+    }
+
+    // 3. Add system defaults
     QUICK_LOG_DEFAULTS.forEach(item => {
       const key = getKey(item.name);
       if (!itemsMap.has(key)) {
-        itemsMap.set(key, item);
+        itemsMap.set(key, {
+          ...item,
+          source: "recent"
+        });
       }
     });
 
     return Array.from(itemsMap.values());
-  }, [mealsState]);
+  }, [mealsState, recipesState]);
 
   const filteredQuickItems = useMemo(() => {
     if (!searchQuery.trim()) return quickLogItems;
@@ -411,7 +443,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
               </div>
 
               {/* Food Items List */}
-              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-0.5">
+              <div className="space-y-3.5 max-h-[380px] overflow-y-auto pr-0.5">
                 {filteredQuickItems.length === 0 ? (
                   <div className="text-center py-8 text-stone-450 text-[10px] font-bold">
                     No matching food items found.
@@ -422,16 +454,16 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                     return (
                       <div
                         key={`${item.name}-${index}`}
-                        className="bg-stone-50/40 hover:bg-stone-50 border border-stone-200/50 rounded-2xl p-3 flex items-center justify-between gap-3 transition-colors shadow-2xs"
+                        className="bg-white/60 hover:bg-white border border-stone-200/40 rounded-[22px] p-4 flex items-center justify-between gap-4 transition-all duration-300 shadow-[0_2px_8px_rgba(0,0,0,0.015)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.035)] active:scale-[0.99] group/card cursor-pointer"
                       >
                         {/* Left Side: Preview & Name & Macros */}
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
                           {isDefaultImage ? (
-                            <div className="w-12 h-12 rounded-xl bg-orange-50/70 flex items-center justify-center text-xl shrink-0 border border-orange-100/50 shadow-inner select-none">
+                            <div className="w-14 h-14 rounded-[16px] bg-orange-50/70 flex items-center justify-center text-2xl shrink-0 border border-orange-100/50 shadow-inner select-none transition-transform duration-300 group-hover/card:scale-105">
                               {getMealEmoji(item.name, item.type)}
                             </div>
                           ) : (
-                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs">
+                            <div className="w-14 h-14 rounded-[16px] overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs transition-transform duration-300 group-hover/card:scale-105">
                               <img
                                 src={item.image}
                                 className="w-full h-full object-cover"
@@ -440,16 +472,31 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                             </div>
                           )}
 
-                          <div className="text-left min-w-0">
-                            <h5 className="text-[11px] font-black text-stone-900 truncate leading-snug">
-                              {item.name}
-                            </h5>
+                          <div className="text-left min-w-0 flex-1 space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h5 className="text-[12px] font-black text-stone-900 truncate leading-snug">
+                                {item.name}
+                              </h5>
+                              {item.source === "recipe" ? (
+                                <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-orange-50 border border-orange-100 text-orange-600 leading-none">
+                                  Recipe
+                                </span>
+                              ) : (
+                                <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200/50 text-stone-500 leading-none">
+                                  Recent
+                                </span>
+                              )}
+                              
+                              <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 leading-none">
+                                {item.logCount || 0} {item.logCount === 1 ? "log" : "logs"}
+                              </span>
+                            </div>
                             {item.meal_description && (
-                              <p className="text-[9px] text-stone-400 font-medium truncate leading-tight mt-0.5" title={item.meal_description}>
+                              <p className="text-[9.5px] text-stone-400 font-semibold line-clamp-2 leading-relaxed" title={item.meal_description}>
                                 {item.meal_description}
                               </p>
                             )}
-                            <div className="text-[9px] font-bold text-stone-505 mt-1 flex flex-wrap gap-x-1.5 items-center">
+                            <div className="text-[9.5px] font-bold text-stone-500 flex flex-wrap gap-x-2 items-center pt-0.5">
                               <span className="text-orange-600 font-extrabold">{item.calories} kcal</span>
                               <span className="text-stone-300">•</span>
                               <span>{item.protein}g P</span>
@@ -757,19 +804,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <div
-                        onClick={onNavigateToSettings}
-                        className="border border-dashed border-stone-200 rounded-xl p-3 text-center cursor-pointer hover:bg-stone-50/50 transition-all select-none group text-left"
-                      >
-                        <span className="text-[10px] font-black text-stone-400 group-hover:text-orange-500 transition-colors uppercase tracking-wider block">
-                          🔒 Unlock Real-Time Camera Scanning
-                        </span>
-                        <span className="text-[8.5px] font-bold text-stone-300 group-hover:text-stone-450 transition-colors block mt-0.5 leading-none">
-                          Link your free Gemini key in Settings to scan plates
-                        </span>
-                      </div>
-                    )}
+                    ) : null}
 
                     <p className="text-[9px] text-stone-400 font-medium leading-relaxed">
                       AI will {hasAnyValues ? "recalculate macros based on your changes" : "estimate calories and macros from your description or photo"}.
@@ -799,7 +834,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                     onClick={() => { setShowAiMode(false); setAiInstruction(""); setErrorMessage(""); }}
                     className="flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-stone-600 bg-stone-100 hover:bg-stone-200/85 active:scale-[0.98] transition-all duration-200 cursor-pointer text-center"
                   >
-                    Cancel
+                    Manual Log
                   </button>
                   <button
                     type="button"

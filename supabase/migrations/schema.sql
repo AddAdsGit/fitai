@@ -12,8 +12,17 @@ create table public.profiles (
   weight numeric(5,2) default 70.00, -- in kg
   dob date,
   gender text,
-  memories text[] default '{}',
   preferences text[] default '{}',
+  
+  -- Knowledge buckets (V3.2)
+  knowledge_preferences text[] default '{}',
+  knowledge_health text[] default '{}',
+  knowledge_notes text[] default '{}',
+  knowledge_patterns text[] default '{}',
+  
+  -- Agent Brain (V3.2)
+  agent_memory text[] default '{}',
+  agent_config jsonb default '{"showGptWidget": true, "generateImages": true, "refinePhotos": false, "artStyle": "gourmet", "customInstructions": "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."}'::jsonb,
   
   -- Goals
   daily_calories_goal integer default 2000,

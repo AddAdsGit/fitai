@@ -65,17 +65,29 @@ export const ProfileView = ({
   currentStreak: number;
   mealsState: Meal[];
 }) => {
-  const [profileTab, setProfileTab] = useState<"meals" | "insights" | "memory">("meals");
+  const [profileTab, setProfileTab] = useState<"meals" | "insights" | "agent-brain">("meals");
   
-  const memoriesText = (profileData.memories || []).join("\n");
-  const [draftMemories, setDraftMemories] = useState(memoriesText);
+  // V3.2 Restructured Agent Brain States (Combined Single Notepad)
+  const getCombinedMemoriesText = () => {
+    const k = profileData.knowledge || { preferences: [], health: [], notes: [], patterns: [] };
+    const am = profileData.agent_memory || [];
+    return [
+      ...(k.preferences || []),
+      ...(k.health || []),
+      ...(k.notes || []),
+      ...(k.patterns || []),
+      ...am
+    ].join("\n");
+  };
+
+  const [draftMemories, setDraftMemories] = useState(getCombinedMemoriesText());
   const [isEditingMemory, setIsEditingMemory] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setDraftMemories((profileData.memories || []).join("\n"));
-  }, [profileData.memories]);
+    setDraftMemories(getCombinedMemoriesText());
+  }, [profileData.knowledge, profileData.agent_memory]);
 
   useEffect(() => {
     if (isEditingMemory && textareaRef.current) {
@@ -84,6 +96,60 @@ export const ProfileView = ({
       textareaRef.current.setSelectionRange(len, len);
     }
   }, [isEditingMemory]);
+
+  const saveAllMemories = (text: string) => {
+    const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    const k = profileData.knowledge || { preferences: [], health: [], notes: [], patterns: [] };
+    const am = profileData.agent_memory || [];
+
+    // Map existing items to check where they came from
+    const bucketMap = new Map<string, string>();
+    (k.preferences || []).forEach((item: string) => bucketMap.set(item, "preferences"));
+    (k.health || []).forEach((item: string) => bucketMap.set(item, "health"));
+    (k.notes || []).forEach((item: string) => bucketMap.set(item, "notes"));
+    (k.patterns || []).forEach((item: string) => bucketMap.set(item, "patterns"));
+    am.forEach((item: string) => bucketMap.set(item, "agent_memory"));
+
+    const newPreferences: string[] = [];
+    const newHealth: string[] = [];
+    const newNotes: string[] = [];
+    const newPatterns: string[] = [];
+    const newAgentMemory: string[] = [];
+
+    lines.forEach((line) => {
+      const originalBucket = bucketMap.get(line);
+      if (originalBucket === "preferences") {
+        newPreferences.push(line);
+      } else if (originalBucket === "health") {
+        newHealth.push(line);
+      } else if (originalBucket === "patterns") {
+        newPatterns.push(line);
+      } else if (originalBucket === "agent_memory") {
+        newAgentMemory.push(line);
+      } else {
+        // Brand new items added by the user
+        // Classify based on keywords
+        const lower = line.toLowerCase();
+        const isAgentBehavior = lower.includes("reply") || lower.includes("converse") || lower.includes("tone") || lower.includes("brief") || lower.includes("short") || lower.includes("format") || lower.includes("bullet") || lower.includes("motivate") || lower.includes("speak") || lower.includes("talk");
+        if (isAgentBehavior) {
+          newAgentMemory.push(line);
+        } else {
+          newNotes.push(line);
+        }
+      }
+    });
+
+    setProfileData({
+      ...profileData,
+      knowledge: {
+        preferences: newPreferences,
+        health: newHealth,
+        notes: newNotes,
+        patterns: newPatterns
+      },
+      agent_memory: newAgentMemory
+    });
+  };
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [showLogsToRecipeModal, setShowLogsToRecipeModal] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
@@ -421,10 +487,10 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
           <BarChart2 className="w-6 h-6" />
         </button>
         <button
-          onClick={() => setProfileTab("memory")}
+          onClick={() => setProfileTab("agent-brain")}
           className={cn(
             "flex-1 py-3 flex justify-center border-b-[3px] transition-colors",
-            profileTab === "memory"
+            profileTab === "agent-brain"
               ? "border-[#1a1a1a] text-[#1a1a1a]"
               : "border-transparent text-[#9e9e9e]",
           )}
@@ -705,12 +771,12 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
           </div>
         )}
 
-        {profileTab === "memory" && (
+        {profileTab === "agent-brain" && (
           <div className="px-6 py-4 max-w-[calc(448px)] mx-auto space-y-5 text-left">
             <div className="flex justify-between items-center pb-2 select-none">
               <div className="flex items-center gap-2">
                 <Database className="w-4 h-4 text-orange-500" />
-                <span className="text-[11px] font-black uppercase tracking-wider text-stone-400">AI Memory</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-stone-400">Agent Brain</span>
               </div>
               <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -729,18 +795,12 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                     setDraftMemories(val);
                     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
                     saveTimeoutRef.current = window.setTimeout(() => {
-                      setProfileData({
-                        ...profileData,
-                        memories: val.split("\n").map(l => l.trim()).filter(l => l.length > 0)
-                      });
+                      saveAllMemories(val);
                     }, 1000);
                   }}
                   onBlur={() => {
                     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-                    setProfileData({
-                      ...profileData,
-                      memories: draftMemories.split("\n").map(l => l.trim()).filter(l => l.length > 0)
-                    });
+                    saveAllMemories(draftMemories);
                     setIsEditingMemory(false);
                   }}
                   placeholder="Tap here to write down things for the AI to remember (one item per line, e.g.)&#13;• Allergic to peanuts&#13;• Prefers high-protein low-carb dinners"
@@ -767,7 +827,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               )}
             </div>
             
-            <div className="flex justify-between items-center text-[7.5px] font-black uppercase text-stone-400 tracking-widest pt-4 border-t border-stone-200/40">
+            <div className="flex justify-between items-center text-[7.5px] font-black uppercase text-stone-400 tracking-widest pt-4 border-t border-stone-200/40 select-none">
               <span>Auto-saves instantly</span>
               <span>{draftMemories.split("\n").filter(l => l.trim().length > 0).length} Memory Slots Active</span>
             </div>

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { SharedItemPayload, decodeBase64ToPayload, decompressToMeal, decompressToRecipe } from "../utils/shareUtils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { hasNoGeneratedImage, getMealEmoji } from "../utils/helpers";
+import { cn } from "../lib/utils";
 
 interface PublicShareViewProps {
   shareId: string | null;

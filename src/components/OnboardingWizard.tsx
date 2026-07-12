@@ -474,10 +474,18 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
 
     const updatedPrefs = [
       ...(metrics.preferences || []),
-      "onboarded",
-      ...(enableGptWidget ? ["show_gpt_widget"] : []),
-      ...(requireGptConfirmation ? ["require_gpt_confirmation"] : [])
+      "onboarded"
     ];
+
+    const initialAgentConfig = {
+      showGptWidget: enableGptWidget,
+      generateImages: true,
+      refinePhotos: false,
+      artStyle: "gourmet",
+      customArtStyle: "",
+      requireConfirmation: requireGptConfirmation,
+      customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
+    };
 
     const { error } = await supabase
       .from('profiles')
@@ -491,7 +499,12 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
         gender: metrics.gender,
         description: silentBio,
         preferences: updatedPrefs,
-        memories: metrics.preferences,
+        knowledge_preferences: metrics.preferences || [],
+        knowledge_health: [],
+        knowledge_notes: [],
+        knowledge_patterns: [],
+        agent_memory: [],
+        agent_config: initialAgentConfig,
         daily_calories_goal: targets.calories,
         weight_goal: metrics.targetWeight,
         protein_goal: targets.protein,
@@ -514,7 +527,14 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
       gender: metrics.gender,
       description: silentBio,
       preferences: updatedPrefs,
-      memories: metrics.preferences,
+      knowledge: {
+        preferences: metrics.preferences || [],
+        health: [],
+        notes: [],
+        patterns: []
+      },
+      agent_memory: [],
+      agent_config: initialAgentConfig,
       goals: {
         dailyCalories: targets.calories,
         weightGoal: metrics.targetWeight

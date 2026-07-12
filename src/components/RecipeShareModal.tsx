@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { X, Copy, Download, Share2, Flame, Check, ChevronLeft, ChevronRight, Utensils } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { X, Copy, Download, Share2, Flame, Check, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
+import { motion } from "motion/react";
 import { SharedItemPayload, generateShareUrl, compressRecipe } from "../utils/shareUtils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { cn } from "../lib/utils";
@@ -18,56 +18,61 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
   onClose,
   triggerToast,
 }) => {
+  // Pure Obsidian Branding Variations (1:1 Post and 9:16 Story)
   const variations = [
-    { id: "obsidian_1_1", name: "Obsidian Teaser (1:1)", theme: "obsidian", format: "square" },
-    { id: "cream_1_1", name: "Cream Menu (1:1)", theme: "cream", format: "square" },
-    { id: "emerald_1_1", name: "Emerald Sport (1:1)", theme: "emerald", format: "square" },
-    { id: "sunset_3_4", name: "Sunset Post (3:4)", theme: "sunset", format: "portrait" },
-    { id: "obsidian_3_4", name: "Obsidian Full (3:4)", theme: "obsidian", format: "portrait" },
-    { id: "cream_3_4", name: "Cream Full (3:4)", theme: "cream", format: "portrait" },
-    { id: "sunset_9_16", name: "Sunset Story (9:16)", theme: "sunset", format: "story" },
-    { id: "emerald_9_16", name: "Emerald Story (9:16)", theme: "emerald", format: "story" }
+    { id: "obsidian", name: "Obsidian (Glass Tech)", format: "square" },
+    { id: "editorial", name: "Editorial (Light Premium)", format: "square" }
   ] as const;
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const initialIndex = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const testVar = params.get("variation");
+    if (testVar) {
+      const idx = parseInt(testVar, 10);
+      return idx >= 0 && idx < variations.length ? idx : 0;
+    }
+    return 0;
+  }, [variations]);
+
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [copied, setCopied] = useState(false);
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [shortUrl, setShortUrl] = useState<string | null>(null);
   const [previewTab, setPreviewTab] = useState<"card" | "webpage">("card");
+  const [canShareFile, setCanShareFile] = useState(false);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
 
-  // Recipe customization toggles
-  const [showCookTime, setShowCookTime] = useState(true);
-  const [showRecipeDesc, setShowRecipeDesc] = useState(true);
-  const [showRecipeSteps, setShowRecipeSteps] = useState(true);
-  
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentVar = variations[currentIndex];
-  const currentTemplate = currentVar.theme;
   const cardFormat = currentVar.format;
-
-  const wrapperBg = useMemo(() => {
-    if (currentTemplate === "obsidian") return "bg-[#1C1917]";
-    if (currentTemplate === "cream") return "bg-[#FAF9F6]";
-    if (currentTemplate === "emerald") return "bg-[#064E3B]";
-    return "bg-gradient-to-tr from-[#FF4E50]/80 to-[#F9D423]/80";
-  }, [currentTemplate]);
 
   const handleStr = profileData.username ? `@${profileData.username}` : "@user";
 
-  const name = item.name || "Custom Recipe";
+  const name = item.name || "Healthy Recipe";
   const calories = Number(item.calories || 0);
   const protein = Number(item.protein || 0);
   const carbs = Number(item.carbs || 0);
   const fats = Number(item.fats || 0);
   const fiber = Number(item.fiber || 0);
-  const time = item.time || "15 mins";
+  const time = item.prep_time || "15 min";
   const image = item.image || "";
-  const ingredients = item.ingredients || [];
+
+  const ingredients: string[] = useMemo(() => {
+    if (Array.isArray(item.ingredients)) return item.ingredients;
+    if (typeof item.ingredients === "string") {
+      try {
+        const parsed = JSON.parse(item.ingredients);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        return item.ingredients.split(",").map((i: string) => i.trim()).filter(Boolean);
+      }
+    }
+    return [];
+  }, [item.ingredients]);
 
   const payload = useMemo(() => compressRecipe(item), [item]);
   const finalLink = shortUrl || generateShareUrl("recipe", payload);
 
-  // HTML5 Canvas draw function
   const drawCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -75,20 +80,65 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
     if (!ctx) return;
 
     canvas.width = 1080;
-    if (cardFormat === "story") {
+    if ((cardFormat as string) === "story") {
       canvas.height = 1920;
-    } else if (cardFormat === "portrait") {
-      canvas.height = 1440;
     } else {
       canvas.height = 1080;
     }
 
-    const accentColor = "#F97316";
+    // Determine colors and styles based on the active variation
+    const isObsidian = (currentVar.id as string) === "obsidian";
+    const isEditorial = (currentVar.id as string) === "editorial";
+    const isSolar = (currentVar.id as string) === "solar";
 
-    // Text Wrapping Helper
-    const wrapText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number, color: string, font: string) => {
+    let fontFamily = "Inter, system-ui, sans-serif";
+    let titleFont = "900 68px Inter, system-ui, sans-serif";
+    let labelFont = "700 18px Inter, system-ui, sans-serif";
+    let textColor = "#FAF9F6";
+    let textMuted = "#A8A29E";
+    let accentColor = "#F97316";
+    let panelFill = "rgba(18, 17, 16, 0.72)";
+    let panelBorder = "rgba(255, 255, 255, 0.15)";
+    let borderWidth = 1.5;
+    let logoBoxColor = "#F97316";
+    let creatorBadgeFill = "rgba(255,255,255,0.12)";
+    let creatorBadgeTextColor = "#FAF9F6";
+    let creatorBadgeFont = "800 20px Inter, system-ui, sans-serif";
+
+    if (isEditorial) {
+      fontFamily = "Georgia, serif";
+      titleFont = "italic 700 68px Georgia, serif";
+      labelFont = "700 18px Georgia, serif";
+      textColor = "#1A1715";
+      textMuted = "#78716C";
+      accentColor = "#C2410C";
+      panelFill = "#FFFFFF";
+      panelBorder = "#1A1715";
+      borderWidth = 1.5;
+      logoBoxColor = "#1A1715";
+      creatorBadgeFill = "rgba(26,23,21,0.06)";
+      creatorBadgeTextColor = "#1A1715";
+      creatorBadgeFont = "700 20px Georgia, serif";
+    } else if (isSolar) {
+      fontFamily = "Inter, system-ui, sans-serif";
+      titleFont = "900 68px Inter, system-ui, sans-serif";
+      labelFont = "700 18px Inter, system-ui, sans-serif";
+      textColor = "#FAF9F6";
+      textMuted = "#A8A29E";
+      accentColor = "#F97316";
+      panelFill = "rgba(255,255,255,0.06)";
+      panelBorder = "rgba(255,255,255,0.09)";
+      borderWidth = 1.5;
+      logoBoxColor = "#F97316";
+      creatorBadgeFill = "rgba(255,255,255,0.12)";
+      creatorBadgeTextColor = "#FAF9F6";
+      creatorBadgeFont = "800 20px Inter, system-ui, sans-serif";
+    }
+
+    const wrapText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number, color: string, font: string, align: "left" | "center" = "left") => {
       ctx.fillStyle = color;
       ctx.font = font;
+      ctx.textAlign = align;
       const words = text.split(" ");
       let line = "";
       let currentY = y;
@@ -105,602 +155,553 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         }
       }
       ctx.fillText(line, x, currentY);
+      ctx.textAlign = "left";
       return currentY;
     };
 
-    const runTemplateDraw = (loadedImg: HTMLImageElement | null) => {
-      ctx.clearRect(0, 0, 1080, canvas.height);
-      
-      const isDark = currentTemplate === "obsidian";
-      const isSunset = currentTemplate === "sunset";
-      let bgColor = isDark ? "#1C1917" : "#FAF9F6";
-      let txtColor = isDark ? "#FAF9F6" : "#1C1917";
-      let subTxtColor = isDark ? "#A8A29E" : "#78716C";
+    const drawMacrosAndFooter = (macroY: number) => {
+      if (isEditorial) {
+        // 4 Macros Layout for Light Editorial (Design 2)
+        const macros = [
+          { label: "PROTEIN", val: `${protein}g` },
+          { label: "CARBS", val: `${carbs}g` },
+          { label: "FAT", val: `${fats}g` },
+          { label: "FIBER", val: `${fiber}g` }
+        ];
 
-      if (currentTemplate === "obsidian") {
-        // ================= TEMPLATE 1: OBSIDIAN DARK =================
-        if (loadedImg) {
-          const scale = Math.max(1080 / loadedImg.width, canvas.height / loadedImg.height);
-          const xOffset = 540 - (loadedImg.width * scale) / 2;
-          const yOffset = (canvas.height / 2) - (loadedImg.height * scale) / 2;
-          ctx.drawImage(loadedImg, xOffset, yOffset, loadedImg.width * scale, loadedImg.height * scale);
-          const overlay = ctx.createLinearGradient(0, 0, 0, canvas.height);
-          overlay.addColorStop(0, "rgba(0,0,0,0.3)");
-          overlay.addColorStop(0.5, "rgba(0,0,0,0.45)");
-          overlay.addColorStop(1, "rgba(0,0,0,0.85)");
-          ctx.fillStyle = overlay;
-          ctx.fillRect(0, 0, 1080, canvas.height);
-        } else {
-          ctx.fillStyle = "#1C1917";
-          ctx.fillRect(0, 0, 1080, canvas.height);
-        }
+        const colWidth = 920 / 4; // 230px
+        const startX = 80;
 
-        // Draw FitAI Brand Logo (Flame Icon Box)
-        ctx.fillStyle = accentColor;
-        ctx.beginPath();
-        ctx.roundRect(80, 80, 72, 72, 20);
-        ctx.fill();
+        macros.forEach((m, idx) => {
+          const centerColX = startX + idx * colWidth + colWidth / 2;
+          
+          // Draw label: PROTEIN, CARBS, etc.
+          ctx.fillStyle = "#78716C";
+          ctx.font = "800 16px Inter, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(m.label, centerColX, macroY + 25);
 
-        ctx.fillStyle = "#FFFFFF";
-        ctx.beginPath();
-        ctx.moveTo(116, 92);
-        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
-        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
-        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
-        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
-        ctx.fill();
-        
-        ctx.fillStyle = accentColor;
-        ctx.beginPath();
-        ctx.moveTo(116, 112);
-        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
-        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
-        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
-        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
-        ctx.fill();
+          // Draw value: 32g, 64g, etc.
+          ctx.fillStyle = "#1A1715";
+          ctx.font = "900 32px Inter, sans-serif";
+          ctx.fillText(m.val, centerColX, macroY + 70);
 
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "black 54px Inter, system-ui, sans-serif";
-        ctx.textBaseline = "middle";
-        ctx.fillText("FitAI", 172, 116);
-
-        // Creator Handle Badge Right
-        ctx.fillStyle = "rgba(255,255,255,0.15)";
-        ctx.beginPath();
-        ctx.roundRect(750, 80, 250, 56, 14);
-        ctx.fill();
-
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "extrabold 20px Inter, system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(handleStr, 875, 108);
-        ctx.textAlign = "left";
-
-        // Title Date & Info
-        const finalY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 76px Inter, system-ui, sans-serif");
-
-        let infoY = finalY + 65;
-        if (showCookTime) {
-          ctx.fillStyle = accentColor;
-          ctx.font = "black 36px Inter, system-ui, sans-serif";
-          ctx.fillText(`🍳 ${time} PREP`, 80, infoY);
-          infoY += 50;
-        }
-
-        ctx.fillStyle = subTxtColor;
-        ctx.font = "bold 28px Inter, system-ui, sans-serif";
-        ctx.fillText(`Logged ${item.log_count || 0} times by ${handleStr}`, 80, infoY);
-
-        let boxY = infoY + 50;
-        let boxH = 340;
-        let ingOffset = 65;
-        let calOffset = 475;
-
-        if (cardFormat !== "square") {
-          if (showRecipeDesc) {
-            const descText = item.description || "A custom recipe generated and tracked on FitAI.";
-            const descY = wrapText(descText, 80, infoY + 75, 920, 44, "#FAF9F6", "medium 28px Inter, system-ui, sans-serif");
-            boxY = descY + 55;
-          } else {
-            boxY = infoY + 55;
+          // Draw vertical divider to the right of the column (except last column)
+          if (idx < 3) {
+            const dividerX = startX + (idx + 1) * colWidth;
+            ctx.strokeStyle = "rgba(26, 23, 21, 0.12)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(dividerX, macroY + 10);
+            ctx.lineTo(dividerX, macroY + 75);
+            ctx.stroke();
           }
-          boxH = 310;
-          ingOffset = 58;
-          calOffset = 425;
-        }
+        });
+        ctx.textAlign = "left"; // reset
 
-        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        // Draw horizontal line above macros
+        ctx.strokeStyle = "rgba(26, 23, 21, 0.12)";
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.roundRect(80, boxY, 920, boxH, 24);
+        ctx.moveTo(80, macroY - 25);
+        ctx.lineTo(1000, macroY - 25);
+        ctx.stroke();
+
+        // Footer Drawing for Editorial
+        const footerY = canvas.height - 110;
+        
+        // Hashtag Outline Pill
+        ctx.save();
+        ctx.strokeStyle = "#F97316";
+        ctx.lineWidth = 2;
+        ctx.fillStyle = "transparent";
+        ctx.beginPath();
+        ctx.roundRect(80, footerY + 20, 190, 50, 25);
+        ctx.stroke();
         ctx.fill();
 
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "extrabold 32px Inter, system-ui, sans-serif";
-        ctx.fillText("INGREDIENTS CHECKLIST", 120, boxY + 60);
+        ctx.fillStyle = "#F97316";
+        ctx.font = "900 20px Inter, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("#FuelYourBest", 175, footerY + 52);
+        ctx.restore();
 
-        ctx.font = "bold 30px Inter, system-ui, sans-serif";
-        const topIngredients = ingredients.slice(0, 3);
-        topIngredients.forEach((ing: string, idx: number) => {
-          ctx.fillStyle = accentColor;
-          ctx.beginPath();
-          ctx.arc(130, boxY + 120 + idx * ingOffset, 7, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = "#FAF9F6";
-          ctx.fillText(ing, 165, boxY + 128 + idx * ingOffset);
-        });
-
-        if (ingredients.length > 3) {
-          ctx.fillStyle = "#A8A29E";
-          ctx.font = "italic 26px Inter, system-ui, sans-serif";
-          ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + boxH - 40);
-        }
-
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "black 90px Inter, system-ui, sans-serif";
-        ctx.fillText(`${calories} kcal`, 80, boxY + calOffset);
-
-        if (cardFormat !== "square" && showRecipeSteps) {
-          const instructionsY = boxY + 310;
-          const instructionsBoxH = cardFormat === "story" ? 640 : 250;
-          ctx.fillStyle = "rgba(255,255,255,0.06)";
-          ctx.beginPath();
-          ctx.roundRect(80, instructionsY, 920, instructionsBoxH, 24);
-          ctx.fill();
-
-          ctx.fillStyle = "#FAF9F6";
-          ctx.font = "extrabold 32px Inter, system-ui, sans-serif";
-          ctx.fillText("PREPARATION STEPS", 120, instructionsY + 60);
-
-          const instructionsText = item.instructions || "Enjoy this healthy custom portion immediately!";
-          wrapText(
-            instructionsText,
-            120,
-            instructionsY + 115,
-            840,
-            42,
-            "#FAF9F6",
-            "bold 28px Inter, system-ui, sans-serif"
-          );
-        }
-
-        // Macros Row
-        const macroY = canvas.height - 260;
+        ctx.fillStyle = "#78716C";
+        ctx.font = "700 20px Inter, sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText("fitpush.vercel.app", 1000, footerY + 52);
+        ctx.textAlign = "left"; // reset
+      } else {
+        // Obsidian regular 3-capsule macros layout
         const macros = [
           { name: "Protein", val: `${protein}g`, color: "#F97316" },
           { name: "Carbs", val: `${carbs}g`, color: "#0891B2" },
           { name: "Fats", val: `${fats}g`, color: "#EAB308" }
         ];
 
+        const startPad = isObsidian ? 120 : 80;
+        const cardW = isObsidian ? 260 : 280;
+        const cardGap = isObsidian ? 30 : 40;
+
         macros.forEach((m, idx) => {
-          const startX = 80 + idx * 320;
-          ctx.fillStyle = "rgba(255,255,255,0.08)";
+          const startX = startPad + idx * (cardW + cardGap);
+          
+          ctx.fillStyle = isObsidian 
+            ? "rgba(255, 255, 255, 0.05)" 
+            : isEditorial 
+              ? "#FFFFFF" 
+              : "rgba(6,214,160,0.08)";
+              
           ctx.beginPath();
-          ctx.roundRect(startX, macroY, 280, 110, 20);
+          ctx.roundRect(startX, macroY, cardW, 115, 22);
           ctx.fill();
 
+          ctx.strokeStyle = isObsidian 
+            ? "rgba(255, 255, 255, 0.12)" 
+            : isEditorial 
+              ? "#1A1715" 
+              : "rgba(6,214,160,0.2)";
+              
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(startX, macroY, cardW, 115, 22);
+          ctx.stroke();
+
+          // Dot indicator
           ctx.fillStyle = m.color;
           ctx.beginPath();
-          ctx.arc(startX + 35, macroY + 55, 8, 0, Math.PI * 2);
+          ctx.arc(startX + 35, macroY + 58, 8, 0, Math.PI * 2);
           ctx.fill();
 
-          ctx.fillStyle = "#A8A29E";
-          ctx.font = "bold 18px Inter, system-ui, sans-serif";
-          ctx.fillText(m.name.toUpperCase(), startX + 60, macroY + 38);
+          ctx.fillStyle = isObsidian 
+            ? "#A8A29E" 
+            : isEditorial 
+              ? "#78716C" 
+              : "rgba(255,255,255,0.6)";
+              
+          ctx.font = `${labelFont}`;
+          ctx.fillText(m.name.toUpperCase(), startX + 60, macroY + 40);
 
-          ctx.fillStyle = "#FAF9F6";
-          ctx.font = "black 30px Inter, system-ui, sans-serif";
-          ctx.fillText(m.val, startX + 60, macroY + 80);
+          ctx.fillStyle = isObsidian 
+            ? "#FAF9F6" 
+            : isEditorial 
+              ? "#1A1715" 
+              : "#FFFFFF";
+              
+          ctx.font = `900 32px ${fontFamily}`;
+          ctx.fillText(m.val, startX + 60, macroY + 84);
         });
 
-        // Footer line
         const footerY = canvas.height - 110;
-        ctx.strokeStyle = "rgba(255,255,255,0.1)";
+        ctx.strokeStyle = isEditorial ? "#1A1715" : "rgba(255,255,255,0.1)";
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(80, footerY);
         ctx.lineTo(1000, footerY);
         ctx.stroke();
 
-        ctx.fillStyle = "#A8A29E";
-        ctx.font = "bold 22px Inter, system-ui, sans-serif";
+        ctx.fillStyle = isObsidian 
+          ? "#A8A29E" 
+          : isEditorial 
+            ? "#78716C" 
+            : "rgba(255,255,255,0.6)";
+            
+        ctx.font = `700 22px ${fontFamily}`;
         ctx.fillText("FITAI • CALORIE ENGINE", 80, footerY + 45);
-        ctx.textAlign = "right";
-        ctx.fillText("fitpush.vercel.app", 1000, footerY + 45);
-        ctx.textAlign = "left";
-
-      } else if (currentTemplate === "cream") {
-        // ================= TEMPLATE 2: CREAM LIGHT =================
-        ctx.fillStyle = "#FAF9F6";
-        ctx.fillRect(0, 0, 1080, canvas.height);
-
-        // Draw Logo Box (Flame)
-        ctx.fillStyle = accentColor;
-        ctx.beginPath();
-        ctx.roundRect(80, 80, 72, 72, 20);
-        ctx.fill();
-
-        ctx.fillStyle = "#FFFFFF";
-        ctx.beginPath();
-        ctx.moveTo(116, 92);
-        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
-        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
-        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
-        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
-        ctx.fill();
-        
-        ctx.fillStyle = accentColor;
-        ctx.beginPath();
-        ctx.moveTo(116, 112);
-        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
-        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
-        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
-        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
-        ctx.fill();
-
-        ctx.fillStyle = "#1C1917";
-        ctx.font = "black 54px Inter, system-ui, sans-serif";
-        ctx.textBaseline = "middle";
-        ctx.fillText("FitAI", 172, 116);
-
-        // Creator Handle
-        ctx.fillStyle = "#E7E5E4";
-        ctx.beginPath();
-        ctx.roundRect(750, 80, 250, 56, 14);
-        ctx.fill();
-
-        ctx.fillStyle = "#1C1917";
-        ctx.font = "extrabold 20px Inter, system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(handleStr, 875, 108);
-        ctx.textAlign = "left";
-
-        const circleX = 540;
-        const circleY = 440;
-
-        if (loadedImg) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(circleX, circleY, 170, 0, Math.PI * 2);
-          ctx.clip();
-          const scale = Math.max(340 / loadedImg.width, 340 / loadedImg.height);
-          const xOffset = circleX - (loadedImg.width * scale) / 2;
-          const yOffset = circleY - (loadedImg.height * scale) / 2;
-          ctx.drawImage(loadedImg, xOffset, yOffset, loadedImg.width * scale, loadedImg.height * scale);
-          ctx.restore();
-
-          ctx.strokeStyle = accentColor;
-          ctx.lineWidth = 12;
-          ctx.beginPath();
-          ctx.arc(circleX, circleY, 170, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.fillStyle = accentColor;
-          ctx.beginPath();
-          ctx.roundRect(circleX - 90, circleY + 130, 180, 56, 16);
-          ctx.fill();
-
-          ctx.fillStyle = "#FFFFFF";
-          ctx.font = "black 26px Inter, system-ui, sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText(`${calories} KCAL`, circleX, circleY + 167);
-          ctx.textAlign = "left";
-        } else {
-          ctx.strokeStyle = "#E7E5E4";
-          ctx.lineWidth = 12;
-          ctx.beginPath();
-          ctx.arc(circleX, circleY, 150, 0, Math.PI * 2);
-          ctx.stroke();
-
-          ctx.strokeStyle = accentColor;
-          ctx.lineWidth = 12;
-          ctx.beginPath();
-          ctx.arc(circleX, circleY, 150, -Math.PI / 2, Math.PI * 1.2);
-          ctx.stroke();
-
-          ctx.fillStyle = "#1C1917";
-          ctx.font = "black 72px Inter, system-ui, sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText(`${calories}`, circleX, circleY - 10);
-          ctx.fillStyle = "#78716C";
-          ctx.font = "bold 20px Inter, system-ui, sans-serif";
-          ctx.fillText("KCAL", circleX, circleY + 50);
-          ctx.textAlign = "left";
-        }
-
-        const titleY = loadedImg ? 735 : 715;
-        const nameY = wrapText(name, 80, titleY, 920, 76, "#1C1917", "black 64px Inter, system-ui, sans-serif");
-
-        // Info Tag
-        let subText = `Logged ${item.log_count || 0} times by ${handleStr}`;
-        if (showCookTime) {
-          subText += ` • ⏱️ ${time}`;
-        }
-        ctx.fillStyle = "#78716C";
-        ctx.font = "bold 28px Inter, system-ui, sans-serif";
-        ctx.fillText(subText, 80, nameY + 55);
-
-        const macroY = canvas.height - 260;
-        ctx.fillStyle = "#1C1917";
-        ctx.font = "extrabold 32px Inter, system-ui, sans-serif";
-        ctx.fillText(`PROTEIN: ${protein}g  •  CARBS: ${carbs}g  •  FATS: ${fats}g`, 80, macroY);
-
-        const footerY = canvas.height - 110;
-        ctx.strokeStyle = "#E7E5E4";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(80, footerY);
-        ctx.lineTo(1000, footerY);
-        ctx.stroke();
-
-        ctx.fillStyle = "#78716C";
-        ctx.font = "bold 22px Inter, system-ui, sans-serif";
-        ctx.fillText("FITAI • MINIMALIST CALORIE ENGINE", 80, footerY + 45);
-        ctx.textAlign = "right";
-        ctx.fillText("fitpush.vercel.app", 1000, footerY + 45);
-        ctx.textAlign = "left";
-
-      } else if (currentTemplate === "emerald") {
-        // ================= TEMPLATE 3: EMERALD NUTRITION FOCUS =================
-        ctx.fillStyle = "#064E3B";
-        ctx.fillRect(0, 0, 1080, canvas.height);
-
-        if (loadedImg) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(0, 0, 480, canvas.height);
-          ctx.clip();
-          const scale = Math.max(480 / loadedImg.width, canvas.height / loadedImg.height);
-          const xOffset = 240 - (loadedImg.width * scale) / 2;
-          const yOffset = (canvas.height / 2) - (loadedImg.height * scale) / 2;
-          ctx.drawImage(loadedImg, xOffset, yOffset, loadedImg.width * scale, loadedImg.height * scale);
-          ctx.restore();
-
-          ctx.strokeStyle = "rgba(250,249,246,0.15)";
-          ctx.lineWidth = 4;
-          ctx.beginPath();
-          ctx.moveTo(480, 0);
-          ctx.lineTo(480, canvas.height);
-          ctx.stroke();
-        }
-
-        const textOffset = loadedImg ? 540 : 80;
-        const textMaxW = loadedImg ? 460 : 500;
-        const statsOffset = loadedImg ? 540 : 640;
-
-        // Draw Flame Logo (White inside emerald)
-        ctx.fillStyle = "#FAF9F6";
-        ctx.beginPath();
-        ctx.roundRect(textOffset, 80, 72, 72, 20);
-        ctx.fill();
-
-        ctx.fillStyle = "#064E3B";
-        ctx.beginPath();
-        ctx.moveTo(textOffset + 36, 92);
-        ctx.bezierCurveTo(textOffset + 24, 106, textOffset + 18, 116, textOffset + 18, 126);
-        ctx.bezierCurveTo(textOffset + 18, 137, textOffset + 26, 144, textOffset + 36, 144);
-        ctx.bezierCurveTo(textOffset + 46, 144, textOffset + 54, 137, textOffset + 54, 126);
-        ctx.bezierCurveTo(textOffset + 54, 112, textOffset + 40, 100, textOffset + 36, 92);
-        ctx.fill();
-        
-        ctx.fillStyle = "#FAF9F6";
-        ctx.beginPath();
-        ctx.moveTo(textOffset + 36, 112);
-        ctx.bezierCurveTo(textOffset + 30, 120, textOffset + 26, 126, textOffset + 26, 132);
-        ctx.bezierCurveTo(textOffset + 26, 138, textOffset + 30, 141, textOffset + 36, 141);
-        ctx.bezierCurveTo(textOffset + 42, 141, textOffset + 46, 138, textOffset + 46, 132);
-        ctx.bezierCurveTo(textOffset + 46, 124, textOffset + 38, 117, textOffset + 36, 112);
-        ctx.fill();
-
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "black 54px Inter, system-ui, sans-serif";
-        ctx.textBaseline = "middle";
-        ctx.fillText("FitAI", textOffset + 92, 116);
-
-        // User Handle
-        ctx.fillStyle = "rgba(250,249,246,0.15)";
-        ctx.beginPath();
-        ctx.roundRect(750, 80, 250, 56, 14);
-        ctx.fill();
-
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "extrabold 20px Inter, system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(handleStr, 875, 108);
-        ctx.textAlign = "left";
-
-        const nameY = wrapText(name, textOffset, 240, textMaxW + 80, 76, "#FAF9F6", "black 64px Inter, system-ui, sans-serif");
-
-        ctx.fillStyle = "#10B981";
-        ctx.font = "black 130px Inter, system-ui, sans-serif";
-        ctx.fillText(`${calories}`, textOffset, nameY + 140);
-        ctx.fillStyle = "#A7F3D0";
-        ctx.font = "bold 28px Inter, system-ui, sans-serif";
-        ctx.fillText("RECIPE CALORIES LOGGED", textOffset, nameY + 195);
-
-        // Macros stats
-        const mStats = [
-          { label: "PROTEIN", val: `${protein}g`, bar: protein / 150 },
-          { label: "CARBS", val: `${carbs}g`, bar: carbs / 200 },
-          { label: "FATS", val: `${fats}g`, bar: fats / 70 }
-        ];
-
-        const barWidth = loadedImg ? 460 : 360;
-
-        mStats.forEach((stat, i) => {
-          const itemY = 560 + i * 130;
-          ctx.fillStyle = "#A7F3D0";
-          ctx.font = "bold 22px Inter, system-ui, sans-serif";
-          ctx.fillText(stat.label, statsOffset, itemY);
-
-          ctx.fillStyle = "#FAF9F6";
-          ctx.font = "black 36px Inter, system-ui, sans-serif";
-          ctx.fillText(stat.val, statsOffset, itemY + 36);
-
-          ctx.fillStyle = "rgba(250,249,246,0.1)";
-          ctx.beginPath();
-          ctx.roundRect(statsOffset, itemY + 54, barWidth, 10, 5);
-          ctx.fill();
-
-          ctx.fillStyle = "#10B981";
-          ctx.beginPath();
-          ctx.roundRect(statsOffset, itemY + 54, Math.min(barWidth, Math.max(10, barWidth * stat.bar)), 10, 5);
-          ctx.fill();
-        });
-
-        // Footer
-        const footerY = canvas.height - 110;
-        ctx.strokeStyle = "rgba(250,249,246,0.1)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(textOffset, footerY);
-        ctx.lineTo(1000, footerY);
-        ctx.stroke();
-
-        ctx.fillStyle = "#A7F3D0";
-        ctx.font = "bold 22px Inter, system-ui, sans-serif";
-        ctx.fillText("FITAI • FRESH LOG SYSTEM", textOffset, footerY + 45);
-        ctx.textAlign = "right";
-        ctx.fillText("fitpush.vercel.app", 1000, footerY + 45);
-        ctx.textAlign = "left";
-
-      } else if (currentTemplate === "sunset") {
-        // ================= TEMPLATE 4: SUNSET GLOW =================
-        if (loadedImg) {
-          const scale = Math.max(1080 / loadedImg.width, canvas.height / loadedImg.height);
-          const xOffset = 540 - (loadedImg.width * scale) / 2;
-          const yOffset = (canvas.height / 2) - (loadedImg.height * scale) / 2;
-          ctx.drawImage(loadedImg, xOffset, yOffset, loadedImg.width * scale, loadedImg.height * scale);
-          const sunsetGradOverlay = ctx.createLinearGradient(0, 0, 0, canvas.height);
-          sunsetGradOverlay.addColorStop(0, "rgba(255, 78, 80, 0.45)");
-          sunsetGradOverlay.addColorStop(1, "rgba(249, 212, 35, 0.45)");
-          ctx.fillStyle = sunsetGradOverlay;
-          ctx.fillRect(0, 0, 1080, canvas.height);
-        } else {
-          const grad = ctx.createLinearGradient(0, 0, 1080, canvas.height);
-          grad.addColorStop(0, "#FF4E50");
-          grad.addColorStop(1, "#F9D423");
-          ctx.fillStyle = grad;
-          ctx.fillRect(0, 0, 1080, canvas.height);
-        }
-
-        // Draw Flame Logo
-        ctx.fillStyle = "#FFFFFF";
-        ctx.beginPath();
-        ctx.roundRect(80, 80, 72, 72, 20);
-        ctx.fill();
-
-        ctx.fillStyle = "#FF4E50";
-        ctx.beginPath();
-        ctx.moveTo(116, 92);
-        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
-        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
-        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
-        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
-        ctx.fill();
-        
-        ctx.fillStyle = "#FFFFFF";
-        ctx.beginPath();
-        ctx.moveTo(116, 112);
-        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
-        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
-        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
-        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
-        ctx.fill();
-
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "black 54px Inter, system-ui, sans-serif";
-        ctx.textBaseline = "middle";
-        ctx.fillText("FitAI", 172, 116);
-
-        // User Handle
-        ctx.fillStyle = "rgba(255,255,255,0.2)";
-        ctx.beginPath();
-        ctx.roundRect(750, 80, 250, 56, 14);
-        ctx.fill();
-
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "extrabold 20px Inter, system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(handleStr, 875, 108);
-        ctx.textAlign = "left";
-
-        const nameY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 76px Inter, system-ui, sans-serif");
-
-        let subText = `Logged ${item.log_count || 0} times by ${handleStr}`;
-        if (showCookTime) {
-          subText += ` • ⏱️ ${time}`;
-        }
-        ctx.fillStyle = "rgba(255,255,255,0.75)";
-        ctx.font = "bold 28px Inter, system-ui, sans-serif";
-        ctx.fillText(subText, 80, nameY + 55);
-
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "black 140px Inter, system-ui, sans-serif";
-        ctx.fillText(`${calories}`, 80, nameY + 185);
-        ctx.fillStyle = "rgba(255,255,255,0.8)";
-        ctx.font = "bold 24px Inter, system-ui, sans-serif";
-        ctx.fillText("KCAL", 85, nameY + 245);
-
-        const macroY = canvas.height - 260;
-        ctx.fillStyle = "#FAF9F6";
-        ctx.font = "extrabold 32px Inter, system-ui, sans-serif";
-        ctx.fillText(`PROTEIN: ${protein}g  •  CARBS: ${carbs}g  •  FATS: ${fats}g`, 80, macroY);
-
-        const footerY = canvas.height - 110;
-        ctx.strokeStyle = "rgba(255,255,255,0.15)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(80, footerY);
-        ctx.lineTo(1000, footerY);
-        ctx.stroke();
-
-        ctx.fillStyle = "rgba(255,255,255,0.75)";
-        ctx.font = "bold 22px Inter, system-ui, sans-serif";
-        ctx.fillText("FITAI • ENERGY STREAM", 80, footerY + 45);
         ctx.textAlign = "right";
         ctx.fillText("fitpush.vercel.app", 1000, footerY + 45);
         ctx.textAlign = "left";
       }
     };
 
+    const drawCoverImage = (img: HTMLImageElement, x: number, y: number, w: number, h: number) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+      
+      const scale = Math.max(w / img.width, h / img.height);
+      const imgW = img.width * scale;
+      const imgH = img.height * scale;
+      const imgX = x + (w - imgW) / 2;
+      const imgY = y + (h - imgH) / 2;
+      
+      ctx.drawImage(img, imgX, imgY, imgW, imgH);
+      ctx.restore();
+    };
+
+    const drawStructuredImage = (img: HTMLImageElement, x: number, y: number, w: number, h: number, r: number) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+      ctx.clip();
+      
+      const scale = Math.max(w / img.width, h / img.height);
+      const imgW = img.width * scale;
+      const imgH = img.height * scale;
+      const imgX = x + (w - imgW) / 2;
+      const imgY = y + (h - imgH) / 2;
+      
+      ctx.drawImage(img, imgX, imgY, imgW, imgH);
+      ctx.restore();
+
+      // Border style based on theme
+      ctx.strokeStyle = isEditorial ? "#1A1715" : "rgba(255,255,255,0.15)";
+      ctx.lineWidth = isEditorial ? 3.5 : 3;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+      ctx.stroke();
+    };
+
+    const runTemplateDraw = (loadedImg: HTMLImageElement | null) => {
+      ctx.clearRect(0, 0, 1080, canvas.height);
+      
+      // Draw Background
+      if (isObsidian) {
+        if (loadedImg) {
+          drawCoverImage(loadedImg, 0, 0, 1080, canvas.height);
+          ctx.fillStyle = "rgba(14, 13, 12, 0.65)";
+          ctx.fillRect(0, 0, 1080, canvas.height);
+        } else {
+          const bgGrad = ctx.createRadialGradient(540, canvas.height / 2, 100, 540, canvas.height / 2, canvas.height);
+          bgGrad.addColorStop(0, "#2E2B28");
+          bgGrad.addColorStop(1, "#0E0D0C");
+          ctx.fillStyle = bgGrad;
+          ctx.fillRect(0, 0, 1080, canvas.height);
+        }
+      } else if (isEditorial) {
+        ctx.fillStyle = "#FAF6EE";
+        ctx.fillRect(0, 0, 1080, canvas.height);
+      } else if (isSolar) {
+        const bgGrad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        bgGrad.addColorStop(0, "#292524"); // Stone 800
+        bgGrad.addColorStop(0.5, "#1C1917"); // Stone 900
+        bgGrad.addColorStop(1, "#0C0A09"); // Stone 950
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, 1080, canvas.height);
+
+        // Add soft amber light glow
+        const glowGrad = ctx.createRadialGradient(540, canvas.height / 2, 50, 540, canvas.height / 2, 600);
+        glowGrad.addColorStop(0, "rgba(249, 115, 22, 0.04)");
+        glowGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        ctx.fillStyle = glowGrad;
+        ctx.fillRect(0, 0, 1080, canvas.height);
+      }
+
+      // 1. Draw Brand Header Logo Box
+      ctx.fillStyle = logoBoxColor;
+      ctx.beginPath();
+      ctx.roundRect(80, 80, 72, 72, 20);
+      ctx.fill();
+
+      // SVG Flame Path
+      ctx.save();
+      ctx.translate(96, 96);
+      ctx.scale(1.7, 1.7);
+      const flamePath = new Path2D("M8.5 14.5a2.5 2.5 0 0 0 2.5-2.5c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z");
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fill(flamePath);
+      ctx.restore();
+
+      ctx.fillStyle = textColor;
+      ctx.font = `900 54px ${fontFamily}`;
+      if (isEditorial) {
+        ctx.font = `italic 700 54px ${fontFamily}`;
+      }
+      ctx.textBaseline = "middle";
+      ctx.fillText("FitAI", 172, 116);
+      ctx.textBaseline = "alphabetic";
+
+      // Creator Badge
+      ctx.fillStyle = creatorBadgeFill;
+      ctx.beginPath();
+      ctx.roundRect(750, 80, 250, 56, 14);
+      ctx.fill();
+
+      ctx.fillStyle = isEditorial ? "#1A1715" : textColor;
+      ctx.font = creatorBadgeFont;
+      ctx.textAlign = "center";
+      ctx.fillText(handleStr, 875, 116);
+      ctx.textAlign = "left";
+
+      // Layout rendering
+      if (isObsidian) {
+        // Obsidian Glass Overlay Layout (Square 1:1)
+        const cardX = 80;
+        const cardY = 220;
+        const cardW = 920;
+        const cardH = 730;
+
+        ctx.fillStyle = panelFill;
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardW, cardH, 36);
+        ctx.fill();
+
+        ctx.strokeStyle = panelBorder;
+        ctx.lineWidth = borderWidth;
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardW, cardH, 36);
+        ctx.stroke();
+
+        const finalY = wrapText(name, 130, 320, 440, 80, textColor, "900 68px Inter, system-ui, sans-serif");
+        const subtitleY = finalY + 45;
+        ctx.fillStyle = accentColor;
+        ctx.font = "900 24px Inter, system-ui, sans-serif";
+        ctx.fillText(`🍳 ${time.toUpperCase()} PREP`, 130, subtitleY);
+
+        const spaceTop = subtitleY + 20;
+        const spaceBottom = canvas.height - 280;
+        const calCenterY = spaceTop + (spaceBottom - spaceTop) / 2;
+
+        ctx.fillStyle = textColor;
+        ctx.font = "900 96px Inter, system-ui, sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`${calories} kcal`, 130, calCenterY);
+        ctx.textBaseline = "alphabetic";
+
+        // Ingredients Checklist Card on the Right inside the Glass Card
+        const checklistX = 580;
+        const checklistY = 280;
+        const checklistW = 340;
+        const checklistH = 430;
+
+        ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.beginPath();
+        ctx.roundRect(checklistX, checklistY, checklistW, checklistH, 24);
+        ctx.fill();
+
+        ctx.strokeStyle = panelBorder;
+        ctx.lineWidth = borderWidth;
+        ctx.beginPath();
+        ctx.roundRect(checklistX, checklistY, checklistW, checklistH, 24);
+        ctx.stroke();
+
+        ctx.fillStyle = textColor;
+        ctx.font = "800 22px Inter, system-ui, sans-serif";
+        ctx.fillText("INGREDIENTS", checklistX + 40, checklistY + 54);
+
+        ctx.font = "700 20px Inter, system-ui, sans-serif";
+        const topIngs = ingredients.slice(0, 5);
+        topIngs.forEach((ing: string, idx: number) => {
+          ctx.fillStyle = accentColor;
+          ctx.beginPath();
+          ctx.arc(checklistX + 50, checklistY + 110 + idx * 55, 5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = textColor;
+          let ingText = ing;
+          if (ingText.length > 20) ingText = ingText.substring(0, 18) + "...";
+          ctx.fillText(ingText, checklistX + 75, checklistY + 118 + idx * 55);
+        });
+
+        if (ingredients.length > 5) {
+          ctx.fillStyle = textMuted;
+          ctx.font = "italic 16px Inter, system-ui, sans-serif";
+          ctx.fillText(`+ ${ingredients.length - 5} more ingredients`, checklistX + 40, checklistY + checklistH - 25);
+        }
+
+        drawMacrosAndFooter(canvas.height - 280);
+      } else if (isEditorial) {
+        // Editorial Layout (Square 1:1 Light Premium)
+        let contentY = 300;
+        if (loadedImg) {
+          drawStructuredImage(loadedImg, 80, 220, 440, 320, 20);
+          contentY = 580;
+        }
+
+        // Title on the left side
+        const titleSize = loadedImg ? "900 48px Impact, Inter, sans-serif" : "900 68px Impact, Inter Condensed, Inter, sans-serif";
+        const finalY = wrapText(name.toUpperCase(), 80, contentY, 440, 65, textColor, titleSize);
+
+        // Prep subtitle
+        ctx.fillStyle = "#F97316";
+        ctx.font = "900 22px Inter, system-ui, sans-serif";
+        ctx.fillText(`🍳 ${time.toUpperCase()} PREP`, 80, finalY + 45);
+
+        // Giant Calories text under title
+        const calY = finalY + 120;
+        ctx.fillStyle = "#F97316"; // orange calories
+        ctx.font = "900 96px Inter, system-ui, sans-serif";
+        ctx.fillText(`${calories}`, 80, calY);
+
+        ctx.fillStyle = "#1A1715";
+        ctx.font = "900 24px Inter, system-ui, sans-serif";
+        ctx.fillText("KCAL", 85 + ctx.measureText(`${calories}`).width, calY);
+
+        // Ingredients Checklist Card on the Right
+        const checklistX = 580;
+        const checklistY = 220;
+        const checklistW = 340;
+        const checklistH = 430;
+
+        // Clean white card background
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.roundRect(checklistX, checklistY, checklistW, checklistH, 24);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(26, 23, 21, 0.08)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(checklistX, checklistY, checklistW, checklistH, 24);
+        ctx.stroke();
+
+        // Heading: INGREDIENTS
+        ctx.fillStyle = "#1A1715";
+        ctx.font = "800 22px Inter, system-ui, sans-serif";
+        ctx.fillText("INGREDIENTS", checklistX + 40, checklistY + 54);
+
+        ctx.font = "700 20px Inter, system-ui, sans-serif";
+        const topIngs = ingredients.slice(0, 5);
+        topIngs.forEach((ing: string, idx: number) => {
+          ctx.fillStyle = "#F97316"; // orange bullet
+          ctx.beginPath();
+          ctx.arc(checklistX + 50, checklistY + 110 + idx * 55, 5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#44403C";
+          let ingText = ing;
+          if (ingText.length > 20) ingText = ingText.substring(0, 18) + "...";
+          ctx.fillText(ingText, checklistX + 75, checklistY + 118 + idx * 55);
+        });
+
+        if (ingredients.length > 5) {
+          ctx.fillStyle = "#78716C";
+          ctx.font = "italic 16px Inter, system-ui, sans-serif";
+          ctx.fillText(`+ ${ingredients.length - 5} more ingredients`, checklistX + 40, checklistY + checklistH - 25);
+        }
+
+        drawMacrosAndFooter(750);
+
+      } else if (isSolar) {
+        // Solar Tech (Symmetric Amber) Layout (Square 1:1)
+        const finalY = wrapText(name, 540, 260, 920, 80, textColor, "900 68px Inter, system-ui, sans-serif", "center");
+
+        const subtitleY = finalY + 95;
+        ctx.fillStyle = accentColor;
+        ctx.font = "900 36px Inter, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`🍳 ${time.toUpperCase()} PREP`, 540, subtitleY);
+
+        let belowImgY = subtitleY + 30;
+
+        if (loadedImg) {
+          // Orange brand glow behind photo
+          const imgCenterX = 540;
+          const imgCenterY = subtitleY + 30 + 150;
+          const glowGrad = ctx.createRadialGradient(imgCenterX, imgCenterY, 50, imgCenterX, imgCenterY, 200);
+          glowGrad.addColorStop(0, "rgba(249, 115, 22, 0.12)");
+          glowGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+          ctx.fillStyle = glowGrad;
+          ctx.beginPath();
+          ctx.arc(imgCenterX, imgCenterY, 200, 0, Math.PI * 2);
+          ctx.fill();
+
+          drawStructuredImage(loadedImg, 290, subtitleY + 30, 500, 300, 28);
+          belowImgY = subtitleY + 30 + 300;
+        } else {
+          // Draw Ingredients checklist centered in Solar Tech card since no image is present
+          const boxY = subtitleY + 30;
+          const boxH = 260;
+
+          ctx.fillStyle = panelFill;
+          ctx.beginPath();
+          ctx.roundRect(80, boxY, 920, boxH, 24);
+          ctx.fill();
+
+          ctx.strokeStyle = panelBorder;
+          ctx.lineWidth = borderWidth;
+          ctx.beginPath();
+          ctx.roundRect(80, boxY, 920, boxH, 24);
+          ctx.stroke();
+
+          ctx.fillStyle = textColor;
+          ctx.font = "800 30px Inter, system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("INGREDIENTS LIST", 540, boxY + 54);
+          ctx.textAlign = "left";
+
+          ctx.font = "700 28px Inter, system-ui, sans-serif";
+          const topIngs = ingredients.slice(0, 3);
+          topIngs.forEach((ing: string, idx: number) => {
+            ctx.fillStyle = accentColor;
+            ctx.beginPath();
+            // Use 50px vertical offset
+            ctx.arc(130, boxY + 110 + idx * 50, 7, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = textColor;
+            ctx.fillText(ing, 165, boxY + 118 + idx * 50);
+          });
+
+          if (ingredients.length > 3) {
+            ctx.fillStyle = textMuted;
+            ctx.font = "italic 24px Inter, system-ui, sans-serif";
+            ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + boxH - 30);
+          }
+
+          belowImgY = boxY + boxH;
+        }
+
+        ctx.textAlign = "left"; // reset alignment
+
+        // Center Calories text vertically in the space below the photo/checklist and above macros
+        const spaceTop = belowImgY + 20;
+        const spaceBottom = canvas.height - 280;
+        const calCenterY = spaceTop + (spaceBottom - spaceTop) / 2;
+
+        ctx.fillStyle = textColor;
+        ctx.font = "900 110px Inter, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(`${calories} kcal`, 540, calCenterY);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic"; // Reset base
+
+        drawMacrosAndFooter(canvas.height - 280);
+      }
+    };
+
     if (image) {
       const img = new Image();
-      const imageUrl = image;
-      
-      const tryLoad = (useCors: boolean) => {
-        img.onload = () => {
-          runTemplateDraw(img);
-        };
-        img.onerror = () => {
-          if (useCors) {
-            const fallbackImg = new Image();
-            fallbackImg.onload = () => {
-              runTemplateDraw(fallbackImg);
-            };
-            fallbackImg.onerror = () => {
-              runTemplateDraw(null);
-            };
-            fallbackImg.src = imageUrl;
-          } else {
-            runTemplateDraw(null);
-          }
-        };
-        if (useCors && imageUrl.startsWith("http")) {
-          img.crossOrigin = "anonymous";
-        }
-        img.src = imageUrl;
+      img.onload = () => {
+        runTemplateDraw(img);
       };
-
-      tryLoad(true);
+      img.onerror = () => {
+        runTemplateDraw(null);
+      };
+      if (image.startsWith("http")) {
+        img.crossOrigin = "anonymous";
+      }
+      img.src = image;
     } else {
       runTemplateDraw(null);
     }
   };
 
   useEffect(() => {
+    if (navigator.canShare) {
+      const dummyBlob = new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 11, 73, 68, 65, 84, 120, 156, 99, 96, 0, 0, 0, 2, 0, 1, 226, 33, 188, 51, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130])], { type: "image/png" });
+      const testFile = new File([dummyBlob], "t.png", { type: "image/png" });
+      try {
+        if (navigator.canShare({ files: [testFile] })) {
+          setCanShareFile(true);
+        }
+      } catch {
+        setCanShareFile(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    document.fonts.ready.then(() => {
+      setFontsLoaded(true);
+    });
+  }, []);
+
+  useEffect(() => {
     drawCanvas();
-  }, [currentIndex, showCookTime, showRecipeDesc, showRecipeSteps]);
+  }, [currentIndex, fontsLoaded]);
 
   const handleNext = () => {
     setCurrentIndex((prev) => (prev + 1) % variations.length);
@@ -793,12 +794,12 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         initial={{ scale: 0.95, y: 15 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 15 }}
-        className="bg-stone-50 border border-white rounded-[32px] w-full max-w-[400px] shadow-2xl p-6 flex flex-col items-center gap-6"
+        className="bg-stone-50 border border-white rounded-[32px] w-full max-w-[400px] shadow-2xl p-6 flex flex-col items-center gap-5 max-h-[90vh] overflow-y-auto no-scrollbar scroll-smooth"
       >
         {/* Header */}
         <div className="flex justify-between items-center w-full">
           <span className="text-[10px] font-black uppercase tracking-widest text-stone-400">
-            Share Recipe
+            Share Recipe Card
           </span>
           <button
             onClick={onClose}
@@ -808,95 +809,30 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
           </button>
         </div>
 
-        {/* Customization Toggles Panel */}
-        <div className="bg-stone-100/60 border border-stone-200/50 p-4 rounded-2xl w-full flex flex-col gap-3 text-[10px] font-bold text-stone-600 shadow-2xs shrink-0">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="text-stone-400">⏱️</span>
-              <span className="tracking-wide">Include Cook Time</span>
-            </span>
+        {/* Preview tabs */}
+        <div className="flex items-center justify-between w-full gap-2 select-none shrink-0">
+          <div className="flex bg-stone-100 p-1 rounded-xl gap-1 flex-1 font-sans">
             <button
               type="button"
-              onClick={() => setShowCookTime(!showCookTime)}
+              onClick={() => setPreviewTab("card")}
               className={cn(
-                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
-                showCookTime ? "bg-orange-500" : "bg-stone-250"
+                "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                previewTab === "card" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
               )}
             >
-              <motion.div
-                layout
-                className="w-4 h-4 rounded-full bg-white shadow-xs"
-                animate={{ x: showCookTime ? 16 : 0 }}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
+              🖼️ Image Card
             </button>
-          </div>
-          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2.5">
-            <span className="flex items-center gap-2">
-              <span className="text-stone-400">📝</span>
-              <span className="tracking-wide">Include Description</span>
-            </span>
             <button
               type="button"
-              onClick={() => setShowRecipeDesc(!showRecipeDesc)}
+              onClick={() => setPreviewTab("webpage")}
               className={cn(
-                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
-                showRecipeDesc ? "bg-orange-500" : "bg-stone-250"
+                "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                previewTab === "webpage" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
               )}
             >
-              <motion.div
-                layout
-                className="w-4 h-4 rounded-full bg-white shadow-xs"
-                animate={{ x: showRecipeDesc ? 16 : 0 }}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
+              🌐 Web Link
             </button>
           </div>
-          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2.5">
-            <span className="flex items-center gap-2">
-              <span className="text-stone-400">🪜</span>
-              <span className="tracking-wide">Include Prep Steps</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowRecipeSteps(!showRecipeSteps)}
-              className={cn(
-                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
-                showRecipeSteps ? "bg-orange-500" : "bg-stone-250"
-              )}
-            >
-              <motion.div
-                layout
-                className="w-4 h-4 rounded-full bg-white shadow-xs"
-                animate={{ x: showRecipeSteps ? 16 : 0 }}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Preview toggle tabs */}
-        <div className="flex bg-stone-100 p-1 rounded-xl gap-1 w-full select-none font-sans shrink-0">
-          <button
-            type="button"
-            onClick={() => setPreviewTab("card")}
-            className={cn(
-              "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
-              previewTab === "card" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
-            )}
-          >
-            🖼️ Image Card
-          </button>
-          <button
-            type="button"
-            onClick={() => setPreviewTab("webpage")}
-            className={cn(
-              "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
-              previewTab === "webpage" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
-            )}
-          >
-            🌐 Web Link
-          </button>
         </div>
 
         {/* Preview Container */}
@@ -910,7 +846,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
                 if (info.offset.x > 80) handlePrev();
                 else if (info.offset.x < -80) handleNext();
               }}
-              className={cn("w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing transition-all duration-355", wrapperBg)}
+              className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#151413]"
             >
               <canvas
                 ref={canvasRef}
@@ -938,22 +874,34 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
                 <img src={payload.img} className="absolute inset-0 w-full h-full object-cover opacity-60" />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                  <Utensils className="w-12 h-12 text-white" />
+                  <BookOpen className="w-12 h-12 text-white" />
                 </div>
               )}
               <div className="relative z-10 space-y-0.5">
                 <h4 className="text-white text-xs font-black drop-shadow-xs truncate">{name}</h4>
                 <p className="text-[8px] text-white/80 font-bold flex items-center gap-1">
-                  <span>⏱️ {time}</span>
+                  <span>⏱️ {time} prep</span>
                   <span>•</span>
-                  <span>🔥 Logged {item.log_count || 0} times by {handleStr}</span>
+                  <span>by {handleStr}</span>
                 </p>
               </div>
             </div>
 
-            {item.description && (
-              <div className="bg-stone-50 border border-stone-100 rounded-xl p-2.5 text-[9.5px] text-stone-600 font-bold leading-relaxed">
-                📝 {item.description}
+            {ingredients.length > 0 && (
+              <div className="bg-stone-50 border border-stone-100 rounded-xl p-2.5 space-y-1">
+                <span className="text-[7.5px] text-stone-400 uppercase font-black tracking-wider block">Ingredients</span>
+                <div className="flex flex-wrap gap-1">
+                  {ingredients.slice(0, 5).map((ing, idx) => (
+                    <span key={idx} className="bg-stone-200/60 text-stone-700 text-[8px] font-extrabold px-2 py-0.5 rounded-md">
+                      {ing}
+                    </span>
+                  ))}
+                  {ingredients.length > 5 && (
+                    <span className="text-stone-400 text-[8px] font-bold self-center">
+                      +{ingredients.length - 5} more
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 
@@ -970,49 +918,22 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
                 </div>
               ))}
             </div>
-
-            <div className="space-y-1">
-              <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">Ingredients checklist</span>
-              <div className="bg-white border border-stone-150 rounded-xl p-3 space-y-1.5">
-                {ingredients.map((ing: string, i: number) => (
-                  <div key={i} className="flex items-center gap-1.5 text-[9px] font-semibold text-stone-700">
-                    <input type="checkbox" defaultChecked className="rounded border-stone-300 text-orange-500 focus:ring-orange-500 w-2.5 h-2.5 cursor-pointer" />
-                    <span className="truncate">{ing}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {item.instructions && (
-              <div className="space-y-1">
-                <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">Preparation Steps</span>
-                <div className="bg-white border border-stone-150 rounded-xl p-3 text-[9px] font-semibold text-stone-600 leading-relaxed whitespace-pre-line">
-                  {item.instructions}
-                </div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Variation Name Display */}
-        {previewTab === "card" && (
-          <span className="text-[9.5px] font-extrabold uppercase text-orange-600 bg-orange-50 px-3 py-1 rounded-full select-none">
-            Preset: {currentVar.name}
-          </span>
-        )}
 
-        {/* Pagination & Navigation Row */}
-        {previewTab === "card" && (
-          <div className="flex items-center gap-6 select-none mt-1">
+
+        {/* Pagination Row */}
+        {previewTab === "card" && variations.length > 1 && (
+          <div className="flex items-center gap-6 select-none mt-1 mb-2">
             <button
               onClick={handlePrev}
               className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
-              title="Previous template"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
 
-            <div className="flex gap-1.5 flex-wrap justify-center max-w-[120px]">
+            <div className="flex gap-1.5 justify-center">
               {variations.map((v, idx) => (
                 <button
                   key={v.id}
@@ -1020,7 +941,6 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
                   className={`h-2 rounded-full transition-all cursor-pointer ${
                     idx === currentIndex ? "w-5 bg-orange-500" : "w-2 bg-stone-300"
                   }`}
-                  title={v.name}
                 />
               ))}
             </div>
@@ -1028,7 +948,6 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
             <button
               onClick={handleNext}
               className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
-              title="Next template"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -1037,29 +956,32 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-2.5 w-full">
-          <button
-            onClick={handleCopyLink}
-            disabled={loadingUrl}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-100 active:scale-98 transition-all"
-          >
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? "Copied!" : "Copy Share Link"}</span>
-          </button>
+          {typeof navigator !== "undefined" && navigator.share && (
+            <button
+              onClick={handleNativeShare}
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-100 active:scale-98 transition-all"
+            >
+              <Share2 className="w-4 h-4" />
+              <span>Share to Apps (WhatsApp, IG...)</span>
+            </button>
+          )}
 
-          <div className="grid grid-cols-2 gap-2.5 w-full">
+          <div className="flex gap-2 w-full">
+            <button
+              onClick={handleCopyLink}
+              disabled={loadingUrl}
+              className="flex-1 bg-stone-100 hover:bg-stone-205 text-stone-800 disabled:opacity-60 text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copied ? "Copied!" : "Copy URL Link"}</span>
+            </button>
+
             <button
               onClick={handleDownloadImage}
-              className="flex-1 bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+              className="flex-1 bg-stone-900 hover:bg-stone-850 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download PNG</span>
-            </button>
-            <button
-              onClick={handleNativeShare}
-              className="flex-1 bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 text-[10px] font-black uppercase tracking-wider py-3 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Share Card</span>
             </button>
           </div>
         </div>

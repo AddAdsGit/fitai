@@ -53,70 +53,7 @@ import { hasNoGeneratedImage, formatDateStr, getMealEmoji } from "./utils/helper
 import { generateShareUrl } from "./utils/shareUtils";
 
 
-const INITIAL_MEALS: Meal[] = [
-  {
-    id: "1",
-    name: "Morning Avocado Toast",
-    time: "8:30 AM",
-    type: "Breakfast",
-    calories: 320,
-    protein: 12,
-    carbs: 35,
-    fats: 18,
-    image:
-      "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=60",
-    date: new Date().toISOString().split('T')[0],
-  },
-  {
-    id: "2",
-    name: "Double Espresso Macchiato",
-    time: "9:15 AM",
-    type: "Drink",
-    calories: 30,
-    protein: 1,
-    carbs: 4,
-    fats: 1,
-    image: "",
-    date: new Date().toISOString().split('T')[0],
-  },
-  {
-    id: "3",
-    name: "Quinoa Power Bowl",
-    time: "1:15 PM",
-    type: "Lunch",
-    calories: 450,
-    protein: 22,
-    carbs: 55,
-    fats: 15,
-    image:
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=60",
-    date: new Date().toISOString().split('T')[0],
-  },
-  {
-    id: "4",
-    name: "Fresh Strawberry & Blueberry Mix",
-    time: "4:00 PM",
-    type: "Snack",
-    calories: 110,
-    protein: 2,
-    carbs: 24,
-    fats: 0,
-    image: "",
-    date: new Date().toISOString().split('T')[0],
-  },
-  {
-    id: "5",
-    name: "Grilled Chicken Breast",
-    time: "7:30 PM",
-    type: "Dinner",
-    calories: 280,
-    protein: 36,
-    carbs: 0,
-    fats: 14,
-    image: "",
-    date: new Date().toISOString().split('T')[0],
-  },
-];
+const INITIAL_MEALS: Meal[] = [];
 
 const INITIAL_RECIPES: Recipe[] = [
   {
@@ -130,8 +67,7 @@ const INITIAL_RECIPES: Recipe[] = [
     fiber: 5,
     tags: ["Vegetarian", "Gluten Free"],
     description: "Soft, steamed rice-and-lentil cakes served with mixed vegetable sambar.",
-    image:
-      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
+    image: "/images/idli.jpg",
     ingredients: [
       "2 pieces Steamed Idli",
       "1 bowl Vegetable Sambar",
@@ -151,8 +87,7 @@ const INITIAL_RECIPES: Recipe[] = [
     fiber: 4,
     tags: ["Vegetarian", "Gluten Free"],
     description: "Thin, crispy fermented rice crepe stuffed with a spiced potato mash.",
-    image:
-      "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&q=80",
+    image: "/images/dosa.jpg",
     ingredients: [
       "1 cup Dosa Batter",
       "100g Spiced Potato Mash (Alloo Masala)",
@@ -172,8 +107,7 @@ const INITIAL_RECIPES: Recipe[] = [
     fiber: 2,
     tags: ["Keto", "Low Carb"],
     description: "A rich, cheesy omelette folded with fresh butter and sautéed baby spinach.",
-    image:
-      "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600&q=80",
+    image: "/images/omelette.jpg",
     ingredients: [
       "3 Large Eggs",
       "1 cup Spinach",
@@ -330,11 +264,31 @@ export default function App() {
     weight: 80,
     dob: "1998-05-15",
     gender: "Male",
-    memories: [
-      "Prefers high protein diet, specifically chicken and eggs.",
-      "Allergic to shellfish.",
-      "Usually works out at 6 PM on weekdays.",
+    knowledge: {
+      preferences: [
+        "Prefers high protein diet, specifically chicken and eggs."
+      ],
+      health: [
+        "Allergic to shellfish."
+      ],
+      notes: [
+        "Usually works out at 6 PM on weekdays."
+      ],
+      patterns: []
+    },
+    agent_memory: [
+      "Prefers concise answers with bullet points",
+      "Uses a professional and encouraging tone"
     ],
+    agent_config: {
+      showGptWidget: true,
+      generateImages: true,
+      refinePhotos: false,
+      artStyle: "gourmet",
+      customArtStyle: "",
+      requireConfirmation: false,
+      customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
+    },
     preferences: ["Gluten Free", "Keto"],
     goals: {
       dailyCalories: 2000,
@@ -665,7 +619,12 @@ export default function App() {
             weight: resolvedData.weight,
             dob: resolvedData.dob,
             gender: resolvedData.gender,
-            memories: resolvedData.memories,
+            knowledge_preferences: resolvedData.knowledge.preferences,
+            knowledge_health: resolvedData.knowledge.health,
+            knowledge_notes: resolvedData.knowledge.notes,
+            knowledge_patterns: resolvedData.knowledge.patterns,
+            agent_memory: resolvedData.agent_memory,
+            agent_config: resolvedData.agent_config,
             preferences: resolvedData.preferences,
             daily_calories_goal: resolvedData.goals.dailyCalories,
             weight_goal: resolvedData.goals.weightGoal,
@@ -801,7 +760,14 @@ export default function App() {
             weight: profile.weight,
             dob: profile.dob,
             gender: profile.gender,
-            memories: profile.memories || [],
+            knowledge: {
+              preferences: profile.knowledge_preferences || [],
+              health: profile.knowledge_health || [],
+              notes: profile.knowledge_notes || [],
+              patterns: profile.knowledge_patterns || []
+            },
+            agent_memory: profile.agent_memory || [],
+            agent_config: profile.agent_config || {},
             preferences: profile.preferences || [],
             goals: {
               dailyCalories: profile.daily_calories_goal,
@@ -891,23 +857,40 @@ export default function App() {
         if (recipesRes.error) {
           console.error("Error loading recipes:", recipesRes.error);
         } else {
-          const mappedRecipes: Recipe[] = (recipesRes.data || []).map(r => ({
-            id: r.id,
-            name: r.name,
-            time: r.time,
-            calories: r.calories,
-            protein: r.protein,
-            carbs: r.carbs,
-            fats: r.fats,
-            fiber: r.fiber || 0,
-            description: r.description || "",
-            tags: r.tags || [],
-            image: r.image,
-            ingredients: r.ingredients || [],
-            instructions: r.instructions,
-            micros: r.micros || [],
-            log_count: r.log_count || 0
-          }));
+          const mappedRecipes: Recipe[] = (recipesRes.data || []).map(r => {
+            let img = r.image || "";
+            let needsUpdate = false;
+            if ((img.includes("1668236543090-82eba5ee5976") || img.includes("1589301760014-d929f3979dbc")) && r.name.toLowerCase().includes("idli")) {
+              img = "/images/idli.jpg";
+              needsUpdate = true;
+            } else if (img.includes("1668236543090-82eba5ee5976") && r.name.toLowerCase().includes("dosa")) {
+              img = "/images/dosa.jpg";
+              needsUpdate = true;
+            } else if (img.includes("1555939594-58d7cb561ad1") || img.includes("1600271886742-f049cd451bba")) {
+              img = "/images/omelette.jpg";
+              needsUpdate = true;
+            }
+            if (needsUpdate && isSupabaseConfigured) {
+              supabase.from("recipes").update({ image: img }).eq("id", r.id).then();
+            }
+            return {
+              id: r.id,
+              name: r.name,
+              time: r.time,
+              calories: r.calories,
+              protein: r.protein,
+              carbs: r.carbs,
+              fats: r.fats,
+              fiber: r.fiber || 0,
+              description: r.description || "",
+              tags: r.tags || [],
+              image: img,
+              ingredients: r.ingredients || [],
+              instructions: r.instructions,
+              micros: r.micros || [],
+              log_count: r.log_count || 0
+            };
+          });
 
           if (mappedRecipes.length === 0 && activeProfileId) {
             // Seed the 3 default recipes for beginning flow
@@ -982,7 +965,7 @@ export default function App() {
             date: m.date
           }));
 
-          if (mappedMeals.length === 0 && profile.username === "johndoe") {
+          if (mappedMeals.length === 0 && profileRes.data?.username === "johndoe") {
             const seedPromises = INITIAL_MEALS.map(m =>
               supabase.from("meals").insert({
                 profile_id: activeProfileId,
@@ -1315,7 +1298,12 @@ User profile details:
 - Weight: ${profileData.weight} kg
 - Gender: ${profileData.gender}
 - Preferences: ${(profileData.preferences || []).join(", ") || "None"}
-- Health notes: ${(profileData.memories || []).join(", ") || "None"}
+- Health notes: ${[
+  ...(profileData.knowledge?.preferences || []),
+  ...(profileData.knowledge?.health || []),
+  ...(profileData.knowledge?.notes || []),
+  ...(profileData.knowledge?.patterns || [])
+].join(", ") || "None"}
 
 Generate a single custom meal recipe that helps complete their macro goals for today. It must align with user preferences and allergies.
 Return a JSON object containing the recipe details:
@@ -1459,8 +1447,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       const cleanName = newMealOrRecipe.name.trim();
       let southIndianContext = "";
       const lowerName = cleanName.toLowerCase();
-      if (lowerName.includes("dosa") || lowerName.includes("idli") || lowerName.includes("sambar") || lowerName.includes("chutney") || lowerName.includes("vada") || lowerName.includes("uttapam")) {
-        southIndianContext = " Plated on a traditional green banana leaf, accompanied by small individual metal bowls of sambar and coconut/peanut chutney.";
+      if (lowerName.includes("dosa") || lowerName.includes("idli") || lowerName.includes("idly") || lowerName.includes("sambar") || lowerName.includes("chutney") || lowerName.includes("vada") || lowerName.includes("uttapam")) {
+        southIndianContext = " Plated on a traditional stainless steel plate (thali), accompanied by small individual metal bowls of sambar and coconut/peanut chutney.";
       }
       const prompt = `gourmet professional food photography of ${cleanName}.${southIndianContext} Crisp food separation with distinct ingredients clearly visible and neatly arranged. High detail textures, photorealistic, macro culinary shot, top-down view, clean bright studio lighting, sharp focus, volumetric depth, no blending or bleeding between food elements.`;
       
@@ -3807,6 +3795,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             mealToEdit={mealToEdit}
             onNavigateToSettings={() => setActiveTab("profile")}
             mealsState={mealsState}
+            recipesState={recipes}
             initialAiMode={manualLogInitialAiMode}
             profileData={profileData}
           />
@@ -3843,7 +3832,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
       {/* Floating ChatGPT Action Widget */}
       <AnimatePresence>
-        {profileData.preferences?.includes("show_gpt_widget") && (activeTab === "home" || activeTab === "profile") && (
+        {(profileData.agent_config?.showGptWidget ?? true) && (activeTab === "home" || activeTab === "profile") && (
           <motion.button
             initial={{ scale: 0, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -3888,6 +3877,10 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                     if (gptUrl && gptUrl.trim()) {
                       window.open(gptUrl.trim(), "_blank");
                     } else {
+                      const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+                      const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
+                      const hasGeminiKey = !!preferenceGeminiKey;
+                      setManualLogInitialAiMode(hasGeminiKey);
                       setIsCameraFullScreen(true);
                     }
                   }}

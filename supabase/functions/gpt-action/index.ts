@@ -474,14 +474,40 @@ serve(async (req) => {
         if (body.daily_calories_goal !== undefined) updateData.daily_calories_goal = body.daily_calories_goal;
         if (body.weight_goal !== undefined) updateData.weight_goal = body.weight_goal;
         if (body.preferences !== undefined) updateData.preferences = body.preferences;
+        if (body.telegram_reminders_enabled !== undefined) updateData.telegram_reminders_enabled = body.telegram_reminders_enabled;
+        if (body.telegram_reports_enabled !== undefined) updateData.telegram_reports_enabled = body.telegram_reports_enabled;
+        if (body.telegram_reminder_times !== undefined) updateData.telegram_reminder_times = body.telegram_reminder_times;
+        if (body.timezone !== undefined) updateData.timezone = body.timezone;
         
-        // Smart Memory appending helper
-        if (body.memories !== undefined) {
-          const currentMemories = profile.memories || [];
-          const newMemories = Array.isArray(body.memories) ? body.memories : [body.memories];
-          // Filter duplicates
-          const mergedMemories = Array.from(new Set([...currentMemories, ...newMemories]));
-          updateData.memories = mergedMemories;
+        // Smart merge helper for V3.2 arrays
+        const mergeArrays = (current: string[], incoming: any) => {
+          if (incoming === undefined) return undefined;
+          const newItems = Array.isArray(incoming) ? incoming : [incoming];
+          return Array.from(new Set([...(current || []), ...newItems]));
+        };
+
+        const incomingPrefs = body.knowledge_preferences ?? body.knowledge?.preferences;
+        if (incomingPrefs !== undefined) {
+          updateData.knowledge_preferences = mergeArrays(profile.knowledge_preferences, incomingPrefs);
+        }
+
+        const incomingHealth = body.knowledge_health ?? body.knowledge?.health;
+        if (incomingHealth !== undefined) {
+          updateData.knowledge_health = mergeArrays(profile.knowledge_health, incomingHealth);
+        }
+
+        const incomingNotes = body.knowledge_notes ?? body.knowledge?.notes;
+        if (incomingNotes !== undefined) {
+          updateData.knowledge_notes = mergeArrays(profile.knowledge_notes, incomingNotes);
+        }
+
+        const incomingPatterns = body.knowledge_patterns ?? body.knowledge?.patterns;
+        if (incomingPatterns !== undefined) {
+          updateData.knowledge_patterns = mergeArrays(profile.knowledge_patterns, incomingPatterns);
+        }
+
+        if (body.agent_memory !== undefined) {
+          updateData.agent_memory = mergeArrays(profile.agent_memory, body.agent_memory);
         }
 
         const { data: updatedProfile, error: updateError } = await supabase
@@ -623,12 +649,12 @@ serve(async (req) => {
         }
 
         // Check if the user has requested AI Photo refinement
-        const refineFoodPics = profile.preferences?.includes("refine_food_pics") ?? false;
-        const disableEmptyImages = profile.preferences?.includes("disable_empty_images") ?? false;
+        const config = profile.agent_config || {};
+        const refineFoodPics = config.refinePhotos ?? false;
+        const disableEmptyImages = !(config.generateImages ?? true);
 
         // Resolve preferred style prompt prefix
-        const styleTag = profile.preferences?.find((p: string) => p.startsWith("food_pic_style:")) || "food_pic_style:gourmet";
-        const styleKey = styleTag.split(":")[1] || "gourmet";
+        const styleKey = config.artStyle || "gourmet";
         
         let stylePrompt = "gourmet,professional,food,styling,photography";
         if (styleKey === "anime") {
@@ -640,8 +666,7 @@ serve(async (req) => {
         } else if (styleKey === "dubai") {
           stylePrompt = "dubai luxury fine dining,gold leaf garnish,opulent presentation,professional studio lighting";
         } else if (styleKey === "custom") {
-          const customTag = profile.preferences?.find((p: string) => p.startsWith("food_pic_custom_style:")) || "food_pic_custom_style:";
-          const customVal = customTag.split(":")[1] || "";
+          const customVal = config.customArtStyle || "";
           if (customVal.trim()) {
             stylePrompt = customVal.trim().replace(/[^a-z0-9, ]/gi, " ");
           }
