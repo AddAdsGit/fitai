@@ -1,22 +1,18 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { X, Copy, Download, Share2, Flame, Check, ChevronLeft, ChevronRight, Utensils } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { SharedItemPayload, generateShareUrl, compressMeal, compressRecipe } from "../utils/shareUtils";
+import { SharedItemPayload, generateShareUrl, compressRecipe } from "../utils/shareUtils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { cn } from "../lib/utils";
 
-interface ShareModalProps {
-  type: "meal" | "recipe" | "day";
-  item: any; // Meal, Recipe, or Day object
-  profileData: any; // User profile containing username
+interface RecipeShareModalProps {
+  item: any; // Recipe object
+  profileData: any; // User profile
   onClose: () => void;
   triggerToast: (msg: string) => void;
 }
 
-type ShareTemplate = "obsidian" | "cream" | "emerald" | "sunset";
-
-export const ShareModal: React.FC<ShareModalProps> = ({
-  type,
+export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
   item,
   profileData,
   onClose,
@@ -46,75 +42,18 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   const handleStr = profileData.username ? `@${profileData.username}` : "@user";
 
-  const isMeal = type === "meal";
-  const isRecipe = type === "recipe";
-  const isDay = type === "day";
-
-  // Date formatting helper for day titles
-  const formatDateTitle = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr + "T00:00:00");
-      return d.toLocaleDateString("en-US", { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase();
-    } catch (_) {
-      return dateStr;
-    }
-  };
-
-  const name = isDay ? formatDateTitle(item.date) : item.name || "Unnamed Item";
+  const name = item.name || "Custom Recipe";
   const calories = Number(item.calories || 0);
   const protein = Number(item.protein || 0);
   const carbs = Number(item.carbs || 0);
   const fats = Number(item.fats || 0);
   const fiber = Number(item.fiber || 0);
-  
-  const time = isDay ? "" : item.time || (isMeal ? "12:00 PM" : "15 mins");
-  const image = isDay ? "" : item.image || "";
-  const ingredients = isDay ? [] : item.ingredients || [];
-  const mealsList = isDay ? item.meals || [] : [];
+  const time = item.time || "15 mins";
+  const image = item.image || "";
+  const ingredients = item.ingredients || [];
 
-  const payload: SharedItemPayload = useMemo(() => {
-    if (type === "recipe") {
-      return compressRecipe(item);
-    } else if (type === "meal") {
-      return compressMeal(item);
-    } else {
-      return {
-        n: name,
-        c: calories,
-        p: protein,
-        cb: carbs,
-        f: fats,
-        fb: fiber,
-        mls: mealsList.map((m: any) => ({ n: m.name, c: m.calories }))
-      };
-    }
-  }, [type, item, name, calories, protein, carbs, fats, fiber, mealsList]);
-
-  useEffect(() => {
-    async function getOrCreateShortLink() {
-      if (!isSupabaseConfigured) return;
-      setLoadingUrl(true);
-      try {
-        const { data: inserted } = await supabase
-          .from("shares")
-          .insert({ type, data: payload })
-          .select("id")
-          .single();
-
-        if (inserted) {
-          setShortUrl(generateShareUrl(type, payload, inserted.id));
-        }
-      } catch (err) {
-        console.error("Error creating database share:", err);
-      } finally {
-        setLoadingUrl(false);
-      }
-    }
-
-    getOrCreateShortLink();
-  }, [type, payload]);
-
-  const finalLink = shortUrl || generateShareUrl(type, payload);
+  const payload = useMemo(() => compressRecipe(item), [item]);
+  const finalLink = shortUrl || generateShareUrl("recipe", payload);
 
   // HTML5 Canvas draw function
   const drawCanvas = () => {
@@ -167,7 +106,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       let subTxtColor = isDark ? "#A8A29E" : "#78716C";
 
       if (currentTemplate === "obsidian") {
-        // ================= TEMPLATE 1: OBSIDIAN DARK (PHOTO OR DARK SOLID) =================
+        // ================= TEMPLATE 1: OBSIDIAN DARK =================
         if (loadedImg) {
           const scale = Math.max(1080 / loadedImg.width, canvas.height / loadedImg.height);
           const xOffset = 540 - (loadedImg.width * scale) / 2;
@@ -184,7 +123,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.fillRect(0, 0, 1080, canvas.height);
         }
 
-        // Draw FitAI Logo Left
+        // Draw FitAI Brand Logo (Flame Icon Box)
         ctx.fillStyle = accentColor;
         ctx.beginPath();
         ctx.roundRect(80, 80, 72, 72, 20);
@@ -192,11 +131,20 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
         ctx.fillStyle = "#FFFFFF";
         ctx.beginPath();
-        ctx.moveTo(116, 96);
-        ctx.bezierCurveTo(110, 105, 106, 114, 106, 122);
-        ctx.bezierCurveTo(106, 131, 112, 138, 120, 138);
-        ctx.bezierCurveTo(128, 138, 134, 131, 134, 122);
-        ctx.bezierCurveTo(134, 110, 120, 102, 116, 96);
+        ctx.moveTo(116, 92);
+        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
+        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
+        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
+        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
+        ctx.fill();
+        
+        ctx.fillStyle = accentColor;
+        ctx.beginPath();
+        ctx.moveTo(116, 112);
+        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
+        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
+        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
+        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
         ctx.fill();
 
         ctx.fillStyle = "#FAF9F6";
@@ -204,7 +152,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         ctx.textBaseline = "middle";
         ctx.fillText("FitAI", 172, 116);
 
-        // Draw User Handle Tag Right
+        // Creator Handle Badge Right
         ctx.fillStyle = "rgba(255,255,255,0.15)";
         ctx.beginPath();
         ctx.roundRect(750, 80, 250, 56, 14);
@@ -216,144 +164,84 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         ctx.fillText(handleStr, 875, 108);
         ctx.textAlign = "left";
 
-        // Title Name / Date
+        // Title Date & Info
         const finalY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 68px Inter, system-ui, sans-serif");
 
-        // Subtitle & List Block
-        if (isDay) {
-          ctx.fillStyle = accentColor;
-          ctx.font = "black 28px Inter, system-ui, sans-serif";
-          ctx.fillText("📅 ALL MEALS RECORDED", 80, finalY + 70);
+        ctx.fillStyle = accentColor;
+        ctx.font = "black 28px Inter, system-ui, sans-serif";
+        ctx.fillText(`🍳 ${time} PREP`, 80, finalY + 60);
 
-          const boxY = finalY + 100;
-          ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.fillStyle = subTxtColor;
+        ctx.font = "bold 24px Inter, system-ui, sans-serif";
+        ctx.fillText(`Logged ${item.log_count || 0} times by ${handleStr}`, 80, finalY + 105);
+
+        let boxY = finalY + 130;
+        let boxH = 280;
+        let ingOffset = 55;
+        let calOffset = 415;
+
+        if (cardFormat !== "square") {
+          const descText = item.description || "A custom recipe generated and tracked on FitAI.";
+          const descY = wrapText(descText, 80, finalY + 155, 920, 36, "#FAF9F6", "medium 23px Inter, system-ui, sans-serif");
+          boxY = descY + 45;
+          boxH = 240;
+          ingOffset = 48;
+          calOffset = 360;
+        }
+
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.beginPath();
+        ctx.roundRect(80, boxY, 920, boxH, 24);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
+        ctx.fillText("INGREDIENTS CHECKLIST", 120, boxY + 50);
+
+        ctx.font = "bold 24px Inter, system-ui, sans-serif";
+        const topIngredients = ingredients.slice(0, 3);
+        topIngredients.forEach((ing: string, idx: number) => {
+          ctx.fillStyle = accentColor;
           ctx.beginPath();
-          ctx.roundRect(80, boxY, 920, 280, 24);
+          ctx.arc(130, boxY + 100 + idx * ingOffset, 6, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.fillStyle = "#FAF9F6";
-          ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
-          ctx.fillText("DAILY FOOD TIMELINE", 120, boxY + 50);
+          ctx.fillText(ing, 160, boxY + 107 + idx * ingOffset);
+        });
 
-          ctx.font = "bold 24px Inter, system-ui, sans-serif";
-          const topMeals = mealsList.slice(0, 3);
-          
-          if (topMeals.length === 0) {
-            ctx.fillStyle = "#A8A29E";
-            ctx.fillText("No meals logged on this day.", 120, boxY + 130);
-          } else {
-            topMeals.forEach((meal: any, idx: number) => {
-              ctx.fillStyle = accentColor;
-              ctx.beginPath();
-              ctx.arc(130, boxY + 110 + idx * 55, 6, 0, Math.PI * 2);
-              ctx.fill();
-
-              ctx.fillStyle = "#FAF9F6";
-              ctx.fillText(meal.name || "Logged Meal", 160, boxY + 118 + idx * 55);
-
-              ctx.fillStyle = "#A8A29E";
-              ctx.font = "black 24px Inter, system-ui, sans-serif";
-              ctx.fillText(`+${meal.calories} kcal`, 820, boxY + 118 + idx * 55);
-            });
-            if (mealsList.length > 3) {
-              ctx.fillStyle = "#A8A29E";
-              ctx.font = "italic 20px Inter, system-ui, sans-serif";
-              ctx.fillText(`+ ${mealsList.length - 3} more meals logged`, 120, boxY + 245);
-            }
-          }
-
-          ctx.fillStyle = "#FAF9F6";
-          ctx.font = "black 76px Inter, system-ui, sans-serif";
-          ctx.fillText(`${calories} kcal`, 80, boxY + 415);
-
-        } else if (isRecipe) {
-          ctx.fillStyle = accentColor;
-          ctx.font = "black 28px Inter, system-ui, sans-serif";
-          ctx.fillText(`🍳 ${time} PREP • LOGGED ${item.log_count || 0} TIMES BY ${handleStr.toUpperCase()}`, 80, finalY + 60);
-
-          let boxY = finalY + 90;
-          let boxH = 280;
-          let ingOffset = 55;
-          let calOffset = 415;
-
-          if (cardFormat !== "square") {
-            const descText = item.description || "A custom recipe generated and tracked on FitAI.";
-            const descY = wrapText(descText, 80, finalY + 115, 920, 36, "#FAF9F6", "medium 23px Inter, system-ui, sans-serif");
-            boxY = descY + 45;
-            boxH = 240;
-            ingOffset = 48;
-            calOffset = 360;
-          }
-
-          ctx.fillStyle = "rgba(255,255,255,0.06)";
-          ctx.beginPath();
-          ctx.roundRect(80, boxY, 920, boxH, 24);
-          ctx.fill();
-
-          ctx.fillStyle = "#FAF9F6";
-          ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
-          ctx.fillText("INGREDIENTS CHECKLIST", 120, boxY + 50);
-
-          ctx.font = "bold 24px Inter, system-ui, sans-serif";
-          const topIngredients = ingredients.slice(0, 3);
-          topIngredients.forEach((ing: string, idx: number) => {
-            ctx.fillStyle = accentColor;
-            ctx.beginPath();
-            ctx.arc(130, boxY + 100 + idx * ingOffset, 6, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.fillStyle = "#FAF9F6";
-            ctx.fillText(ing, 160, boxY + 107 + idx * ingOffset);
-          });
-
-          if (ingredients.length > 3) {
-            ctx.fillStyle = "#A8A29E";
-            ctx.font = "italic 20px Inter, system-ui, sans-serif";
-            ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + boxH - 35);
-          }
-
-          ctx.fillStyle = "#FAF9F6";
-          ctx.font = "black 76px Inter, system-ui, sans-serif";
-          ctx.fillText(`${calories} kcal`, 80, boxY + calOffset);
-
-          if (cardFormat !== "square") {
-            const instructionsY = boxY + 270;
-            const instructionsBoxH = cardFormat === "story" ? 640 : 250;
-            ctx.fillStyle = "rgba(255,255,255,0.06)";
-            ctx.beginPath();
-            ctx.roundRect(80, instructionsY, 920, instructionsBoxH, 24);
-            ctx.fill();
-
-            ctx.fillStyle = "#FAF9F6";
-            ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
-            ctx.fillText("PREPARATION STEPS", 120, instructionsY + 50);
-
-            const instructionsText = item.instructions || "Enjoy this healthy custom portion immediately!";
-            wrapText(
-              instructionsText,
-              120,
-              instructionsY + 95,
-              840,
-              34,
-              "#FAF9F6",
-              "medium 21px Inter, system-ui, sans-serif"
-            );
-          }
-
-        } else {
-          // Standard Meal Log
-          ctx.fillStyle = accentColor;
-          ctx.font = "black 28px Inter, system-ui, sans-serif";
-          ctx.fillText(`⚡ LOGGED AT ${time} BY ${handleStr.toUpperCase()}`, 80, finalY + 70);
-
-          ctx.fillStyle = "#FAF9F6";
-          ctx.font = "black 170px Inter, system-ui, sans-serif";
-          const calY = finalY + 235;
-          ctx.fillText(`${calories}`, 80, calY);
-
+        if (ingredients.length > 3) {
           ctx.fillStyle = "#A8A29E";
-          ctx.font = "bold 32px Inter, system-ui, sans-serif";
-          ctx.fillText("TOTAL KCAL", 85, calY + 60);
+          ctx.font = "italic 20px Inter, system-ui, sans-serif";
+          ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + boxH - 35);
+        }
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "black 76px Inter, system-ui, sans-serif";
+        ctx.fillText(`${calories} kcal`, 80, boxY + calOffset);
+
+        if (cardFormat !== "square") {
+          const instructionsY = boxY + 270;
+          const instructionsBoxH = cardFormat === "story" ? 640 : 250;
+          ctx.fillStyle = "rgba(255,255,255,0.06)";
+          ctx.beginPath();
+          ctx.roundRect(80, instructionsY, 920, instructionsBoxH, 24);
+          ctx.fill();
+
+          ctx.fillStyle = "#FAF9F6";
+          ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
+          ctx.fillText("PREPARATION STEPS", 120, instructionsY + 50);
+
+          const instructionsText = item.instructions || "Enjoy this healthy custom portion immediately!";
+          wrapText(
+            instructionsText,
+            120,
+            instructionsY + 95,
+            840,
+            34,
+            "#FAF9F6",
+            "medium 21px Inter, system-ui, sans-serif"
+          );
         }
 
         // Macros Row
@@ -402,11 +290,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         ctx.textAlign = "left";
 
       } else if (currentTemplate === "cream") {
-        // ================= TEMPLATE 2: CREAM LIGHT (MENU CARD SOLID) =================
+        // ================= TEMPLATE 2: CREAM LIGHT =================
         ctx.fillStyle = "#FAF9F6";
         ctx.fillRect(0, 0, 1080, canvas.height);
 
-        // Logo Left
+        // Draw Logo Box (Flame)
         ctx.fillStyle = accentColor;
         ctx.beginPath();
         ctx.roundRect(80, 80, 72, 72, 20);
@@ -414,11 +302,20 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
         ctx.fillStyle = "#FFFFFF";
         ctx.beginPath();
-        ctx.moveTo(116, 96);
-        ctx.bezierCurveTo(110, 105, 106, 114, 106, 122);
-        ctx.bezierCurveTo(106, 131, 112, 138, 120, 138);
-        ctx.bezierCurveTo(128, 138, 134, 131, 134, 122);
-        ctx.bezierCurveTo(134, 110, 120, 102, 116, 96);
+        ctx.moveTo(116, 92);
+        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
+        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
+        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
+        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
+        ctx.fill();
+        
+        ctx.fillStyle = accentColor;
+        ctx.beginPath();
+        ctx.moveTo(116, 112);
+        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
+        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
+        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
+        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
         ctx.fill();
 
         ctx.fillStyle = "#1C1917";
@@ -426,7 +323,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         ctx.textBaseline = "middle";
         ctx.fillText("FitAI", 172, 116);
 
-        // User Handle Right
+        // Creator Handle
         ctx.fillStyle = "#E7E5E4";
         ctx.beginPath();
         ctx.roundRect(750, 80, 250, 56, 14);
@@ -441,8 +338,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         const circleX = 540;
         const circleY = 440;
 
-        if (loadedImg && !isDay) {
-          // Circular Image Polaroid
+        if (loadedImg) {
           ctx.save();
           ctx.beginPath();
           ctx.arc(circleX, circleY, 170, 0, Math.PI * 2);
@@ -453,14 +349,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.drawImage(loadedImg, xOffset, yOffset, loadedImg.width * scale, loadedImg.height * scale);
           ctx.restore();
 
-          // Border Ring
           ctx.strokeStyle = accentColor;
           ctx.lineWidth = 12;
           ctx.beginPath();
           ctx.arc(circleX, circleY, 170, 0, Math.PI * 2);
           ctx.stroke();
 
-          // Calorie Badge
           ctx.fillStyle = accentColor;
           ctx.beginPath();
           ctx.roundRect(circleX - 90, circleY + 130, 180, 56, 16);
@@ -472,7 +366,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.fillText(`${calories} KCAL`, circleX, circleY + 167);
           ctx.textAlign = "left";
         } else {
-          // Centered Circular Calorie Ring
           ctx.strokeStyle = "#E7E5E4";
           ctx.lineWidth = 12;
           ctx.beginPath();
@@ -495,37 +388,40 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.textAlign = "left";
         }
 
-        // Title below ring
-        const titleY = (loadedImg && !isDay) ? 735 : 715;
-        wrapText(name, 80, titleY, 920, 68, "#1C1917", "black 48px Inter, system-ui, sans-serif");
+        const titleY = loadedImg ? 735 : 715;
+        const nameY = wrapText(name, 80, titleY, 920, 68, "#1C1917", "black 48px Inter, system-ui, sans-serif");
 
-        // Macros text Row
-        const macroY = 880;
+        // Info Tag
+        ctx.fillStyle = "#78716C";
+        ctx.font = "bold 22px Inter, system-ui, sans-serif";
+        ctx.fillText(`Logged ${item.log_count || 0} times by ${handleStr} • ⏱️ ${time}`, 80, nameY + 50);
+
+        const macroY = canvas.height - 260;
         ctx.fillStyle = "#1C1917";
         ctx.font = "extrabold 28px Inter, system-ui, sans-serif";
         ctx.fillText(`PROTEIN: ${protein}g  •  CARBS: ${carbs}g  •  FATS: ${fats}g`, 80, macroY);
 
-        // Footer
+        const footerY = canvas.height - 110;
         ctx.strokeStyle = "#E7E5E4";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(80, 970);
-        ctx.lineTo(1000, 970);
+        ctx.moveTo(80, footerY);
+        ctx.lineTo(1000, footerY);
         ctx.stroke();
 
         ctx.fillStyle = "#78716C";
         ctx.font = "bold 22px Inter, system-ui, sans-serif";
-        ctx.fillText("FITAI • MINIMALIST CALORIE ENGINE", 80, 1015);
+        ctx.fillText("FITAI • MINIMALIST CALORIE ENGINE", 80, footerY + 45);
         ctx.textAlign = "right";
-        ctx.fillText("fitpush.vercel.app", 1000, 1015);
+        ctx.fillText("fitpush.vercel.app", 1000, footerY + 45);
         ctx.textAlign = "left";
 
       } else if (currentTemplate === "emerald") {
-        // ================= TEMPLATE 3: EMERALD SOLID GREEN (NUTRITION FOCUS) =================
+        // ================= TEMPLATE 3: EMERALD NUTRITION FOCUS =================
         ctx.fillStyle = "#064E3B";
         ctx.fillRect(0, 0, 1080, canvas.height);
 
-        if (loadedImg && !isDay) {
+        if (loadedImg) {
           ctx.save();
           ctx.beginPath();
           ctx.rect(0, 0, 480, canvas.height);
@@ -544,11 +440,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.stroke();
         }
 
-        const textOffset = (loadedImg && !isDay) ? 540 : 80;
-        const textMaxW = (loadedImg && !isDay) ? 460 : 500;
-        const statsOffset = (loadedImg && !isDay) ? 540 : 640;
+        const textOffset = loadedImg ? 540 : 80;
+        const textMaxW = loadedImg ? 460 : 500;
+        const statsOffset = loadedImg ? 540 : 640;
 
-        // Logo
+        // Draw Flame Logo (White inside emerald)
         ctx.fillStyle = "#FAF9F6";
         ctx.beginPath();
         ctx.roundRect(textOffset, 80, 72, 72, 20);
@@ -556,11 +452,20 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
         ctx.fillStyle = "#064E3B";
         ctx.beginPath();
-        ctx.moveTo(textOffset + 36, 96);
-        ctx.bezierCurveTo(textOffset + 30, 105, textOffset + 26, 114, textOffset + 26, 122);
-        ctx.bezierCurveTo(textOffset + 26, 131, textOffset + 32, 138, textOffset + 40, 138);
-        ctx.bezierCurveTo(textOffset + 48, 138, textOffset + 54, 131, textOffset + 54, 122);
-        ctx.bezierCurveTo(textOffset + 54, 110, textOffset + 40, 102, textOffset + 36, 96);
+        ctx.moveTo(textOffset + 36, 92);
+        ctx.bezierCurveTo(textOffset + 24, 106, textOffset + 18, 116, textOffset + 18, 126);
+        ctx.bezierCurveTo(textOffset + 18, 137, textOffset + 26, 144, textOffset + 36, 144);
+        ctx.bezierCurveTo(textOffset + 46, 144, textOffset + 54, 137, textOffset + 54, 126);
+        ctx.bezierCurveTo(textOffset + 54, 112, textOffset + 40, 100, textOffset + 36, 92);
+        ctx.fill();
+        
+        ctx.fillStyle = "#FAF9F6";
+        ctx.beginPath();
+        ctx.moveTo(textOffset + 36, 112);
+        ctx.bezierCurveTo(textOffset + 30, 120, textOffset + 26, 126, textOffset + 26, 132);
+        ctx.bezierCurveTo(textOffset + 26, 138, textOffset + 30, 141, textOffset + 36, 141);
+        ctx.bezierCurveTo(textOffset + 42, 141, textOffset + 46, 138, textOffset + 46, 132);
+        ctx.bezierCurveTo(textOffset + 46, 124, textOffset + 38, 117, textOffset + 36, 112);
         ctx.fill();
 
         ctx.fillStyle = "#FAF9F6";
@@ -568,7 +473,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         ctx.textBaseline = "middle";
         ctx.fillText("FitAI", textOffset + 92, 116);
 
-        // User Handle Right
+        // User Handle
         ctx.fillStyle = "rgba(250,249,246,0.15)";
         ctx.beginPath();
         ctx.roundRect(750, 80, 250, 56, 14);
@@ -587,7 +492,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         ctx.fillText(`${calories}`, textOffset, nameY + 130);
         ctx.fillStyle = "#A7F3D0";
         ctx.font = "bold 24px Inter, system-ui, sans-serif";
-        ctx.fillText("DAILY CALORIES LOGGED", textOffset, nameY + 180);
+        ctx.fillText("RECIPE CALORIES LOGGED", textOffset, nameY + 180);
 
         // Macros stats
         const mStats = [
@@ -596,7 +501,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           { label: "FATS", val: `${fats}g`, bar: fats / 70 }
         ];
 
-        const barWidth = (loadedImg && !isDay) ? 460 : 360;
+        const barWidth = loadedImg ? 460 : 360;
 
         mStats.forEach((stat, i) => {
           const itemY = 560 + i * 130;
@@ -620,23 +525,24 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         });
 
         // Footer
+        const footerY = canvas.height - 110;
         ctx.strokeStyle = "rgba(250,249,246,0.1)";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(textOffset, 970);
-        ctx.lineTo(1000, 970);
+        ctx.moveTo(textOffset, footerY);
+        ctx.lineTo(1000, footerY);
         ctx.stroke();
 
         ctx.fillStyle = "#A7F3D0";
         ctx.font = "bold 22px Inter, system-ui, sans-serif";
-        ctx.fillText("FITAI • FRESH LOG SYSTEM", textOffset, 1015);
+        ctx.fillText("FITAI • FRESH LOG SYSTEM", textOffset, footerY + 45);
         ctx.textAlign = "right";
-        ctx.fillText("fitpush.vercel.app", 1000, 1015);
+        ctx.fillText("fitpush.vercel.app", 1000, footerY + 45);
         ctx.textAlign = "left";
 
       } else if (currentTemplate === "sunset") {
-        // ================= TEMPLATE 4: SUNSET GLOW (GRADIENT + PHOTO OVERLAY) =================
-        if (loadedImg && !isDay) {
+        // ================= TEMPLATE 4: SUNSET GLOW =================
+        if (loadedImg) {
           const scale = Math.max(1080 / loadedImg.width, canvas.height / loadedImg.height);
           const xOffset = 540 - (loadedImg.width * scale) / 2;
           const yOffset = (canvas.height / 2) - (loadedImg.height * scale) / 2;
@@ -654,7 +560,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           ctx.fillRect(0, 0, 1080, canvas.height);
         }
 
-        // Logo Left
+        // Draw Flame Logo
         ctx.fillStyle = "#FFFFFF";
         ctx.beginPath();
         ctx.roundRect(80, 80, 72, 72, 20);
@@ -662,89 +568,77 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
         ctx.fillStyle = "#FF4E50";
         ctx.beginPath();
-        ctx.moveTo(116, 96);
-        ctx.bezierCurveTo(110, 105, 106, 114, 106, 122);
-        ctx.bezierCurveTo(106, 131, 112, 138, 120, 138);
-        ctx.bezierCurveTo(128, 138, 134, 131, 134, 122);
-        ctx.bezierCurveTo(134, 110, 120, 102, 116, 96);
+        ctx.moveTo(116, 92);
+        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
+        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
+        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
+        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
+        ctx.fill();
+        
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.moveTo(116, 112);
+        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
+        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
+        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
+        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
         ctx.fill();
 
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = "#FAF9F6";
         ctx.font = "black 54px Inter, system-ui, sans-serif";
         ctx.textBaseline = "middle";
         ctx.fillText("FitAI", 172, 116);
 
-        // User Handle Right
-        ctx.fillStyle = "rgba(255,255,255,0.25)";
+        // User Handle
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
         ctx.beginPath();
         ctx.roundRect(750, 80, 250, 56, 14);
         ctx.fill();
 
-        ctx.fillStyle = "#FFFFFF";
+        ctx.fillStyle = "#FAF9F6";
         ctx.font = "extrabold 20px Inter, system-ui, sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(handleStr, 875, 108);
         ctx.textAlign = "left";
 
-        // Central Glassmorphic Card Panel
-        ctx.fillStyle = "rgba(255,255,255,0.18)";
-        ctx.beginPath();
-        ctx.roundRect(80, 220, 920, 710, 32);
-        ctx.fill();
+        const nameY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 68px Inter, system-ui, sans-serif");
 
-        wrapText(name, 130, 310, 820, 76, "#FFFFFF", "black 60px Inter, system-ui, sans-serif");
-
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "black 160px Inter, system-ui, sans-serif";
-        ctx.fillText(`${calories}`, 130, 580);
         ctx.fillStyle = "rgba(255,255,255,0.75)";
-        ctx.font = "bold 26px Inter, system-ui, sans-serif";
-        ctx.fillText("TOTAL CALORIES INGESTED", 135, 630);
+        ctx.font = "bold 22px Inter, system-ui, sans-serif";
+        ctx.fillText(`Logged ${item.log_count || 0} times by ${handleStr} • ⏱️ ${time}`, 80, nameY + 50);
 
-        // Macros
-        const macroY = 740;
-        const macros = [
-          { name: "Protein", val: `${protein}g` },
-          { name: "Carbs", val: `${carbs}g` },
-          { name: "Fats", val: `${fats}g` }
-        ];
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "black 120px Inter, system-ui, sans-serif";
+        ctx.fillText(`${calories}`, 80, nameY + 175);
+        ctx.fillStyle = "rgba(255,255,255,0.8)";
+        ctx.font = "bold 20px Inter, system-ui, sans-serif";
+        ctx.fillText("KCAL", 85, nameY + 225);
 
-        macros.forEach((m, idx) => {
-          const startX = 130 + idx * 280;
-          ctx.fillStyle = "rgba(255,255,255,0.2)";
-          ctx.beginPath();
-          ctx.roundRect(startX, macroY, 240, 110, 16);
-          ctx.fill();
+        const macroY = canvas.height - 260;
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "extrabold 28px Inter, system-ui, sans-serif";
+        ctx.fillText(`PROTEIN: ${protein}g  •  CARBS: ${carbs}g  •  FATS: ${fats}g`, 80, macroY);
 
-          ctx.fillStyle = "rgba(255,255,255,0.8)";
-          ctx.font = "bold 16px Inter, system-ui, sans-serif";
-          ctx.fillText(m.name.toUpperCase(), startX + 30, macroY + 38);
-
-          ctx.fillStyle = "#FFFFFF";
-          ctx.font = "black 28px Inter, system-ui, sans-serif";
-          ctx.fillText(m.val, startX + 30, macroY + 80);
-        });
-
-        // Footer
-        ctx.strokeStyle = "rgba(255,255,255,0.25)";
+        const footerY = canvas.height - 110;
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(80, 970);
-        ctx.lineTo(1000, 970);
+        ctx.moveTo(80, footerY);
+        ctx.lineTo(1000, footerY);
         ctx.stroke();
 
         ctx.fillStyle = "rgba(255,255,255,0.75)";
         ctx.font = "bold 22px Inter, system-ui, sans-serif";
-        ctx.fillText("FITAI • ENERGY STREAM", 80, 1015);
+        ctx.fillText("FITAI • ENERGY STREAM", 80, footerY + 45);
         ctx.textAlign = "right";
-        ctx.fillText("fitpush.vercel.app", 1000, 1015);
+        ctx.fillText("fitpush.vercel.app", 1000, footerY + 45);
         ctx.textAlign = "left";
       }
     };
 
-    if (hasImage && !isDay) {
-      const imageUrl = payload.img || "";
+    if (image) {
       const img = new Image();
+      const imageUrl = image;
       
       const tryLoad = (useCors: boolean) => {
         img.onload = () => {
@@ -752,7 +646,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         };
         img.onerror = () => {
           if (useCors) {
-            // Fallback: Try loading without crossOrigin property
             const fallbackImg = new Image();
             fallbackImg.onload = () => {
               runTemplateDraw(fallbackImg);
@@ -801,10 +694,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     if (!canvas) return;
     const url = canvas.toDataURL("image/png");
     const link = document.createElement("a");
-    link.download = `${name.replace(/\s+/g, "_").toLowerCase()}_card.png`;
+    link.download = `${name.replace(/\s+/g, "_").toLowerCase()}_recipe.png`;
     link.href = url;
     link.click();
-    triggerToast("💾 Infographic card downloaded!");
+    triggerToast("💾 Recipe card downloaded!");
   };
 
   const handleNativeShare = async () => {
@@ -813,24 +706,23 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     canvas.toBlob(async (blob) => {
       if (!blob) return;
       try {
-        const file = new File([blob], `${name.replace(/\s+/g, "_").toLowerCase()}_card.png`, { type: "image/png" });
+        const file = new File([blob], `${name.replace(/\s+/g, "_").toLowerCase()}_recipe.png`, { type: "image/png" });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
             title: `FitAI Share: ${name}`,
-            text: `Check out this ${type === "meal" ? "meal log" : "recipe"} on FitAI!`,
+            text: `Check out my custom recipe: ${name} on FitAI!`,
             url: finalLink,
           });
         } else {
           await navigator.share({
             title: `FitAI Share: ${name}`,
-            text: `Check out this ${type === "meal" ? "meal log" : "recipe"} on FitAI!`,
+            text: `Check out my custom recipe: ${name} on FitAI!`,
             url: finalLink,
           });
         }
       } catch (err) {
-        // Suppress dialog cancellation abort error
         if (err instanceof Error && err.name !== "AbortError") {
           handleCopyLink();
         }
@@ -838,7 +730,29 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     });
   };
 
-  const hasImage = !!payload.img;
+  useEffect(() => {
+    async function getOrCreateShortLink() {
+      if (!isSupabaseConfigured) return;
+      setLoadingUrl(true);
+      try {
+        const { data: inserted } = await supabase
+          .from("shares")
+          .insert({ type: "recipe", data: payload })
+          .select("id")
+          .single();
+
+        if (inserted) {
+          setShortUrl(generateShareUrl("recipe", payload, inserted.id));
+        }
+      } catch (err) {
+        console.error("Error creating database share:", err);
+      } finally {
+        setLoadingUrl(false);
+      }
+    }
+
+    getOrCreateShortLink();
+  }, [payload]);
 
   return (
     <motion.div
@@ -856,7 +770,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         {/* Header */}
         <div className="flex justify-between items-center w-full">
           <span className="text-[10px] font-black uppercase tracking-widest text-stone-400">
-            Swipe Templates
+            Share Recipe
           </span>
           <button
             onClick={onClose}
@@ -912,20 +826,18 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         ) : (
           /* Web Link View Mockup */
           <div className="w-full aspect-square bg-[#FAF9F6] rounded-[28px] border border-stone-200 shadow-xl overflow-y-auto p-4.5 text-left font-sans flex flex-col gap-3.5 no-scrollbar">
-            {/* Simulate PublicShareView Header */}
             <div className="flex items-center justify-between border-b border-stone-200 pb-2.5">
               <div className="flex items-center gap-1.5">
                 <div className="w-5.5 h-5.5 rounded-lg bg-orange-500 flex items-center justify-center shadow-xs">
                   <Flame className="text-white w-3 h-3 fill-white" />
                 </div>
-                <span className="text-[10px] font-black text-stone-700 tracking-tight">FitAI Shared View</span>
+                <span className="text-[10px] font-black text-stone-700 tracking-tight">FitAI Link View</span>
               </div>
               <span className="text-[7.5px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none">
-                Webpage Link
+                Guest View
               </span>
             </div>
 
-            {/* Cover Card */}
             <div className="w-full aspect-video rounded-xl relative overflow-hidden bg-stone-900 flex flex-col justify-end p-3 border border-stone-200/40 shrink-0">
               {payload.img ? (
                 <img src={payload.img} className="absolute inset-0 w-full h-full object-cover opacity-60" />
@@ -937,25 +849,19 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               <div className="relative z-10 space-y-0.5">
                 <h4 className="text-white text-xs font-black drop-shadow-xs truncate">{name}</h4>
                 <p className="text-[8px] text-white/80 font-bold flex items-center gap-1">
-                  <span>⏱️ {time || "15 mins"}</span>
-                  {type === "recipe" && (
-                    <>
-                      <span>•</span>
-                      <span>🔥 Logged {item.log_count || 0} times by {handleStr}</span>
-                    </>
-                  )}
+                  <span>⏱️ {time}</span>
+                  <span>•</span>
+                  <span>🔥 Logged {item.log_count || 0} times by {handleStr}</span>
                 </p>
               </div>
             </div>
 
-            {/* Description */}
             {item.description && (
               <div className="bg-stone-50 border border-stone-100 rounded-xl p-2.5 text-[9.5px] text-stone-600 font-bold leading-relaxed">
                 📝 {item.description}
               </div>
             )}
 
-            {/* Macros Ring summary */}
             <div className="grid grid-cols-4 gap-1.5 shrink-0">
               {[
                 { label: "Kcal", val: calories, color: "text-orange-600" },
@@ -970,23 +876,19 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               ))}
             </div>
 
-            {/* Ingredients Checklist */}
-            {type === "recipe" && ingredients.length > 0 && (
-              <div className="space-y-1">
-                <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">Ingredients checklist</span>
-                <div className="bg-white border border-stone-150 rounded-xl p-3 space-y-1.5">
-                  {ingredients.map((ing, i) => (
-                    <div key={i} className="flex items-center gap-1.5 text-[9px] font-semibold text-stone-700">
-                      <input type="checkbox" defaultChecked className="rounded border-stone-300 text-orange-500 focus:ring-orange-500 w-2.5 h-2.5 cursor-pointer" />
-                      <span className="truncate">{ing}</span>
-                    </div>
-                  ))}
-                </div>
+            <div className="space-y-1">
+              <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">Ingredients checklist</span>
+              <div className="bg-white border border-stone-150 rounded-xl p-3 space-y-1.5">
+                {ingredients.map((ing: string, i: number) => (
+                  <div key={i} className="flex items-center gap-1.5 text-[9px] font-semibold text-stone-700">
+                    <input type="checkbox" defaultChecked className="rounded border-stone-300 text-orange-500 focus:ring-orange-500 w-2.5 h-2.5 cursor-pointer" />
+                    <span className="truncate">{ing}</span>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
-            {/* Instructions */}
-            {type === "recipe" && item.instructions && (
+            {item.instructions && (
               <div className="space-y-1">
                 <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">Preparation Steps</span>
                 <div className="bg-white border border-stone-150 rounded-xl p-3 text-[9px] font-semibold text-stone-600 leading-relaxed whitespace-pre-line">
@@ -1007,38 +909,38 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         {/* Pagination & Navigation Row */}
         {previewTab === "card" && (
           <div className="flex items-center gap-6 select-none mt-1">
-          <button
-            onClick={handlePrev}
-            className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
-            title="Previous template"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+            <button
+              onClick={handlePrev}
+              className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+              title="Previous template"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
 
-          <div className="flex gap-1.5 flex-wrap justify-center max-w-[120px]">
-            {variations.map((v, idx) => (
-              <button
-                key={v.id}
-                onClick={() => setCurrentIndex(idx)}
-                className={`h-2 rounded-full transition-all cursor-pointer ${
-                  idx === currentIndex ? "w-5 bg-orange-500" : "w-2 bg-stone-300"
-                }`}
-                title={v.name}
-              />
-            ))}
+            <div className="flex gap-1.5 flex-wrap justify-center max-w-[120px]">
+              {variations.map((v, idx) => (
+                <button
+                  key={v.id}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`h-2 rounded-full transition-all cursor-pointer ${
+                    idx === currentIndex ? "w-5 bg-orange-500" : "w-2 bg-stone-300"
+                  }`}
+                  title={v.name}
+                />
+              ))}
+            </div>
+
+            <button
+              onClick={handleNext}
+              className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+              title="Next template"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
-
-          <button
-            onClick={handleNext}
-            className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
-            title="Next template"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
         )}
 
-        {/* Buttons */}
+        {/* Action Buttons */}
         <div className="flex flex-col gap-2.5 w-full">
           <button
             onClick={handleCopyLink}
@@ -1046,7 +948,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-100 active:scale-98 transition-all"
           >
             {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            <span>{copied ? "Copied!" : isDay ? "Copy Day Share Link" : "Copy Shareable Link"}</span>
+            <span>{copied ? "Copied!" : "Copy Share Link"}</span>
           </button>
 
           <div className="grid grid-cols-2 gap-2.5 w-full">
@@ -1066,7 +968,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             </button>
           </div>
         </div>
-
       </motion.div>
     </motion.div>
   );

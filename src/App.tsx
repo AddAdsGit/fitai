@@ -40,7 +40,9 @@ import { OAuthConsentView } from "./components/OAuthConsentView";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { CalendarPickerModal } from "./components/CalendarPickerModal";
 import { DefaultAvatar } from "./components/DefaultAvatar";
-import { ShareModal } from "./components/ShareModal";
+import { RecipeShareModal } from "./components/RecipeShareModal";
+import { MealShareModal } from "./components/MealShareModal";
+import { DayShareModal } from "./components/DayShareModal";
 import { PublicShareView } from "./components/PublicShareView";
 import { ChatGPTIcon } from "./components/ChatGPTIcon";
 
@@ -3813,9 +3815,24 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
       {/* Visual Share Modal Overlay */}
       <AnimatePresence>
-        {shareItemPopup && (
-          <ShareModal
-            type={shareItemPopup.type}
+        {shareItemPopup && shareItemPopup.type === "recipe" && (
+          <RecipeShareModal
+            item={shareItemPopup.item}
+            profileData={profileData}
+            onClose={() => setShareItemPopup(null)}
+            triggerToast={showToast}
+          />
+        )}
+        {shareItemPopup && shareItemPopup.type === "meal" && (
+          <MealShareModal
+            item={shareItemPopup.item}
+            profileData={profileData}
+            onClose={() => setShareItemPopup(null)}
+            triggerToast={showToast}
+          />
+        )}
+        {shareItemPopup && shareItemPopup.type === "day" && (
+          <DayShareModal
             item={shareItemPopup.item}
             profileData={profileData}
             onClose={() => setShareItemPopup(null)}

@@ -1,0 +1,846 @@
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { X, Copy, Download, Share2, Flame, Check, ChevronLeft, ChevronRight, Utensils } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { SharedItemPayload, generateShareUrl } from "../utils/shareUtils";
+import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { cn } from "../lib/utils";
+
+interface DayShareModalProps {
+  item: any; // Day summary object
+  profileData: any; // User profile
+  onClose: () => void;
+  triggerToast: (msg: string) => void;
+}
+
+export const DayShareModal: React.FC<DayShareModalProps> = ({
+  item,
+  profileData,
+  onClose,
+  triggerToast,
+}) => {
+  const variations = [
+    { id: "obsidian_3_4", name: "Obsidian Post (3:4)", theme: "obsidian", format: "portrait" },
+    { id: "cream_3_4", name: "Cream Post (3:4)", theme: "cream", format: "portrait" },
+    { id: "sunset_9_16", name: "Sunset Story (9:16)", theme: "sunset", format: "story" },
+    { id: "emerald_9_16", name: "Emerald Story (9:16)", theme: "emerald", format: "story" }
+  ] as const;
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [loadingUrl, setLoadingUrl] = useState(false);
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [previewTab, setPreviewTab] = useState<"card" | "webpage">("card");
+
+  // Day summary customization toggles
+  const [includeMealTimes, setIncludeMealTimes] = useState(true);
+  const [includeMealPhotos, setIncludeMealPhotos] = useState(true);
+  const [includeMealCalories, setIncludeMealCalories] = useState(true);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const currentVar = variations[currentIndex];
+  const currentTemplate = currentVar.theme;
+  const cardFormat = currentVar.format;
+
+  const handleStr = profileData.username ? `@${profileData.username}` : "@user";
+
+  const name = item.name || "Daily Summary";
+  const calories = Number(item.calories || 0);
+  const protein = Number(item.protein || 0);
+  const carbs = Number(item.carbs || 0);
+  const fats = Number(item.fats || 0);
+  const fiber = Number(item.fiber || 0);
+  const mealsList = item.meals || [];
+
+  const payload: SharedItemPayload = useMemo(() => ({
+    n: name,
+    c: calories,
+    p: protein,
+    cb: carbs,
+    f: fats,
+    fb: fiber,
+    mls: mealsList.map((m: any) => ({ n: m.name, c: m.calories }))
+  }), [name, calories, protein, carbs, fats, fiber, mealsList]);
+
+  const finalLink = shortUrl || generateShareUrl("day", payload);
+
+  const drawCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = 1080;
+    if (cardFormat === "story") {
+      canvas.height = 1920;
+    } else {
+      canvas.height = 1440;
+    }
+
+    const accentColor = "#F97316";
+
+    const wrapText = (text: string, x: number, y: number, maxWidth: number, lineHeight: number, color: string, font: string) => {
+      ctx.fillStyle = color;
+      ctx.font = font;
+      const words = text.split(" ");
+      let line = "";
+      let currentY = y;
+      
+      for (let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + " ";
+        let metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && n > 0) {
+          ctx.fillText(line, x, currentY);
+          line = words[n] + " ";
+          currentY += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, x, currentY);
+      return currentY;
+    };
+
+    const runTemplateDraw = () => {
+      ctx.clearRect(0, 0, 1080, canvas.height);
+      
+      const isDark = currentTemplate === "obsidian";
+      const isSunset = currentTemplate === "sunset";
+      let bgColor = isDark ? "#1C1917" : "#FAF9F6";
+      let txtColor = isDark ? "#FAF9F6" : "#1C1917";
+      let subTxtColor = isDark ? "#A8A29E" : "#78716C";
+
+      if (currentTemplate === "obsidian") {
+        ctx.fillStyle = "#1C1917";
+        ctx.fillRect(0, 0, 1080, canvas.height);
+
+        // Flame Logo Box
+        ctx.fillStyle = accentColor;
+        ctx.beginPath();
+        ctx.roundRect(80, 80, 72, 72, 20);
+        ctx.fill();
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.moveTo(116, 92);
+        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
+        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
+        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
+        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
+        ctx.fill();
+        
+        ctx.fillStyle = accentColor;
+        ctx.beginPath();
+        ctx.moveTo(116, 112);
+        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
+        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
+        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
+        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "black 54px Inter, system-ui, sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillText("FitAI", 172, 116);
+
+        // User Badge
+        ctx.fillStyle = "rgba(255,255,255,0.15)";
+        ctx.beginPath();
+        ctx.roundRect(750, 80, 250, 56, 14);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "extrabold 20px Inter, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(handleStr, 875, 108);
+        ctx.textAlign = "left";
+
+        const finalY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 68px Inter, system-ui, sans-serif");
+
+        ctx.fillStyle = accentColor;
+        ctx.font = "black 28px Inter, system-ui, sans-serif";
+        ctx.fillText("📅 DAILY PROGRESS SUMMARY", 80, finalY + 70);
+
+        const boxY = finalY + 110;
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.beginPath();
+        ctx.roundRect(80, boxY, 920, cardFormat === "story" ? 640 : 420, 24);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
+        ctx.fillText("DAILY FOOD TIMELINE", 120, boxY + 50);
+
+        ctx.font = "bold 24px Inter, system-ui, sans-serif";
+        const topMeals = mealsList.slice(0, cardFormat === "story" ? 8 : 5);
+
+        if (topMeals.length === 0) {
+          ctx.fillStyle = "#A8A29E";
+          ctx.fillText("No meals logged on this day.", 120, boxY + 130);
+        } else {
+          topMeals.forEach((meal: any, idx: number) => {
+            ctx.fillStyle = accentColor;
+            ctx.beginPath();
+            ctx.arc(130, boxY + 110 + idx * 58, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#FAF9F6";
+
+            let mealLabel = meal.name || "Logged Meal";
+            if (includeMealTimes && meal.time) {
+              mealLabel = `[${meal.time}] ${mealLabel}`;
+            }
+            if (includeMealPhotos && meal.image) {
+              mealLabel += " 📷";
+            }
+
+            ctx.fillText(mealLabel, 160, boxY + 118 + idx * 58);
+
+            if (includeMealCalories) {
+              ctx.fillStyle = "#A8A29E";
+              ctx.font = "black 24px Inter, system-ui, sans-serif";
+              ctx.fillText(`+${meal.calories || 0} kcal`, 820, boxY + 118 + idx * 58);
+            }
+          });
+          if (mealsList.length > topMeals.length) {
+            ctx.fillStyle = "#A8A29E";
+            ctx.font = "italic 20px Inter, system-ui, sans-serif";
+            ctx.fillText(`+ ${mealsList.length - topMeals.length} more meals logged`, 120, boxY + 110 + topMeals.length * 58);
+          }
+        }
+
+      } else if (currentTemplate === "cream") {
+        ctx.fillStyle = "#FAF9F6";
+        ctx.fillRect(0, 0, 1080, canvas.height);
+
+        // Logo
+        ctx.fillStyle = accentColor;
+        ctx.beginPath();
+        ctx.roundRect(80, 80, 72, 72, 20);
+        ctx.fill();
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.moveTo(116, 92);
+        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
+        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
+        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
+        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
+        ctx.fill();
+        
+        ctx.fillStyle = accentColor;
+        ctx.beginPath();
+        ctx.moveTo(116, 112);
+        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
+        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
+        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
+        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
+        ctx.fill();
+
+        ctx.fillStyle = "#1C1917";
+        ctx.font = "black 54px Inter, system-ui, sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillText("FitAI", 172, 116);
+
+        // User Badge
+        ctx.fillStyle = "#E7E5E4";
+        ctx.beginPath();
+        ctx.roundRect(750, 80, 250, 56, 14);
+        ctx.fill();
+
+        ctx.fillStyle = "#1C1917";
+        ctx.font = "extrabold 20px Inter, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(handleStr, 875, 108);
+        ctx.textAlign = "left";
+
+        const nameY = wrapText(name, 80, 260, 920, 68, "#1C1917", "black 50px Inter, system-ui, sans-serif");
+
+        // Subtitle
+        ctx.fillStyle = "#78716C";
+        ctx.font = "bold 22px Inter, system-ui, sans-serif";
+        ctx.fillText(`Daily Log Summary by ${handleStr} • ${mealsList.length} Meals`, 80, nameY + 50);
+
+        const timelineY = nameY + 110;
+        ctx.fillStyle = "#E7E5E4";
+        ctx.beginPath();
+        ctx.roundRect(80, timelineY, 920, cardFormat === "story" ? 640 : 420, 24);
+        ctx.fill();
+
+        ctx.fillStyle = "#1C1917";
+        ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
+        ctx.fillText("DAILY FOOD TIMELINE", 120, timelineY + 50);
+
+        ctx.font = "bold 24px Inter, system-ui, sans-serif";
+        const topMeals = mealsList.slice(0, cardFormat === "story" ? 8 : 5);
+
+        if (topMeals.length === 0) {
+          ctx.fillStyle = "#78716C";
+          ctx.fillText("No meals logged on this day.", 120, timelineY + 130);
+        } else {
+          topMeals.forEach((meal: any, idx: number) => {
+            ctx.fillStyle = accentColor;
+            ctx.beginPath();
+            ctx.arc(130, timelineY + 110 + idx * 58, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#1C1917";
+
+            let mealLabel = meal.name || "Logged Meal";
+            if (includeMealTimes && meal.time) {
+              mealLabel = `[${meal.time}] ${mealLabel}`;
+            }
+            if (includeMealPhotos && meal.image) {
+              mealLabel += " 📷";
+            }
+
+            ctx.fillText(mealLabel, 160, timelineY + 118 + idx * 58);
+
+            if (includeMealCalories) {
+              ctx.fillStyle = "#78716C";
+              ctx.font = "black 24px Inter, system-ui, sans-serif";
+              ctx.fillText(`+${meal.calories || 0} kcal`, 820, timelineY + 118 + idx * 58);
+            }
+          });
+        }
+
+      } else if (currentTemplate === "emerald") {
+        ctx.fillStyle = "#064E3B";
+        ctx.fillRect(0, 0, 1080, canvas.height);
+
+        // Logo
+        ctx.fillStyle = "#FAF9F6";
+        ctx.beginPath();
+        ctx.roundRect(80, 80, 72, 72, 20);
+        ctx.fill();
+
+        ctx.fillStyle = "#064E3B";
+        ctx.beginPath();
+        ctx.moveTo(116, 92);
+        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
+        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
+        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
+        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
+        ctx.fill();
+        
+        ctx.fillStyle = "#FAF9F6";
+        ctx.beginPath();
+        ctx.moveTo(116, 112);
+        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
+        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
+        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
+        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "black 54px Inter, system-ui, sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillText("FitAI", 172, 116);
+
+        ctx.fillStyle = "rgba(250,249,246,0.15)";
+        ctx.beginPath();
+        ctx.roundRect(750, 80, 250, 56, 14);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "extrabold 20px Inter, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(handleStr, 875, 108);
+        ctx.textAlign = "left";
+
+        const nameY = wrapText(name, 80, 260, 920, 68, "#FAF9F6", "black 50px Inter, system-ui, sans-serif");
+
+        const timelineY = nameY + 110;
+        ctx.fillStyle = "rgba(250,249,246,0.06)";
+        ctx.beginPath();
+        ctx.roundRect(80, timelineY, 920, cardFormat === "story" ? 640 : 420, 24);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
+        ctx.fillText("DAILY FOOD TIMELINE", 120, timelineY + 50);
+
+        ctx.font = "bold 24px Inter, system-ui, sans-serif";
+        const topMeals = mealsList.slice(0, cardFormat === "story" ? 8 : 5);
+
+        if (topMeals.length === 0) {
+          ctx.fillStyle = "#A7F3D0";
+          ctx.fillText("No meals logged on this day.", 120, timelineY + 130);
+        } else {
+          topMeals.forEach((meal: any, idx: number) => {
+            ctx.fillStyle = accentColor;
+            ctx.beginPath();
+            ctx.arc(130, timelineY + 110 + idx * 58, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#FAF9F6";
+
+            let mealLabel = meal.name || "Logged Meal";
+            if (includeMealTimes && meal.time) {
+              mealLabel = `[${meal.time}] ${mealLabel}`;
+            }
+            if (includeMealPhotos && meal.image) {
+              mealLabel += " 📷";
+            }
+
+            ctx.fillText(mealLabel, 160, timelineY + 118 + idx * 58);
+
+            if (includeMealCalories) {
+              ctx.fillStyle = "#A7F3D0";
+              ctx.font = "black 24px Inter, system-ui, sans-serif";
+              ctx.fillText(`+${meal.calories || 0} kcal`, 820, timelineY + 118 + idx * 58);
+            }
+          });
+        }
+
+      } else if (currentTemplate === "sunset") {
+        const grad = ctx.createLinearGradient(0, 0, 1080, canvas.height);
+        grad.addColorStop(0, "#FF4E50");
+        grad.addColorStop(1, "#F9D423");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 1080, canvas.height);
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.roundRect(80, 80, 72, 72, 20);
+        ctx.fill();
+
+        ctx.fillStyle = "#FF4E50";
+        ctx.beginPath();
+        ctx.moveTo(116, 92);
+        ctx.bezierCurveTo(104, 106, 98, 116, 98, 126);
+        ctx.bezierCurveTo(98, 137, 106, 144, 116, 144);
+        ctx.bezierCurveTo(126, 144, 134, 137, 134, 126);
+        ctx.bezierCurveTo(134, 112, 120, 100, 116, 92);
+        ctx.fill();
+        
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.moveTo(116, 112);
+        ctx.bezierCurveTo(110, 120, 106, 126, 106, 132);
+        ctx.bezierCurveTo(106, 138, 110, 141, 116, 141);
+        ctx.bezierCurveTo(122, 141, 126, 138, 126, 132);
+        ctx.bezierCurveTo(126, 124, 118, 117, 116, 112);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "black 54px Inter, system-ui, sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillText("FitAI", 172, 116);
+
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.beginPath();
+        ctx.roundRect(750, 80, 250, 56, 14);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "extrabold 20px Inter, system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(handleStr, 875, 108);
+        ctx.textAlign = "left";
+
+        const nameY = wrapText(name, 80, 260, 920, 68, "#FAF9F6", "black 50px Inter, system-ui, sans-serif");
+
+        const timelineY = nameY + 110;
+        ctx.fillStyle = "rgba(255,255,255,0.1)";
+        ctx.beginPath();
+        ctx.roundRect(80, timelineY, 920, cardFormat === "story" ? 640 : 420, 24);
+        ctx.fill();
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
+        ctx.fillText("DAILY FOOD TIMELINE", 120, timelineY + 50);
+
+        ctx.font = "bold 24px Inter, system-ui, sans-serif";
+        const topMeals = mealsList.slice(0, cardFormat === "story" ? 8 : 5);
+
+        if (topMeals.length === 0) {
+          ctx.fillStyle = "rgba(255,255,255,0.8)";
+          ctx.fillText("No meals logged on this day.", 120, timelineY + 130);
+        } else {
+          topMeals.forEach((meal: any, idx: number) => {
+            ctx.fillStyle = accentColor;
+            ctx.beginPath();
+            ctx.arc(130, timelineY + 110 + idx * 58, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#FAF9F6";
+
+            let mealLabel = meal.name || "Logged Meal";
+            if (includeMealTimes && meal.time) {
+              mealLabel = `[${meal.time}] ${mealLabel}`;
+            }
+            if (includeMealPhotos && meal.image) {
+              mealLabel += " 📷";
+            }
+
+            ctx.fillText(mealLabel, 160, timelineY + 118 + idx * 58);
+
+            if (includeMealCalories) {
+              ctx.fillStyle = "rgba(255,255,255,0.8)";
+              ctx.font = "black 24px Inter, system-ui, sans-serif";
+              ctx.fillText(`+${meal.calories || 0} kcal`, 820, timelineY + 118 + idx * 58);
+            }
+          });
+        }
+      }
+
+      // Draw bottom macros Row
+      const macroY = canvas.height - 260;
+      const macros = [
+        { name: "Protein", val: `${protein}g`, color: "#F97316" },
+        { name: "Carbs", val: `${carbs}g`, color: "#0891B2" },
+        { name: "Fats", val: `${fats}g`, color: "#EAB308" }
+      ];
+
+      macros.forEach((m, idx) => {
+        const startX = 80 + idx * 320;
+        ctx.fillStyle = "rgba(255,255,255,0.08)";
+        ctx.beginPath();
+        ctx.roundRect(startX, macroY, 280, 110, 20);
+        ctx.fill();
+
+        ctx.fillStyle = m.color;
+        ctx.beginPath();
+        ctx.arc(startX + 35, macroY + 55, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#A8A29E";
+        ctx.font = "bold 18px Inter, system-ui, sans-serif";
+        ctx.fillText(m.name.toUpperCase(), startX + 60, macroY + 38);
+
+        ctx.fillStyle = "#FAF9F6";
+        ctx.font = "black 30px Inter, system-ui, sans-serif";
+        ctx.fillText(m.val, startX + 60, macroY + 80);
+      });
+
+      // Footer
+      const footerY = canvas.height - 110;
+      ctx.strokeStyle = "rgba(255,255,255,0.1)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(80, footerY);
+      ctx.lineTo(1000, footerY);
+      ctx.stroke();
+
+      ctx.fillStyle = "#A8A29E";
+      ctx.font = "bold 22px Inter, system-ui, sans-serif";
+      ctx.fillText("FITAI • DAILY LOG REPORT", 80, footerY + 45);
+      ctx.textAlign = "right";
+      ctx.fillText("fitpush.vercel.app", 1000, footerY + 45);
+      ctx.textAlign = "left";
+    };
+
+    runTemplateDraw();
+  };
+
+  useEffect(() => {
+    drawCanvas();
+  }, [currentIndex, includeMealTimes, includeMealPhotos, includeMealCalories]);
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % variations.length);
+  };
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + variations.length) % variations.length);
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(finalLink);
+    setCopied(true);
+    triggerToast("🔗 Share link copied to clipboard!");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadImage = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.download = `${name.replace(/\s+/g, "_").toLowerCase()}_report.png`;
+    link.href = url;
+    link.click();
+    triggerToast("💾 Daily progress card downloaded!");
+  };
+
+  const handleNativeShare = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      try {
+        const file = new File([blob], `${name.replace(/\s+/g, "_").toLowerCase()}_report.png`, { type: "image/png" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `FitAI Share: ${name}`,
+            text: `Check out my daily report: ${name} on FitAI!`,
+            url: finalLink,
+          });
+        } else {
+          await navigator.share({
+            title: `FitAI Share: ${name}`,
+            text: `Check out my daily report: ${name} on FitAI!`,
+            url: finalLink,
+          });
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name !== "AbortError") {
+          handleCopyLink();
+        }
+      }
+    });
+  };
+
+  useEffect(() => {
+    async function getOrCreateShortLink() {
+      if (!isSupabaseConfigured) return;
+      setLoadingUrl(true);
+      try {
+        const { data: inserted } = await supabase
+          .from("shares")
+          .insert({ type: "day", data: payload })
+          .select("id")
+          .single();
+
+        if (inserted) {
+          setShortUrl(generateShareUrl("day", payload, inserted.id));
+        }
+      } catch (err) {
+        console.error("Error creating database share:", err);
+      } finally {
+        setLoadingUrl(false);
+      }
+    }
+
+    getOrCreateShortLink();
+  }, [payload]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[300] flex items-center justify-center p-6 font-sans"
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 15 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 15 }}
+        className="bg-stone-50 border border-white rounded-[32px] w-full max-w-[400px] shadow-2xl p-6 flex flex-col items-center gap-5"
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center w-full">
+          <span className="text-[10px] font-black uppercase tracking-widest text-stone-400">
+            Share Daily Progress
+          </span>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 bg-stone-200/50 hover:bg-stone-200 text-stone-500 rounded-full flex items-center justify-center cursor-pointer transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Toggle options panel */}
+        <div className="bg-stone-100/50 border border-stone-200/40 p-3 rounded-2xl w-full flex flex-col gap-2.5 text-[9.5px] font-extrabold text-stone-600">
+          <div className="flex items-center justify-between">
+            <span className="uppercase tracking-wider">⏱️ Include Meal Times</span>
+            <input
+              type="checkbox"
+              checked={includeMealTimes}
+              onChange={(e) => setIncludeMealTimes(e.target.checked)}
+              className="rounded text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
+            />
+          </div>
+          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2">
+            <span className="uppercase tracking-wider">📷 Indicate Meal Photos</span>
+            <input
+              type="checkbox"
+              checked={includeMealPhotos}
+              onChange={(e) => setIncludeMealPhotos(e.target.checked)}
+              className="rounded text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
+            />
+          </div>
+          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2">
+            <span className="uppercase tracking-wider">🔥 Include Meal Calories</span>
+            <input
+              type="checkbox"
+              checked={includeMealCalories}
+              onChange={(e) => setIncludeMealCalories(e.target.checked)}
+              className="rounded text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
+            />
+          </div>
+        </div>
+
+        {/* Preview tabs */}
+        <div className="flex bg-stone-100 p-1 rounded-xl gap-1 w-full select-none font-sans shrink-0">
+          <button
+            type="button"
+            onClick={() => setPreviewTab("card")}
+            className={cn(
+              "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
+              previewTab === "card" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
+            )}
+          >
+            🖼️ Image Card
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewTab("webpage")}
+            className={cn(
+              "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
+              previewTab === "webpage" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
+            )}
+          >
+            🌐 Web Link
+          </button>
+        </div>
+
+        {/* Preview Container */}
+        {previewTab === "card" ? (
+          <div className="relative w-full aspect-square flex flex-col items-center justify-center">
+            <motion.div
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.4}
+              onDragEnd={(_, info) => {
+                if (info.offset.x > 80) handlePrev();
+                else if (info.offset.x < -80) handleNext();
+              }}
+              className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#1C1917]"
+            >
+              <canvas
+                ref={canvasRef}
+                className="w-full h-full object-contain block"
+              />
+            </motion.div>
+          </div>
+        ) : (
+          /* Web Link View Mockup */
+          <div className="w-full aspect-square bg-[#FAF9F6] rounded-[28px] border border-stone-200 shadow-xl overflow-y-auto p-4.5 text-left font-sans flex flex-col gap-3.5 no-scrollbar">
+            <div className="flex items-center justify-between border-b border-stone-200 pb-2.5">
+              <div className="flex items-center gap-1.5">
+                <div className="w-5.5 h-5.5 rounded-lg bg-orange-500 flex items-center justify-center shadow-xs">
+                  <Flame className="text-white w-3 h-3 fill-white" />
+                </div>
+                <span className="text-[10px] font-black text-stone-700 tracking-tight">FitAI Link View</span>
+              </div>
+              <span className="text-[7.5px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none">
+                Guest View
+              </span>
+            </div>
+
+            <div className="bg-stone-50 border border-stone-100 rounded-xl p-3 text-[10px] text-stone-700 font-extrabold flex justify-between items-center">
+              <span>📅 {name}</span>
+              <span className="text-orange-600">{calories} kcal total</span>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block font-sans">Timeline summary</span>
+              <div className="bg-white border border-stone-150 rounded-xl p-3.5 space-y-2.5">
+                {mealsList.map((meal: any, i: number) => (
+                  <div key={i} className="flex justify-between items-center text-[9.5px] font-semibold text-stone-700 border-b border-stone-50 pb-1.5 last:border-0 last:pb-0">
+                    <span className="truncate">
+                      {includeMealTimes && meal.time ? `[${meal.time}] ` : ""}
+                      {meal.name}
+                      {includeMealPhotos && meal.image ? " 📷" : ""}
+                    </span>
+                    {includeMealCalories && (
+                      <span className="text-stone-400 shrink-0 font-bold">+{meal.calories} kcal</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1.5 shrink-0">
+              {[
+                { label: "Kcal", val: calories, color: "text-orange-600" },
+                { label: "Protein", val: `${protein}g`, color: "text-stone-700" },
+                { label: "Carbs", val: `${carbs}g`, color: "text-stone-700" },
+                { label: "Fats", val: `${fats}g`, color: "text-stone-700" }
+              ].map((stat) => (
+                <div key={stat.label} className="bg-white border border-stone-100/70 p-1.5 rounded-xl text-center shadow-3xs">
+                  <span className="text-[6.5px] text-stone-400 block uppercase font-black">{stat.label}</span>
+                  <span className={cn("text-[9.5px] font-black mt-0.5 block", stat.color)}>{stat.val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Preset Name Display */}
+        {previewTab === "card" && (
+          <span className="text-[9.5px] font-extrabold uppercase text-orange-600 bg-orange-50 px-3 py-1 rounded-full select-none">
+            Preset: {currentVar.name}
+          </span>
+        )}
+
+        {/* Pagination Row */}
+        {previewTab === "card" && (
+          <div className="flex items-center gap-6 select-none mt-1">
+            <button
+              onClick={handlePrev}
+              className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+              title="Previous template"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <div className="flex gap-1.5 justify-center">
+              {variations.map((v, idx) => (
+                <button
+                  key={v.id}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`h-2 rounded-full transition-all cursor-pointer ${
+                    idx === currentIndex ? "w-5 bg-orange-500" : "w-2 bg-stone-300"
+                  }`}
+                  title={v.name}
+                />
+              ))}
+            </div>
+
+            <button
+              onClick={handleNext}
+              className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+              title="Next template"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-2.5 w-full">
+          <button
+            onClick={handleCopyLink}
+            disabled={loadingUrl}
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-100 active:scale-98 transition-all"
+          >
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            <span>{copied ? "Copied!" : "Copy Share Link"}</span>
+          </button>
+
+          <div className="grid grid-cols-2 gap-2.5 w-full">
+            <button
+              onClick={handleDownloadImage}
+              className="flex-1 bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download PNG</span>
+            </button>
+            <button
+              onClick={handleNativeShare}
+              className="flex-1 bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-700 text-[10px] font-black uppercase tracking-wider py-3 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share Card</span>
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
