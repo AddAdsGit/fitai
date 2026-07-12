@@ -726,7 +726,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               </div>
 
               {/* notepad styled area */}
-              <div className="w-full min-h-[220px] flex flex-col justify-start bg-[#FAF9F6] border border-stone-200/60 rounded-2xl p-4.5 shadow-2xs relative">
+              <div className="w-full min-h-[220px] flex flex-col justify-start relative pt-2">
                 {isEditingMemory ? (
                   <textarea
                     ref={textareaRef}
