@@ -732,15 +732,35 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     };
 
     if (hasImage && !isDay) {
+      const imageUrl = payload.img || "";
       const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = payload.img || "";
-      img.onload = () => {
-        runTemplateDraw(img);
+      
+      const tryLoad = (useCors: boolean) => {
+        img.onload = () => {
+          runTemplateDraw(img);
+        };
+        img.onerror = () => {
+          if (useCors) {
+            // Fallback: Try loading without crossOrigin property
+            const fallbackImg = new Image();
+            fallbackImg.onload = () => {
+              runTemplateDraw(fallbackImg);
+            };
+            fallbackImg.onerror = () => {
+              runTemplateDraw(null);
+            };
+            fallbackImg.src = imageUrl;
+          } else {
+            runTemplateDraw(null);
+          }
+        };
+        if (useCors && imageUrl.startsWith("http")) {
+          img.crossOrigin = "anonymous";
+        }
+        img.src = imageUrl;
       };
-      img.onerror = () => {
-        runTemplateDraw(null);
-      };
+
+      tryLoad(true);
     } else {
       runTemplateDraw(null);
     }
@@ -950,15 +970,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               <div className="space-y-1">
                 <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">Ingredients checklist</span>
                 <div className="bg-white border border-stone-150 rounded-xl p-3 space-y-1.5">
-                  {ingredients.slice(0, 3).map((ing, i) => (
+                  {ingredients.map((ing, i) => (
                     <div key={i} className="flex items-center gap-1.5 text-[9px] font-semibold text-stone-700">
                       <input type="checkbox" defaultChecked className="rounded border-stone-300 text-orange-500 focus:ring-orange-500 w-2.5 h-2.5 cursor-pointer" />
                       <span className="truncate">{ing}</span>
                     </div>
                   ))}
-                  {ingredients.length > 3 && (
-                    <span className="text-[7.5px] text-stone-400 font-semibold italic pl-4 block">+ {ingredients.length - 3} more ingredients</span>
-                  )}
                 </div>
               </div>
             )}
@@ -967,7 +984,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             {type === "recipe" && item.instructions && (
               <div className="space-y-1">
                 <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">Preparation Steps</span>
-                <div className="bg-white border border-stone-150 rounded-xl p-3 text-[9px] font-semibold text-stone-600 leading-relaxed whitespace-pre-line max-h-[80px] overflow-y-auto no-scrollbar">
+                <div className="bg-white border border-stone-150 rounded-xl p-3 text-[9px] font-semibold text-stone-600 leading-relaxed whitespace-pre-line">
                   {item.instructions}
                 </div>
               </div>
