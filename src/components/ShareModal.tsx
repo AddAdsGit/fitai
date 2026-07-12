@@ -22,16 +22,27 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   onClose,
   triggerToast,
 }) => {
-  const templates: ShareTemplate[] = ["obsidian", "cream", "emerald", "sunset"];
+  const variations = [
+    { id: "obsidian_1_1", name: "Obsidian Teaser (1:1)", theme: "obsidian", format: "square" },
+    { id: "cream_1_1", name: "Cream Menu (1:1)", theme: "cream", format: "square" },
+    { id: "emerald_1_1", name: "Emerald Sport (1:1)", theme: "emerald", format: "square" },
+    { id: "sunset_3_4", name: "Sunset Post (3:4)", theme: "sunset", format: "portrait" },
+    { id: "obsidian_3_4", name: "Obsidian Full (3:4)", theme: "obsidian", format: "portrait" },
+    { id: "cream_3_4", name: "Cream Full (3:4)", theme: "cream", format: "portrait" },
+    { id: "sunset_9_16", name: "Sunset Story (9:16)", theme: "sunset", format: "story" },
+    { id: "emerald_9_16", name: "Emerald Story (9:16)", theme: "emerald", format: "story" }
+  ] as const;
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [copied, setCopied] = useState(false);
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [shortUrl, setShortUrl] = useState<string | null>(null);
-  const [cardFormat, setCardFormat] = useState<"square" | "portrait" | "story">("square");
   const [previewTab, setPreviewTab] = useState<"card" | "webpage">("card");
   
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const currentTemplate = templates[currentIndex];
+  const currentVar = variations[currentIndex];
+  const currentTemplate = currentVar.theme;
+  const cardFormat = currentVar.format;
 
   const handleStr = profileData.username ? `@${profileData.username}` : "@user";
 
@@ -777,14 +788,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   useEffect(() => {
     drawCanvas();
-  }, [currentIndex, cardFormat]);
+  }, [currentIndex]);
 
   const handleNext = () => {
-    setCurrentIndex((prev) => (prev + 1) % templates.length);
+    setCurrentIndex((prev) => (prev + 1) % variations.length);
   };
 
   const handlePrev = () => {
-    setCurrentIndex((prev) => (prev - 1 + templates.length) % templates.length);
+    setCurrentIndex((prev) => (prev - 1 + variations.length) % variations.length);
   };
 
   const handleCopyLink = () => {
@@ -891,7 +902,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             <div className="relative w-full h-full">
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={currentTemplate}
+                  key={currentVar.id}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
@@ -1001,30 +1012,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </div>
         )}
 
-        {/* Card Format Selector (Only when previewTab is card) */}
+        {/* Variation Name Display */}
         {previewTab === "card" && (
-          <div className="flex justify-center gap-1.5 select-none w-full mt-1.5">
-            {[
-              { id: "square", label: "Square 1:1", icon: "▢" },
-              { id: "portrait", label: "Portrait 3:4", icon: "▭" },
-              { id: "story", label: "Story 9:16", icon: "📱" }
-            ].map((fmt) => (
-              <button
-                key={fmt.id}
-                type="button"
-                onClick={() => setCardFormat(fmt.id as any)}
-                className={cn(
-                  "flex-1 py-1.5 rounded-xl text-[8.5px] font-black uppercase tracking-wider border transition-all cursor-pointer flex items-center justify-center gap-1",
-                  cardFormat === fmt.id
-                    ? "bg-orange-50 border-orange-200 text-orange-600 shadow-3xs"
-                    : "bg-white border-stone-200 text-stone-500 hover:text-stone-700"
-                )}
-              >
-                <span>{fmt.icon}</span>
-                <span>{fmt.label}</span>
-              </button>
-            ))}
-          </div>
+          <span className="text-[9.5px] font-extrabold uppercase text-orange-600 bg-orange-50 px-3 py-1 rounded-full select-none">
+            Preset: {currentVar.name}
+          </span>
         )}
 
         {/* Pagination & Navigation Row */}
@@ -1038,14 +1030,15 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             <ChevronLeft className="w-4 h-4" />
           </button>
 
-          <div className="flex gap-1.5">
-            {templates.map((t, idx) => (
+          <div className="flex gap-1.5 flex-wrap justify-center max-w-[120px]">
+            {variations.map((v, idx) => (
               <button
-                key={t}
+                key={v.id}
                 onClick={() => setCurrentIndex(idx)}
                 className={`h-2 rounded-full transition-all cursor-pointer ${
                   idx === currentIndex ? "w-5 bg-orange-500" : "w-2 bg-stone-300"
                 }`}
+                title={v.name}
               />
             ))}
           </div>
