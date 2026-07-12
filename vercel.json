@@ -3,6 +3,18 @@
     {
       "source": "/api/:path*",
       "destination": "https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action/:path*"
+    },
+    {
+      "source": "/login",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/signin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/oauth-consent",
+      "destination": "/index.html"
     }
   ]
 }

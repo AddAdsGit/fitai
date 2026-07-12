@@ -22,7 +22,7 @@ create table public.profiles (
   
   -- Agent Brain (V3.2)
   agent_memory text[] default '{}',
-  agent_config jsonb default '{"showGptWidget": true, "generateImages": true, "refinePhotos": false, "artStyle": "gourmet", "customInstructions": "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."}'::jsonb,
+  agent_config jsonb default '{"showGptWidget": true, "generateImages": true, "refinePhotos": false, "artStyle": "gourmet", "trackWeight": true, "customInstructions": "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."}'::jsonb,
   
   -- Goals
   daily_calories_goal integer default 2000,

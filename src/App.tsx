@@ -168,7 +168,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("page") === "oauth-consent") {
+    if (params.get("page") === "oauth-consent" || window.location.pathname === "/oauth-consent") {
       return "oauth-consent";
     }
     return "home";
@@ -334,6 +334,7 @@ export default function App() {
       artStyle: "gourmet",
       customArtStyle: "",
       requireConfirmation: false,
+      trackWeight: true,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     },
     preferences: ["Gluten Free", "Keto"],
@@ -487,7 +488,6 @@ export default function App() {
           weight: 70,
           dob: "1998-05-15",
           gender: "Male",
-          memories: [],
           preferences: [],
           daily_calories_goal: 2000,
           weight_goal: 70.0,
@@ -517,10 +517,11 @@ export default function App() {
 
   const handleGoogleLogin = async () => {
     try {
+      const returnUrl = window.location.href;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: "https://fitpush.vercel.app"
+          redirectTo: returnUrl
         }
       });
       if (error) {
@@ -615,7 +616,6 @@ export default function App() {
           weight: 70,
           dob: "1998-05-15",
           gender: "Male",
-          memories: [],
           preferences: [],
           daily_calories_goal: 2000,
           weight_goal: 70.0,
@@ -890,57 +890,6 @@ export default function App() {
             } else {
               setWeightLogs(weightLogsRes.data);
             }
-          }
-
-          // Run one-time legacy notes migration from profile memories
-          const legacyNotes = (profile.memories || []).filter((m: string) => m.startsWith("[") && m.includes("Note]"));
-          if (legacyNotes.length > 0) {
-            console.log("Migrating legacy daily notes from profile memories...", legacyNotes);
-            const remainingMemories = (profile.memories || []).filter((m: string) => !(m.startsWith("[") && m.includes("Note]")));
-            
-            const migratedNotes: DailyWellness[] = [];
-            for (const noteStr of legacyNotes) {
-              const match = noteStr.match(/^\[(\d{4}-\d{2}-\d{2})\s+Note\]\s*(.*)$/i);
-              if (match) {
-                const dateVal = match[1];
-                const contentVal = match[2];
-                migratedNotes.push({
-                  date: dateVal,
-                  notes: contentVal
-                });
-              }
-            }
-
-            if (migratedNotes.length > 0) {
-              // Merge with existing
-              const mergedNotesMap = new Map(initialNotesList.map(n => [n.date, n]));
-              migratedNotes.forEach(n => mergedNotesMap.set(n.date, n));
-              const mergedList = Array.from(mergedNotesMap.values());
-              
-              setDailyNotes(mergedList);
-              initialNotesList = mergedList;
-
-              // Save to database
-              const rowsToInsert = migratedNotes.map(n => ({
-                profile_id: activeProfileId,
-                date: n.date,
-                notes: n.notes
-              }));
-              supabase.from("daily_wellness").upsert(rowsToInsert, { onConflict: "profile_id,date" }).then((res) => {
-                if (res.error) console.error("Failed to insert migrated wellness notes:", res.error);
-              });
-            }
-
-            // Save cleaned memories back to profile
-            supabase.from("profiles").update({ memories: remainingMemories }).eq("id", profile.id).then((res) => {
-              if (res.error) console.error("Failed to clean up memories array:", res.error);
-            });
-            
-            // Update local profile state in profileData
-            setProfileDataState(prev => ({
-              ...prev,
-              memories: remainingMemories
-            }));
           }
 
           // Onboarding states removed, handled by OnboardingWizard

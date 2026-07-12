@@ -46,6 +46,7 @@ export interface AgentConfig {
   artStyle?: string;
   customArtStyle?: string;
   requireConfirmation?: boolean;
+  trackWeight?: boolean;
   customInstructions?: string;
 }
 

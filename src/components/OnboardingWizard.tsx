@@ -484,6 +484,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
       artStyle: "gourmet",
       customArtStyle: "",
       requireConfirmation: requireGptConfirmation,
+      trackWeight: true,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     };
 
