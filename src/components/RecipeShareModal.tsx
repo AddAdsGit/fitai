@@ -177,36 +177,36 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         ctx.textAlign = "left";
 
         // Title Date & Info
-        const finalY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 68px Inter, system-ui, sans-serif");
+        const finalY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 76px Inter, system-ui, sans-serif");
 
-        let infoY = finalY + 60;
+        let infoY = finalY + 65;
         if (showCookTime) {
           ctx.fillStyle = accentColor;
-          ctx.font = "black 28px Inter, system-ui, sans-serif";
+          ctx.font = "black 36px Inter, system-ui, sans-serif";
           ctx.fillText(`🍳 ${time} PREP`, 80, infoY);
-          infoY += 45;
+          infoY += 50;
         }
 
         ctx.fillStyle = subTxtColor;
-        ctx.font = "bold 24px Inter, system-ui, sans-serif";
+        ctx.font = "bold 28px Inter, system-ui, sans-serif";
         ctx.fillText(`Logged ${item.log_count || 0} times by ${handleStr}`, 80, infoY);
 
-        let boxY = infoY + 40;
-        let boxH = 280;
-        let ingOffset = 55;
-        let calOffset = 415;
+        let boxY = infoY + 50;
+        let boxH = 340;
+        let ingOffset = 65;
+        let calOffset = 475;
 
         if (cardFormat !== "square") {
           if (showRecipeDesc) {
             const descText = item.description || "A custom recipe generated and tracked on FitAI.";
-            const descY = wrapText(descText, 80, infoY + 65, 920, 36, "#FAF9F6", "medium 23px Inter, system-ui, sans-serif");
-            boxY = descY + 45;
+            const descY = wrapText(descText, 80, infoY + 75, 920, 44, "#FAF9F6", "medium 28px Inter, system-ui, sans-serif");
+            boxY = descY + 55;
           } else {
-            boxY = infoY + 45;
+            boxY = infoY + 55;
           }
-          boxH = 240;
-          ingOffset = 48;
-          calOffset = 360;
+          boxH = 310;
+          ingOffset = 58;
+          calOffset = 425;
         }
 
         ctx.fillStyle = "rgba(255,255,255,0.06)";
@@ -215,33 +215,33 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         ctx.fill();
 
         ctx.fillStyle = "#FAF9F6";
-        ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
-        ctx.fillText("INGREDIENTS CHECKLIST", 120, boxY + 50);
+        ctx.font = "extrabold 32px Inter, system-ui, sans-serif";
+        ctx.fillText("INGREDIENTS CHECKLIST", 120, boxY + 60);
 
-        ctx.font = "bold 24px Inter, system-ui, sans-serif";
+        ctx.font = "bold 30px Inter, system-ui, sans-serif";
         const topIngredients = ingredients.slice(0, 3);
         topIngredients.forEach((ing: string, idx: number) => {
           ctx.fillStyle = accentColor;
           ctx.beginPath();
-          ctx.arc(130, boxY + 100 + idx * ingOffset, 6, 0, Math.PI * 2);
+          ctx.arc(130, boxY + 120 + idx * ingOffset, 7, 0, Math.PI * 2);
           ctx.fill();
 
           ctx.fillStyle = "#FAF9F6";
-          ctx.fillText(ing, 160, boxY + 107 + idx * ingOffset);
+          ctx.fillText(ing, 165, boxY + 128 + idx * ingOffset);
         });
 
         if (ingredients.length > 3) {
           ctx.fillStyle = "#A8A29E";
-          ctx.font = "italic 20px Inter, system-ui, sans-serif";
-          ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + boxH - 35);
+          ctx.font = "italic 26px Inter, system-ui, sans-serif";
+          ctx.fillText(`+ ${ingredients.length - 3} more ingredients`, 120, boxY + boxH - 40);
         }
 
         ctx.fillStyle = "#FAF9F6";
-        ctx.font = "black 76px Inter, system-ui, sans-serif";
+        ctx.font = "black 90px Inter, system-ui, sans-serif";
         ctx.fillText(`${calories} kcal`, 80, boxY + calOffset);
 
         if (cardFormat !== "square" && showRecipeSteps) {
-          const instructionsY = boxY + 270;
+          const instructionsY = boxY + 310;
           const instructionsBoxH = cardFormat === "story" ? 640 : 250;
           ctx.fillStyle = "rgba(255,255,255,0.06)";
           ctx.beginPath();
@@ -249,18 +249,18 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
           ctx.fill();
 
           ctx.fillStyle = "#FAF9F6";
-          ctx.font = "extrabold 26px Inter, system-ui, sans-serif";
-          ctx.fillText("PREPARATION STEPS", 120, instructionsY + 50);
+          ctx.font = "extrabold 32px Inter, system-ui, sans-serif";
+          ctx.fillText("PREPARATION STEPS", 120, instructionsY + 60);
 
           const instructionsText = item.instructions || "Enjoy this healthy custom portion immediately!";
           wrapText(
             instructionsText,
             120,
-            instructionsY + 95,
+            instructionsY + 115,
             840,
-            34,
+            42,
             "#FAF9F6",
-            "medium 21px Inter, system-ui, sans-serif"
+            "bold 28px Inter, system-ui, sans-serif"
           );
         }
 
@@ -409,16 +409,20 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         }
 
         const titleY = loadedImg ? 735 : 715;
-        const nameY = wrapText(name, 80, titleY, 920, 68, "#1C1917", "black 48px Inter, system-ui, sans-serif");
+        const nameY = wrapText(name, 80, titleY, 920, 76, "#1C1917", "black 64px Inter, system-ui, sans-serif");
 
         // Info Tag
+        let subText = `Logged ${item.log_count || 0} times by ${handleStr}`;
+        if (showCookTime) {
+          subText += ` • ⏱️ ${time}`;
+        }
         ctx.fillStyle = "#78716C";
-        ctx.font = "bold 22px Inter, system-ui, sans-serif";
-        ctx.fillText(`Logged ${item.log_count || 0} times by ${handleStr} • ⏱️ ${time}`, 80, nameY + 50);
+        ctx.font = "bold 28px Inter, system-ui, sans-serif";
+        ctx.fillText(subText, 80, nameY + 55);
 
         const macroY = canvas.height - 260;
         ctx.fillStyle = "#1C1917";
-        ctx.font = "extrabold 28px Inter, system-ui, sans-serif";
+        ctx.font = "extrabold 32px Inter, system-ui, sans-serif";
         ctx.fillText(`PROTEIN: ${protein}g  •  CARBS: ${carbs}g  •  FATS: ${fats}g`, 80, macroY);
 
         const footerY = canvas.height - 110;
@@ -505,14 +509,14 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         ctx.fillText(handleStr, 875, 108);
         ctx.textAlign = "left";
 
-        const nameY = wrapText(name, textOffset, 240, textMaxW + 80, 68, "#FAF9F6", "black 50px Inter, system-ui, sans-serif");
+        const nameY = wrapText(name, textOffset, 240, textMaxW + 80, 76, "#FAF9F6", "black 64px Inter, system-ui, sans-serif");
 
         ctx.fillStyle = "#10B981";
-        ctx.font = "black 120px Inter, system-ui, sans-serif";
-        ctx.fillText(`${calories}`, textOffset, nameY + 130);
+        ctx.font = "black 130px Inter, system-ui, sans-serif";
+        ctx.fillText(`${calories}`, textOffset, nameY + 140);
         ctx.fillStyle = "#A7F3D0";
-        ctx.font = "bold 24px Inter, system-ui, sans-serif";
-        ctx.fillText("RECIPE CALORIES LOGGED", textOffset, nameY + 180);
+        ctx.font = "bold 28px Inter, system-ui, sans-serif";
+        ctx.fillText("RECIPE CALORIES LOGGED", textOffset, nameY + 195);
 
         // Macros stats
         const mStats = [
@@ -526,7 +530,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         mStats.forEach((stat, i) => {
           const itemY = 560 + i * 130;
           ctx.fillStyle = "#A7F3D0";
-          ctx.font = "bold 16px Inter, system-ui, sans-serif";
+          ctx.font = "bold 22px Inter, system-ui, sans-serif";
           ctx.fillText(stat.label, statsOffset, itemY);
 
           ctx.fillStyle = "#FAF9F6";
@@ -621,22 +625,26 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         ctx.fillText(handleStr, 875, 108);
         ctx.textAlign = "left";
 
-        const nameY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 68px Inter, system-ui, sans-serif");
+        const nameY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 76px Inter, system-ui, sans-serif");
 
+        let subText = `Logged ${item.log_count || 0} times by ${handleStr}`;
+        if (showCookTime) {
+          subText += ` • ⏱️ ${time}`;
+        }
         ctx.fillStyle = "rgba(255,255,255,0.75)";
-        ctx.font = "bold 22px Inter, system-ui, sans-serif";
-        ctx.fillText(`Logged ${item.log_count || 0} times by ${handleStr} • ⏱️ ${time}`, 80, nameY + 50);
+        ctx.font = "bold 28px Inter, system-ui, sans-serif";
+        ctx.fillText(subText, 80, nameY + 55);
 
         ctx.fillStyle = "#FAF9F6";
-        ctx.font = "black 120px Inter, system-ui, sans-serif";
-        ctx.fillText(`${calories}`, 80, nameY + 175);
+        ctx.font = "black 140px Inter, system-ui, sans-serif";
+        ctx.fillText(`${calories}`, 80, nameY + 185);
         ctx.fillStyle = "rgba(255,255,255,0.8)";
-        ctx.font = "bold 20px Inter, system-ui, sans-serif";
-        ctx.fillText("KCAL", 85, nameY + 225);
+        ctx.font = "bold 24px Inter, system-ui, sans-serif";
+        ctx.fillText("KCAL", 85, nameY + 245);
 
         const macroY = canvas.height - 260;
         ctx.fillStyle = "#FAF9F6";
-        ctx.font = "extrabold 28px Inter, system-ui, sans-serif";
+        ctx.font = "extrabold 32px Inter, system-ui, sans-serif";
         ctx.fillText(`PROTEIN: ${protein}g  •  CARBS: ${carbs}g  •  FATS: ${fats}g`, 80, macroY);
 
         const footerY = canvas.height - 110;
