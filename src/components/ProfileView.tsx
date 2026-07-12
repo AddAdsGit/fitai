@@ -706,77 +706,70 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
         )}
 
         {profileTab === "memory" && (
-          <div className="p-6 max-w-[calc(448px)] mx-auto space-y-6">
-            <div className="bg-white rounded-[28px] p-6 shadow-sm border border-black/5 space-y-4">
-              <div className="flex justify-between items-center border-b border-stone-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
-                    <Database className="w-4 h-4" />
-                  </div>
-                  <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">AI Memory</span>
-                </div>
-                <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Live Sync
-                </span>
+          <div className="px-6 py-4 max-w-[calc(448px)] mx-auto space-y-5 text-left">
+            <div className="flex justify-between items-center pb-2 select-none">
+              <div className="flex items-center gap-2">
+                <Database className="w-4 h-4 text-orange-500" />
+                <span className="text-[11px] font-black uppercase tracking-wider text-stone-400">AI Memory</span>
               </div>
+              <span className="text-[8px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Live Sync
+              </span>
+            </div>
 
-              <div className="text-[9.5px] font-bold text-stone-500 leading-relaxed bg-stone-50 p-3 rounded-2xl border border-stone-200/40 text-left">
-                Allergies, preferences, and dietary rules used by the AI to customize calculations and logs.
-              </div>
-
-              {/* notepad styled area */}
-              <div className="w-full min-h-[220px] flex flex-col justify-start relative pt-2">
-                {isEditingMemory ? (
-                  <textarea
-                    ref={textareaRef}
-                    value={draftMemories}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setDraftMemories(val);
-                      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-                      saveTimeoutRef.current = window.setTimeout(() => {
-                        setProfileData({
-                          ...profileData,
-                          memories: val.split("\n").map(l => l.trim()).filter(l => l.length > 0)
-                        });
-                      }, 1000);
-                    }}
-                    onBlur={() => {
-                      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            {/* notepad styled area */}
+            <div className="w-full min-h-[220px] flex flex-col justify-start relative pt-2">
+              {isEditingMemory ? (
+                <textarea
+                  ref={textareaRef}
+                  value={draftMemories}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDraftMemories(val);
+                    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                    saveTimeoutRef.current = window.setTimeout(() => {
                       setProfileData({
                         ...profileData,
-                        memories: draftMemories.split("\n").map(l => l.trim()).filter(l => l.length > 0)
+                        memories: val.split("\n").map(l => l.trim()).filter(l => l.length > 0)
                       });
-                      setIsEditingMemory(false);
-                    }}
-                    placeholder="Enter what AI should remember (one item per line, e.g.)&#13;• Allergic to peanuts&#13;• Prefers high-protein low-carb dinners&#13;• Gym routine is Mon/Wed/Fri mornings"
-                    className="w-full bg-transparent border-0 outline-none ring-0 focus:ring-0 focus:outline-none p-0 text-xs font-semibold text-stone-850 placeholder-stone-400 resize-none min-h-[180px] leading-relaxed transition-all"
-                  />
-                ) : (
-                  <div
-                    onClick={() => setIsEditingMemory(true)}
-                    className="text-xs leading-relaxed min-h-[180px] py-0.5 cursor-text whitespace-pre-line text-left"
-                  >
-                    {draftMemories ? (
-                      draftMemories.split("\n").map((line, idx) => (
-                        <div key={idx} className="flex items-start gap-1.5 py-0.5 text-stone-800 font-semibold">
-                          <span className="text-orange-500">•</span>
-                          <span>{line}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <span className="font-medium text-stone-450 italic">
-                        Tap here to write down things for the AI to remember...
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="flex justify-between items-center text-[7px] font-black uppercase text-stone-400 tracking-widest px-1">
-                <span>Auto-saves instantly</span>
-                <span>{draftMemories.split("\n").filter(l => l.trim().length > 0).length} Memory Slots Active</span>
-              </div>
+                    }, 1000);
+                  }}
+                  onBlur={() => {
+                    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+                    setProfileData({
+                      ...profileData,
+                      memories: draftMemories.split("\n").map(l => l.trim()).filter(l => l.length > 0)
+                    });
+                    setIsEditingMemory(false);
+                  }}
+                  placeholder="Tap here to write down things for the AI to remember (one item per line, e.g.)&#13;• Allergic to peanuts&#13;• Prefers high-protein low-carb dinners"
+                  className="w-full bg-transparent border-0 outline-none ring-0 focus:ring-0 focus:outline-none p-0 text-sm font-semibold text-stone-800 placeholder-stone-400 resize-none min-h-[200px] leading-relaxed transition-all"
+                />
+              ) : (
+                <div
+                  onClick={() => setIsEditingMemory(true)}
+                  className="text-sm leading-relaxed min-h-[200px] py-0.5 cursor-text whitespace-pre-line text-left text-stone-800 font-semibold"
+                >
+                  {draftMemories ? (
+                    draftMemories.split("\n").map((line, idx) => (
+                      <div key={idx} className="flex items-start gap-1.5 py-1">
+                        <span className="text-orange-500 text-xs mt-1">•</span>
+                        <span>{line}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="font-medium text-stone-400 italic">
+                      Tap here to write down things for the AI to remember...
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-between items-center text-[7.5px] font-black uppercase text-stone-400 tracking-widest pt-4 border-t border-stone-200/40">
+              <span>Auto-saves instantly</span>
+              <span>{draftMemories.split("\n").filter(l => l.trim().length > 0).length} Memory Slots Active</span>
             </div>
           </div>
         )}
