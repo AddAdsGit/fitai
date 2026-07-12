@@ -93,3 +93,11 @@ export interface Profile {
   telegramReminderTimes: string[];
 }
 
+export interface WeightLog {
+  id?: string;
+  profile_id?: string;
+  weight: number;
+  date: string;
+  created_at?: string;
+}
+

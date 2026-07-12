@@ -166,7 +166,7 @@ export const EditProfileView = ({
               <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
                 <User className="w-4 h-4" />
               </div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">Age & Birthdate Settings</span>
+              <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">Age Settings</span>
             </div>
             <div className="pt-2">
               <div className="flex justify-between items-center mb-1.5 px-1">
@@ -411,6 +411,35 @@ export const EditProfileView = ({
                   <Plus className="w-3.5 h-3.5" />
                 </button>
               </div>
+            </div>
+
+            {/* Weight Tracking Switch Toggle */}
+            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 flex items-center justify-between shadow-2xs">
+              <div className="flex flex-col text-left">
+                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Weight Tracker</span>
+                <span className="text-[9px] font-bold text-stone-400">Log progress & show history charts</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfileData({
+                  ...profileData,
+                  agent_config: {
+                    ...profileData.agent_config,
+                    trackWeight: !(profileData.agent_config?.trackWeight ?? false)
+                  }
+                })}
+                className={cn(
+                  "w-12 h-6 rounded-full p-1 transition-colors duration-200 cursor-pointer border-none",
+                  (profileData.agent_config?.trackWeight ?? false) ? "bg-orange-500" : "bg-stone-200"
+                )}
+              >
+                <div
+                  className={cn(
+                    "bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200",
+                    (profileData.agent_config?.trackWeight ?? false) ? "translate-x-6" : "translate-x-0"
+                  )}
+                />
+              </button>
             </div>
 
             {/* Macros Grid */}

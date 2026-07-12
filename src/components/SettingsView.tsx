@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail } from "lucide-react";
+import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProUpgradeModal } from "./ProUpgradeModal";
@@ -225,6 +225,67 @@ paths:
       responses:
         '201':
           description: Recipe saved successfully
+  /weight:
+    get:
+      summary: Get weight history logs
+      operationId: getWeightLogs
+      responses:
+        '200':
+          description: Weight logs retrieved successfully
+    post:
+      summary: Log a weight entry
+      operationId: logWeight
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - weight
+              properties:
+                date:
+                  type: string
+                  description: YYYY-MM-DD. Defaults to today.
+                weight:
+                  type: number
+                  description: Weight in kg (e.g. 78.5)
+      responses:
+        '200':
+          description: Weight log saved successfully
+  /daily-wellness:
+    get:
+      summary: Get daily wellness/health notes for a specific date
+      operationId: getDailyWellness
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wellness notes retrieved successfully
+    post:
+      summary: Save or update daily wellness notes
+      operationId: saveDailyWellness
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - notes
+              properties:
+                date:
+                  type: string
+                  description: YYYY-MM-DD. Defaults to today.
+                notes:
+                  type: string
+                  description: The text content of the daily wellness or health note.
+      responses:
+        '200':
+          description: Daily wellness notes saved successfully
 components:
   schemas: {}
   securitySchemes:
@@ -249,7 +310,7 @@ export const SettingsView = ({
   session: any;
 }) => {
   const [showPro, setShowPro] = useState(false);
-  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | null>(null);
+  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "logging" | null>(null);
 
   const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gpt-action`;
@@ -571,7 +632,7 @@ export const SettingsView = ({
     );
   }
 
-  if (activeSubView === "telegram") {
+  if (activeSubView === "reminders") {
     return (
       <motion.div
         initial={{ opacity: 0, x: -20 }}
@@ -987,6 +1048,147 @@ export const SettingsView = ({
     );
   }
 
+  if (activeSubView === "logging") {
+    const currentAction = profileData.preferences?.find((p: string) => p.startsWith("plus_button_action:"))?.split(":")[1] || "ai_logger";
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
+      >
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveSubView(null)}
+            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <h2 className="text-xl font-black text-[#1a1a1a]">Logging Preferences</h2>
+        </div>
+
+        <div>
+          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
+            Plus Button (+) Action
+          </h3>
+          <p className="text-[10px] text-stone-450 font-bold px-3 mb-4 leading-normal">
+            Choose what action triggers automatically when you tap the Plus (+) button on your Home screen.
+          </p>
+
+          <div className="space-y-3">
+            {[
+              {
+                id: "ai_logger",
+                title: "AI Logger (Default)",
+                description: "Describe meals in natural language, AI handles the rest.",
+                icon: Sparkles,
+              },
+              {
+                id: "quick_log",
+                title: "Past Foods",
+                description: "Search history or tap past logs to add meals in one click.",
+                icon: Search,
+              },
+              {
+                id: "detailed_log",
+                title: "Detailed Manual Form",
+                description: "Opens standard text fields to manually input calories and macros.",
+                icon: Edit2,
+              },
+              {
+                id: "camera",
+                title: "Direct Camera Capture",
+                description: "Opens the scanner and immediately triggers the device camera.",
+                icon: Camera,
+              },
+              {
+                id: "gpt_redirect",
+                title: "Redirect to Custom GPT",
+                description: "Launches and opens your Custom ChatGPT fitness action.",
+                icon: Bot,
+              },
+            ].map((opt) => {
+              const isSelected = currentAction === opt.id;
+              const IconComp = opt.icon;
+
+              return (
+                <motion.div
+                  key={opt.id}
+                  onClick={() => {
+                    const filteredPrefs = (profileData.preferences || []).filter((p: string) => !p.startsWith("plus_button_action:"));
+                    filteredPrefs.push(`plus_button_action:${opt.id}`);
+                    setProfileData({
+                      ...profileData,
+                      preferences: filteredPrefs
+                    });
+                    triggerToast(`Saved preference: ${opt.title} ⚡`);
+                  }}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  className={cn(
+                    "flex items-center justify-between p-4 rounded-3xl border transition-all cursor-pointer select-none",
+                    isSelected
+                      ? "bg-orange-50/70 border-orange-200/60 shadow-xs"
+                      : "bg-white border-stone-100 hover:border-stone-200 shadow-3xs"
+                  )}
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className={cn(
+                      "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                      isSelected ? "bg-orange-500 text-white" : "bg-stone-50 text-stone-550 border border-stone-100"
+                    )}>
+                      <IconComp className="w-4 h-4" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <h4 className={cn("text-xs font-black leading-tight", isSelected ? "text-orange-950" : "text-stone-850")}>
+                        {opt.title}
+                      </h4>
+                      <p className="text-[9.5px] text-stone-400 font-semibold mt-0.5 leading-snug">
+                        {opt.description}
+                      </p>
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white shrink-0 shadow-xs">
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {currentAction === "gpt_redirect" && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-6 bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-3.5 text-left"
+            >
+              <div>
+                <label className="text-[9px] font-black text-stone-450 uppercase tracking-widest block mb-1.5 px-1">
+                  Custom GPT Chat URL
+                </label>
+                <input
+                  type="text"
+                  placeholder="https://chatgpt.com/g/g-..."
+                  value={localStorage.getItem("fitai_custom_gpt_url") || "https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai"}
+                  onChange={(e) => {
+                    localStorage.setItem("fitai_custom_gpt_url", e.target.value);
+                  }}
+                  className="w-full bg-stone-50 border border-stone-150 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-400"
+                />
+              </div>
+              <p className="text-[9.5px] text-stone-400 font-bold leading-relaxed px-1">
+                Tapping the Plus button will launch a new tab pointing directly to your ChatGPT custom action interface.
+              </p>
+            </motion.div>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
   // --- Main Settings View ---
   return (
     <>
@@ -1080,6 +1282,37 @@ export const SettingsView = ({
                 ) : (
                   <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Off</span>
                 )}
+                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+
+            {/* Plus Button Actions */}
+            <div
+              onClick={() => setActiveSubView("logging")}
+              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group border-t border-stone-50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shrink-0">
+                  <Plus className="w-4 h-4 text-orange-550" />
+                </div>
+                <div>
+                  <div className="font-bold text-[#1a1a1a] text-xs">Plus Button Actions</div>
+                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
+                    Configure what happens when you tap the home Plus button
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
+                <span className="text-stone-500 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">
+                  {(() => {
+                    const act = profileData.preferences?.find((p: string) => p.startsWith("plus_button_action:"))?.split(":")[1] || "ai_logger";
+                    return act === "ai_logger" ? "AI Logger" :
+                           act === "quick_log" ? "Past Foods" :
+                           act === "detailed_log" ? "Manual Form" :
+                           act === "camera" ? "Camera Direct" :
+                           "Custom GPT";
+                  })()}
+                </span>
                 <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>

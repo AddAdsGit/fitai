@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   Utensils,
   X,
@@ -40,6 +40,8 @@ export const ManualLogModal = ({
   recipesState = [],
   initialAiMode,
   profileData,
+  initialSegment,
+  autoTriggerPhotoScan,
 }: {
   onClose: () => void;
   onAddMeal: (meal: any) => void;
@@ -49,6 +51,8 @@ export const ManualLogModal = ({
   recipesState?: any[];
   initialAiMode?: boolean;
   profileData?: any;
+  initialSegment?: "quick" | "detailed";
+  autoTriggerPhotoScan?: boolean;
 }) => {
   const [name, setName] = useState(mealToEdit?.name || "");
   const [calories, setCalories] = useState(mealToEdit ? String(mealToEdit.calories) : "");
@@ -70,6 +74,7 @@ export const ManualLogModal = ({
   const isEditing = !!mealToEdit;
   const [segment, setSegment] = useState<"quick" | "detailed">(() => {
     if (mealToEdit) return "detailed";
+    if (initialSegment) return initialSegment;
     if (initialAiMode) return "detailed";
     return "quick";
   });
@@ -82,6 +87,23 @@ export const ManualLogModal = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
 
+  const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+  const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
+  const hasGeminiKey = !!preferenceGeminiKey;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoTriggerPhotoScan && hasGeminiKey && fileInputRef.current) {
+      const t = setTimeout(() => {
+        fileInputRef.current?.click();
+      }, 300);
+      return () => clearTimeout(t);
+    } else if (autoTriggerPhotoScan && !hasGeminiKey) {
+      setErrorMessage("Please configure your Gemini API Key in Settings to use photo recognition.");
+    }
+  }, [autoTriggerPhotoScan, hasGeminiKey]);
+
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -93,12 +115,7 @@ export const ManualLogModal = ({
   };
 
   const hasImage = (imageUrl && !hasNoGeneratedImage(imageUrl)) || !!uploadedImage;
-  // True if the user has entered any macro/name data (determines Write vs Edit label)
   const hasAnyValues = !!(name.trim() || calories || protein || carbs || fats);
-
-  const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-  const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
-  const hasGeminiKey = !!preferenceGeminiKey;
 
   const quickLogItems = useMemo(() => {
     const itemsMap = new Map<string, QuickLogItem>();
@@ -383,7 +400,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
           <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1.5 font-sans">
             <Utensils className="w-4 h-4 text-orange-500" />
             {showAiMode 
-              ? (mealToEdit || hasAnyValues ? "Edit Log with AI 🤖" : "Write Log with AI 🤖")
+              ? (mealToEdit || hasAnyValues ? "Edit Log with AI" : "Write Log with AI")
               : (mealToEdit ? "Edit Meal Log" : "New Calorie Log")}
           </h4>
           <button
@@ -404,7 +421,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                 segment === "quick" ? "bg-white text-orange-600 shadow-sm" : "text-stone-500 hover:text-stone-900"
               )}
             >
-              Quick Log
+              Past Foods
             </button>
             <button
               onClick={() => setSegment("detailed")}
@@ -762,49 +779,68 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                     />
 
                     {/* Multimodal Camera Scan Controls */}
-                    {hasGeminiKey ? (
-                      <div className="flex flex-col gap-3 py-1 text-left">
-                        <div className="flex gap-2">
-                          <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-stone-50 border border-stone-200 hover:bg-stone-100/70 rounded-xl text-[10px] font-black uppercase text-stone-600 cursor-pointer transition-all select-none active:scale-[0.98]">
-                            <Camera className="w-3.5 h-3.5 text-stone-500" />
-                            <span>Scan Plate</span>
+                    <div className="flex flex-col gap-3 py-1 text-left">
+                      <div className="flex gap-2">
+                        <label 
+                          onClick={(e) => {
+                            if (!hasGeminiKey) {
+                              e.preventDefault();
+                              setErrorMessage("Please configure your Gemini API Key in Settings to use photo recognition.");
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-stone-50 border border-stone-200 hover:bg-stone-100/70 rounded-xl text-[10px] font-black uppercase text-stone-600 cursor-pointer transition-all select-none active:scale-[0.98]"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-stone-500" />
+                          <span>Scan Plate</span>
+                          {hasGeminiKey && (
                             <input
+                              ref={fileInputRef}
                               type="file"
                               accept="image/*"
                               capture="environment"
                               onChange={handleImageFileChange}
                               className="hidden"
                             />
-                          </label>
-                          <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-stone-50 border border-stone-200 hover:bg-stone-100/70 rounded-xl text-[10px] font-black uppercase text-stone-600 cursor-pointer transition-all select-none active:scale-[0.98]">
-                            <svg className="w-3.5 h-3.5 text-stone-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                              <circle cx="8.5" cy="8.5" r="1.5"/>
-                              <polyline points="21 15 16 10 5 21"/>
-                            </svg>
-                            <span>Upload Photo</span>
+                          )}
+                        </label>
+                        <label 
+                          onClick={(e) => {
+                            if (!hasGeminiKey) {
+                              e.preventDefault();
+                              setErrorMessage("Please configure your Gemini API Key in Settings to use photo recognition.");
+                            }
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-stone-50 border border-stone-200 hover:bg-stone-100/70 rounded-xl text-[10px] font-black uppercase text-stone-600 cursor-pointer transition-all select-none active:scale-[0.98]"
+                        >
+                          <svg className="w-3.5 h-3.5 text-stone-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                          </svg>
+                          <span>Upload Photo</span>
+                          {hasGeminiKey && (
                             <input
                               type="file"
                               accept="image/*"
                               onChange={handleImageFileChange}
                               className="hidden"
                             />
-                          </label>
-                        </div>
-                        {uploadedImage && (
-                          <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-stone-200 shadow-2xs group shrink-0">
-                            <img src={uploadedImage} className="w-full h-full object-cover" alt="Preview" />
-                            <button
-                              type="button"
-                              onClick={() => setUploadedImage(null)}
-                              className="absolute top-1 right-1 w-4 h-4 bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] hover:bg-black font-sans font-bold"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        )}
+                          )}
+                        </label>
                       </div>
-                    ) : null}
+                      {uploadedImage && (
+                        <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-stone-200 shadow-2xs group shrink-0">
+                          <img src={uploadedImage} className="w-full h-full object-cover" alt="Preview" />
+                          <button
+                            type="button"
+                            onClick={() => setUploadedImage(null)}
+                            className="absolute top-1 right-1 w-4 h-4 bg-black/60 rounded-full flex items-center justify-center text-white text-[9px] hover:bg-black font-sans font-bold"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
                     <p className="text-[9px] text-stone-400 font-medium leading-relaxed">
                       AI will {hasAnyValues ? "recalculate macros based on your changes" : "estimate calories and macros from your description or photo"}.
@@ -854,15 +890,13 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                   transition={{ duration: 0.15 }}
                   className="flex gap-2.5 w-full"
                 >
-                  {hasGeminiKey && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAiMode(true)}
-                      className="flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-white bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center shadow-md shadow-orange-500/10"
-                    >
-                      {mealToEdit || hasAnyValues ? "AI Editor" : "AI Logger"}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowAiMode(true)}
+                    className="flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-white bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center shadow-md shadow-orange-500/10"
+                  >
+                    {mealToEdit || hasAnyValues ? "AI Editor" : "AI Logger"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -882,10 +916,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                       });
                       onClose();
                     }}
-                    className={cn(
-                      "py-3 rounded-2xl text-white text-xs font-black uppercase tracking-widest text-center shadow-md shadow-emerald-600/15 active:scale-[0.98] transition-all duration-200 cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-110",
-                      hasGeminiKey ? "flex-1" : "w-full"
-                    )}
+                    className="py-3 rounded-2xl text-white text-xs font-black uppercase tracking-widest text-center shadow-md shadow-emerald-600/15 active:scale-[0.98] transition-all duration-200 cursor-pointer bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-110 flex-1"
                   >
                     Save
                   </button>

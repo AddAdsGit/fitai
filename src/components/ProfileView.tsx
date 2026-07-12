@@ -1,13 +1,22 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   BookOpen, BarChart2, Target, Search, Filter, X, Utensils,
-  Plus, Sparkles, Check, Info, Scale, Ruler, Database, Camera,
+  Plus, Minus, Sparkles, Check, Info, Scale, Ruler, Database, Camera,
   User, Smile,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
-import type { Meal, Recipe } from "../types";
+import type { Meal, Recipe, WeightLog } from "../types";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 import { hasNoGeneratedImage, getMealEmoji } from "../utils/helpers";
 import { InsightsView } from "./InsightsView";
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -50,6 +59,9 @@ export const ProfileView = ({
   activeProfileId,
   currentStreak,
   mealsState,
+  weightLogs = [],
+  onLogWeight,
+  onDeleteWeight,
 }: {
   key?: string;
   profileData: any;
@@ -64,6 +76,9 @@ export const ProfileView = ({
   activeProfileId: string | null;
   currentStreak: number;
   mealsState: Meal[];
+  weightLogs?: WeightLog[];
+  onLogWeight?: (weight: number, date: string) => void;
+  onDeleteWeight?: (id: string) => void;
 }) => {
   const [profileTab, setProfileTab] = useState<"meals" | "insights" | "agent-brain">("meals");
   
@@ -389,14 +404,29 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
             )}
           </div>
           <div className="flex-1 flex justify-around">
-            <div className="flex flex-col items-center">
-              <div className="text-xl font-black text-[#1a1a1a]">
-                {profileData.weight}
+            {profileData.agent_config?.trackWeight ? (
+              <div
+                onClick={() => setProfileTab("insights")}
+                className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 p-1 px-2.5 rounded-xl transition-all select-none"
+              >
+                <div className="text-xl font-black text-[#1a1a1a] flex items-center gap-0.5">
+                  {profileData.weight}
+                  <Scale className="w-3.5 h-3.5 text-orange-500" />
+                </div>
+                <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
+                  Weight(kg)
+                </div>
               </div>
-              <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
-                Weight(kg)
+            ) : (
+              <div className="flex flex-col items-center">
+                <div className="text-xl font-black text-[#1a1a1a]">
+                  {profileData.weight}
+                </div>
+                <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
+                  Weight(kg)
+                </div>
               </div>
-            </div>
+            )}
             <div className="flex flex-col items-center">
               <div className="text-xl font-black text-[#1a1a1a]">
                 {profileData.height}
@@ -767,7 +797,14 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
 
         {profileTab === "insights" && (
           <div className="pb-8">
-            <InsightsView currentStreak={currentStreak} mealsState={mealsState} profileData={profileData} />
+            <InsightsView 
+              currentStreak={currentStreak} 
+              mealsState={mealsState} 
+              profileData={profileData} 
+              weightLogs={weightLogs}
+              onLogWeight={onLogWeight}
+              onDeleteWeight={onDeleteWeight}
+            />
           </div>
         )}
 

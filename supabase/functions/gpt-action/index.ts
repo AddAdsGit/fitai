@@ -586,6 +586,82 @@ serve(async (req) => {
       }
     }
 
+    // --- WEIGHT ENDPOINTS ---
+    if (path.endsWith("/weight")) {
+      if (method === "GET") {
+        const { data: logs, error: fetchError } = await supabase
+          .from("weight_logs")
+          .select("*")
+          .eq("profile_id", profile.id)
+          .order("date", { ascending: true });
+
+        if (fetchError) {
+          return new Response(JSON.stringify({ error: "Failed to retrieve weight logs", details: fetchError }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ weight_logs: logs || [] }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else if (method === "POST" || method === "PATCH") {
+        const body = await req.json();
+        const targetDate = body.date || getLocalTimeAndDate().dateStr;
+        const weightVal = parseFloat(body.weight);
+
+        if (isNaN(weightVal) || weightVal <= 0) {
+          return new Response(JSON.stringify({ error: "Valid weight value is required" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // 1. Upsert weight log
+        const { data: record, error: upsertError } = await supabase
+          .from("weight_logs")
+          .upsert(
+            {
+              profile_id: profile.id,
+              date: targetDate,
+              weight: weightVal,
+            },
+            { onConflict: "profile_id,date" }
+          )
+          .select("*")
+          .single();
+
+        if (upsertError) {
+          return new Response(JSON.stringify({ error: "Failed to save weight log", details: upsertError }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // 2. Auto-update current weight in profiles if this is the most recent log (by date)
+        const { data: latestLog } = await supabase
+          .from("weight_logs")
+          .select("weight,date")
+          .eq("profile_id", profile.id)
+          .order("date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestLog && latestLog.date === targetDate) {
+          await supabase
+            .from("profiles")
+            .update({ weight: weightVal })
+            .eq("id", profile.id);
+        }
+
+        return new Response(JSON.stringify({ message: "Weight log saved successfully", record }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // --- MEALS ENDPOINTS ---
     if (path.endsWith("/meals")) {
       if (method === "GET") {

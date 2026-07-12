@@ -8,6 +8,8 @@ import {
   Flame,
   Home,
   Plus,
+  Minus,
+  Scale,
   Zap,
   User,
   X,
@@ -48,7 +50,7 @@ import { ChatGPTIcon } from "./components/ChatGPTIcon";
 
 
 // Import types & helpers
-import type { Meal, Recipe, DailyWellness } from "./types";
+import type { Meal, Recipe, DailyWellness, WeightLog } from "./types";
 import { hasNoGeneratedImage, formatDateStr, getMealEmoji } from "./utils/helpers";
 import { generateShareUrl } from "./utils/shareUtils";
 
@@ -173,6 +175,47 @@ export default function App() {
   });
   const [shareItemPopup, setShareItemPopup] = useState<{ type: "meal" | "recipe" | "day", item: any } | null>(null);
   
+  const handleLogMealClick = () => {
+    const plusActionTag = (profileData.preferences || []).find((p: string) => p.startsWith("plus_button_action:")) || "";
+    const plusAction = plusActionTag.split(":")[1] || "ai_logger";
+
+    if (plusAction === "gpt_redirect") {
+      const gptUrl = localStorage.getItem("fitai_custom_gpt_url") || "https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai";
+      window.open(gptUrl.trim(), "_blank");
+      return;
+    }
+
+    if (plusAction === "camera") {
+      setManualLogInitialAiMode(true);
+      setIsCameraFullScreen(true);
+      setManualLogInitialSegment("detailed");
+      setAutoTriggerPhotoScan(true);
+      return;
+    }
+
+    if (plusAction === "quick_log") {
+      setManualLogInitialAiMode(false);
+      setIsCameraFullScreen(true);
+      setManualLogInitialSegment("quick");
+      setAutoTriggerPhotoScan(false);
+      return;
+    }
+
+    if (plusAction === "detailed_log") {
+      setManualLogInitialAiMode(false);
+      setIsCameraFullScreen(true);
+      setManualLogInitialSegment("detailed");
+      setAutoTriggerPhotoScan(false);
+      return;
+    }
+
+    // Default: ai_logger
+    setManualLogInitialAiMode(true);
+    setIsCameraFullScreen(true);
+    setManualLogInitialSegment("detailed");
+    setAutoTriggerPhotoScan(false);
+  };
+
   const handleShareMeal = (meal: Meal) => {
     setShareItemPopup({ type: "meal", item: meal });
   };
@@ -235,6 +278,10 @@ export default function App() {
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [manualLogInitialAiMode, setManualLogInitialAiMode] = useState(false);
+  const [manualLogInitialSegment, setManualLogInitialSegment] = useState<"quick" | "detailed">("detailed");
+  const [autoTriggerPhotoScan, setAutoTriggerPhotoScan] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [draftWeight, setDraftWeight] = useState<number | null>(null);
 
   useEffect(() => {
     const savedKey = localStorage.getItem("fitai_gemini_api_key");
@@ -386,6 +433,18 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("fitai_daily_notes", JSON.stringify(dailyNotes));
   }, [dailyNotes]);
+
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("fitai_weight_logs") || "[]");
+    } catch (_) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("fitai_weight_logs", JSON.stringify(weightLogs));
+  }, [weightLogs]);
 
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [loginUsername, setLoginUsername] = useState("");
@@ -603,6 +662,22 @@ export default function App() {
     
     setProfileDataState(resolvedData);
 
+    if (resolvedData.agent_config?.trackWeight && resolvedData.weight !== profileDataRef.current.weight) {
+      const todayStr = new Date().toLocaleDateString("en-CA");
+      setWeightLogs(prev => {
+        const filtered = prev.filter(l => l.date !== todayStr);
+        return [...filtered, { weight: resolvedData.weight, date: todayStr }].sort((a, b) => a.date.localeCompare(b.date));
+      });
+
+      if (isSupabaseConfigured && activeProfileId) {
+        supabase.from("weight_logs").upsert({
+          profile_id: activeProfileId,
+          weight: resolvedData.weight,
+          date: todayStr
+        }, { onConflict: "profile_id,date" }).then();
+      }
+    }
+
     if (isSupabaseConfigured && activeProfileId) {
       if (dbUpdateTimeoutRef.current) {
         clearTimeout(dbUpdateTimeoutRef.current);
@@ -725,11 +800,12 @@ export default function App() {
     const loadUserData = async () => {
       setIsDataLoading(true);
       try {
-        const [profileRes, recipesRes, mealsRes, wellnessRes] = await Promise.all([
+        const [profileRes, recipesRes, mealsRes, wellnessRes, weightLogsRes] = await Promise.all([
           supabase.from('profiles').select('*').eq('id', activeProfileId).single(),
           supabase.from('recipes').select('*').eq('profile_id', activeProfileId).order('name', { ascending: true }),
           supabase.from('meals').select('*').eq('profile_id', activeProfileId).order('created_at', { ascending: false }),
-          supabase.from('daily_wellness').select('*').eq('profile_id', activeProfileId)
+          supabase.from('daily_wellness').select('*').eq('profile_id', activeProfileId),
+          supabase.from('weight_logs').select('*').eq('profile_id', activeProfileId).order('date', { ascending: true })
         ]);
 
         if (profileRes.error) {
@@ -798,6 +874,22 @@ export default function App() {
           if (wellnessRes && !wellnessRes.error && wellnessRes.data) {
             initialNotesList = wellnessRes.data;
             setDailyNotes(wellnessRes.data);
+          }
+
+          // Load weight logs if table query was successful
+          if (weightLogsRes && !weightLogsRes.error && weightLogsRes.data) {
+            if (weightLogsRes.data.length === 0 && profile.weight) {
+              const todayStr = new Date().toLocaleDateString("en-CA");
+              const seedLog = {
+                profile_id: activeProfileId,
+                date: todayStr,
+                weight: profile.weight
+              };
+              setWeightLogs([seedLog]);
+              supabase.from("weight_logs").insert(seedLog).then();
+            } else {
+              setWeightLogs(weightLogsRes.data);
+            }
           }
 
           // Run one-time legacy notes migration from profile memories
@@ -1080,6 +1172,26 @@ export default function App() {
             .eq('profile_id', activeProfileId);
           if (!error && data) {
             setDailyNotes(data);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'weight_logs',
+          filter: `profile_id=eq.${activeProfileId}`,
+        },
+        async () => {
+          // Refetch all weight logs when any change happens
+          const { data, error } = await supabase
+            .from('weight_logs')
+            .select('*')
+            .eq('profile_id', activeProfileId)
+            .order('date', { ascending: true });
+          if (!error && data) {
+            setWeightLogs(data);
           }
         }
       )
@@ -2036,6 +2148,90 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
+  const handleLogWeight = async (weight: number, dateStr: string) => {
+    if (!activeProfileId) return;
+    
+    const { data: upsertedData, error: upsertError } = await supabase
+      .from("weight_logs")
+      .upsert(
+        {
+          profile_id: activeProfileId,
+          date: dateStr,
+          weight: weight
+        },
+        { onConflict: "profile_id,date" }
+      )
+      .select();
+
+    if (upsertError) {
+      showToast("❌ Failed to save weight log");
+      console.error(upsertError);
+      return;
+    }
+
+    const loggedRow = (upsertedData && upsertedData[0]) || {
+      id: Math.random().toString(),
+      profile_id: activeProfileId,
+      date: dateStr,
+      weight: weight
+    };
+
+    setWeightLogs(prev => {
+      const filtered = prev.filter(l => l.date !== dateStr);
+      return [...filtered, loggedRow];
+    });
+
+    const { data: latest } = await supabase
+      .from("weight_logs")
+      .select("weight,date")
+      .eq("profile_id", activeProfileId)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latest && latest.date === dateStr) {
+      setProfileData((prev: any) => ({
+        ...prev,
+        weight: weight
+      }));
+    }
+
+    showToast("✨ Weight logged successfully");
+  };
+
+  const handleDeleteWeight = async (logId: string) => {
+    if (!activeProfileId) return;
+
+    const logToDelete = weightLogs.find(l => l.id === logId);
+    if (!logToDelete) return;
+
+    const { error: deleteError } = await supabase
+      .from("weight_logs")
+      .delete()
+      .eq("id", logId);
+
+    if (deleteError) {
+      showToast("❌ Failed to delete weight log");
+      console.error(deleteError);
+      return;
+    }
+
+    const remainingLogs = weightLogs.filter(l => l.id !== logId);
+    setWeightLogs(remainingLogs);
+
+    if (remainingLogs.length > 0) {
+      const sorted = [...remainingLogs].sort((a, b) => b.date.localeCompare(a.date));
+      const latestLog = sorted[0];
+      
+      setProfileData((prev: any) => ({
+        ...prev,
+        weight: latestLog.weight
+      }));
+    }
+
+    showToast("Weight log removed");
+  };
+
   if (isDataLoading) {
     return (
       <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans p-6 max-w-md mx-auto space-y-8 flex flex-col justify-center items-center">
@@ -2308,91 +2504,70 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 ))}
               </div>
             </div>
+ 
+            {/* Weight Tracker Section — only visible when not yet logged today */}
+            {profileData.agent_config?.trackWeight && (() => {
+              const todayStr = new Date().toLocaleDateString("en-CA");
+              const todayLog = weightLogs.find(l => l.date === todayStr);
+              
+              if (todayLog) return null; // Logged weight appears in Today's Notes
 
-            {/* Quick Log Action Row (Separated Containers) */}
-            <div className="px-6 mt-6 relative z-10 text-left">
-              <span className="text-[9px] font-black uppercase text-stone-400 tracking-wider block mb-1.5 px-1">
-                Quick Log Item
-              </span>
-              <div className="flex gap-2.5 items-stretch w-full">
-                
-                {/* Container 1: Unified Quick Calorie Logger Form */}
-                <div className="w-full h-12 bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-3xs flex gap-2 items-center p-1 px-2.5 min-w-0">
-                  {/* description input (first) */}
-                  <input
-                    type="text"
-                    placeholder="Add item..."
-                    value={customCalName}
-                    onChange={(e) => setCustomCalName(e.target.value)}
-                    className="flex-1 h-full bg-transparent text-xs font-bold text-stone-900 placeholder-stone-400 focus:outline-none min-w-0"
-                  />
+              const baseWeight = (() => {
+                const pastLogs = weightLogs.filter(l => l.date < todayStr);
+                if (pastLogs.length > 0) {
+                  const sortedPast = [...pastLogs].sort((a, b) => b.date.localeCompare(a.date));
+                  return sortedPast[0].weight;
+                }
+                return profileData.weight || 70;
+              })();
 
-                  {/* kcal input (second) */}
-                  <input
-                    type="number"
-                    placeholder="kcal"
-                    value={customCalVal}
-                    onChange={(e) => setCustomCalVal(e.target.value)}
-                    className="w-20 h-full bg-stone-50/50 border border-stone-200/50 rounded-xl text-center text-xs font-bold text-stone-900 placeholder-stone-400 focus:outline-none"
-                  />
+              const currentWeight = draftWeight ?? baseWeight;
+
+              return (
+                <section className="px-6 mt-10 relative z-10 text-left">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
+                      Today's Weight
+                    </h3>
+                  </div>
                   
-                  {/* Submit button (inside container) */}
-                  <button
-                    onClick={() => {
-                      const name = customCalName.trim();
-                      const kcalStr = customCalVal.trim();
-                      const kcalVal = parseInt(kcalStr);
-
-                      if (!name && !kcalStr) {
-                        showToast("Enter an item name or calories");
-                        return;
-                      }
-
-                      if (kcalStr && kcalVal > 0) {
-                        // Manual entry (has calories specified explicitly)
-                        onAddMeal({
-                          name: name || "Quick Cal Log",
-                          calories: kcalVal,
-                          protein: 0,
-                          carbs: 0,
-                          fats: 0,
-                          type: "Quick Cal",
-                        });
-                        showToast(`Logged "${name || "Quick Cal Log"}" of ${kcalVal} kcal! ⚡`);
-                        setCustomCalName("");
-                        setCustomCalVal("");
-                      } else {
-                        // No calories specified, parse using local calculateNutritionFromIngredients
-                        const ingredientsList = name
-                          .split(/,|and|\+/)
-                          .map((i) => i.trim())
-                          .filter(Boolean);
-                        
-                        const nutrition = calculateNutritionFromIngredients(name, ingredientsList);
-                        
-                        onAddMeal({
-                          name,
-                          calories: nutrition.calories,
-                          protein: nutrition.protein,
-                          carbs: nutrition.carbs,
-                          fats: nutrition.fats,
-                          type: "Quick Cal",
-                        });
-                        
-                        showToast(`🤖 AI Estimated: ${nutrition.calories} kcal, ${nutrition.protein}g Protein`);
-                        setCustomCalName("");
-                        setCustomCalVal("");
-                      }
-                    }}
-                    className="w-8 h-8 bg-orange-500 hover:bg-orange-600 text-white rounded-xl flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                    title="Log Meal"
-                  >
-                    <Check className="w-4.5 h-4.5" />
-                  </button>
-                </div>
-
-              </div>
-            </div>
+                  <div className="flex items-center gap-2.5 w-full">
+                    <div className="flex-1 flex items-center bg-white/60 backdrop-blur-md border border-white/80 rounded-2xl px-2 py-1.5 shadow-sm">
+                      <button
+                        onClick={() => {
+                          setDraftWeight(Math.max(30, Number((currentWeight - 0.1).toFixed(1))));
+                        }}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-white/60 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750 select-none">
+                        <span className="text-sm font-black text-stone-850">{currentWeight}</span>
+                        <span className="text-stone-400">kg</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setDraftWeight(Math.min(300, Number((currentWeight + 0.1).toFixed(1))));
+                        }}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-white/60 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await handleLogWeight(currentWeight, todayStr);
+                        setDraftWeight(null);
+                      }}
+                      className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                      title="Log Weight"
+                    >
+                      <Check className="w-5 h-5 text-white" />
+                    </button>
+                  </div>
+                </section>
+              );
+            })()}
 
             {/* Today's Consumption Section */}
             <section className="px-6 mt-16 relative z-10">
@@ -2402,25 +2577,117 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 </h3>
                 {selectedDate === todayStr && (
                   <div className="flex gap-2">
+                    {/* Quick Add Zap Button */}
                     <button
-                      onClick={() => {
-                        setManualLogInitialAiMode(true);
-                        setIsCameraFullScreen(true);
-                      }}
-                      className="text-white font-black uppercase text-[9px] tracking-wider flex items-center gap-1.5 group bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 px-4 py-2 rounded-full hover:brightness-110 transition-all cursor-pointer select-none active:scale-95 shadow-sm shadow-orange-500/10 border-none font-sans"
+                      onClick={() => setShowQuickAdd(!showQuickAdd)}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-sm border-none ${
+                        showQuickAdd
+                          ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10"
+                          : "bg-stone-100 hover:bg-stone-200 text-stone-500 shadow-stone-200/10"
+                      }`}
+                      title="Quick Add"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-white fill-white group-hover:scale-110 transition-transform" />
-                      <span>AI Logger</span>
+                      <Zap className="w-4 h-4" />
+                    </button>
+                    {/* Log Meal Plus Button */}
+                    <button
+                      onClick={handleLogMealClick}
+                      className="w-8 h-8 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-sm shadow-orange-500/10 border-none"
+                      title="Log Meal"
+                    >
+                      <Plus className="w-4 h-4 text-white" />
                     </button>
                   </div>
                 )}
               </div>
 
+              {/* Collapsible Quick Add Row */}
+              <AnimatePresence>
+                {showQuickAdd && selectedDate === todayStr && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pb-6">
+                    <div className="flex gap-2.5 items-center w-full">
+                      <input
+                        type="text"
+                        placeholder="Add item..."
+                        value={customCalName}
+                        onChange={(e) => setCustomCalName(e.target.value)}
+                        className="flex-1 h-12 bg-white/60 backdrop-blur-md border border-white/80 rounded-2xl px-4 text-xs font-bold text-stone-900 placeholder-stone-400 focus:outline-none shadow-sm focus:ring-1 focus:ring-orange-500/10 transition-all text-left"
+                      />
+                      <input
+                        type="number"
+                        placeholder="kcal"
+                        value={customCalVal}
+                        onChange={(e) => setCustomCalVal(e.target.value)}
+                        className="w-20 h-12 bg-white/60 backdrop-blur-md border border-white/80 rounded-2xl text-center text-xs font-bold text-stone-900 placeholder-stone-400 focus:outline-none shadow-sm focus:ring-1 focus:ring-orange-500/10 transition-all"
+                      />
+                      <button
+                        onClick={() => {
+                          const name = customCalName.trim();
+                          const kcalStr = customCalVal.trim();
+                          const kcalVal = parseInt(kcalStr);
+
+                          if (!name && !kcalStr) {
+                            showToast("Enter an item name or calories");
+                            return;
+                          }
+
+                          if (kcalStr && kcalVal > 0) {
+                            onAddMeal({
+                              name: name || "Quick Add",
+                              calories: kcalVal,
+                              protein: 0,
+                              carbs: 0,
+                              fats: 0,
+                              type: "Quick Cal",
+                            });
+                            showToast(`Logged "${name || "Quick Add"}" — ${kcalVal} kcal`);
+                            setCustomCalName("");
+                            setCustomCalVal("");
+                          } else {
+                            const ingredientsList = name
+                              .split(/,|and|\+/)
+                              .map((i) => i.trim())
+                              .filter(Boolean);
+                            
+                            const nutrition = calculateNutritionFromIngredients(name, ingredientsList);
+                            
+                            onAddMeal({
+                              name,
+                              calories: nutrition.calories,
+                              protein: nutrition.protein,
+                              carbs: nutrition.carbs,
+                              fats: nutrition.fats,
+                              type: "Quick Cal",
+                            });
+                            
+                            showToast(`AI Estimated: ${nutrition.calories} kcal, ${nutrition.protein}g Protein`);
+                            setCustomCalName("");
+                            setCustomCalVal("");
+                          }
+                        }}
+                        className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                        title="Quick Add"
+                      >
+                        <Check className="w-5 h-5 text-white" />
+                      </button>
+                    </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="space-y-6">
                 {activeMeals.length === 0 ? (
-                  <div className="text-center py-12 bg-white rounded-[32px] border border-gray-100 p-6 shadow-sm">
-                    <p className="text-sm font-bold text-gray-500">No logs for this date yet</p>
-                    <p className="text-[10px] text-gray-400 mt-1 font-medium leading-relaxed">
+                  <div className="text-center py-12 px-6">
+                    <p className="text-sm font-bold text-stone-500">No logs for this date yet</p>
+                    <p className="text-[10px] text-stone-400 mt-1 font-medium leading-relaxed">
                       All meals, quick calories, or recipe favorites logged on this date will show up here.
                     </p>
                   </div>
@@ -2678,6 +2945,33 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                   </span>
                 )}
               </div>
+
+              {/* Weight logged note — plain text matching journal style */}
+              {profileData.agent_config?.trackWeight && (() => {
+                const weightTodayLog = weightLogs.find(l => l.date === selectedDate);
+                if (!weightTodayLog) return null;
+                return (
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-sm font-semibold text-stone-800">
+                      Today's Weight — {weightTodayLog.weight} kg
+                    </p>
+                    {selectedDate === todayStr && (
+                      <button
+                        onClick={async () => {
+                          if (weightTodayLog.id) {
+                            await handleDeleteWeight(weightTodayLog.id);
+                          }
+                        }}
+                        className="w-4 h-4 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-stone-500 hover:text-stone-700 cursor-pointer border-none transition-colors shrink-0"
+                        title="Remove weight log"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
               <WellnessJournal
                 selectedDate={selectedDate}
                 dailyNotes={dailyNotes}
@@ -2723,6 +3017,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             activeProfileId={activeProfileId}
             currentStreak={currentStreak}
             mealsState={mealsState}
+            weightLogs={weightLogs}
+            onLogWeight={handleLogWeight}
+            onDeleteWeight={handleDeleteWeight}
           />
         )}
         {activeTab === "edit-profile" && (
@@ -3287,7 +3584,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                             )}
                           >
                             <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-                            {isAiCalculating ? "Extracting..." : "Auto-Fill with AI 🤖"}
+                            {isAiCalculating ? "Extracting..." : "Auto-Fill with AI"}
                           </button>
                         </div>
 
@@ -3436,7 +3733,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                       onClick={() => setIsRecipeAiMode(!isRecipeAiMode)}
                       className="px-3.5 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-655 rounded-xl transition-all cursor-pointer border border-orange-100/55 flex items-center justify-center gap-1 font-black text-[10px] uppercase tracking-wider active:scale-95"
                     >
-                      {isRecipeAiMode ? "✏️ Manual Form" : (selectedRecipePopup.id === "new" ? "🤖 AI Generator" : "🤖 AI Editor")}
+                      {isRecipeAiMode ? "Manual Form" : (selectedRecipePopup.id === "new" ? "AI Generator" : "AI Editor")}
                     </button>
                     <button
                       onClick={async () => {
@@ -3872,18 +4169,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               {selectedDate === todayStr ? (
                 <motion.button
                   id="fab-add-food"
-                  onClick={() => {
-                    const gptUrl = localStorage.getItem("fitai_custom_gpt_url");
-                    if (gptUrl && gptUrl.trim()) {
-                      window.open(gptUrl.trim(), "_blank");
-                    } else {
-                      const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-                      const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
-                      const hasGeminiKey = !!preferenceGeminiKey;
-                      setManualLogInitialAiMode(hasGeminiKey);
-                      setIsCameraFullScreen(true);
-                    }
-                  }}
+                  onClick={handleLogMealClick}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="w-full h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-[16px] shadow-[0_8px_30px_rgb(251,146,60,0.4)] flex items-center justify-center text-white relative overflow-hidden"

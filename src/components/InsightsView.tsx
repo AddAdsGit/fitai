@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { TrendingUp } from "lucide-react";
+import React, { useState, useMemo, useEffect } from "react";
+import { TrendingUp, Minus, Plus, Scale, X } from "lucide-react";
 import { motion } from "motion/react";
 import {
   BarChart,
@@ -11,9 +11,13 @@ import {
   LineChart,
   Line,
   ReferenceLine,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  YAxis,
 } from "recharts";
 import { cn } from "../lib/utils";
-import type { Meal } from "../types";
+import type { Meal, WeightLog } from "../types";
 
 const ProgressBar = ({
   value,
@@ -66,12 +70,40 @@ export const InsightsView = ({
   currentStreak = 0,
   mealsState = [],
   profileData,
+  weightLogs = [],
+  onLogWeight,
+  onDeleteWeight,
 }: {
   currentStreak?: number;
   mealsState?: Meal[];
   profileData: any;
+  weightLogs?: WeightLog[];
+  onLogWeight?: (weight: number, date: string) => void;
+  onDeleteWeight?: (id: string) => void;
 }) => {
   const [timeRange, setTimeRange] = useState<"7D" | "30D" | "60D" | "90D">("7D");
+
+  const filteredWeightData = useMemo(() => {
+    if (!weightLogs || weightLogs.length === 0) return [];
+    const sorted = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date));
+    const limitDate = new Date();
+    const numDays = timeRange === "7D" ? 7 : timeRange === "30D" ? 30 : timeRange === "60D" ? 60 : 90;
+    limitDate.setDate(limitDate.getDate() - numDays);
+    const limitDateStr = limitDate.toLocaleDateString("en-CA");
+    return sorted.filter(log => log.date >= limitDateStr);
+  }, [weightLogs, timeRange]);
+
+  const weightStats = useMemo(() => {
+    if (!weightLogs || weightLogs.length === 0) {
+      return { start: profileData.weight, current: profileData.weight, goal: profileData.goals.weightGoal, change: 0 };
+    }
+    const sorted = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date));
+    const start = sorted[0].weight;
+    const current = sorted[sorted.length - 1].weight;
+    const goal = profileData.goals.weightGoal || 70;
+    const change = current - start;
+    return { start, current, goal, change };
+  }, [weightLogs, profileData.weight, profileData.goals.weightGoal]);
 
   const localFormatDateStr = (date: Date) => {
     const y = date.getFullYear();
@@ -337,6 +369,103 @@ export const InsightsView = ({
         </div>
         )}
       </div>
+
+      {/* Weight Progress & Tracking Card (Toggled) */}
+      {profileData.agent_config?.trackWeight && (
+        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-6">
+          
+          {/* Stats Header */}
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-1">
+                Weight Tracking
+              </div>
+              <div className="text-3xl font-black text-orange-950">
+                {weightStats.current} <span className="text-sm font-bold text-orange-900/40">kg</span>
+              </div>
+            </div>
+            
+            <div className="bg-orange-100/40 rounded-2xl p-2 px-3 border border-orange-200/20 flex gap-4 text-center select-none text-[10px] font-black uppercase tracking-wider text-orange-950/70">
+              <div>
+                <span className="text-orange-950/40 text-[8px] block leading-none mb-0.5">Start</span>
+                <span>{weightStats.start} kg</span>
+              </div>
+              <div className="w-px h-6 bg-orange-200/30" />
+              <div>
+                <span className="text-orange-950/40 text-[8px] block leading-none mb-0.5">Goal</span>
+                <span>{weightStats.goal} kg</span>
+              </div>
+              <div className="w-px h-6 bg-orange-200/30" />
+              <div>
+                <span className="text-orange-950/40 text-[8px] block leading-none mb-0.5">Change</span>
+                <span className={cn(
+                  weightStats.change < 0 ? "text-emerald-600" : weightStats.change > 0 ? "text-rose-500" : "text-stone-500"
+                )}>
+                  {weightStats.change > 0 ? `+${weightStats.change.toFixed(1)}` : weightStats.change.toFixed(1)} kg
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Recharts Area Chart */}
+          <div className="h-48 w-full relative z-0">
+            {filteredWeightData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={filteredWeightData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="insightsWeightGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.03)" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }}
+                    tickFormatter={(str) => {
+                      try {
+                        const d = new Date(str);
+                        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+                      } catch (_) {
+                        return str;
+                      }
+                    }}
+                  />
+                  <YAxis 
+                    domain={['dataMin - 1', 'dataMax + 1']} 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }}
+                  />
+                  <RechartsTooltip 
+                    contentStyle={{ 
+                      borderRadius: "16px", 
+                      border: "none", 
+                      background: "rgba(255,255,255,0.9)", 
+                      backdropFilter: "blur(10px)", 
+                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                      fontSize: 10,
+                      fontWeight: 900,
+                      color: "#431407"
+                    }}
+                    labelFormatter={(label) => {
+                      return new Date(label).toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+                    }}
+                  />
+                  <Area type="monotone" dataKey="weight" stroke="#f97316" strokeWidth={2.5} fillOpacity={1} fill="url(#insightsWeightGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <Scale className="w-8 h-8 text-stone-300 animate-bounce" />
+                <span className="text-xs font-bold text-stone-400 mt-2">No weight logs recorded in this range</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Macros Chart Card */}
       <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80">

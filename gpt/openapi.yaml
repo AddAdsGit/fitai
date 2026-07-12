@@ -234,6 +234,36 @@ paths:
       responses:
         '200':
           description: Saved
+  /weight:
+    get:
+      summary: Get weight history logs
+      description: Retrieve the history of logged weights for the user, sorted chronologically.
+      operationId: getWeightLogs
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Log a weight entry
+      description: Log or update the user's weight for a specific date (defaults to today). Automatically updates current profile weight if it is the most recent log.
+      operationId: logWeight
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - weight
+              properties:
+                date:
+                  type: string
+                  description: YYYY-MM-DD. Defaults to today.
+                weight:
+                  type: number
+                  description: Weight in kg (e.g. 78.5)
+      responses:
+        '200':
+          description: Saved
   /recipes:
     get:
       summary: List user recipes
