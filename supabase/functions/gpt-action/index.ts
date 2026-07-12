@@ -669,7 +669,7 @@ serve(async (req) => {
             }
             const prompt = `gourmet professional food photography of ${cleanName}.${southIndianContext} Crisp food separation with distinct ingredients clearly visible and neatly arranged. High detail textures, photorealistic, macro culinary shot, top-down view, clean bright studio lighting, sharp focus, volumetric depth, no blending or bleeding between food elements.`;
             const seed = Math.floor(Math.random() * 1000000);
-            imageUrlToDownload = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true&seed=${seed}`;
+            imageUrlToDownload = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true&seed=${seed}&model=flux`;
             console.log(`[image-refinement] Resolved image fallback: ${imageUrlToDownload}`);
           }
         }
