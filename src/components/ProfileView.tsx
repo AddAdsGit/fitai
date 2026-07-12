@@ -722,7 +722,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               </div>
 
               <div className="text-[9.5px] font-bold text-stone-500 leading-relaxed bg-stone-50 p-3 rounded-2xl border border-stone-200/40 text-left">
-                ChatGPT will utilize this AI memory to personalize responses and send personalized reminders via Telegram from our scheduled reminders feature.
+                Allergies, preferences, and dietary rules used by the AI to customize calculations and logs.
               </div>
 
               {/* notepad styled area */}
