@@ -659,36 +659,72 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
         </div>
 
         {/* Toggle controls panel */}
-        <div className="bg-stone-100/50 border border-stone-200/40 p-3 rounded-2xl w-full flex flex-col gap-2.5 text-[9.5px] font-extrabold text-stone-600">
+        <div className="bg-stone-100/60 border border-stone-200/50 p-4 rounded-2xl w-full flex flex-col gap-3 text-[10px] font-bold text-stone-600 shadow-2xs shrink-0">
           <div className="flex items-center justify-between">
-            <span className="uppercase tracking-wider">⏱️ Show Meal Time</span>
-            <input
-              type="checkbox"
-              checked={showMealTime}
-              onChange={(e) => setShowMealTime(e.target.checked)}
-              className="rounded text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
-            />
+            <span className="flex items-center gap-2">
+              <span className="text-stone-400">⏱️</span>
+              <span className="tracking-wide">Include Timestamp</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowMealTime(!showMealTime)}
+              className={cn(
+                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
+                showMealTime ? "bg-orange-500" : "bg-stone-250"
+              )}
+            >
+              <motion.div
+                layout
+                className="w-4 h-4 rounded-full bg-white shadow-xs"
+                animate={{ x: showMealTime ? 16 : 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
           </div>
           {image && (
-            <div className="flex items-center justify-between border-t border-stone-200/30 pt-2">
-              <span className="uppercase tracking-wider">📷 Show Meal Photo</span>
-              <input
-                type="checkbox"
-                checked={showMealPhoto}
-                onChange={(e) => setShowMealPhoto(e.target.checked)}
-                className="rounded text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
-              />
+            <div className="flex items-center justify-between border-t border-stone-200/30 pt-2.5">
+              <span className="flex items-center gap-2">
+                <span className="text-stone-400">📷</span>
+                <span className="tracking-wide">Include Meal Photo</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowMealPhoto(!showMealPhoto)}
+                className={cn(
+                  "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
+                  showMealPhoto ? "bg-orange-500" : "bg-stone-250"
+                )}
+              >
+                <motion.div
+                  layout
+                  className="w-4 h-4 rounded-full bg-white shadow-xs"
+                  animate={{ x: showMealPhoto ? 16 : 0 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              </button>
             </div>
           )}
           {item.meal_description && (
-            <div className="flex items-center justify-between border-t border-stone-200/30 pt-2">
-              <span className="uppercase tracking-wider">📝 Show Meal Description</span>
-              <input
-                type="checkbox"
-                checked={showMealDesc}
-                onChange={(e) => setShowMealDesc(e.target.checked)}
-                className="rounded text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
-              />
+            <div className="flex items-center justify-between border-t border-stone-200/30 pt-2.5">
+              <span className="flex items-center gap-2">
+                <span className="text-stone-400">📝</span>
+                <span className="tracking-wide">Include Description</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowMealDesc(!showMealDesc)}
+                className={cn(
+                  "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
+                  showMealDesc ? "bg-orange-500" : "bg-stone-250"
+                )}
+              >
+                <motion.div
+                  layout
+                  className="w-4 h-4 rounded-full bg-white shadow-xs"
+                  animate={{ x: showMealDesc ? 16 : 0 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              </button>
             </div>
           )}
         </div>

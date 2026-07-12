@@ -34,6 +34,11 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
   const [loadingUrl, setLoadingUrl] = useState(false);
   const [shortUrl, setShortUrl] = useState<string | null>(null);
   const [previewTab, setPreviewTab] = useState<"card" | "webpage">("card");
+
+  // Recipe customization toggles
+  const [showCookTime, setShowCookTime] = useState(true);
+  const [showRecipeDesc, setShowRecipeDesc] = useState(true);
+  const [showRecipeSteps, setShowRecipeSteps] = useState(true);
   
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentVar = variations[currentIndex];
@@ -167,23 +172,31 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         // Title Date & Info
         const finalY = wrapText(name, 80, 260, 920, 84, "#FAF9F6", "black 68px Inter, system-ui, sans-serif");
 
-        ctx.fillStyle = accentColor;
-        ctx.font = "black 28px Inter, system-ui, sans-serif";
-        ctx.fillText(`🍳 ${time} PREP`, 80, finalY + 60);
+        let infoY = finalY + 60;
+        if (showCookTime) {
+          ctx.fillStyle = accentColor;
+          ctx.font = "black 28px Inter, system-ui, sans-serif";
+          ctx.fillText(`🍳 ${time} PREP`, 80, infoY);
+          infoY += 45;
+        }
 
         ctx.fillStyle = subTxtColor;
         ctx.font = "bold 24px Inter, system-ui, sans-serif";
-        ctx.fillText(`Logged ${item.log_count || 0} times by ${handleStr}`, 80, finalY + 105);
+        ctx.fillText(`Logged ${item.log_count || 0} times by ${handleStr}`, 80, infoY);
 
-        let boxY = finalY + 130;
+        let boxY = infoY + 40;
         let boxH = 280;
         let ingOffset = 55;
         let calOffset = 415;
 
         if (cardFormat !== "square") {
-          const descText = item.description || "A custom recipe generated and tracked on FitAI.";
-          const descY = wrapText(descText, 80, finalY + 155, 920, 36, "#FAF9F6", "medium 23px Inter, system-ui, sans-serif");
-          boxY = descY + 45;
+          if (showRecipeDesc) {
+            const descText = item.description || "A custom recipe generated and tracked on FitAI.";
+            const descY = wrapText(descText, 80, infoY + 65, 920, 36, "#FAF9F6", "medium 23px Inter, system-ui, sans-serif");
+            boxY = descY + 45;
+          } else {
+            boxY = infoY + 45;
+          }
           boxH = 240;
           ingOffset = 48;
           calOffset = 360;
@@ -220,7 +233,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
         ctx.font = "black 76px Inter, system-ui, sans-serif";
         ctx.fillText(`${calories} kcal`, 80, boxY + calOffset);
 
-        if (cardFormat !== "square") {
+        if (cardFormat !== "square" && showRecipeSteps) {
           const instructionsY = boxY + 270;
           const instructionsBoxH = cardFormat === "story" ? 640 : 250;
           ctx.fillStyle = "rgba(255,255,255,0.06)";
@@ -672,7 +685,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
 
   useEffect(() => {
     drawCanvas();
-  }, [currentIndex]);
+  }, [currentIndex, showCookTime, showRecipeDesc, showRecipeSteps]);
 
   const handleNext = () => {
     setCurrentIndex((prev) => (prev + 1) % variations.length);
@@ -778,6 +791,73 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Customization Toggles Panel */}
+        <div className="bg-stone-100/60 border border-stone-200/50 p-4 rounded-2xl w-full flex flex-col gap-3 text-[10px] font-bold text-stone-600 shadow-2xs shrink-0">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <span className="text-stone-400">⏱️</span>
+              <span className="tracking-wide">Include Cook Time</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowCookTime(!showCookTime)}
+              className={cn(
+                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
+                showCookTime ? "bg-orange-500" : "bg-stone-250"
+              )}
+            >
+              <motion.div
+                layout
+                className="w-4 h-4 rounded-full bg-white shadow-xs"
+                animate={{ x: showCookTime ? 16 : 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
+          </div>
+          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2.5">
+            <span className="flex items-center gap-2">
+              <span className="text-stone-400">📝</span>
+              <span className="tracking-wide">Include Description</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowRecipeDesc(!showRecipeDesc)}
+              className={cn(
+                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
+                showRecipeDesc ? "bg-orange-500" : "bg-stone-250"
+              )}
+            >
+              <motion.div
+                layout
+                className="w-4 h-4 rounded-full bg-white shadow-xs"
+                animate={{ x: showRecipeDesc ? 16 : 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
+          </div>
+          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2.5">
+            <span className="flex items-center gap-2">
+              <span className="text-stone-400">🪜</span>
+              <span className="tracking-wide">Include Prep Steps</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowRecipeSteps(!showRecipeSteps)}
+              className={cn(
+                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
+                showRecipeSteps ? "bg-orange-500" : "bg-stone-250"
+              )}
+            >
+              <motion.div
+                layout
+                className="w-4 h-4 rounded-full bg-white shadow-xs"
+                animate={{ x: showRecipeSteps ? 16 : 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Preview toggle tabs */}

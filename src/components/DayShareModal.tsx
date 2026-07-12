@@ -644,33 +644,69 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
         </div>
 
         {/* Toggle options panel */}
-        <div className="bg-stone-100/50 border border-stone-200/40 p-3 rounded-2xl w-full flex flex-col gap-2.5 text-[9.5px] font-extrabold text-stone-600">
+        <div className="bg-stone-100/60 border border-stone-200/50 p-4 rounded-2xl w-full flex flex-col gap-3 text-[10px] font-bold text-stone-600 shadow-2xs shrink-0">
           <div className="flex items-center justify-between">
-            <span className="uppercase tracking-wider">⏱️ Include Meal Times</span>
-            <input
-              type="checkbox"
-              checked={includeMealTimes}
-              onChange={(e) => setIncludeMealTimes(e.target.checked)}
-              className="rounded text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
-            />
+            <span className="flex items-center gap-2">
+              <span className="text-stone-400">⏱️</span>
+              <span className="tracking-wide">Include Meal Times</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setIncludeMealTimes(!includeMealTimes)}
+              className={cn(
+                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
+                includeMealTimes ? "bg-orange-500" : "bg-stone-250"
+              )}
+            >
+              <motion.div
+                layout
+                className="w-4 h-4 rounded-full bg-white shadow-xs"
+                animate={{ x: includeMealTimes ? 16 : 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
           </div>
-          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2">
-            <span className="uppercase tracking-wider">📷 Indicate Meal Photos</span>
-            <input
-              type="checkbox"
-              checked={includeMealPhotos}
-              onChange={(e) => setIncludeMealPhotos(e.target.checked)}
-              className="rounded text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
-            />
+          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2.5">
+            <span className="flex items-center gap-2">
+              <span className="text-stone-400">📷</span>
+              <span className="tracking-wide">Indicate Meal Photos</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setIncludeMealPhotos(!includeMealPhotos)}
+              className={cn(
+                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
+                includeMealPhotos ? "bg-orange-500" : "bg-stone-250"
+              )}
+            >
+              <motion.div
+                layout
+                className="w-4 h-4 rounded-full bg-white shadow-xs"
+                animate={{ x: includeMealPhotos ? 16 : 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
           </div>
-          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2">
-            <span className="uppercase tracking-wider">🔥 Include Meal Calories</span>
-            <input
-              type="checkbox"
-              checked={includeMealCalories}
-              onChange={(e) => setIncludeMealCalories(e.target.checked)}
-              className="rounded text-orange-500 focus:ring-orange-500 w-4 h-4 cursor-pointer"
-            />
+          <div className="flex items-center justify-between border-t border-stone-200/30 pt-2.5">
+            <span className="flex items-center gap-2">
+              <span className="text-stone-400">🔥</span>
+              <span className="tracking-wide">Include Meal Calories</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setIncludeMealCalories(!includeMealCalories)}
+              className={cn(
+                "w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer",
+                includeMealCalories ? "bg-orange-500" : "bg-stone-250"
+              )}
+            >
+              <motion.div
+                layout
+                className="w-4 h-4 rounded-full bg-white shadow-xs"
+                animate={{ x: includeMealCalories ? 16 : 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            </button>
           </div>
         </div>
 
