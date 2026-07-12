@@ -795,6 +795,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (activeTab === "home" || activeTab === "profile" || activeTab === "settings" || activeTab === "edit-profile") {
+      if (window.location.pathname !== "/") {
+        const url = new URL(window.location.href);
+        url.pathname = "/";
+        url.searchParams.delete("page");
+        url.searchParams.delete("client_id");
+        url.searchParams.delete("redirect_uri");
+        url.searchParams.delete("state");
+        window.history.pushState({ path: url.pathname }, "", url.toString());
+      }
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
     if (!isSupabaseConfigured || !activeProfileId) return;
 
     const loadUserData = async () => {
