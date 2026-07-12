@@ -45,6 +45,13 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
   const currentTemplate = currentVar.theme;
   const cardFormat = currentVar.format;
 
+  const wrapperBg = useMemo(() => {
+    if (currentTemplate === "obsidian") return "bg-[#1C1917]";
+    if (currentTemplate === "cream") return "bg-[#FAF9F6]";
+    if (currentTemplate === "emerald") return "bg-[#064E3B]";
+    return "bg-gradient-to-tr from-[#FF4E50]/80 to-[#F9D423]/80";
+  }, [currentTemplate]);
+
   const handleStr = profileData.username ? `@${profileData.username}` : "@user";
 
   const name = item.name || "Custom Recipe";
@@ -895,7 +902,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
                 if (info.offset.x > 80) handlePrev();
                 else if (info.offset.x < -80) handleNext();
               }}
-              className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#1C1917]"
+              className={cn("w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing transition-all duration-355", wrapperBg)}
             >
               <canvas
                 ref={canvasRef}
