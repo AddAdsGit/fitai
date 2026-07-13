@@ -531,6 +531,27 @@ serve(async (req) => {
       }
     }
 
+    // --- LOGOUT ENDPOINT ---
+    if (path.endsWith("/logout") && method === "POST") {
+      const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+      const { error: updateErr } = await supabase
+        .from("profiles")
+        .update({ api_key: newKey })
+        .eq("id", profile.id);
+
+      if (updateErr) {
+        return new Response(JSON.stringify({ error: "Failed to log out", details: updateErr }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ message: "Logged out successfully. Connection revoked." }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // --- DAILY WELLNESS ENDPOINTS ---
     if (path.endsWith("/daily-wellness")) {
       if (method === "GET") {

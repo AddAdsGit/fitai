@@ -363,7 +363,7 @@ export default function App() {
     telegramRemindersEnabled: false,
     telegramReportsEnabled: false,
     telegramReminderTimes: ["09:00", "13:00", "20:00"],
-    timezone: "UTC"
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
   };
 
   // Precise selected date tracking states
@@ -511,7 +511,8 @@ export default function App() {
           carbs_goal: 150,
           fats_goal: 60,
           fiber_goal: 30,
-          api_key: newKey
+          api_key: newKey,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
 
         const { error: createErr } = await supabase
@@ -726,7 +727,8 @@ export default function App() {
             telegram_reminders_enabled: resolvedData.telegramRemindersEnabled,
             telegram_reports_enabled: resolvedData.telegramReportsEnabled,
             telegram_reminder_times: resolvedData.telegramReminderTimes,
-            timezone: resolvedData.timezone
+            timezone: resolvedData.timezone,
+            api_key: resolvedData.api_key
           })
           .eq('id', activeProfileId);
         if (error) {
@@ -836,14 +838,21 @@ export default function App() {
         } else if (profileRes.data) {
           const profile = profileRes.data;
 
-          // Auto-sync local timezone to preferences
+          // Auto-sync local timezone to preferences and dedicated column
           const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
           const tzPref = `tz_${localTz}`;
           let currentPrefs = profile.preferences || [];
-          if (!currentPrefs.some((p: string) => p.startsWith("tz_"))) {
+          const hasTzPref = currentPrefs.some((p: string) => p.startsWith("tz_"));
+          const needsDbUpdate = !hasTzPref || profile.timezone !== localTz;
+          
+          if (needsDbUpdate) {
             const updatedPrefs = [...currentPrefs.filter((p: string) => !p.startsWith("tz_")), tzPref];
-            supabase.from('profiles').update({ preferences: updatedPrefs }).eq('id', profile.id).then();
+            supabase.from('profiles').update({ 
+              preferences: updatedPrefs,
+              timezone: localTz
+            }).eq('id', profile.id).then();
             profile.preferences = updatedPrefs;
+            profile.timezone = localTz;
           }
 
           if (profile.preferences?.includes("onboarded")) {
@@ -1192,6 +1201,21 @@ export default function App() {
 
   const showToast = (msg: React.ReactNode | string) => {
     setToastMessage(msg);
+  };
+
+  const handleLogout = async () => {
+    if (activeProfileId) {
+      localStorage.removeItem(`fitai_onboarded_${activeProfileId}`);
+    }
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    }
+    localStorage.removeItem("fitai_active_profile_id");
+    setActiveProfileId(null);
+    setMealsState([]);
+    setRecipesState([]);
+    setProfileDataState(INITIAL_PROFILE_STATE);
+    showToast("🔒 Logged out successfully");
   };
 
   const handleRecipeAiPromptGenerate = async (promptText: string) => {
@@ -2960,18 +2984,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             setProfileData={setProfileData}
             triggerToast={(msg) => setToastMessage(msg)}
             session={session}
-            onLogout={async () => {
-              if (activeProfileId) {
-                localStorage.removeItem(`fitai_onboarded_${activeProfileId}`);
-              }
-              await supabase.auth.signOut();
-              localStorage.removeItem("fitai_active_profile_id");
-              setActiveProfileId(null);
-              setMealsState([]);
-              setRecipesState([]);
-              setProfileDataState(INITIAL_PROFILE_STATE);
-              setToastMessage("🔒 Logged out successfully");
-            }}
+            onLogout={handleLogout}
           />
         )}
         {activeTab === "profile" && (
@@ -2992,6 +3005,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             weightLogs={weightLogs}
             onLogWeight={handleLogWeight}
             onDeleteWeight={handleDeleteWeight}
+            onLogout={handleLogout}
           />
         )}
         {activeTab === "edit-profile" && (

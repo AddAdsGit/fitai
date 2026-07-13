@@ -1041,6 +1041,34 @@ export const SettingsView = ({
                 <span>⚙️</span>
                 <span>ChatGPT cannot modify these settings. These are your strict instructions.</span>
               </div>
+
+              {/* Disconnect / Reset Section */}
+              <div className="space-y-3 pt-4 border-t border-stone-100">
+                <div>
+                  <span className="text-[10px] font-bold text-stone-700 block">Disconnect ChatGPT Integration</span>
+                  <span className="text-[9px] text-stone-400 font-medium block leading-tight">
+                    Revoke ChatGPT's access token immediately. You will need to sign in again from ChatGPT to re-link your profile.
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    const confirmReset = window.confirm(
+                      "Are you sure you want to disconnect ChatGPT? This will rotate your security API key and immediately revoke all existing ChatGPT connections."
+                    );
+                    if (confirmReset) {
+                      const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+                      setProfileData({
+                        ...profileData,
+                        api_key: newKey
+                      });
+                      triggerToast("🔒 ChatGPT disconnected! Access token revoked.");
+                    }
+                  }}
+                  className="w-full bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-black uppercase tracking-wider py-3.5 rounded-xl transition-all cursor-pointer text-center active:scale-99 border-none"
+                >
+                  Disconnect ChatGPT (Rotate Key)
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -62,6 +62,7 @@ export const ProfileView = ({
   weightLogs = [],
   onLogWeight,
   onDeleteWeight,
+  onLogout,
 }: {
   key?: string;
   profileData: any;
@@ -79,6 +80,7 @@ export const ProfileView = ({
   weightLogs?: WeightLog[];
   onLogWeight?: (weight: number, date: string) => void;
   onDeleteWeight?: (id: string) => void;
+  onLogout?: () => void;
 }) => {
   const [profileTab, setProfileTab] = useState<"meals" | "insights" | "agent-brain">("meals");
   
@@ -490,6 +492,14 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
           >
             Settings
           </button>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="flex-1 bg-stone-900 hover:bg-stone-850 py-1.5 rounded-lg text-[13px] font-bold text-white shadow-sm transition-colors cursor-pointer"
+            >
+              Sign Out
+            </button>
+          )}
         </div>
       </div>
 

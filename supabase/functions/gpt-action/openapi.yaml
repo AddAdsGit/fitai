@@ -423,6 +423,15 @@ paths:
       responses:
         '200':
           description: Weight log saved successfully
+  /logout:
+    post:
+      x-openai-isConsequential: true
+      summary: Revoke access token / Log out
+      description: Rotates the user's API key, immediately invalidating the current ChatGPT connection on the server.
+      operationId: logoutUser
+      responses:
+        '200':
+          description: Logged out successfully
   /recipes:
     get:
       summary: List user recipes
