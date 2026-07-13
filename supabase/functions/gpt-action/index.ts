@@ -39,7 +39,7 @@ serve(async (req) => {
       }
 
       const redirectBase = Deno.env.get("FRONTEND_URL") || "http://localhost:3000";
-      const consentUrl = `${redirectBase}/?page=oauth-consent&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
+      const consentUrl = `${redirectBase}/oauth-consent?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
 
       return new Response(null, {
         status: 302,

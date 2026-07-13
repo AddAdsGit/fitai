@@ -926,7 +926,9 @@ export default function App() {
         navigateTo("/app");
       }
     } else {
-      if (currentPath === "/app" || currentPath === "/app/dashboard" || currentPath === "/dashboard" || currentPath === "/") {
+      const urlParams2 = new URLSearchParams(window.location.search);
+      const hasPendingOAuth2 = urlParams2.get("page") === "oauth-consent" || (urlParams2.get("client_id") && urlParams2.get("redirect_uri")) || (localStorage.getItem("fitai_oauth_client_id") && localStorage.getItem("fitai_oauth_redirect_uri"));
+      if ((currentPath === "/app" || currentPath === "/app/dashboard" || currentPath === "/dashboard" || currentPath === "/") && !hasPendingOAuth2) {
         navigateTo("/login");
       }
     }
