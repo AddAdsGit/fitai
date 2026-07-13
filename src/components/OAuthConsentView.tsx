@@ -230,82 +230,20 @@ export const OAuthConsentView = ({
     );
   }
 
-  // LOGGED IN — show consent UI
+  // LOGGED IN — show clean automatic connection status (completely minimal)
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
-      transition={{ duration: 0.25 }}
-      className="px-6 py-12 max-w-[448px] mx-auto text-left font-sans flex flex-col justify-center min-h-[calc(100vh-80px)]"
+      transition={{ duration: 0.2 }}
+      className="px-6 py-12 max-w-[448px] mx-auto text-left font-sans flex flex-col justify-center min-h-[calc(100vh-80px)] animate-none"
     >
-      <div className="bg-white rounded-[32px] p-8 shadow-sm border border-stone-200/60 space-y-6 relative overflow-hidden">
-        {/* Integration Header */}
-        <div className="flex items-center justify-center gap-3 relative z-10 py-2">
-          <div className="w-12 h-12 rounded-xl bg-orange-500 flex items-center justify-center shadow-sm">
-            <Sparkles className="text-white w-5 h-5 fill-white" />
-          </div>
-          <span className="text-stone-300 text-sm font-bold">＋</span>
-          <div className="w-12 h-12 rounded-xl bg-stone-900 flex items-center justify-center shadow-sm">
-            <ChatGPTIcon className="text-white w-5 h-5" />
-          </div>
-        </div>
-
-        {/* Text Details */}
-        <div className="space-y-1 text-center relative z-10">
-          <h2 className="text-xl font-black text-stone-900">Connect to ChatGPT</h2>
-          <p className="text-[9px] text-stone-400 font-bold uppercase tracking-widest leading-normal">
-            FitAI Companion Custom GPT
-          </p>
-        </div>
-
-        <div className="bg-stone-50/50 border border-stone-200/30 rounded-2xl p-4.5 space-y-3 relative z-10">
-          <p className="text-xs text-stone-600 font-bold leading-relaxed">
-            By authorizing, you allow the Custom GPT to:
-          </p>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
-              <Check className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
-              <span>Read your height, weight, and target daily goals.</span>
-            </li>
-            <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
-              <Check className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
-              <span>Log new meals and snack entries on your daily calendar.</span>
-            </li>
-            <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
-              <Check className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
-              <span>Fetch and update your stored custom recipes.</span>
-            </li>
-            <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
-              <Check className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
-              <span>Save custom food memories, likes, and exclusions.</span>
-            </li>
-          </ul>
-        </div>
-
-        {/* Actions */}
-        <div className="space-y-2.5 pt-2 relative z-10">
-          <button
-            onClick={handleApprove}
-            disabled={isApproving || isRejecting}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
-          >
-            {isApproving ? "Authorizing..." : "Approve Connection"}
-          </button>
-          <button
-            onClick={handleCancel}
-            disabled={isApproving || isRejecting}
-            className="w-full bg-stone-100 hover:bg-stone-200 disabled:opacity-50 text-stone-700 text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer text-center border-none"
-          >
-            Cancel
-          </button>
-        </div>
-        
-        <div className="text-center pt-2">
-          <span className="text-[7px] text-stone-400 font-bold uppercase tracking-widest block">
-            Client ID: {clientId || "Unknown"}
-          </span>
-        </div>
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest animate-pulse">
+          Connecting...
+        </span>
       </div>
     </motion.div>
   );
