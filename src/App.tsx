@@ -919,7 +919,9 @@ export default function App() {
     const isLoggedIn = !!activeProfileId;
 
     if (isLoggedIn) {
-      if (currentPath === "/" || currentPath === "/login" || currentPath === "/signin") {
+      // If there's a pending OAuth flow, don't redirect to dashboard — let the OAuth handler take over
+      const hasPendingOAuth = localStorage.getItem("fitai_oauth_client_id") && localStorage.getItem("fitai_oauth_redirect_uri");
+      if ((currentPath === "/" || currentPath === "/login" || currentPath === "/signin") && !hasPendingOAuth) {
         navigateTo("/app");
       }
     } else {
