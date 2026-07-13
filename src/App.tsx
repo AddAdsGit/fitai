@@ -453,8 +453,37 @@ export default function App() {
   const [showDeveloperBypass, setShowDeveloperBypass] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authMode, setAuthMode] = useState<"login" | "signup" | "forgot">("login");
   const [authLoading, setAuthLoading] = useState(false);
+  
+  // Router States & Navigation
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  // Password Recovery States
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+
+    window.addEventListener("popstate", handleLocationChange);
+    window.addEventListener("pushstate-changed", handleLocationChange);
+
+    return () => {
+      window.removeEventListener("popstate", handleLocationChange);
+      window.removeEventListener("pushstate-changed", handleLocationChange);
+    };
+  }, []);
+
+  const navigateTo = (path: string) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, "", path);
+      window.dispatchEvent(new Event("pushstate-changed"));
+    }
+  };
 
   const isAuthenticatingRef = useRef(false);
 
@@ -600,6 +629,58 @@ export default function App() {
       showToast(`❌ Error signing up: ${err.message}`);
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setAuthLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        showToast(`❌ Failed to send reset email: ${error.message}`);
+      } else {
+        showToast("✉️ Check your email for a password reset link!");
+        setAuthMode("login");
+      }
+    } catch (err: any) {
+      showToast(`❌ Error: ${err.message}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword.trim()) return;
+    if (newPassword !== confirmNewPassword) {
+      showToast("❌ Passwords do not match!");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword.trim(),
+      });
+
+      if (error) {
+        showToast(`❌ Failed to update password: ${error.message}`);
+      } else {
+        showToast("✨ Password updated successfully!");
+        setNewPassword("");
+        setConfirmNewPassword("");
+        navigateTo("/app");
+      }
+    } catch (err: any) {
+      showToast(`❌ Error updating password: ${err.message}`);
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -810,20 +891,33 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Redirect / session handling rules
   useEffect(() => {
-    if (activeTab === "home" || activeTab === "profile" || activeTab === "settings" || activeTab === "edit-profile") {
-      if (window.location.pathname !== "/" || window.location.hash !== "") {
-        const url = new URL(window.location.href);
-        url.pathname = "/";
-        url.hash = "";
-        url.searchParams.delete("page");
-        url.searchParams.delete("client_id");
-        url.searchParams.delete("redirect_uri");
-        url.searchParams.delete("state");
-        window.history.pushState({ path: url.pathname }, "", url.toString());
+    if (isSessionLoading) return;
+
+    const isLoggedIn = !!activeProfileId;
+
+    if (isLoggedIn) {
+      if (currentPath === "/" || currentPath === "/login" || currentPath === "/signin") {
+        navigateTo("/app");
+      }
+    } else {
+      if (currentPath === "/app" || currentPath === "/app/dashboard" || currentPath === "/dashboard" || currentPath === "/") {
+        navigateTo("/login");
       }
     }
-  }, [activeTab]);
+  }, [currentPath, activeProfileId, isSessionLoading]);
+
+  // Sync activeTab for OAuth or other paths
+  useEffect(() => {
+    if (currentPath === "/oauth-consent") {
+      setActiveTab("oauth-consent");
+    } else if (currentPath === "/app" || currentPath === "/app/dashboard" || currentPath === "/dashboard") {
+      if (activeTab === "oauth-consent") {
+        setActiveTab("home");
+      }
+    }
+  }, [currentPath]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !activeProfileId) return;
@@ -1978,7 +2072,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
-  if (isSupabaseConfigured && isSessionLoading) {
+  if (isSupabaseConfigured && isSessionLoading && currentPath !== "/") {
     return (
       <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
         <div className="flex flex-col items-center gap-4">
@@ -1993,10 +2087,130 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
-  if (isSupabaseConfigured && !activeProfileId) {
+  // --- ROUTING HANDLERS ---
+
+  // 1. Landing Page View (Redirecting)
+  if (currentPath === "/") {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
+        <span className="text-xs font-black text-stone-400 uppercase tracking-widest animate-pulse">
+          Redirecting...
+        </span>
+      </div>
+    );
+  }
+
+  // 2. Reset Password View
+  if (currentPath === "/reset-password") {
+    const isLoggedIn = !!activeProfileId;
     return (
       <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-8 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
-        {/* Absolute Custom Toast Alert */}
+        <AnimatePresence>
+          {toastMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -40, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{ type: "spring", damping: 20, stiffness: 300 }}
+              className="fixed top-8 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-[380px] z-[250] pointer-events-auto"
+            >
+              <div className="bg-stone-900/95 backdrop-blur-md text-white text-xs font-bold py-3.5 px-4 rounded-2xl shadow-2xl border border-white/10 flex items-center justify-between gap-3 font-sans">
+                <span className="flex-1 tracking-tight leading-tight">{toastMessage}</span>
+                <button
+                  onClick={() => setToastMessage(null)}
+                  className="w-5 h-5 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="my-auto space-y-8 py-12">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center">
+              <Sparkles className="text-white w-8 h-8 fill-white" />
+            </div>
+            <h1 className="text-3xl font-black tracking-tight text-center mt-2">
+              Fit<span className="text-orange-500">AI</span>
+            </h1>
+            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest text-center">
+              Secure Password Reset
+            </p>
+          </div>
+
+          {!isLoggedIn ? (
+            <div className="space-y-4 text-center">
+              <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-5 space-y-3">
+                <p className="text-xs text-stone-600 font-semibold leading-relaxed">
+                  Invalid or expired password reset link. Please request a new recovery link from the login page.
+                </p>
+              </div>
+              <button
+                onClick={() => navigateTo("/login")}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 cursor-pointer"
+              >
+                Go to Login
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="space-y-1 text-center">
+                <h2 className="text-xl font-black text-stone-850">Reset Your Password</h2>
+                <p className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">
+                  Enter your new password below.
+                </p>
+              </div>
+
+              <form onSubmit={handleResetPassword} className="space-y-3">
+                <input
+                  type="password"
+                  placeholder="New Password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
+                />
+                <input
+                  type="password"
+                  placeholder="Confirm New Password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  required
+                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
+                />
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer mt-1"
+                >
+                  {resetLoading ? "Updating..." : "Update Password"}
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+
+        <div className="text-center text-[8px] text-stone-300 font-bold tracking-widest uppercase">
+          © 2026 FitAI. All rights reserved.
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Login / Signup View
+  if (currentPath === "/login" || currentPath === "/signin") {
+    if (activeProfileId) {
+      return (
+        <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
+          <span className="text-xs font-black text-stone-400 uppercase tracking-widest animate-pulse">Redirecting...</span>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-8 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
         <AnimatePresence>
           {toastMessage && (
             <motion.div
@@ -2021,7 +2235,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
         <div className="my-auto space-y-8 py-12">
           {/* Logo */}
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-3" onClick={() => navigateTo("/")} style={{ cursor: 'pointer' }}>
             <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center">
               <Sparkles className="text-white w-8 h-8 fill-white" />
             </div>
@@ -2035,112 +2249,160 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
           {/* Welcome Text */}
           <div className="space-y-1 text-center">
-            <h2 className="text-xl font-black text-stone-850">Welcome to FitAI</h2>
+            <h2 className="text-xl font-black text-stone-850">
+              {authMode === "forgot" ? "Reset Password" : "Welcome to FitAI"}
+            </h2>
             <p className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">
-              Your AI nutrition engine.
+              {authMode === "forgot" ? "Recover your account access" : "Your AI nutrition engine."}
             </p>
           </div>
 
           {/* Authentication Actions */}
           <div className="space-y-5">
-            {/* Google Authentication Button */}
-            <button
-              onClick={handleGoogleLogin}
-              className="w-full bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-sm cursor-pointer"
-            >
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-              </svg>
-              Continue with Google
-            </button>
-
-            {/* Subtle Divider */}
-            <div className="flex items-center gap-3 my-2">
-              <div className="flex-1 h-px bg-stone-200" />
-              <span className="text-[9px] font-black tracking-widest text-stone-300 uppercase">OR</span>
-              <div className="flex-1 h-px bg-stone-200" />
-            </div>
-
-            {/* Email & Password Authentication Form */}
-            <form onSubmit={authMode === "login" ? handleEmailSignIn : handleEmailSignUp} className="space-y-3">
-              <input
-                type="email"
-                placeholder="Email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
-              />
-              
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer mt-1"
-              >
-                {authLoading ? "Authenticating..." : authMode === "login" ? "Sign In" : "Create Account"}
-              </button>
-            </form>
-
-            {/* Mode Switch Link */}
-            <div className="text-center">
-              <button
-                onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
-                className="text-[9px] text-orange-500 hover:text-orange-600 font-bold transition-colors cursor-pointer bg-transparent border-0"
-              >
-                {authMode === "login" ? "Create an account" : "Sign in to your account"}
-              </button>
-            </div>
-
-            {/* Minimal Developer Mode Bypass */}
-            <div className="text-center pt-2">
-              <button
-                onClick={() => setShowDeveloperBypass(!showDeveloperBypass)}
-                className="text-[8px] text-stone-400 hover:text-stone-500 font-bold uppercase tracking-widest transition-colors cursor-pointer bg-transparent border-0"
-              >
-                {showDeveloperBypass ? "Close Developer Bypass" : "Developer Bypass"}
-              </button>
-            </div>
-
-            {/* Username Input Form (Conditional Bypass) */}
-            <AnimatePresence>
-              {showDeveloperBypass && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="space-y-3 pt-2 overflow-hidden"
+            {authMode === "forgot" ? (
+              <form onSubmit={handleForgotPassword} className="space-y-3">
+                <p className="text-[10px] text-stone-500 font-bold text-center leading-relaxed mb-1">
+                  Enter your email and we'll send a password recovery link.
+                </p>
+                <input
+                  type="email"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
+                />
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer mt-1"
                 >
-                  <input
-                    type="text"
-                    placeholder="Enter developer username (e.g. johndoe)"
-                    value={loginUsername}
-                    onChange={(e) => setLoginUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleLoginSubmit();
-                    }}
-                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
-                  />
+                  {authLoading ? "Sending Link..." : "Send Reset Link"}
+                </button>
+                <div className="text-center pt-2">
                   <button
-                    onClick={handleLoginSubmit}
-                    disabled={!loginUsername.trim()}
-                    className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                    type="button"
+                    onClick={() => setAuthMode("login")}
+                    className="text-[9px] text-orange-500 hover:text-orange-600 font-bold transition-colors cursor-pointer bg-transparent border-0"
                   >
-                    Bypass Authentication
+                    Back to Sign In
                   </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </div>
+              </form>
+            ) : (
+              <>
+                {/* Google Authentication Button */}
+                <button
+                  onClick={handleGoogleLogin}
+                  className="w-full bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-sm cursor-pointer"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                  </svg>
+                  Continue with Google
+                </button>
+
+                {/* Subtle Divider */}
+                <div className="flex items-center gap-3 my-2">
+                  <div className="flex-1 h-px bg-stone-200" />
+                  <span className="text-[9px] font-black tracking-widest text-stone-300 uppercase">OR</span>
+                  <div className="flex-1 h-px bg-stone-200" />
+                </div>
+
+                {/* Email & Password Authentication Form */}
+                <form onSubmit={authMode === "login" ? handleEmailSignIn : handleEmailSignUp} className="space-y-3">
+                  <input
+                    type="email"
+                    placeholder="Email address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
+                  />
+                  
+                  {authMode === "login" && (
+                    <div className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => setAuthMode("forgot")}
+                        className="text-[9px] text-stone-400 hover:text-stone-500 font-bold transition-colors cursor-pointer bg-transparent border-0"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer mt-1"
+                  >
+                    {authLoading ? "Authenticating..." : authMode === "login" ? "Sign In" : "Create Account"}
+                  </button>
+                </form>
+
+                {/* Mode Switch Link */}
+                <div className="text-center">
+                  <button
+                    onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
+                    className="text-[9px] text-orange-500 hover:text-orange-600 font-bold transition-colors cursor-pointer bg-transparent border-0"
+                  >
+                    {authMode === "login" ? "Create an account" : "Sign in to your account"}
+                  </button>
+                </div>
+
+                {/* Minimal Developer Mode Bypass */}
+                <div className="text-center pt-2">
+                  <button
+                    onClick={() => setShowDeveloperBypass(!showDeveloperBypass)}
+                    className="text-[8px] text-stone-400 hover:text-stone-500 font-bold uppercase tracking-widest transition-colors cursor-pointer bg-transparent border-0"
+                  >
+                    {showDeveloperBypass ? "Close Developer Bypass" : "Developer Bypass"}
+                  </button>
+                </div>
+
+                {/* Username Input Form (Conditional Bypass) */}
+                <AnimatePresence>
+                  {showDeveloperBypass && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-3 pt-2 overflow-hidden"
+                    >
+                      <input
+                        type="text"
+                        placeholder="Enter developer username (e.g. johndoe)"
+                        value={loginUsername}
+                        onChange={(e) => setLoginUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleLoginSubmit();
+                        }}
+                        className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
+                      />
+                      <button
+                        onClick={handleLoginSubmit}
+                        disabled={!loginUsername.trim()}
+                        className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                      >
+                        Bypass Authentication
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
           </div>
         </div>
 
@@ -2148,6 +2410,15 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         <div className="text-center text-[8px] text-stone-300 font-bold tracking-widest uppercase">
           © 2026 FitAI. All rights reserved.
         </div>
+      </div>
+    );
+  }
+
+  // 4. Fallback Redirect for other unauthenticated routes
+  if (!activeProfileId) {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
+        <span className="text-xs font-black text-stone-400 uppercase tracking-widest animate-pulse">Redirecting to login...</span>
       </div>
     );
   }

@@ -13,7 +13,23 @@
       "destination": "/index.html"
     },
     {
+      "source": "/reset-password",
+      "destination": "/index.html"
+    },
+    {
       "source": "/oauth-consent",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/app",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/app/dashboard",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dashboard",
       "destination": "/index.html"
     }
   ]

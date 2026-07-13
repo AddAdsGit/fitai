@@ -18,9 +18,10 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
   onClose,
   triggerToast,
 }) => {
-  // Pure Obsidian Branding Variation
+  // Pure Obsidian Branding Variations (1:1 Post and 9:16 Story)
   const variations = [
-    { id: "obsidian", name: "Obsidian (Glass Tech)", format: "square" }
+    { id: "obsidian", name: "Obsidian (Glass Tech)", format: "square" },
+    { id: "editorial", name: "Editorial (Light Premium)", format: "square" }
   ] as const;
 
   const initialIndex = useMemo(() => {
