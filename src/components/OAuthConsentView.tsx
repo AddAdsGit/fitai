@@ -7,10 +7,12 @@ import { ChatGPTIcon } from "./ChatGPTIcon";
 export const OAuthConsentView = ({
   setActiveTab,
   triggerToast,
+  navigateTo,
 }: {
   key?: string;
   setActiveTab: (tab: string) => void;
   triggerToast: (msg: string) => void;
+  navigateTo?: (path: string) => void;
 }) => {
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
@@ -196,7 +198,7 @@ export const OAuthConsentView = ({
             </p>
           </div>
 
-          <div className="space-y-3 pt-2 relative z-10">
+          <div className="space-y-3 pt-2 relative z-10 flex flex-col gap-2">
             <button
               onClick={handleGoogleLoginForConsent}
               disabled={isSigningIn}
@@ -209,6 +211,20 @@ export const OAuthConsentView = ({
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
               {isSigningIn ? "Signing in..." : "Continue with Google"}
+            </button>
+            
+            <button
+              onClick={() => {
+                if (navigateTo) {
+                  navigateTo("/login");
+                } else {
+                  window.history.pushState(null, "", "/login");
+                  window.dispatchEvent(new Event("pushstate-changed"));
+                }
+              }}
+              className="w-full flex items-center justify-center gap-3 bg-stone-100 hover:bg-stone-200 border border-stone-200/40 text-stone-700 text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer shadow-sm"
+            >
+              Sign in with Email
             </button>
           </div>
 

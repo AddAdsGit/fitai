@@ -2496,7 +2496,41 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
-  // 4. Fallback Redirect for other unauthenticated routes
+  // 4. OAuth Consent View (Must render even if activeProfileId is null / user is unauthenticated)
+  if (currentPath === "/oauth-consent" || activeTab === "oauth-consent") {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-8 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
+        <AnimatePresence>
+          {toastMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -40, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.95 }}
+              transition={{ type: "spring", damping: 20, stiffness: 300 }}
+              className="fixed top-8 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-[380px] z-[250] pointer-events-auto"
+            >
+              <div className="bg-stone-900/95 backdrop-blur-md text-white text-xs font-bold py-3.5 px-4 rounded-2xl shadow-2xl border border-white/10 flex items-center justify-between gap-3 font-sans">
+                <span className="flex-1 tracking-tight leading-tight">{toastMessage}</span>
+                <button
+                  onClick={() => setToastMessage(null)}
+                  className="w-5 h-5 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <OAuthConsentView
+          setActiveTab={setActiveTab}
+          triggerToast={(msg) => setToastMessage(msg)}
+          navigateTo={navigateTo}
+        />
+      </div>
+    );
+  }
+
+  // 5. Fallback Redirect for other unauthenticated routes
   if (!activeProfileId) {
     return (
       <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
