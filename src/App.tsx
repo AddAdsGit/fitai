@@ -2307,15 +2307,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             </p>
           </div>
 
-          {/* Welcome Text */}
-          <div className="space-y-1 text-center">
-            <h2 className="text-xl font-black text-stone-850">
-              Welcome to FitAI
-            </h2>
-            <p className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">
-              Your AI nutrition engine.
-            </p>
-          </div>
+
 
           {/* Authentication Actions */}
           <div className="space-y-5">
