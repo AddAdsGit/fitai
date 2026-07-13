@@ -48,18 +48,18 @@ export const OAuthConsentView = ({
         },
       });
       if (error) {
-        triggerToast("❌ Google login failed");
+        triggerToast("Google login failed");
         setIsSigningIn(false);
       }
     } catch {
-      triggerToast("❌ Google login error");
+      triggerToast("Google login error");
       setIsSigningIn(false);
     }
   };
 
   const handleApprove = async () => {
     if (!clientId || !redirectUri) {
-      triggerToast("❌ Missing OAuth configuration parameters");
+      triggerToast("Missing OAuth configuration parameters");
       return;
     }
 
@@ -73,7 +73,7 @@ export const OAuthConsentView = ({
       }
 
       if (!jwtToken) {
-        triggerToast("❌ Session expired. Please log in again.");
+        triggerToast("Session expired. Please log in again.");
         setIsApproving(false);
         return;
       }
@@ -101,21 +101,21 @@ export const OAuthConsentView = ({
       const data = await response.json();
       const code = data.code;
 
-      triggerToast("✨ Authorized successfully! Redirecting...");
+      triggerToast("Authorized successfully! Redirecting...");
       
       setTimeout(() => {
         window.location.href = `${redirectUri}?code=${code}&state=${encodeURIComponent(state)}`;
       }, 1000);
     } catch (err: any) {
       console.error(err);
-      triggerToast(`❌ Authorization failed: ${err.message}`);
+      triggerToast(`Authorization failed: ${err.message}`);
       setIsApproving(false);
     }
   };
 
   const handleCancel = () => {
     setIsRejecting(true);
-    triggerToast("🔒 Connection cancelled.");
+    triggerToast("Connection cancelled.");
     setTimeout(() => {
       window.location.href = `${redirectUri}?error=access_denied&state=${encodeURIComponent(state)}`;
     }, 1000);
@@ -167,34 +167,28 @@ export const OAuthConsentView = ({
   if (!session) {
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.3 }}
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 10 }}
+        transition={{ duration: 0.25 }}
         className="px-6 py-12 max-w-[448px] mx-auto text-left font-sans flex flex-col justify-center min-h-[calc(100vh-80px)]"
       >
-        <div className="bg-white rounded-[32px] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.04)] border border-black/5 space-y-6 relative overflow-hidden">
-          <div className="absolute -top-12 -left-12 w-32 h-32 bg-orange-100 rounded-full blur-3xl opacity-60" />
-          <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-orange-100 rounded-full blur-3xl opacity-60" />
-
+        <div className="bg-white rounded-[32px] p-8 shadow-sm border border-stone-200/60 space-y-6 relative overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-center gap-6 relative z-10 py-4">
-            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg shadow-orange-150 flex items-center justify-center shrink-0">
-              <Sparkles className="text-white w-7 h-7 fill-white" />
+          <div className="flex items-center justify-center gap-3 relative z-10 py-2">
+            <div className="w-12 h-12 rounded-xl bg-orange-500 flex items-center justify-center shadow-sm">
+              <Sparkles className="text-white w-5 h-5 fill-white" />
             </div>
-            <div className="flex flex-col gap-1 items-center justify-center">
-              <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
-              <div className="h-0.5 w-10 bg-gradient-to-r from-orange-500 to-stone-400" />
-            </div>
-            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg flex items-center justify-center shrink-0 shadow-orange-100/50">
-              <ChatGPTIcon className="text-white w-7 h-7" />
+            <span className="text-stone-300 text-sm font-bold">＋</span>
+            <div className="w-12 h-12 rounded-xl bg-stone-900 flex items-center justify-center shadow-sm">
+              <ChatGPTIcon className="text-white w-5 h-5" />
             </div>
           </div>
 
           <div className="space-y-2 text-center relative z-10">
-            <h2 className="text-xl font-black text-stone-850">Sign in to connect</h2>
-            <p className="text-[11px] text-stone-400 font-medium leading-relaxed">
-              ChatGPT wants to connect to your FitAI account. Sign in first to approve or deny this request.
+            <h2 className="text-xl font-black text-stone-900">Sign in to connect</h2>
+            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider leading-relaxed">
+              ChatGPT wants to connect to your FitAI account.
             </p>
           </div>
 
@@ -202,7 +196,7 @@ export const OAuthConsentView = ({
             <button
               onClick={handleGoogleLoginForConsent}
               disabled={isSigningIn}
-              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-stone-50 disabled:opacity-60 border border-stone-200 text-stone-700 text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer shadow-sm"
+              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-stone-50 disabled:opacity-60 border border-stone-200 text-stone-700 text-xs font-bold py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer shadow-sm"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -222,13 +216,13 @@ export const OAuthConsentView = ({
                   window.dispatchEvent(new Event("pushstate-changed"));
                 }
               }}
-              className="w-full flex items-center justify-center gap-3 bg-stone-100 hover:bg-stone-200 border border-stone-200/40 text-stone-700 text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer shadow-sm"
+              className="w-full flex items-center justify-center gap-3 bg-stone-100 hover:bg-stone-200 border border-stone-200/40 text-stone-700 text-xs font-bold py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer shadow-sm"
             >
               Sign in with Email
             </button>
           </div>
 
-          <p className="text-[8px] text-stone-400 text-center font-medium relative z-10">
+          <p className="text-[8px] text-stone-400 text-center font-bold uppercase tracking-wider relative z-10">
             After signing in, you'll return here to approve the ChatGPT connection.
           </p>
         </div>
@@ -239,57 +233,51 @@ export const OAuthConsentView = ({
   // LOGGED IN — show consent UI
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.3 }}
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      transition={{ duration: 0.25 }}
       className="px-6 py-12 max-w-[448px] mx-auto text-left font-sans flex flex-col justify-center min-h-[calc(100vh-80px)]"
     >
-      <div className="bg-white rounded-[32px] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.04)] border border-black/5 space-y-6 relative overflow-hidden">
-        <div className="absolute -top-12 -left-12 w-32 h-32 bg-orange-100 rounded-full blur-3xl opacity-60" />
-        <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-orange-100 rounded-full blur-3xl opacity-60" />
-
+      <div className="bg-white rounded-[32px] p-8 shadow-sm border border-stone-200/60 space-y-6 relative overflow-hidden">
         {/* Integration Header */}
-        <div className="flex items-center justify-center gap-6 relative z-10 py-4">
-          <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg shadow-orange-150 flex items-center justify-center shrink-0">
-            <Sparkles className="text-white w-7 h-7 fill-white" />
+        <div className="flex items-center justify-center gap-3 relative z-10 py-2">
+          <div className="w-12 h-12 rounded-xl bg-orange-500 flex items-center justify-center shadow-sm">
+            <Sparkles className="text-white w-5 h-5 fill-white" />
           </div>
-          <div className="flex flex-col gap-1 items-center justify-center">
-            <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-ping" />
-            <div className="h-0.5 w-10 bg-gradient-to-r from-orange-500 to-stone-400" />
-          </div>
-          <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-lg flex items-center justify-center shrink-0 shadow-orange-100/50">
-            <ChatGPTIcon className="text-white w-7 h-7" />
+          <span className="text-stone-300 text-sm font-bold">＋</span>
+          <div className="w-12 h-12 rounded-xl bg-stone-900 flex items-center justify-center shadow-sm">
+            <ChatGPTIcon className="text-white w-5 h-5" />
           </div>
         </div>
 
         {/* Text Details */}
-        <div className="space-y-2 text-center relative z-10">
-          <h2 className="text-xl font-black text-stone-850">Connect to ChatGPT</h2>
-          <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest leading-normal">
+        <div className="space-y-1 text-center relative z-10">
+          <h2 className="text-xl font-black text-stone-900">Connect to ChatGPT</h2>
+          <p className="text-[9px] text-stone-400 font-bold uppercase tracking-widest leading-normal">
             FitAI Companion Custom GPT
           </p>
         </div>
 
-        <div className="bg-stone-50/50 border border-stone-150/50 rounded-2xl p-4.5 space-y-3.5 relative z-10">
-          <p className="text-xs text-stone-600 font-medium leading-relaxed">
-            By authorizing, you allow the **FitAI Companion** Custom GPT in ChatGPT to:
+        <div className="bg-stone-50/50 border border-stone-200/30 rounded-2xl p-4.5 space-y-3 relative z-10">
+          <p className="text-xs text-stone-600 font-bold leading-relaxed">
+            By authorizing, you allow the Custom GPT to:
           </p>
-          <ul className="space-y-2.5">
+          <ul className="space-y-2">
             <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
-              <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <Check className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
               <span>Read your height, weight, and target daily goals.</span>
             </li>
             <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
-              <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <Check className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
               <span>Log new meals and snack entries on your daily calendar.</span>
             </li>
             <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
-              <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <Check className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
               <span>Fetch and update your stored custom recipes.</span>
             </li>
             <li className="flex items-start gap-2.5 text-[11px] text-stone-500 font-bold">
-              <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+              <Check className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
               <span>Save custom food memories, likes, and exclusions.</span>
             </li>
           </ul>
@@ -300,21 +288,21 @@ export const OAuthConsentView = ({
           <button
             onClick={handleApprove}
             disabled={isApproving || isRejecting}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-orange-100"
+            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
           >
             {isApproving ? "Authorizing..." : "Approve Connection"}
           </button>
           <button
             onClick={handleCancel}
             disabled={isApproving || isRejecting}
-            className="w-full bg-stone-100 hover:bg-stone-200 disabled:opacity-50 text-stone-700 text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer text-center"
+            className="w-full bg-stone-100 hover:bg-stone-200 disabled:opacity-50 text-stone-700 text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer text-center border-none"
           >
             Cancel
           </button>
         </div>
         
         <div className="text-center pt-2">
-          <span className="text-[8px] text-stone-400 font-semibold uppercase tracking-wider block">
+          <span className="text-[7px] text-stone-400 font-bold uppercase tracking-widest block">
             Client ID: {clientId || "Unknown"}
           </span>
         </div>
