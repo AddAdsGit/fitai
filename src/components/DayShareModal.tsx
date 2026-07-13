@@ -18,8 +18,10 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   onClose,
   triggerToast,
 }) => {
-  // Pure Obsidian Branding Variations (Portrait 3:4)
+  // Variations for Daily Summary Card (Portrait 3:4)
   const variations = [
+    { id: "minimal", name: "Minimal Slate (Premium)", format: "portrait" },
+    { id: "collage", name: "Photo Collage (Visual Gallery)", format: "portrait" },
     { id: "obsidian", name: "Obsidian (Metrics Tech)", format: "portrait" },
     { id: "editorial", name: "Editorial (Light Premium)", format: "portrait" }
   ] as const;
@@ -41,10 +43,42 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   const [previewTab, setPreviewTab] = useState<"card" | "webpage">("card");
   const [canShareFile, setCanShareFile] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [mealImages, setMealImages] = useState<Record<string, HTMLImageElement>>({});
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentVar = variations[currentIndex];
   const cardFormat = currentVar.format;
+
+  // Load and cache meal images for Collage layout
+  const mealsList = item.meals || [];
+  useEffect(() => {
+    const imagesToLoad = mealsList.filter((m: any) => m.image);
+    const loadedMap: Record<string, HTMLImageElement> = {};
+    let loadedCount = 0;
+    if (imagesToLoad.length === 0) {
+      setMealImages({});
+      return;
+    }
+
+    imagesToLoad.forEach((meal: any) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        loadedMap[meal.id || meal.name] = img;
+        loadedCount++;
+        if (loadedCount === imagesToLoad.length) {
+          setMealImages({ ...loadedMap });
+        }
+      };
+      img.onerror = () => {
+        loadedCount++;
+        if (loadedCount === imagesToLoad.length) {
+          setMealImages({ ...loadedMap });
+        }
+      };
+      img.src = meal.image;
+    });
+  }, [mealsList]);
 
   const handleStr = profileData.username ? `@${profileData.username}` : "@user";
 
@@ -54,7 +88,6 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   const carbs = Number(item.carbs || 0);
   const fats = Number(item.fats || 0);
   const fiber = Number(item.fiber || 0);
-  const mealsList = item.meals || [];
 
   const payload: SharedItemPayload = useMemo(() => ({
     n: name,
@@ -84,6 +117,8 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
     }
 
     // Determine colors and styles based on active variation
+    const isMinimal = (currentVar.id as string) === "minimal";
+    const isCollage = (currentVar.id as string) === "collage";
     const isObsidian = (currentVar.id as string) === "obsidian";
     const isEditorial = (currentVar.id as string) === "editorial";
     const isSolar = (currentVar.id as string) === "solar";
@@ -160,7 +195,7 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
       ctx.clearRect(0, 0, 1080, canvas.height);
       
       // Draw Background
-      if (isObsidian) {
+      if (isObsidian || isMinimal || isCollage) {
         const bgGrad = ctx.createRadialGradient(540, canvas.height / 2, 100, 540, canvas.height / 2, canvas.height);
         bgGrad.addColorStop(0, "#23211F");
         bgGrad.addColorStop(1, "#0E0D0C");
@@ -215,8 +250,172 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
       ctx.fillText(handleStr, 1000, 116);
       ctx.textAlign = "left";
 
+      // Helper to draw crop-centered cover image with rounded corners
+      const drawCoverImage = (imgCtx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number, radius = 16) => {
+        imgCtx.save();
+        imgCtx.beginPath();
+        imgCtx.roundRect(x, y, w, h, radius);
+        imgCtx.clip();
+
+        const imgRatio = img.width / img.height;
+        const boxRatio = w / h;
+        let sWidth, sHeight, sx, sy;
+
+        if (imgRatio > boxRatio) {
+          sHeight = img.height;
+          sWidth = img.height * boxRatio;
+          sx = (img.width - sWidth) / 2;
+          sy = 0;
+        } else {
+          sWidth = img.width;
+          sHeight = img.width / boxRatio;
+          sx = 0;
+          sy = (img.height - sHeight) / 2;
+        }
+
+        imgCtx.drawImage(img, sx, sy, sWidth, sHeight, x, y, w, h);
+        imgCtx.restore();
+      };
+
       // Layout rendering
-      if (isObsidian) {
+      if (isMinimal) {
+        // ================= MINIMALIST SLATE PORTRAIT (3:4) =================
+        const finalY = wrapText(name, 80, 250, 920, 84, textColor, "900 76px Inter, system-ui, sans-serif");
+        
+        const subtitleY = finalY + 45;
+        ctx.fillStyle = accentColor;
+        ctx.font = "900 24px Inter, system-ui, sans-serif";
+        ctx.fillText("⚡ DAILY LOG & MACRO DYNAMICS", 80, subtitleY);
+
+        // Render clean timeline list without terminal container box
+        const logStartY = finalY + 110;
+        const rowH = 65;
+        const maxLogs = 5;
+        const displayedMeals = mealsList.slice(0, maxLogs);
+
+        displayedMeals.forEach((meal: any, idx: number) => {
+          const currentY = logStartY + idx * rowH;
+          
+          // Subtle circular indicator dot
+          ctx.fillStyle = accentColor;
+          ctx.beginPath();
+          ctx.arc(90, currentY, 5, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Time + Name text
+          ctx.fillStyle = textColor;
+          ctx.font = "500 26px Inter, system-ui, sans-serif";
+          let mealLabel = meal.name || "Logged Meal";
+          if (meal.time) {
+            mealLabel = `${meal.time}   •   ${mealLabel}`;
+          }
+          if (mealLabel.length > 42) mealLabel = mealLabel.substring(0, 39) + "...";
+          ctx.fillText(mealLabel, 120, currentY + 8);
+
+          // Calorie count
+          ctx.fillStyle = textMuted;
+          ctx.font = "800 26px Inter, system-ui, sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText(`+${meal.calories || 0} kcal`, 1000, currentY + 8);
+          ctx.textAlign = "left"; // reset
+
+          // Subtle divider line (except last row)
+          if (idx < displayedMeals.length - 1) {
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(80, currentY + 30);
+            ctx.lineTo(1000, currentY + 30);
+            ctx.stroke();
+          }
+        });
+
+        if (mealsList.length > maxLogs) {
+          ctx.fillStyle = textMuted;
+          ctx.font = "italic 22px Inter, system-ui, sans-serif";
+          ctx.fillText(`+ ${mealsList.length - maxLogs} additional logs tracked today`, 90, logStartY + maxLogs * rowH - 10);
+        }
+
+        // Spacious elegant Calories Display
+        const calY = canvas.height - 400;
+        ctx.fillStyle = textColor;
+        ctx.font = "900 120px Inter, system-ui, sans-serif";
+        ctx.fillText(`${calories}`, 80, calY);
+
+        ctx.fillStyle = textMuted;
+        ctx.font = "800 24px Inter, system-ui, sans-serif";
+        ctx.fillText("TOTAL KCAL LOGGED", 85, calY + 50);
+
+      } else if (isCollage) {
+        // ================= PHOTO COLLAGE PORTRAIT (3:4) =================
+        const finalY = wrapText(name, 80, 250, 920, 84, textColor, "900 76px Inter, system-ui, sans-serif");
+        const subtitleY = finalY + 45;
+        
+        ctx.fillStyle = textMuted;
+        ctx.font = "700 24px Inter, system-ui, sans-serif";
+        ctx.fillText("📷 TODAY'S FOOD GALLERY", 80, subtitleY);
+
+        // Gather all pre-loaded meal images
+        const imgs = mealsList
+          .map((m: any) => mealImages[m.id || m.name])
+          .filter(Boolean);
+
+        const gridY = finalY + 95;
+        const gridH = 500; // fixed height for photo section
+
+        if (imgs.length === 0) {
+          // Fallback if no images are logged or loaded yet
+          ctx.fillStyle = panelFill;
+          ctx.beginPath();
+          ctx.roundRect(80, gridY, 920, gridH, 24);
+          ctx.fill();
+          
+          ctx.strokeStyle = panelBorder;
+          ctx.lineWidth = borderWidth;
+          ctx.stroke();
+
+          ctx.fillStyle = textMuted;
+          ctx.font = "500 28px Inter, system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("Log meals with photos to see your daily collage here!", 540, gridY + 260);
+          ctx.textAlign = "left"; // reset
+        } else if (imgs.length === 1) {
+          // 1 Large image
+          drawCoverImage(ctx, imgs[0], 80, gridY, 920, gridH, 24);
+        } else if (imgs.length === 2) {
+          // 2 Columns side-by-side
+          const colW = 445;
+          drawCoverImage(ctx, imgs[0], 80, gridY, colW, gridH, 24);
+          drawCoverImage(ctx, imgs[1], 80 + colW + 30, gridY, colW, gridH, 24);
+        } else if (imgs.length === 3) {
+          // 1 Left large, 2 Right stacked
+          const leftW = 480;
+          const rightW = 410;
+          const halfH = (gridH - 30) / 2;
+          drawCoverImage(ctx, imgs[0], 80, gridY, leftW, gridH, 24);
+          drawCoverImage(ctx, imgs[1], 80 + leftW + 30, gridY, rightW, halfH, 20);
+          drawCoverImage(ctx, imgs[2], 80 + leftW + 30, gridY + halfH + 30, rightW, halfH, 20);
+        } else {
+          // 4 Grid layout
+          const colW = 445;
+          const halfH = (gridH - 30) / 2;
+          drawCoverImage(ctx, imgs[0], 80, gridY, colW, halfH, 20);
+          drawCoverImage(ctx, imgs[1], 80 + colW + 30, gridY, colW, halfH, 20);
+          drawCoverImage(ctx, imgs[2], 80, gridY + halfH + 30, colW, halfH, 20);
+          drawCoverImage(ctx, imgs[3], 80 + colW + 30, gridY + halfH + 30, colW, halfH, 20);
+        }
+
+        // Under the collage: show clean minimalist totals summary
+        const textTopY = gridY + gridH + 80;
+        ctx.fillStyle = textColor;
+        ctx.font = "900 90px Inter, system-ui, sans-serif";
+        ctx.fillText(`${calories} kcal`, 80, textTopY);
+
+        ctx.fillStyle = textMuted;
+        ctx.font = "700 24px Inter, system-ui, sans-serif";
+        ctx.fillText("DAILY TOTAL ENERGY CONSUMED", 85, textTopY + 45);
+
+      } else if (isObsidian) {
         // ================= OBSIDIAN PORTRAIT (3:4) =================
         const finalY = wrapText(name, 80, 250, 920, 84, textColor, "900 76px Inter, system-ui, sans-serif");
 
@@ -526,12 +725,52 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
         ctx.textAlign = "center";
         ctx.fillText("#FuelYourBest", 175, footerY + 52);
         ctx.restore();
+      } else if (isMinimal || isCollage) {
+        // Clean box-less macros for dark minimalist/collage themes
+        const macros = [
+          { label: "PROTEIN", val: `${protein}g`, color: "#F97316" },
+          { label: "CARBS", val: `${carbs}g`, color: "#38BDF8" },
+          { label: "FAT", val: `${fats}g`, color: "#FBBF24" },
+          { label: "FIBER", val: `${fiber}g`, color: "#34D399" }
+        ];
 
-        ctx.fillStyle = "#78716C";
-        ctx.font = "700 20px Inter, sans-serif";
-        ctx.textAlign = "right";
-        ctx.fillText("fitpush.vercel.app", 1000, footerY + 52);
+        const colWidth = 920 / 4; // 230px
+        const startX = 80;
+
+        macros.forEach((m, idx) => {
+          const centerColX = startX + idx * colWidth + colWidth / 2;
+          
+          // Draw label: PROTEIN, CARBS, etc.
+          ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+          ctx.font = "800 16px Inter, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(m.label, centerColX, macroY + 25);
+
+          // Draw value: 32g, 64g, etc.
+          ctx.fillStyle = m.color; // colorized macro values look gorgeous!
+          ctx.font = "900 32px Inter, sans-serif";
+          ctx.fillText(m.val, centerColX, macroY + 70);
+
+          // Draw vertical divider (except last column)
+          if (idx < 3) {
+            const dividerX = startX + (idx + 1) * colWidth;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(dividerX, macroY + 10);
+            ctx.lineTo(dividerX, macroY + 75);
+            ctx.stroke();
+          }
+        });
         ctx.textAlign = "left"; // reset
+
+        // Draw horizontal line above macros
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(80, macroY - 25);
+        ctx.lineTo(1000, macroY - 25);
+        ctx.stroke();
       } else {
         const macros = [
           { name: "Protein", val: `${protein}g`, color: "#F97316" },
@@ -611,7 +850,7 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
 
   useEffect(() => {
     drawCanvas();
-  }, [currentIndex, fontsLoaded]);
+  }, [currentIndex, fontsLoaded, mealImages]);
 
   const handleNext = () => {
     setCurrentIndex((prev) => (prev + 1) % variations.length);
