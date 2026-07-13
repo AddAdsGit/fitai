@@ -413,11 +413,6 @@ export const EditProfileView = ({
               </div>
             </div>
 
-          </div>
-
-          <div className="space-y-3 mt-6">
-            <h4 className="text-[10px] font-black text-stone-450 uppercase tracking-widest px-1">Enabled Trackers</h4>
-
             {/* Weight Tracking Switch Toggle */}
             <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 flex items-center justify-between shadow-2xs">
               <div className="flex flex-col text-left">
