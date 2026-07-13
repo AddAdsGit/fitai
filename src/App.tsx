@@ -2165,15 +2165,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
   if (isSupabaseConfigured && isSessionLoading && currentPath !== "/") {
     return (
-      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center animate-pulse">
-            <Flame className="text-white w-9 h-9 fill-white" />
-          </div>
-          <span className="text-xs font-black text-orange-950 uppercase tracking-widest animate-pulse">
-            Loading FitAI...
-          </span>
-        </div>
+      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
+        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
