@@ -7,6 +7,7 @@ create table public.profiles (
   username text unique not null,
   display_name text not null,
   image_url text,
+  email text,
   description text,
   height integer default 170, -- in cm
   weight numeric(5,2) default 70.00, -- in kg

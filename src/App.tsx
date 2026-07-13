@@ -503,6 +503,9 @@ export default function App() {
       if (existing) {
         setActiveProfileId(existing.id);
         localStorage.setItem("fitai_active_profile_id", existing.id);
+        if (!existing.email && user.email) {
+          supabase.from('profiles').update({ email: user.email }).eq('id', existing.id).then();
+        }
       } else {
         const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
         const baseUsername = user.email ? user.email.split('@')[0] : "user_" + Math.random().toString(36).substring(7);
@@ -527,6 +530,7 @@ export default function App() {
           username: resolvedUsername,
           display_name: googleName,
           image_url: googleAvatar,
+          email: user.email,
           height: 175,
           weight: 70,
           dob: "1998-05-15",
@@ -582,12 +586,37 @@ export default function App() {
 
   const handleEmailOtpSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    const input = email.trim();
+    if (!input) return;
 
     setAuthLoading(true);
     try {
+      let targetEmail = input;
+
+      // If it's a username (doesn't contain @), look up registered email in profiles table
+      if (!input.includes("@")) {
+        const cleanUsername = input.toLowerCase().replace(/[^a-z0-9_]/g, "");
+        const { data: profile, error: dbErr } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('username', cleanUsername)
+          .maybeSingle();
+
+        if (dbErr) {
+          throw new Error(`Lookup failed: ${dbErr.message}`);
+        }
+
+        if (!profile || !profile.email) {
+          showToast("❌ No registered email found for this username.");
+          setAuthLoading(false);
+          return;
+        }
+
+        targetEmail = profile.email;
+      }
+
       const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
+        email: targetEmail,
         options: {
           emailRedirectTo: window.location.origin,
         },
@@ -596,10 +625,12 @@ export default function App() {
       if (error) {
         showToast(`❌ Failed to send link: ${error.message}`);
       } else {
-        showToast("✉️ Check your email for a secure sign-in link!");
+        // Mask email for privacy (e.g., jo***@domain.com)
+        const masked = targetEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3");
+        showToast(`✉️ Sent secure sign-in link to: ${masked}`);
       }
     } catch (err: any) {
-      showToast(`❌ Error sending sign-in link: ${err.message}`);
+      showToast(`❌ Error: ${err.message}`);
     } finally {
       setAuthLoading(false);
     }
@@ -2309,8 +2340,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               {/* Passwordless Email OTP / Magic Link Form */}
               <form onSubmit={handleEmailOtpSignIn} className="space-y-3">
                 <input
-                  type="email"
-                  placeholder="Email address"
+                  type="text"
+                  placeholder="Username or email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
