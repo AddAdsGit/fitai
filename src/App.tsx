@@ -1366,7 +1366,7 @@ Please return a clean, valid JSON object containing the updated recipe details:
 }
 Do not include any extra text, markdown styling, backticks, or "json" prefix. Just return the raw JSON string itself.`
         : `You are a professional dietitian. Create a single custom recipe based on the user's request prompt: "${promptText}".
-Verify details, calculate accurate calorie content, and establish healthy macros.
+Verify details, calculate accurate calorie content, and establish healthy macros. The recipe "name" must be a concise, descriptive food name strictly limited to 2-3 words (e.g., "Veg Biryani", "Avocado Toast").
 Return a clean, valid JSON object containing the recipe details:
 {
   "name": "Sleek Custom Dish Name",
@@ -1513,7 +1513,7 @@ User profile details:
   ...(profileData.knowledge?.patterns || [])
 ].join(", ") || "None"}
 
-Generate a single custom meal recipe that helps complete their macro goals for today. It must align with user preferences and allergies.
+Generate a single custom meal recipe that helps complete their macro goals for today. It must align with user preferences and allergies. The recipe "name" must be a concise, descriptive food name strictly limited to 2-3 words (e.g., "Veg Biryani", "Avocado Toast").
 Return a JSON object containing the recipe details:
 {
   "name": "Creative Recipe Title",
