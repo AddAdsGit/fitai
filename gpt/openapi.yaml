@@ -168,6 +168,9 @@ paths:
                 fats:
                   type: integer
                   description: Fats in grams
+                fiber:
+                  type: integer
+                  description: Fiber in grams
                 type:
                   type: string
                   description: Categorization of the log (e.g. "Breakfast", "Lunch", "Dinner", "Snack")
@@ -297,6 +300,8 @@ paths:
                 carbs:
                   type: integer
                 fats:
+                  type: integer
+                fiber:
                   type: integer
                 type:
                   type: string

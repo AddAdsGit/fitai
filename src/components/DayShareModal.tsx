@@ -209,16 +209,10 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
       ctx.fillText("FitAI", 172, 116);
       ctx.textBaseline = "alphabetic";
 
-      // Creator Badge
-      ctx.fillStyle = creatorBadgeFill;
-      ctx.beginPath();
-      ctx.roundRect(750, 80, 250, 56, 14);
-      ctx.fill();
-
       ctx.fillStyle = creatorBadgeTextColor;
       ctx.font = creatorBadgeFont;
-      ctx.textAlign = "center";
-      ctx.fillText(handleStr, 875, 116);
+      ctx.textAlign = "right";
+      ctx.fillText(handleStr, 1000, 116);
       ctx.textAlign = "left";
 
       // Layout rendering

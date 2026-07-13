@@ -57,6 +57,7 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
   const time = item.time || "12:00 PM";
   const image = item.image || "";
 
+
   const payload = useMemo(() => compressMeal(item), [item]);
   const finalLink = shortUrl || generateShareUrl("meal", payload);
 
@@ -394,18 +395,10 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
       ctx.fillText("FitAI", 172, 116);
       ctx.textBaseline = "alphabetic";
 
-      // Creator Badge
-      ctx.fillStyle = isEditorial 
-        ? "rgba(26,23,21,0.06)" 
-        : "rgba(255, 255, 255, 0.12)";
-      ctx.beginPath();
-      ctx.roundRect(750, 80, 250, 56, 14);
-      ctx.fill();
-
       ctx.fillStyle = isEditorial ? "#1A1715" : textColor;
       ctx.font = creatorBadgeFont;
-      ctx.textAlign = "center";
-      ctx.fillText(handleStr, 875, 116);
+      ctx.textAlign = "right";
+      ctx.fillText(handleStr, 1000, 116);
       ctx.textAlign = "left";
 
       // 3. Render layouts
@@ -418,13 +411,21 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
         ctx.font = "700 24px Inter, system-ui, sans-serif";
         ctx.fillText(`⏱ LOGGED AT ${time}`, 80, subtitleY);
 
+        // Draw description below subtitle on Obsidian card
+        const mealDesc = item.meal_description || "";
+        let descEndY = subtitleY;
+        if (mealDesc) {
+          descEndY = wrapText(mealDesc, 80, subtitleY + 45, 920, 34, "rgba(255,255,255,0.7)", "500 22px Inter, system-ui, sans-serif");
+        }
+
+        const calY = Math.max(560, descEndY + 110);
         ctx.fillStyle = textColor;
         ctx.font = "900 130px Inter, system-ui, sans-serif";
-        ctx.fillText(`${calories}`, 80, 560);
+        ctx.fillText(`${calories}`, 80, calY);
 
         ctx.fillStyle = textMuted;
         ctx.font = "700 24px Inter, system-ui, sans-serif";
-        ctx.fillText("TOTAL KCAL", 85, 615);
+        ctx.fillText("TOTAL KCAL", 85, calY + 55);
 
         drawMacrosAndFooter(820);
       } else if (isEditorial) {
