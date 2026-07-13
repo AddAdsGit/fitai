@@ -1026,7 +1026,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
               (!isStepValid() || isSubmitting) ? "opacity-50 cursor-not-allowed shadow-none" : "shadow-lg shadow-orange-100 active:scale-[0.98]"
             }`}
           >
-            <span>{step === totalSteps ? "Start Tracking 🚀" : "Continue"}</span>
+            <span>{step === totalSteps ? "Start Tracking" : "Continue"}</span>
             {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
           </button>
         </div>

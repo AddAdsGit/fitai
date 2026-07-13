@@ -1042,18 +1042,18 @@ export const SettingsView = ({
                 <span>ChatGPT cannot modify these settings. These are your strict instructions.</span>
               </div>
 
-              {/* Disconnect / Reset Section */}
+              {/* ChatGPT Unlink Section */}
               <div className="space-y-3 pt-4 border-t border-stone-100">
                 <div>
-                  <span className="text-[10px] font-bold text-stone-700 block">Disconnect ChatGPT Integration</span>
+                  <span className="text-[10px] font-bold text-stone-700 block">Unlink ChatGPT Connection</span>
                   <span className="text-[9px] text-stone-400 font-medium block leading-tight">
-                    Revoke ChatGPT's access token immediately. You will need to sign in again from ChatGPT to re-link your profile.
+                    Revoke ChatGPT's access immediately. You will need to sign in again from ChatGPT to re-link your profile.
                   </span>
                 </div>
                 <button
                   onClick={() => {
                     const confirmReset = window.confirm(
-                      "Are you sure you want to disconnect ChatGPT? This will rotate your security API key and immediately revoke all existing ChatGPT connections."
+                      "Are you sure you want to unlink your ChatGPT connection? This will immediately revoke ChatGPT's access to your profile."
                     );
                     if (confirmReset) {
                       const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
@@ -1061,12 +1061,12 @@ export const SettingsView = ({
                         ...profileData,
                         api_key: newKey
                       });
-                      triggerToast("🔒 ChatGPT disconnected! Access token revoked.");
+                      triggerToast("🔒 ChatGPT unlinked successfully!");
                     }
                   }}
                   className="w-full bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-black uppercase tracking-wider py-3.5 rounded-xl transition-all cursor-pointer text-center active:scale-99 border-none"
                 >
-                  Disconnect ChatGPT (Rotate Key)
+                  Unlink ChatGPT Account
                 </button>
               </div>
             </div>

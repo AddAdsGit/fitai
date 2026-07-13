@@ -413,46 +413,6 @@ export const EditProfileView = ({
               </div>
             </div>
 
-            {/* Target Water Goal */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Target Water</span>
-                <span className="text-[9px] font-black text-stone-400 uppercase">ml</span>
-              </div>
-              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, waterGoalMl: Math.max(250, (profileData.goals?.waterGoalMl || 2000) - 250) }
-                  })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <div className="flex-1 flex items-center justify-center">
-                  <input
-                    type="number"
-                    value={profileData.goals?.waterGoalMl || 2000}
-                    onChange={(e) => setProfileData({
-                      ...profileData,
-                      goals: { ...profileData.goals, waterGoalMl: parseInt(e.target.value) || 0 }
-                    })}
-                    className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, waterGoalMl: Math.min(10000, (profileData.goals?.waterGoalMl || 2000) + 250) }
-                  })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
           </div>
 
           <div className="space-y-3 mt-6">
@@ -482,35 +442,6 @@ export const EditProfileView = ({
                   className={cn(
                     "bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200",
                     (profileData.agent_config?.trackWeight ?? false) ? "translate-x-6" : "translate-x-0"
-                  )}
-                />
-              </button>
-            </div>
-
-            {/* Water Tracking Switch Toggle */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 flex items-center justify-between shadow-2xs">
-              <div className="flex flex-col text-left">
-                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Water Tracker</span>
-                <span className="text-[9px] font-bold text-stone-400">Log hydration & progress slider</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setProfileData({
-                  ...profileData,
-                  agent_config: {
-                    ...profileData.agent_config,
-                    trackWater: !(profileData.agent_config?.trackWater ?? true)
-                  }
-                })}
-                className={cn(
-                  "w-12 h-6 rounded-full p-1 transition-colors duration-200 cursor-pointer border-none",
-                  (profileData.agent_config?.trackWater ?? true) ? "bg-orange-500" : "bg-stone-200"
-                )}
-              >
-                <div
-                  className={cn(
-                    "bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200",
-                    (profileData.agent_config?.trackWater ?? true) ? "translate-x-6" : "translate-x-0"
                   )}
                 />
               </button>

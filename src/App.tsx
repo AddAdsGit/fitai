@@ -804,6 +804,11 @@ export default function App() {
       setSession(session);
       if (session?.user) {
         await handleUserAuthenticated(session.user);
+        if (window.location.hash) {
+          const url = new URL(window.location.href);
+          url.hash = "";
+          window.history.replaceState({ path: url.pathname }, "", url.toString());
+        }
       } else if (event === "SIGNED_OUT") {
         setActiveProfileId(null);
         localStorage.removeItem("fitai_active_profile_id");
@@ -815,9 +820,10 @@ export default function App() {
 
   useEffect(() => {
     if (activeTab === "home" || activeTab === "profile" || activeTab === "settings" || activeTab === "edit-profile") {
-      if (window.location.pathname !== "/") {
+      if (window.location.pathname !== "/" || window.location.hash !== "") {
         const url = new URL(window.location.href);
         url.pathname = "/";
+        url.hash = "";
         url.searchParams.delete("page");
         url.searchParams.delete("client_id");
         url.searchParams.delete("redirect_uri");

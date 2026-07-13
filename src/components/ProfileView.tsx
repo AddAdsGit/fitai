@@ -411,9 +411,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                 onClick={() => setProfileTab("insights")}
                 className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 p-1 px-2.5 rounded-xl transition-all select-none"
               >
-                <div className="text-xl font-black text-[#1a1a1a] flex items-center gap-0.5">
+                <div className="text-xl font-black text-[#1a1a1a]">
                   {profileData.weight}
-                  <Scale className="w-3.5 h-3.5 text-orange-500" />
                 </div>
                 <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
                   Weight(kg)
