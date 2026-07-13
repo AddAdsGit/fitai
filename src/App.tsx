@@ -341,6 +341,7 @@ export default function App() {
     goals: {
       dailyCalories: 2000,
       weightGoal: 75,
+      waterGoalMl: 2000,
     },
     macros: {
       protein: 150,
@@ -369,6 +370,13 @@ export default function App() {
   // Precise selected date tracking states
   const todayStr = formatDateStr(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+
+  const [waterIntake, setWaterIntake] = useState(0);
+
+  useEffect(() => {
+    const val = localStorage.getItem(`fitai_water_${selectedDate}`);
+    setWaterIntake(val ? parseInt(val) : 0);
+  }, [selectedDate]);
   const [daysList, setDaysList] = useState(() => {
     const DAYS_OF_WEEK = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     const today = new Date();
@@ -2564,6 +2572,96 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 </section>
               );
             })()}
+
+            {/* Water Tracker Section (Toggled) */}
+            {(profileData.agent_config?.trackWater ?? true) && (
+              <section className="px-6 mt-10 relative z-10 text-left">
+                <div className="flex justify-between items-baseline mb-3">
+                  <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
+                    Today's Hydration
+                  </h3>
+                  <span className="text-xs font-black text-blue-650 select-none">
+                    {waterIntake} <span className="text-[10px] text-stone-400 font-bold">/ {profileData.goals?.waterGoalMl || 2000} ml</span>
+                  </span>
+                </div>
+                
+                <div className="bg-white/60 backdrop-blur-md border border-white/80 rounded-[28px] p-5 shadow-xl shadow-blue-100/10 space-y-4">
+                  {/* Slider Wrapper */}
+                  <div className="relative flex items-center w-full group">
+                    {/* Glass tube track */}
+                    <div className="w-full h-8 bg-stone-100/40 border border-stone-200/20 rounded-full overflow-hidden relative shadow-inner">
+                      {/* Translucent liquid fill */}
+                      <div 
+                        className="h-full bg-gradient-to-r from-sky-400/70 via-blue-500/80 to-indigo-650/75 backdrop-blur-xs transition-all duration-300 ease-out"
+                        style={{ width: `${Math.min(100, (waterIntake / (profileData.goals?.waterGoalMl || 2000)) * 100)}%` }}
+                      />
+                    </div>
+                    {/* Invisible input range slider overlaid */}
+                    <input
+                      type="range"
+                      min="0"
+                      max={profileData.goals?.waterGoalMl || 2000}
+                      step="50"
+                      value={waterIntake}
+                      onChange={(e) => {
+                        const newAmt = parseInt(e.target.value);
+                        setWaterIntake(newAmt);
+                        localStorage.setItem(`fitai_water_${selectedDate}`, newAmt.toString());
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    {/* Custom white Droplet handle */}
+                    <div 
+                      className="absolute top-1/2 -translate-y-1/2 pointer-events-none w-7 h-7 bg-white border-2 border-blue-400 shadow-md rounded-full flex items-center justify-center transition-all duration-300 ease-out"
+                      style={{ 
+                        left: `calc(${Math.min(100, (waterIntake / (profileData.goals?.waterGoalMl || 2000)) * 100)}% - 14px)` 
+                      }}
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                    </div>
+                  </div>
+
+                  {/* Preset Shortcuts */}
+                  <div className="flex gap-2 items-center justify-between">
+                    <button
+                      onClick={() => {
+                        const newAmt = Math.max(0, waterIntake - 250);
+                        setWaterIntake(newAmt);
+                        localStorage.setItem(`fitai_water_${selectedDate}`, newAmt.toString());
+                        showToast("🗑️ Removed 250ml water");
+                      }}
+                      className="h-9 px-3.5 bg-stone-100 hover:bg-stone-200/70 text-stone-500 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border-none cursor-pointer"
+                    >
+                      − 250ml
+                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const newAmt = waterIntake + 250;
+                          setWaterIntake(newAmt);
+                          localStorage.setItem(`fitai_water_${selectedDate}`, newAmt.toString());
+                          showToast("💧 Added 250ml Glass!");
+                        }}
+                        className="h-9 px-4 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border border-blue-100/50 cursor-pointer"
+                      >
+                        + 250ml Glass
+                      </button>
+                      <button
+                        onClick={() => {
+                          const newAmt = waterIntake + 500;
+                          setWaterIntake(newAmt);
+                          localStorage.setItem(`fitai_water_${selectedDate}`, newAmt.toString());
+                          showToast("🥤 Added 500ml Bottle!");
+                        }}
+                        className="h-9 px-4 bg-gradient-to-br from-blue-500 to-indigo-650 hover:from-blue-600 hover:to-indigo-750 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 border-none cursor-pointer shadow-sm shadow-blue-500/10"
+                      >
+                        + 500ml Bottle
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* Today's Consumption Section */}
             <section className="px-6 mt-16 relative z-10">
