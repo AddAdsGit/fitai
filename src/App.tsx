@@ -975,8 +975,17 @@ export default function App() {
     }
   }, [activeProfileId, currentPath, isSessionLoading]);
 
-  // Sync activeTab for OAuth or other paths
+  // Sync activeTab for OAuth or other paths and support backwards compatibility for ?page=oauth-consent
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("page") === "oauth-consent") {
+      const clientId = params.get("client_id") || "";
+      const redirectUri = params.get("redirect_uri") || "";
+      const state = params.get("state") || "";
+      navigateTo(`/oauth-consent?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`);
+      return;
+    }
+
     if (currentPath === "/oauth-consent") {
       setActiveTab("oauth-consent");
     } else if (currentPath === "/" || currentPath === "/dashboard") {
