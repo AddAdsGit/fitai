@@ -831,31 +831,28 @@ export const SettingsView = ({
 
         {/* Status card */}
         <div className="bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-5">
-          <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0 animate-pulse" />
-            <div>
-              <p className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">OAuth Connection Ready</p>
-              <p className="text-[10px] text-emerald-600 font-medium mt-0.5 leading-relaxed">
-                Connect FitAI to your ChatGPT account. Once opened, simply log in when prompted to link your profile, logs, and recipes in real-time.
-              </p>
+          <div className="flex items-center justify-between pb-3 border-b border-stone-50 select-none">
+            <div className="flex items-center gap-2">
+              <ChatGPTIcon className="w-5 h-5 text-stone-750" />
+              <span className="text-[11px] font-black text-stone-850 uppercase tracking-wider">ChatGPT Connection</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100/50">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] font-bold uppercase tracking-wider">Linked</span>
             </div>
           </div>
 
-          <div className="space-y-4 pt-2 border-t border-stone-100 text-[10px] leading-relaxed font-semibold text-stone-550">
-            <p className="font-extrabold text-stone-700">Open FitAI on ChatGPT:</p>
-            
+          <div className="space-y-3">
             <a
               href="https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai"
               target="_blank"
               rel="noreferrer"
-              className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl transition-all cursor-pointer shadow-md shadow-orange-100/50 active:scale-99 text-center select-none border-none"
+              className="w-full flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-99 text-center select-none border-none"
             >
-              <ChatGPTIcon className="w-4 h-4 text-white" />
-              <span>Open FitAI Custom GPT ↗</span>
+              <span>Open Custom GPT ↗</span>
             </a>
 
-            <div className="flex justify-between items-center px-1 text-[9px] font-semibold text-stone-400 select-none">
-              <span>ChatGPT connection active</span>
+            <div className="flex justify-end select-none">
               <button
                 onClick={() => {
                   const confirmReset = window.confirm(
@@ -870,9 +867,9 @@ export const SettingsView = ({
                     triggerToast("🔒 ChatGPT unlinked successfully!");
                   }
                 }}
-                className="text-[9px] font-bold text-stone-450 hover:text-red-500 transition-colors bg-transparent border-none p-0 cursor-pointer underline hover:no-underline"
+                className="text-[9px] font-bold text-stone-400 hover:text-red-500 transition-colors bg-transparent border-none p-0 cursor-pointer underline hover:no-underline"
               >
-                Unlink ChatGPT
+                Unlink Connection
               </button>
             </div>
 
@@ -1043,7 +1040,26 @@ export const SettingsView = ({
 
               {/* Custom Instructions Textarea */}
               <div className="flex flex-col gap-1.5 pt-3 border-t border-stone-50">
-                <label className="text-[10px] font-bold text-stone-700 block">Custom Instructions to AI</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-bold text-stone-700">Custom Instructions to AI</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = profileData.agent_config || {};
+                      setProfileData({
+                        ...profileData,
+                        agent_config: {
+                          ...current,
+                          customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
+                        }
+                      });
+                      triggerToast("✏️ Reset to default instructions!");
+                    }}
+                    className="text-[9px] font-bold text-stone-400 hover:text-orange-500 transition-colors bg-transparent border-none p-0 cursor-pointer underline hover:no-underline"
+                  >
+                    Restore Default
+                  </button>
+                </div>
                 <span className="text-[9px] text-stone-400 font-medium block leading-tight mb-2">Write strict behavioral rules for the agent (e.g. 'be brief', 'no greetings')</span>
                 <textarea
                   value={profileData.agent_config?.customInstructions || ""}
@@ -1251,7 +1267,7 @@ export const SettingsView = ({
                 </div>
               </div>
               <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
-                <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Active</span>
+                <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
                 <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
@@ -1329,11 +1345,11 @@ export const SettingsView = ({
                 <span className="text-stone-500 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">
                   {(() => {
                     const act = profileData.preferences?.find((p: string) => p.startsWith("plus_button_action:"))?.split(":")[1] || "ai_logger";
-                    return act === "ai_logger" ? "AI Logger" :
-                           act === "quick_log" ? "Past Foods" :
-                           act === "detailed_log" ? "Manual Form" :
-                           act === "camera" ? "Camera Direct" :
-                           "Custom GPT";
+                    return act === "ai_logger" ? "AI" :
+                           act === "quick_log" ? "Past" :
+                           act === "detailed_log" ? "Form" :
+                           act === "camera" ? "Camera" :
+                           "GPT";
                   })()}
                 </span>
                 <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
@@ -1358,9 +1374,9 @@ export const SettingsView = ({
               </div>
               <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
                 {geminiKey.trim() ? (
-                  <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Linked</span>
+                  <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
                 ) : (
-                  <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Not Linked</span>
+                  <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Off</span>
                 )}
                 <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
