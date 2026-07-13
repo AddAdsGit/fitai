@@ -919,8 +919,9 @@ export default function App() {
     const isLoggedIn = !!activeProfileId;
 
     if (isLoggedIn) {
-      // If there's a pending OAuth flow, don't redirect to dashboard — let the OAuth handler take over
-      const hasPendingOAuth = localStorage.getItem("fitai_oauth_client_id") && localStorage.getItem("fitai_oauth_redirect_uri");
+      // If there's a pending OAuth flow (URL params OR localStorage), don't redirect to dashboard — let the OAuth handler take over
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasPendingOAuth = urlParams.get("page") === "oauth-consent" || (urlParams.get("client_id") && urlParams.get("redirect_uri")) || (localStorage.getItem("fitai_oauth_client_id") && localStorage.getItem("fitai_oauth_redirect_uri"));
       if ((currentPath === "/" || currentPath === "/login" || currentPath === "/signin") && !hasPendingOAuth) {
         navigateTo("/app");
       }
@@ -2182,8 +2183,10 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
   // --- ROUTING HANDLERS ---
 
-  // 1. Landing Page View (Redirecting)
-  if (currentPath === "/") {
+  // 1. Landing Page View (Redirecting) — skip if OAuth consent flow is active
+  const rootUrlParams = new URLSearchParams(window.location.search);
+  const isOauthLanding = rootUrlParams.get("page") === "oauth-consent" || (rootUrlParams.get("client_id") && rootUrlParams.get("redirect_uri"));
+  if (currentPath === "/" && !isOauthLanding) {
     return (
       <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
         <span className="text-xs font-black text-stone-400 uppercase tracking-widest animate-pulse">
