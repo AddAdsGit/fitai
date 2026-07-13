@@ -2629,9 +2629,28 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         profileData={profileData}
         onComplete={(completedData) => {
           if (activeProfileId) {
-            localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
+            try {
+              localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
+            } catch (e) {
+              console.warn("localStorage is blocked or disabled:", e);
+            }
           }
-          setProfileDataState(completedData);
+          setProfileDataState((prev: any) => ({
+            ...prev,
+            ...completedData,
+            goals: {
+              ...prev.goals,
+              ...completedData.goals
+            },
+            macros: {
+              ...prev.macros,
+              ...completedData.macros
+            },
+            knowledge: {
+              ...prev.knowledge,
+              ...completedData.knowledge
+            }
+          }));
         }}
         triggerToast={showToast}
       />
