@@ -453,6 +453,9 @@ export default function App() {
   const [showDeveloperBypass, setShowDeveloperBypass] = useState(false);
   const [email, setEmail] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [resolvedEmail, setResolvedEmail] = useState("");
   
   // Router States & Navigation
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
@@ -615,6 +618,8 @@ export default function App() {
         targetEmail = profile.email;
       }
 
+      setResolvedEmail(targetEmail);
+
       const { error } = await supabase.auth.signInWithOtp({
         email: targetEmail,
         options: {
@@ -627,7 +632,35 @@ export default function App() {
       } else {
         // Mask email for privacy (e.g., jo***@domain.com)
         const masked = targetEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3");
-        showToast(`✉️ Sent secure sign-in link to: ${masked}`);
+        showToast(`✉️ Sent secure sign-in link & code to: ${masked}`);
+        setOtpSent(true);
+      }
+    } catch (err: any) {
+      showToast(`❌ Error: ${err.message}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = verificationCode.trim();
+    if (!code || !resolvedEmail) return;
+
+    setAuthLoading(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: resolvedEmail,
+        token: code,
+        type: "email",
+      });
+
+      if (error) {
+        showToast(`❌ Verification failed: ${error.message}`);
+      } else {
+        showToast("✨ Logged in successfully!");
+        setOtpSent(false);
+        setVerificationCode("");
       }
     } catch (err: any) {
       showToast(`❌ Error: ${err.message}`);
@@ -2342,24 +2375,69 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               </div>
 
               {/* Passwordless Email OTP / Magic Link Form */}
-              <form onSubmit={handleEmailOtpSignIn} className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Username or email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
-                />
+              {!otpSent ? (
+                <form onSubmit={handleEmailOtpSignIn} className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Username or email address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
+                  />
 
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer mt-1"
-                >
-                  {authLoading ? "Sending Link..." : "Send Login Link"}
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer mt-1"
+                  >
+                    {authLoading ? "Sending Link..." : "Send Login Link"}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="space-y-1.5 text-center">
+                    <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider leading-relaxed">
+                      ✉️ Check your inbox
+                    </p>
+                    <p className="text-[9px] text-stone-400 font-medium leading-relaxed">
+                      Click the link in the email to log in instantly,<br />
+                      or enter the 6-digit code below to connect here.
+                    </p>
+                  </div>
+                  
+                  <input
+                    type="text"
+                    placeholder="6-digit verification code"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, "").substring(0, 6))}
+                    required
+                    maxLength={6}
+                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-center text-sm font-black tracking-widest text-stone-850 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
+                  />
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="submit"
+                      disabled={authLoading || verificationCode.length < 6}
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
+                    >
+                      {authLoading ? "Verifying..." : "Verify Code"}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpSent(false);
+                        setVerificationCode("");
+                      }}
+                      className="w-full text-center text-[9px] text-stone-400 hover:text-stone-500 font-bold tracking-wider uppercase py-1 bg-transparent border-0 cursor-pointer transition-colors"
+                    >
+                      ← Back / Change Email
+                    </button>
+                  </div>
+                </form>
+              )}
 
 
                 {/* Minimal Developer Mode Bypass */}
