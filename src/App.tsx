@@ -668,6 +668,10 @@ export default function App() {
   // Onboarding submit removed, handled by OnboardingWizard
 
   const handleLoginSubmit = async () => {
+    if (!import.meta.env.DEV) {
+      showToast("❌ Developer bypass is disabled in production.");
+      return;
+    }
     const username = loginUsername.toLowerCase().trim();
     if (!username) return;
     
@@ -2359,44 +2363,48 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
 
                 {/* Minimal Developer Mode Bypass */}
-                <div className="text-center pt-2">
-                  <button
-                    onClick={() => setShowDeveloperBypass(!showDeveloperBypass)}
-                    className="text-[8px] text-stone-400 hover:text-stone-500 font-bold uppercase tracking-widest transition-colors cursor-pointer bg-transparent border-0"
-                  >
-                    {showDeveloperBypass ? "Close Developer Bypass" : "Developer Bypass"}
-                  </button>
-                </div>
-
-                {/* Username Input Form (Conditional Bypass) */}
-                <AnimatePresence>
-                  {showDeveloperBypass && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="space-y-3 pt-2 overflow-hidden"
-                    >
-                      <input
-                        type="text"
-                        placeholder="Enter developer username (e.g. johndoe)"
-                        value={loginUsername}
-                        onChange={(e) => setLoginUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleLoginSubmit();
-                        }}
-                        className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
-                      />
+                {import.meta.env.DEV && (
+                  <>
+                    <div className="text-center pt-2">
                       <button
-                        onClick={handleLoginSubmit}
-                        disabled={!loginUsername.trim()}
-                        className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                        onClick={() => setShowDeveloperBypass(!showDeveloperBypass)}
+                        className="text-[8px] text-stone-400 hover:text-stone-500 font-bold uppercase tracking-widest transition-colors cursor-pointer bg-transparent border-0"
                       >
-                        Bypass Authentication
+                        {showDeveloperBypass ? "Close Developer Bypass" : "Developer Bypass"}
                       </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    </div>
+
+                    {/* Username Input Form (Conditional Bypass) */}
+                    <AnimatePresence>
+                      {showDeveloperBypass && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="space-y-3 pt-2 overflow-hidden"
+                        >
+                          <input
+                            type="text"
+                            placeholder="Enter developer username (e.g. johndoe)"
+                            value={loginUsername}
+                            onChange={(e) => setLoginUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleLoginSubmit();
+                            }}
+                            className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
+                          />
+                          <button
+                            onClick={handleLoginSubmit}
+                            disabled={!loginUsername.trim()}
+                            className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+                          >
+                            Bypass Authentication
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                )}
               </>
             </div>
         </div>
