@@ -397,12 +397,8 @@ export const InsightsView = ({
               </div>
               <div className="w-px h-6 bg-orange-200/30" />
               <div>
-                <span className="text-orange-950/40 text-[8px] block leading-none mb-0.5">Change</span>
-                <span className={cn(
-                  weightStats.change < 0 ? "text-emerald-600" : weightStats.change > 0 ? "text-rose-500" : "text-stone-500"
-                )}>
-                  {weightStats.change > 0 ? `+${weightStats.change.toFixed(1)}` : weightStats.change.toFixed(1)} kg
-                </span>
+                <span className="text-orange-950/40 text-[8px] block leading-none mb-0.5">Current</span>
+                <span>{weightStats.current} kg</span>
               </div>
             </div>
           </div>

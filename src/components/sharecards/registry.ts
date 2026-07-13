@@ -1,0 +1,33 @@
+import { CardVariation } from "./types";
+
+// Day summary drawers
+import { drawCollageCard }   from "./drawCollageCard";
+import { drawObsidianCard }  from "./drawObsidianCard";
+import { drawEditorialCard } from "./drawEditorialCard";
+
+// Meal drawers
+import { drawMealObsidianCard }  from "./drawMealObsidianCard";
+import { drawMealEditorialCard } from "./drawMealEditorialCard";
+
+// Recipe drawers
+import { drawRecipeObsidianCard }  from "./drawRecipeObsidianCard";
+import { drawRecipeEditorialCard } from "./drawRecipeEditorialCard";
+
+/** Variations for Daily Summary Card (Portrait 3:4) */
+export const dayCardVariations: CardVariation[] = [
+  { id: "obsidian",  name: "Dashboard Minimal (Story)",   format: "story",    draw: drawObsidianCard },
+  { id: "collage",   name: "Photo Collage (Visual Gallery)", format: "portrait", draw: drawCollageCard },
+  { id: "editorial", name: "Editorial (Light Premium)",     format: "portrait", draw: drawEditorialCard },
+];
+
+/** Variations for Meal Card (Square 1:1) */
+export const mealCardVariations: CardVariation[] = [
+  { id: "obsidian",  name: "Obsidian (Glass Tech)",       format: "square",   draw: drawMealObsidianCard },
+  { id: "editorial", name: "Editorial (Light Premium)",     format: "square",   draw: drawMealEditorialCard },
+];
+
+/** Variations for Recipe Card (Square 1:1) */
+export const recipeCardVariations: CardVariation[] = [
+  { id: "obsidian",  name: "Obsidian (Glass Tech)",       format: "square",   draw: drawRecipeObsidianCard },
+  { id: "editorial", name: "Editorial (Light Premium)",     format: "square",   draw: drawRecipeEditorialCard },
+];

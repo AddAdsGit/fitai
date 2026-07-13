@@ -639,7 +639,7 @@ export default function App() {
     setAuthLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/app`,
       });
 
       if (error) {
@@ -692,44 +692,65 @@ export default function App() {
     
     setAuthLoading(true);
     try {
-      const email = `${username}@fitpush.app`;
-      const password = `BypassPassword123!`;
+      // Query profile by username directly
+      const { data: existing, error: fetchErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('username', username)
+        .maybeSingle();
 
-      // 1. Try to sign in
-      let { data, error: signInErr } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      // 2. If user doesn't exist, sign up
-      if (signInErr) {
-        const { error: signUpErr } = await supabase.auth.signUp({
-          email,
-          password
-        });
-        if (signUpErr) {
-          console.error("Bypass sign up error:", signUpErr);
-          showToast(`❌ Failed to bypass: ${signUpErr.message}`);
-          setAuthLoading(false);
-          return;
-        }
-        // Sign in after sign up
-        const res = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-        data = res.data;
-        signInErr = res.error;
-      }
-
-      if (signInErr || !data.session?.user) {
-        console.error("Bypass sign in error:", signInErr);
-        showToast("❌ Failed to bypass auth");
+      if (fetchErr) {
+        console.error("Bypass fetch error:", fetchErr);
+        showToast(`❌ Failed to bypass: ${fetchErr.message}`);
         setAuthLoading(false);
         return;
       }
 
-      showToast(`✨ Authenticated bypass for @${username}!`);
+      if (existing) {
+        // Set local storage and state directly
+        localStorage.setItem("fitai_active_profile_id", existing.id);
+        setActiveProfileId(existing.id);
+        showToast(`✨ Authenticated bypass for @${username}!`);
+      } else {
+        // Create a new profile with a generated UUID
+        const newId = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === "x" ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+        const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+        const newProfile = {
+          id: newId,
+          username,
+          display_name: username,
+          height: 175,
+          weight: 70,
+          dob: "1998-05-15",
+          gender: "Male",
+          preferences: [],
+          daily_calories_goal: 2000,
+          weight_goal: 70.0,
+          protein_goal: 150,
+          carbs_goal: 150,
+          fats_goal: 60,
+          fiber_goal: 30,
+          api_key: newKey,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        };
+
+        const { error: createErr } = await supabase
+          .from('profiles')
+          .insert(newProfile);
+
+        if (createErr) {
+          console.error("Bypass profile creation error:", createErr);
+          showToast(`❌ Failed to bypass: ${createErr.message}`);
+        } else {
+          localStorage.setItem("fitai_active_profile_id", newId);
+          setActiveProfileId(newId);
+          showToast(`✨ Profile created for @${username}!`);
+        }
+      }
     } catch (err: any) {
       console.error(err);
       showToast("❌ Unexpected error during bypass");
@@ -753,7 +774,7 @@ export default function App() {
     
     setProfileDataState(resolvedData);
 
-    if (resolvedData.agent_config?.trackWeight && resolvedData.weight !== profileDataRef.current.weight) {
+    if (!isDataLoading && resolvedData.agent_config?.trackWeight && resolvedData.weight !== profileDataRef.current.weight) {
       const todayStr = new Date().toLocaleDateString("en-CA");
       setWeightLogs(prev => {
         const filtered = prev.filter(l => l.date !== todayStr);
@@ -959,13 +980,23 @@ export default function App() {
             localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
           }
 
+          // Resolve latest logged weight from history
+          let latestWeight = profile.weight;
+          if (weightLogsRes && !weightLogsRes.error && weightLogsRes.data) {
+            setWeightLogs(weightLogsRes.data);
+            if (weightLogsRes.data.length > 0) {
+              const sorted = [...weightLogsRes.data].sort((a, b) => a.date.localeCompare(b.date));
+              latestWeight = sorted[sorted.length - 1].weight;
+            }
+          }
+
           setProfileDataState({
             name: profile.display_name,
             username: profile.username || "",
             imageUrl: profile.image_url,
             description: profile.description,
             height: profile.height,
-            weight: profile.weight,
+            weight: latestWeight,
             dob: profile.dob,
             gender: profile.gender,
             knowledge: {
@@ -1006,22 +1037,6 @@ export default function App() {
           if (wellnessRes && !wellnessRes.error && wellnessRes.data) {
             initialNotesList = wellnessRes.data;
             setDailyNotes(wellnessRes.data);
-          }
-
-          // Load weight logs if table query was successful
-          if (weightLogsRes && !weightLogsRes.error && weightLogsRes.data) {
-            if (weightLogsRes.data.length === 0 && profile.weight) {
-              const todayStr = new Date().toLocaleDateString("en-CA");
-              const seedLog = {
-                profile_id: activeProfileId,
-                date: todayStr,
-                weight: profile.weight
-              };
-              setWeightLogs([seedLog]);
-              supabase.from("weight_logs").insert(seedLog).then();
-            } else {
-              setWeightLogs(weightLogsRes.data);
-            }
           }
 
           // Onboarding states removed, handled by OnboardingWizard
@@ -4386,6 +4401,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
           <DayShareModal
             item={shareItemPopup.item}
             profileData={profileData}
+            currentStreak={currentStreak}
             onClose={() => setShareItemPopup(null)}
             triggerToast={showToast}
           />
