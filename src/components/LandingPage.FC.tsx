@@ -25,7 +25,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isLoggedIn, onNavigate
         </div>
         
         <button
-          onClick={() => onNavigate(isLoggedIn ? "/app" : "/login")}
+          onClick={() => onNavigate(isLoggedIn ? "/" : "/login")}
           className="bg-white/10 hover:bg-white/15 text-white border border-white/10 text-xs font-bold px-4 py-2 rounded-xl transition-all active:scale-[0.98] cursor-pointer"
         >
           {isLoggedIn ? "Go to App" : "Sign In"}
@@ -58,7 +58,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ isLoggedIn, onNavigate
 
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
-              onClick={() => onNavigate(isLoggedIn ? "/app" : "/login")}
+              onClick={() => onNavigate(isLoggedIn ? "/" : "/login")}
               className="w-full sm:w-auto bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-black uppercase tracking-widest px-8 py-4.5 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer"
             >
               {isLoggedIn ? "Open Dashboard" : "Get Started for Free"}

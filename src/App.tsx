@@ -639,7 +639,7 @@ export default function App() {
     setAuthLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/app`,
+        redirectTo: `${window.location.origin}/`,
       });
 
       if (error) {
@@ -675,7 +675,7 @@ export default function App() {
         showToast("✨ Password updated successfully!");
         setNewPassword("");
         setConfirmNewPassword("");
-        navigateTo("/app");
+        navigateTo("/");
       }
     } catch (err: any) {
       showToast(`❌ Error updating password: ${err.message}`);
@@ -919,16 +919,11 @@ export default function App() {
     const isLoggedIn = !!activeProfileId;
 
     if (isLoggedIn) {
-      // If there's a pending OAuth flow (URL params OR localStorage), don't redirect to dashboard — let the OAuth handler take over
-      const urlParams = new URLSearchParams(window.location.search);
-      const hasPendingOAuth = urlParams.get("page") === "oauth-consent" || (urlParams.get("client_id") && urlParams.get("redirect_uri")) || (localStorage.getItem("fitai_oauth_client_id") && localStorage.getItem("fitai_oauth_redirect_uri"));
-      if ((currentPath === "/" || currentPath === "/login" || currentPath === "/signin") && !hasPendingOAuth) {
-        navigateTo("/app");
+      if (currentPath === "/login" || currentPath === "/signin") {
+        navigateTo("/");
       }
     } else {
-      const urlParams2 = new URLSearchParams(window.location.search);
-      const hasPendingOAuth2 = urlParams2.get("page") === "oauth-consent" || (urlParams2.get("client_id") && urlParams2.get("redirect_uri")) || (localStorage.getItem("fitai_oauth_client_id") && localStorage.getItem("fitai_oauth_redirect_uri"));
-      if ((currentPath === "/app" || currentPath === "/app/dashboard" || currentPath === "/dashboard" || currentPath === "/") && !hasPendingOAuth2) {
+      if (currentPath === "/" || currentPath === "/dashboard") {
         navigateTo("/login");
       }
     }
@@ -958,7 +953,7 @@ export default function App() {
   useEffect(() => {
     if (currentPath === "/oauth-consent") {
       setActiveTab("oauth-consent");
-    } else if (currentPath === "/app" || currentPath === "/app/dashboard" || currentPath === "/dashboard") {
+    } else if (currentPath === "/" || currentPath === "/dashboard") {
       if (activeTab === "oauth-consent") {
         setActiveTab("home");
       }
@@ -2185,18 +2180,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
   // --- ROUTING HANDLERS ---
 
-  // 1. Landing Page View (Redirecting) — skip if OAuth consent flow is active
-  const rootUrlParams = new URLSearchParams(window.location.search);
-  const isOauthLanding = rootUrlParams.get("page") === "oauth-consent" || (rootUrlParams.get("client_id") && rootUrlParams.get("redirect_uri"));
-  if (currentPath === "/" && !isOauthLanding) {
-    return (
-      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
-        <span className="text-xs font-black text-stone-400 uppercase tracking-widest animate-pulse">
-          Redirecting...
-        </span>
-      </div>
-    );
-  }
+  // "/" is the main app — no more Redirecting... screen needed
 
   // 2. Reset Password View
   if (currentPath === "/reset-password") {

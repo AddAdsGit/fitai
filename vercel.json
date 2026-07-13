@@ -1,4 +1,16 @@
 {
+  "redirects": [
+    {
+      "source": "/app",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/app/dashboard",
+      "destination": "/",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -18,14 +30,6 @@
     },
     {
       "source": "/oauth-consent",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/app",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/app/dashboard",
       "destination": "/index.html"
     },
     {
