@@ -25,12 +25,13 @@ export const OAuthConsentView = ({
   const redirectUri = params.get("redirect_uri") || "";
   const state = params.get("state") || "";
 
-  // Preserve OAuth params in localStorage to handle redirects from Supabase login
+  // Preserve OAuth params in localStorage to handle redirects from Supabase login with a 10-minute expiry timestamp
   useEffect(() => {
     if (clientId && redirectUri) {
       localStorage.setItem("fitai_oauth_client_id", clientId);
       localStorage.setItem("fitai_oauth_redirect_uri", redirectUri);
       localStorage.setItem("fitai_oauth_state", state);
+      localStorage.setItem("fitai_oauth_timestamp", Date.now().toString());
     }
   }, [clientId, redirectUri, state]);
 

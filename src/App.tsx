@@ -921,16 +921,24 @@ export default function App() {
     const savedClientId = localStorage.getItem("fitai_oauth_client_id");
     const savedRedirectUri = localStorage.getItem("fitai_oauth_redirect_uri");
     const savedState = localStorage.getItem("fitai_oauth_state") || "";
+    const savedTimestampStr = localStorage.getItem("fitai_oauth_timestamp");
 
-    if (savedClientId && savedRedirectUri && currentPath !== "/oauth-consent") {
-      // Clear them first to avoid redirection loops
+    if (savedClientId && savedRedirectUri) {
+      const now = Date.now();
+      const savedTime = savedTimestampStr ? parseInt(savedTimestampStr, 10) : 0;
+      const isRecent = now - savedTime < 10 * 60 * 1000; // 10 minutes (600,000ms)
+
+      // Clear them first to avoid redirection loops and clean up stale data
       localStorage.removeItem("fitai_oauth_client_id");
       localStorage.removeItem("fitai_oauth_redirect_uri");
       localStorage.removeItem("fitai_oauth_state");
+      localStorage.removeItem("fitai_oauth_timestamp");
 
-      // Redirect to the consent page with the saved parameters
-      const url = `/oauth-consent?client_id=${encodeURIComponent(savedClientId)}&redirect_uri=${encodeURIComponent(savedRedirectUri)}&state=${encodeURIComponent(savedState)}`;
-      navigateTo(url);
+      if (isRecent && currentPath !== "/oauth-consent") {
+        // Redirect to the consent page with the saved parameters
+        const url = `/oauth-consent?client_id=${encodeURIComponent(savedClientId)}&redirect_uri=${encodeURIComponent(savedRedirectUri)}&state=${encodeURIComponent(savedState)}`;
+        navigateTo(url);
+      }
     }
   }, [activeProfileId, currentPath, isSessionLoading]);
 
