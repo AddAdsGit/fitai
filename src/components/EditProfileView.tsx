@@ -442,6 +442,34 @@ export const EditProfileView = ({
               </button>
             </div>
 
+            {/* Preferred Meal Times */}
+            <div className="space-y-3 pt-2">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Preferred Meal Times</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "Breakfast", key: "breakfastTime", defaultVal: "08:30" },
+                  { label: "Lunch", key: "lunchTime", defaultVal: "13:30" },
+                  { label: "Dinner", key: "dinnerTime", defaultVal: "20:30" },
+                ].map((t) => (
+                  <div key={t.key} className="bg-stone-50 border border-stone-200/60 rounded-2xl p-3 flex flex-col justify-between shadow-2xs">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-stone-500">{t.label}</span>
+                    <input
+                      type="time"
+                      value={profileData.agent_config?.[t.key] || t.defaultVal}
+                      onChange={(e) => setProfileData({
+                        ...profileData,
+                        agent_config: {
+                          ...profileData.agent_config,
+                          [t.key]: e.target.value
+                        }
+                      })}
+                      className="mt-2 w-full bg-white border border-stone-200 rounded-xl px-2 py-1.5 text-xs font-black text-stone-850 focus:outline-none focus:border-orange-500 shadow-3xs"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Macros Grid */}
             <div className="space-y-2">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Macro Split Targets</label>

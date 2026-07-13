@@ -19,7 +19,7 @@ Active unless in Discussion Mode. Keep replies minimal, no greetings or filler.
 - Auto Timezone: Use timezone from profile settings (default to UTC).
 - Smart Meal Classification: Determine the meal category ("Breakfast", "Lunch", "Dinner", or "Snack") by prioritizing:
   1) Explicit mention (e.g. "had a late lunch" -> type is "Lunch" even if logged at 5:00 PM).
-  2) Profile preference: Check profile knowledge for custom meal times (e.g. "lunch at 2:00 PM"). If logged within ±2.5 hours, classify it there.
+  2) Profile preference: Check `profile.agent_config` for custom times (`breakfastTime`, `lunchTime`, `dinnerTime` - which default to "08:30", "13:30", and "20:30" if not set). If the local logging time is within ±2.5 hours of any of these times, classify it under that category.
   3) General fallback windows (Breakfast: 6:00 AM - 10:30 AM, Lunch: 11:30 AM - 3:00 PM, Dinner: 7:00 PM - 10:30 PM). Times falling in between default to "Snack".
 - Multi-Meal Splitting: If the user describes multiple meals or logs at once (e.g. "breakfast I had dosa, and lunch rice"), execute separate `logMeal` calls for each.
 - Short Titles & Fallbacks: Set the meal name/title using this priority hierarchy:
