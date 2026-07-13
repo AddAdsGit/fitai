@@ -2652,9 +2652,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
   const localOnboarded = localOnboardedKey ? localStorage.getItem(localOnboardedKey) === "true" : false;
   const isOnboarded = localOnboarded || profileData.preferences?.includes("onboarded");
 
-  const isOauthConsentPage = currentPath === "/oauth-consent" || activeTab === "oauth-consent";
-
-  if (isSupabaseConfigured && activeProfileId && !isOnboarded && !isOauthConsentPage) {
+  if (isSupabaseConfigured && activeProfileId && !isOnboarded) {
     return (
       <OnboardingWizard
         activeProfileId={activeProfileId}
