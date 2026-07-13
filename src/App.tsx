@@ -929,6 +929,26 @@ export default function App() {
     }
   }, [currentPath, activeProfileId, isSessionLoading]);
 
+  // Handle pending OAuth redirects after successful login
+  useEffect(() => {
+    if (isSessionLoading || !activeProfileId) return;
+
+    const savedClientId = localStorage.getItem("fitai_oauth_client_id");
+    const savedRedirectUri = localStorage.getItem("fitai_oauth_redirect_uri");
+    const savedState = localStorage.getItem("fitai_oauth_state") || "";
+
+    if (savedClientId && savedRedirectUri && currentPath !== "/oauth-consent") {
+      // Clear them first to avoid redirection loops
+      localStorage.removeItem("fitai_oauth_client_id");
+      localStorage.removeItem("fitai_oauth_redirect_uri");
+      localStorage.removeItem("fitai_oauth_state");
+
+      // Redirect to the consent page with the saved parameters
+      const url = `/oauth-consent?client_id=${encodeURIComponent(savedClientId)}&redirect_uri=${encodeURIComponent(savedRedirectUri)}&state=${encodeURIComponent(savedState)}`;
+      navigateTo(url);
+    }
+  }, [activeProfileId, currentPath, isSessionLoading]);
+
   // Sync activeTab for OAuth or other paths
   useEffect(() => {
     if (currentPath === "/oauth-consent") {

@@ -23,6 +23,15 @@ export const OAuthConsentView = ({
   const redirectUri = params.get("redirect_uri") || "";
   const state = params.get("state") || "";
 
+  // Preserve OAuth params in localStorage to handle redirects from Supabase login
+  useEffect(() => {
+    if (clientId && redirectUri) {
+      localStorage.setItem("fitai_oauth_client_id", clientId);
+      localStorage.setItem("fitai_oauth_redirect_uri", redirectUri);
+      localStorage.setItem("fitai_oauth_state", state);
+    }
+  }, [clientId, redirectUri, state]);
+
   // Session and auto-approve hook is loaded below handleApprove
 
   // Google login — passes current consent URL as redirectTo so params survive after login
