@@ -1311,6 +1311,62 @@ export default function App() {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${activeProfileId}`,
+        },
+        async (payload) => {
+          if (payload.new) {
+            const profile = payload.new;
+            setProfileDataState((prev: any) => ({
+              ...prev,
+              name: profile.display_name,
+              username: profile.username || "",
+              imageUrl: profile.image_url,
+              description: profile.description,
+              height: profile.height,
+              weight: profile.weight,
+              dob: profile.dob,
+              gender: profile.gender,
+              knowledge: {
+                preferences: profile.knowledge_preferences || [],
+                health: profile.knowledge_health || [],
+                notes: profile.knowledge_notes || [],
+                patterns: profile.knowledge_patterns || []
+              },
+              agent_memory: profile.agent_memory || [],
+              agent_config: profile.agent_config || {},
+              preferences: profile.preferences || [],
+              goals: {
+                dailyCalories: profile.daily_calories_goal,
+                weightGoal: profile.weight_goal
+              },
+              macros: {
+                protein: profile.protein_goal,
+                carbs: profile.carbs_goal,
+                fats: profile.fats_goal,
+                fiber: profile.fiber_goal
+              },
+              trackMicros: profile.track_micros,
+              micros: profile.micros || [],
+              api_key: profile.api_key,
+              notionApiKey: profile.notion_api_key || "",
+              notionDatabaseId: profile.notion_database_id || "",
+              googleSheetsWebhookUrl: profile.google_sheets_webhook_url || "",
+              telegramBotToken: profile.telegram_bot_token || "",
+              telegramChatId: profile.telegram_chat_id || "",
+              telegramRemindersEnabled: profile.telegram_reminders_enabled || false,
+              telegramReportsEnabled: profile.telegram_reports_enabled || false,
+              telegramReminderTimes: profile.telegram_reminder_times || ["09:00", "13:00", "20:00"],
+              timezone: profile.timezone || "UTC"
+            }));
+          }
+        }
+      )
       .subscribe();
 
     return () => {

@@ -479,35 +479,34 @@ serve(async (req) => {
         if (body.telegram_reminder_times !== undefined) updateData.telegram_reminder_times = body.telegram_reminder_times;
         if (body.timezone !== undefined) updateData.timezone = body.timezone;
         
-        // Smart merge helper for V3.2 arrays
-        const mergeArrays = (current: string[], incoming: any) => {
-          if (incoming === undefined) return undefined;
-          const newItems = Array.isArray(incoming) ? incoming : [incoming];
-          return Array.from(new Set([...(current || []), ...newItems]));
+        // Helper to format incoming value as a string array
+        const toArray = (incoming: any): string[] => {
+          if (!incoming) return [];
+          return Array.isArray(incoming) ? incoming.map(String) : [String(incoming)];
         };
 
         const incomingPrefs = body.knowledge_preferences ?? body.knowledge?.preferences;
         if (incomingPrefs !== undefined) {
-          updateData.knowledge_preferences = mergeArrays(profile.knowledge_preferences, incomingPrefs);
+          updateData.knowledge_preferences = toArray(incomingPrefs);
         }
 
         const incomingHealth = body.knowledge_health ?? body.knowledge?.health;
         if (incomingHealth !== undefined) {
-          updateData.knowledge_health = mergeArrays(profile.knowledge_health, incomingHealth);
+          updateData.knowledge_health = toArray(incomingHealth);
         }
 
         const incomingNotes = body.knowledge_notes ?? body.knowledge?.notes;
         if (incomingNotes !== undefined) {
-          updateData.knowledge_notes = mergeArrays(profile.knowledge_notes, incomingNotes);
+          updateData.knowledge_notes = toArray(incomingNotes);
         }
 
         const incomingPatterns = body.knowledge_patterns ?? body.knowledge?.patterns;
         if (incomingPatterns !== undefined) {
-          updateData.knowledge_patterns = mergeArrays(profile.knowledge_patterns, incomingPatterns);
+          updateData.knowledge_patterns = toArray(incomingPatterns);
         }
 
         if (body.agent_memory !== undefined) {
-          updateData.agent_memory = mergeArrays(profile.agent_memory, body.agent_memory);
+          updateData.agent_memory = toArray(body.agent_memory);
         }
 
         const { data: updatedProfile, error: updateError } = await supabase
