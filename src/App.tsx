@@ -1428,6 +1428,7 @@ Return a JSON object containing the recipe details:
   "protein": ${remainingProtein > 0 ? remainingProtein : 30},
   "carbs": ${remainingCarbs > 0 ? remainingCarbs : 40},
   "fats": ${remainingFats > 0 ? remainingFats : 15},
+  "fiber": ${remainingFiber > 0 ? remainingFiber : 5},
   "tags": ["AI Recommended"],
   "ingredients": ["exact ingredient 1 with quantity", "ingredient 2", ...],
   "instructions": "Step-by-step description of how to prepare the recipe..."
@@ -1503,6 +1504,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         protein: Math.max(0, parseInt(result.protein) || 0),
         carbs: Math.max(0, parseInt(result.carbs) || 0),
         fats: Math.max(0, parseInt(result.fats) || 0),
+        fiber: Math.max(0, parseInt(result.fiber) || 0),
         tags: result.tags || ["Custom", "AI Generated"],
         ingredients: result.ingredients || [],
         instructions: result.instructions || "Prep and enjoy!",
