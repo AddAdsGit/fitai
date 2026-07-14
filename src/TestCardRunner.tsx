@@ -42,12 +42,12 @@ const mockDay = {
   fats: 55,
   fiber: 28,
   meals: [
-    { name: "Avocado Toast & Eggs", calories: 450, time: "08:30 AM", protein: 24, carbs: 38, fats: 22, fiber: 6 },
-    { name: "Whey Protein Shake", calories: 220, time: "11:30 AM", protein: 30, carbs: 5, fats: 3, fiber: 1 },
-    { name: "Chicken Masala Dosa", calories: 580, time: "01:30 PM", protein: 28, carbs: 68, fats: 18, fiber: 4 },
-    { name: "Greek Yogurt & Berries", calories: 180, time: "05:00 PM", protein: 15, carbs: 18, fats: 4, fiber: 3 },
-    { name: "Grilled Salmon & Veggies", calories: 420, time: "08:00 PM", protein: 38, carbs: 12, fats: 20, fiber: 5 },
-    { name: "Post-Workout Casein", calories: 150, time: "10:30 PM", protein: 24, carbs: 2, fats: 1, fiber: 0 }
+    { name: "Avocado Toast & Eggs", calories: 450, time: "08:30 AM", protein: 24, carbs: 38, fats: 22, fiber: 6, tags: ["healthy-fats", "breakfast"] },
+    { name: "Whey Protein Shake", calories: 220, time: "11:30 AM", protein: 30, carbs: 5, fats: 3, fiber: 1, tags: ["high-protein", "post-workout"] },
+    { name: "Chicken Masala Dosa", calories: 580, time: "01:30 PM", protein: 28, carbs: 68, fats: 18, fiber: 4, tags: ["high-carb", "local-delight"] },
+    { name: "Greek Yogurt & Berries", calories: 180, time: "05:00 PM", protein: 15, carbs: 18, fats: 4, fiber: 3, tags: ["healthy-snacks"] },
+    { name: "Grilled Salmon & Veggies", calories: 420, time: "08:00 PM", protein: 38, carbs: 12, fats: 20, fiber: 5, tags: ["healthy-fats", "high-protein"] },
+    { name: "Post-Workout Casein", calories: 150, time: "10:30 PM", protein: 24, carbs: 2, fats: 1, fiber: 0, tags: ["bedtime-protein"] }
   ]
 };
 

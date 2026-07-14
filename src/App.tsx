@@ -1216,7 +1216,8 @@ export default function App() {
             fiber: m.fiber || 0,
             image: m.image,
             meal_description: m.meal_description || "",
-            date: m.date
+            date: m.date,
+            tags: m.tags || []
           }));
 
           if (mappedMeals.length === 0 && profileRes.data?.username === "johndoe") {
@@ -1253,7 +1254,8 @@ export default function App() {
                   fiber: m.fiber || 0,
                   image: m.image,
                   meal_description: m.meal_description || "",
-                  date: m.date
+                  date: m.date,
+                  tags: m.tags || []
                 }));
               if (seededMapped.length > 0) {
                 setMealsState(seededMapped);
@@ -1313,6 +1315,7 @@ export default function App() {
               image: m.image,
               meal_description: m.meal_description || "",
               date: m.date,
+              tags: m.tags || []
             }));
             setMealsState(mappedMeals);
           }
@@ -1865,7 +1868,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               type: newMealOrRecipe.type,
               time: formattedTime,
               date: selectedDate,
-              meal_description: newMealOrRecipe.meal_description
+              meal_description: newMealOrRecipe.meal_description,
+              tags: (newMealOrRecipe as any).tags || []
             })
           });
 
@@ -1883,7 +1887,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               fiber: data.meal.fiber || 0,
               image: data.meal.image,
               meal_description: data.meal.meal_description || "",
-              date: data.meal.date
+              date: data.meal.date,
+              tags: data.meal.tags || []
             };
             setMealsState((prev) => prev.map(m => m.id === mapped.id ? mapped : m));
             showToast(`🍽️ Meal updated successfully!`);
@@ -1905,7 +1910,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         fats: newMealOrRecipe.fats,
         fiber: (newMealOrRecipe as any).fiber || m.fiber || 0,
         image: finalImage,
-        meal_description: newMealOrRecipe.meal_description !== undefined ? newMealOrRecipe.meal_description : m.meal_description
+        meal_description: newMealOrRecipe.meal_description !== undefined ? newMealOrRecipe.meal_description : m.meal_description,
+        tags: (newMealOrRecipe as any).tags !== undefined ? (newMealOrRecipe as any).tags : m.tags
       } : m));
       showToast("🍽️ Meal updated locally");
       return;
@@ -1931,7 +1937,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             type: newMealOrRecipe.type,
             time: formattedTime,
             date: selectedDate,
-            meal_description: newMealOrRecipe.meal_description
+            meal_description: newMealOrRecipe.meal_description,
+            tags: (newMealOrRecipe as any).tags || []
           })
         });
 
@@ -1949,7 +1956,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             fiber: data.meal.fiber || 0,
             image: data.meal.image || finalImage,
             meal_description: data.meal.meal_description || "",
-            date: data.meal.date
+            date: data.meal.date,
+            tags: data.meal.tags || []
           };
           setMealsState((prev) => [mapped, ...prev]);
           showToast(`🍽️ Logged & Synced: "${newMealOrRecipe.name}" (+${newMealOrRecipe.calories} kcal)`);
@@ -1976,6 +1984,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       image: finalImage,
       meal_description: newMealOrRecipe.meal_description || "",
       date: selectedDate,
+      tags: (newMealOrRecipe as any).tags || []
     };
 
     setMealsState((prev) => [meal, ...prev]);

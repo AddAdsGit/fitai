@@ -580,9 +580,11 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                                 protein: item.protein,
                                 carbs: item.carbs,
                                 fats: item.fats,
+                                fiber: item.fiber || 0,
                                 type: item.type || "Meal",
                                 image: item.image,
-                                meal_description: item.meal_description || ""
+                                meal_description: item.meal_description || "",
+                                tags: item.tags || []
                               });
                               onClose();
                             }}

@@ -543,21 +543,19 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
             )}
 
             {/* Legend List */}
-            <div className="flex-1 bg-white/60 backdrop-blur-md p-3 rounded-2xl border border-white/85 shadow-xs flex flex-col justify-center gap-1.5 min-w-0">
+            <div className="flex-1 bg-white/70 backdrop-blur-md p-3 rounded-2xl border border-stone-200/30 shadow-2xs flex flex-col justify-center gap-1.5 min-w-0">
               {[
-                { label: "P", name: "Protein", val: protein, target: targetProtein, color: "#EF4444" },
-                { label: "C", name: "Carbs", val: carbs, target: targetCarbs, color: "#0891B2" },
-                { label: "F", name: "Fats", val: fats, target: targetFats, color: "#EAB308" },
-                { label: "Fb", name: "Fiber", val: fiber, target: targetFiber, color: "#10B981" },
+                { name: "Protein", val: protein, target: targetProtein, color: "#EF4444" },
+                { name: "Carbs", val: carbs, target: targetCarbs, color: "#0891B2" },
+                { name: "Fats", val: fats, target: targetFats, color: "#EAB308" },
+                { name: "Fiber", val: fiber, target: targetFiber, color: "#10B981" },
               ].map((macro) => (
                 <div key={macro.name} className="flex items-center justify-between text-[9.5px] leading-none">
-                  <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span 
-                      className="text-[8px] font-black px-1.5 py-0.5 rounded-sm text-white shrink-0" 
+                      className="w-1.5 h-1.5 rounded-full shrink-0" 
                       style={{ backgroundColor: macro.color }}
-                    >
-                      {macro.label}
-                    </span>
+                    />
                     <span className="text-[9.5px] font-extrabold text-stone-500 truncate lowercase tracking-wide">
                       {macro.name.toLowerCase()}
                     </span>
