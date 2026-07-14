@@ -4866,30 +4866,22 @@ function WellnessJournal({
         const activeTags = Object.entries(dailyTagHits || {}).filter(([_, count]) => count > 0);
         if (activeTags.length === 0) return null;
 
-        const getTagInfo = (tagName: string) => {
+        const getTagName = (tagName: string) => {
           const found = (trackingTags || []).find((t: any) => t.name.toLowerCase() === tagName.toLowerCase());
-          if (found) return found;
-          const defaultFound = DEFAULT_TRACKING_TAGS.find(t => t.name.toLowerCase() === tagName.toLowerCase());
-          return defaultFound || { emoji: "🏷️", color: "#F97316", name: tagName };
+          return found ? found.name : tagName;
         };
 
         return (
-          <div className="flex flex-wrap gap-1.5 pt-3.5 border-t border-stone-100 select-none">
+          <div className="flex flex-wrap gap-1.5 pt-3 border-t border-stone-100/80 select-none">
             {activeTags.map(([tagName, count]) => {
-              const info = getTagInfo(tagName);
+              const displayName = getTagName(tagName);
               return (
                 <div
                   key={tagName}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9.5px] font-black uppercase border border-stone-100/50"
-                  style={{
-                    backgroundColor: `${info.color}12`,
-                    borderColor: `${info.color}25`,
-                    color: info.color
-                  }}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-stone-50 border border-stone-200/60 text-stone-500"
                 >
-                  <span>{info.emoji}</span>
-                  <span>{info.name}</span>
-                  <span className="font-extrabold opacity-75">×{count}</span>
+                  <span>{displayName}</span>
+                  <span className="font-extrabold text-stone-400">×{count}</span>
                 </div>
               );
             })}
