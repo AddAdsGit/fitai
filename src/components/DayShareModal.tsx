@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { X, Copy, Download, Share2, Flame, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
+import { toPng } from "html-to-image";
 import { SharedItemPayload, generateShareUrl } from "../utils/shareUtils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { cn } from "../lib/utils";
 import { dayCardVariations } from "./sharecards/registry";
+import { ObsidianCardComponent } from "./sharecards/ObsidianCardComponent";
 
 interface DayShareModalProps {
   item: any; // Day summary object
@@ -41,12 +43,25 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   const [canShareFile, setCanShareFile] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [mealImages, setMealImages] = useState<Record<string, HTMLImageElement>>({});
+  const [scale, setScale] = useState(0.3);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  
   const currentVar = variations[currentIndex];
   const cardFormat = currentVar.format;
+  const isObsidian = currentVar.id === "obsidian" || currentVar.id === "obsidian_split" || currentVar.id === "obsidian_split_circles" || currentVar.id === "obsidian_creative";
 
   const mealsList = item.meals || [];
+  
+  // Calculate scale dynamically to fit container
+  useEffect(() => {
+    if (containerRef.current) {
+      const containerWidth = containerRef.current.clientWidth;
+      setScale(containerWidth / 390);
+    }
+  }, [currentIndex, previewTab]);
+
   useEffect(() => {
     const imagesToLoad = mealsList.filter((m: any) => m.image);
     const loadedMap: Record<string, HTMLImageElement> = {};
@@ -98,6 +113,9 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   const finalLink = shortUrl || generateShareUrl("day", payload);
 
   const drawCanvas = () => {
+    // Only draw canvas for standard variations, skip Obsidian
+    if (isObsidian) return;
+    
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -177,7 +195,39 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownloadImage = () => {
+  const handleDownloadImage = async () => {
+    if (isObsidian) {
+      const node = document.getElementById("obsidian-card-capture");
+      if (!node) return;
+      triggerToast("⏳ Preparing high-res card...");
+      
+      try {
+        // Wait for rendering elements & fonts to settle
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const dataUrl = await toPng(node, {
+          cacheBust: true,
+          width: 1080,
+          height: 1920,
+          style: {
+            transform: "scale(2.76923)",
+            transformOrigin: "top left",
+            width: "390px",
+            height: "693.3px",
+          },
+        });
+        
+        const link = document.createElement("a");
+        link.download = `${name.replace(/\s+/g, "_").toLowerCase()}_report.png`;
+        link.href = dataUrl;
+        link.click();
+        triggerToast("💾 Daily progress card downloaded!");
+      } catch (err) {
+        console.error("Error creating image:", err);
+        triggerToast("❌ Failed to generate card image.");
+      }
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const url = canvas.toDataURL("image/png");
@@ -189,6 +239,52 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   };
 
   const handleNativeShare = async () => {
+    if (isObsidian) {
+      const node = document.getElementById("obsidian-card-capture");
+      if (!node) return;
+      triggerToast("⏳ Preparing share card...");
+      
+      try {
+        // Wait for rendering elements & fonts to settle
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        const dataUrl = await toPng(node, {
+          cacheBust: true,
+          width: 1080,
+          height: 1920,
+          style: {
+            transform: "scale(2.76923)",
+            transformOrigin: "top left",
+            width: "390px",
+            height: "693.3px",
+          },
+        });
+        
+        const res = await fetch(dataUrl);
+        const blob = await res.blob();
+        const file = new File([blob], `${name.replace(/\s+/g, "_").toLowerCase()}_report.png`, { type: "image/png" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `FitAI Share: ${name}`,
+            text: `Check out my daily progress: ${name} on FitAI!`,
+            url: finalLink,
+          });
+        } else {
+          await navigator.share({
+            title: `FitAI Share: ${name}`,
+            text: `Check out my daily progress: ${name} on FitAI!`,
+            url: finalLink,
+          });
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name !== "AbortError") {
+          handleCopyLink();
+        }
+      }
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.toBlob(async (blob) => {
@@ -296,7 +392,13 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
 
         {/* Preview Container */}
         {previewTab === "card" ? (
-          <div className="relative w-full aspect-square flex flex-col items-center justify-center">
+          <div 
+            ref={containerRef}
+            className={cn(
+              "relative w-full rounded-[28px] shadow-xl border border-stone-200/50 select-none bg-[#151413] no-scrollbar",
+              isObsidian ? "h-[380px] overflow-y-auto" : "aspect-square overflow-hidden flex items-center justify-center"
+            )}
+          >
             <motion.div
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
@@ -305,12 +407,59 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
                 if (info.offset.x > 80) handlePrev();
                 else if (info.offset.x < -80) handleNext();
               }}
-              className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#151413]"
+              className="w-full flex flex-col items-center justify-start relative cursor-grab active:cursor-grabbing"
+              style={isObsidian ? { height: `${693.3 * scale + 32}px`, minHeight: "100%" } : { height: "100%", width: "100%" }}
             >
-              <canvas
-                ref={canvasRef}
-                className="w-full h-full object-contain block"
-              />
+              {isObsidian ? (
+                /* Dynamic HTML Rendering with CSS scaling for the Obsidian/Dashboard Card */
+                <div 
+                  style={{
+                    width: "390px",
+                    height: "693.3px",
+                    transform: `scale(${scale})`,
+                    transformOrigin: "top left",
+                    position: "absolute",
+                    top: "16px",
+                    left: 0,
+                    flexShrink: 0
+                  }}
+                >
+                  <ObsidianCardComponent
+                    layout={
+                      currentVar.id === "obsidian_split_circles"
+                        ? "split_circles"
+                        : currentVar.id === "obsidian_split"
+                        ? "split"
+                        : currentVar.id === "obsidian_creative"
+                        ? "creative"
+                        : "original"
+                    }
+                    name={name}
+                    date={item.date}
+                    calories={calories}
+                    protein={protein}
+                    carbs={carbs}
+                    fats={fats}
+                    fiber={fiber}
+                    mealsList={mealsList}
+                    weight={Number(profileData.weight || 0)}
+                    targetCalories={Number(profileData.goals?.dailyCalories || 2000)}
+                    targetProtein={Number(profileData.macros?.protein || 140)}
+                    targetCarbs={Number(profileData.macros?.carbs || 210)}
+                    targetFats={Number(profileData.macros?.fats || 65)}
+                    targetFiber={Number(profileData.macros?.fiber || 35)}
+                    currentStreak={currentStreak}
+                    mealImages={mealImages}
+                    handleStr={handleStr}
+                  />
+                </div>
+              ) : (
+                /* Canvas fallback for standard styles */
+                <canvas
+                  ref={canvasRef}
+                  className="w-full h-full object-contain block"
+                />
+              )}
             </motion.div>
           </div>
         ) : (

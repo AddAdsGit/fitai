@@ -1,5 +1,4 @@
-[auth]
-enable_email_confirmation = false
+
 
 [functions.gpt-action]
 verify_jwt = false

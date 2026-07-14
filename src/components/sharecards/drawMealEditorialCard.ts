@@ -2,7 +2,7 @@ import { CardDrawContext } from "./types";
 import { drawBrandHeader, wrapText } from "./helpers";
 
 export function drawMealEditorialCard(dc: CardDrawContext): void {
-  const { ctx, canvas, handleStr, name, calories, protein, carbs, fats, fiber, description } = dc;
+  const { ctx, canvas, handleStr, name, calories, protein, carbs, fats, fiber, description, tags } = dc;
 
   const textColor = "#1A1715";
   const textMuted = "#78716C";
@@ -30,7 +30,34 @@ export function drawMealEditorialCard(dc: CardDrawContext): void {
 
   const descY = finalY + 95;
   const mealDesc = description || "Healthy food logged on FitAI to power daily wellness.";
-  wrapText(ctx, mealDesc, 80, descY, 520, 38, "#44403C", "500 25px Inter, system-ui, sans-serif");
+  const descEndY = wrapText(ctx, mealDesc, 80, descY, 520, 38, "#44403C", "500 25px Inter, system-ui, sans-serif");
+
+  // Draw tag pills
+  const activeTags = tags || [];
+  if (activeTags.length > 0) {
+    ctx.font = "800 14px Inter, system-ui, sans-serif";
+    const tagsY = descEndY + 35;
+    let currentX = 80;
+    activeTags.slice(0, 3).forEach(tag => {
+      const textWidth = ctx.measureText(tag.toUpperCase()).width;
+      const pillW = textWidth + 24;
+      
+      ctx.fillStyle = "rgba(26, 23, 21, 0.05)";
+      ctx.beginPath();
+      ctx.roundRect(currentX, tagsY, pillW, 30, 8);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(26, 23, 21, 0.1)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(currentX, tagsY, pillW, 30, 8);
+      ctx.stroke();
+
+      ctx.fillStyle = "#1A1715";
+      ctx.fillText(tag.toUpperCase(), currentX + 12, tagsY + 20);
+      currentX += pillW + 8;
+    });
+  }
 
   ctx.textAlign = "right";
   ctx.fillStyle = "#F97316";

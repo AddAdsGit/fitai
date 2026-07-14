@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search } from "lucide-react";
+import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProUpgradeModal } from "./ProUpgradeModal";
@@ -295,6 +295,19 @@ components:
 security:
   - BearerAuth: []`;
 
+export const DEFAULT_TRACKING_TAGS = [
+  { id: 'gluten_free', name: 'Gluten Free', description: 'Apply when meal contains no wheat, barley, rye, or oats', enabled: true },
+  { id: 'dairy_free', name: 'Dairy Free', description: 'Apply when meal contains no milk, cheese, cream, butter, or yogurt', enabled: true },
+  { id: 'nut_free', name: 'Nut Free', description: 'Apply when meal contains no peanuts, tree nuts, or seeds', enabled: true },
+  { id: 'vegan', name: 'Vegan', description: 'Apply when meal contains no animal products', enabled: true },
+  { id: 'vegetarian', name: 'Vegetarian', description: 'Apply when meal contains no meat or fish', enabled: true },
+  { id: 'keto', name: 'Keto', description: 'Apply when meal is high fat and carbs are 10g or less', enabled: true },
+  { id: 'rich_in_iron', name: 'Rich in Iron', description: 'Apply when meal contains iron-rich foods (e.g. spinach, red meat)', enabled: true },
+  { id: 'rich_in_b12', name: 'Rich in B12', description: 'Apply when meal contains B12-rich foods (e.g. fish, eggs, meat)', enabled: true },
+  { id: 'rich_in_omega3', name: 'Rich in Omega-3', description: 'Apply when meal contains omega-3 rich foods (e.g. salmon, walnuts, chia)', enabled: true },
+  { id: 'rich_in_magnesium', name: 'Rich in Magnesium', description: 'Apply when meal contains magnesium-rich foods (e.g. dark chocolate, avocado, pumpkin seeds)', enabled: true },
+];
+
 export const SettingsView = ({
   profileData,
   setProfileData,
@@ -310,7 +323,7 @@ export const SettingsView = ({
   session: any;
 }) => {
   const [showPro, setShowPro] = useState(false);
-  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "logging" | null>(null);
+  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "logging" | "gemini" | null>(null);
 
   const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gpt-action`;
@@ -1331,7 +1344,7 @@ export const SettingsView = ({
               className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group border-t border-stone-50"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-550 shrink-0">
                   <Plus className="w-4 h-4 text-orange-550" />
                 </div>
                 <div>
@@ -1359,11 +1372,11 @@ export const SettingsView = ({
             {/* Google Gemini API */}
             <div
               onClick={() => setActiveSubView("gemini")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] rounded-b-[18px] transition-colors cursor-pointer group"
+              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] rounded-b-[18px] transition-colors cursor-pointer group border-t border-stone-50"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shrink-0">
-                  <Sparkles className="w-4 h-4 text-orange-500 fill-orange-100" />
+                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-550 shrink-0">
+                  <Sparkles className="w-4 h-4 text-orange-550 fill-orange-100" />
                 </div>
                 <div>
                   <div className="font-bold text-[#1a1a1a] text-xs">Google Gemini Image API</div>

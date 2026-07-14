@@ -9,6 +9,7 @@ export function calculateNutritionFromIngredients(name: string, ingredients: str
   protein: number;
   carbs: number;
   fats: number;
+  fiber: number;
   tags: string[];
   micros: MicroNutrient[];
 } {
@@ -145,9 +146,27 @@ export function calculateNutritionFromIngredients(name: string, ingredients: str
   const fats = Math.round(Math.max(0, totalFats));
   const calories = Math.round(totalCalories > 0 ? totalCalories : (protein * 4 + carbs * 4 + fats * 9));
 
+  // Estimate fiber based on ingredients
+  let totalFiber = 0;
+  const fiberText = (name + ' ' + ingredients.join(' ')).toLowerCase();
+  if (fiberText.includes('oat') || fiberText.includes('oatmeal')) totalFiber += 4;
+  if (fiberText.includes('avocado')) totalFiber += 5;
+  if (fiberText.includes('spinach') || fiberText.includes('kale') || fiberText.includes('greens')) totalFiber += 3;
+  if (fiberText.includes('bean') || fiberText.includes('lentil') || fiberText.includes('chickpea')) totalFiber += 8;
+  if (fiberText.includes('chia') || fiberText.includes('flax')) totalFiber += 5;
+  if (fiberText.includes('banana') || fiberText.includes('apple') || fiberText.includes('berry') || fiberText.includes('berries')) totalFiber += 3;
+  if (fiberText.includes('quinoa') || fiberText.includes('brown rice')) totalFiber += 3;
+  if (fiberText.includes('almond') || fiberText.includes('nuts') || fiberText.includes('peanut')) totalFiber += 2;
+  if (fiberText.includes('bread') && fiberText.includes('whole')) totalFiber += 3;
+  const fiber = Math.round(totalFiber);
+
   const tags: string[] = [];
   const fullText = (name + ' ' + ingredients.join(' ')).toLowerCase();
   
+  // Macro-based tags
+  if (protein >= 25) tags.push('High Protein');
+  if (fiber >= 8) tags.push('High Fiber');
+
   if (!fullText.includes('bread') && !fullText.includes('oat') && !fullText.includes('wheat') && !fullText.includes('flour') && !fullText.includes('pasta')) {
     tags.push('Gluten Free');
   }
@@ -180,7 +199,8 @@ export function calculateNutritionFromIngredients(name: string, ingredients: str
     protein: protein || 10,
     carbs: carbs || 15,
     fats: fats || 5,
-    tags: Array.from(new Set(tags)).slice(0, 3),
+    fiber,
+    tags: Array.from(new Set(tags)).slice(0, 5),
     micros
   };
 }

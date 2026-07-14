@@ -17,6 +17,7 @@ export interface CardDrawContext {
   description?: string;
   ingredients?: string[];
   loadedImg?: HTMLImageElement | null;
+  tags?: string[];
 
   // Profile data & dynamic macro goals
   weight?: number;

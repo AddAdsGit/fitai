@@ -15,9 +15,12 @@ import { drawRecipeEditorialCard } from "./drawRecipeEditorialCard";
 
 /** Variations for Daily Summary Card (Portrait 3:4) */
 export const dayCardVariations: CardVariation[] = [
-  { id: "obsidian",  name: "Dashboard Minimal (Story)",   format: "story",    draw: drawObsidianCard },
-  { id: "collage",   name: "Photo Collage (Visual Gallery)", format: "portrait", draw: drawCollageCard },
-  { id: "editorial", name: "Editorial (Light Premium)",     format: "portrait", draw: drawEditorialCard },
+  { id: "obsidian",               name: "Dashboard Minimal (Story)",   format: "story",    draw: drawObsidianCard },
+  { id: "obsidian_split",         name: "Dashboard Side-by-Side (Story)", format: "story", draw: drawObsidianCard },
+  { id: "obsidian_split_circles", name: "Dashboard Rings (Story)",       format: "story",    draw: drawObsidianCard },
+  { id: "obsidian_creative",      name: "Dashboard Creative (Story)",  format: "story",    draw: drawObsidianCard },
+  { id: "collage",                name: "Photo Collage (Visual Gallery)", format: "portrait", draw: drawCollageCard },
+  { id: "editorial",              name: "Editorial (Light Premium)",     format: "portrait", draw: drawEditorialCard },
 ];
 
 /** Variations for Meal Card (Square 1:1) */

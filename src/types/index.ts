@@ -10,6 +10,7 @@ export interface Meal {
   image: string;
   date: string;
   fiber?: number;
+  tags?: string[];
   meal_description?: string;
 }
 
@@ -37,6 +38,13 @@ export interface Recipe {
   instructions: string;
   micros?: { name: string; value: number; unit: string }[];
   log_count?: number;
+}
+
+export interface TrackingTag {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
 }
 
 export interface AgentConfig {
@@ -76,6 +84,9 @@ export interface Profile {
   carbs_goal: number;
   fats_goal: number;
   fiber_goal: number;
+  
+  // Tags
+  tracking_tags: TrackingTag[];
   
   // V3.2 Restructured Agent & Knowledge
   knowledge: Knowledge;

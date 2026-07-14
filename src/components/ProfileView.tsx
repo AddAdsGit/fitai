@@ -990,7 +990,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                               {meal.type} • {new Date(meal.date + "T00:00:00").toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                             </div>
                             <div className="text-[8px] font-mono text-orange-600 font-black tracking-wider mt-1">
-                              {meal.calories} KCAL • P: {meal.protein}g C: {meal.carbs}g F: {meal.fats}g
+                              {meal.calories} KCAL • P: {meal.protein}g C: {meal.carbs}g F: {meal.fats}g Fiber: {meal.fiber || 0}g
                             </div>
                           </div>
                         </div>

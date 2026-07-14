@@ -2,7 +2,7 @@ import { CardDrawContext } from "./types";
 import { drawBrandHeader, wrapText, drawCoverImage } from "./helpers";
 
 export function drawMealObsidianCard(dc: CardDrawContext): void {
-  const { ctx, canvas, handleStr, name, time, calories, protein, carbs, fats, fiber, loadedImg, description } = dc;
+  const { ctx, canvas, handleStr, name, time, calories, protein, carbs, fats, fiber, loadedImg, description, tags } = dc;
 
   const textColor = "#FAF9F6";
   const textMuted = "#A8A29E";
@@ -36,6 +36,34 @@ export function drawMealObsidianCard(dc: CardDrawContext): void {
   let descEndY = finalY;
   if (mealDesc) {
     descEndY = wrapText(ctx, mealDesc, 80, finalY + 60, 920, 34, "rgba(255,255,255,0.7)", "500 22px Inter, system-ui, sans-serif");
+  }
+
+  // Draw tag pills
+  const activeTags = tags || [];
+  if (activeTags.length > 0) {
+    ctx.font = "800 16px Inter, system-ui, sans-serif";
+    const tagsY = descEndY + 50;
+    let currentX = 80;
+    activeTags.slice(0, 3).forEach(tag => {
+      const textWidth = ctx.measureText(tag.toUpperCase()).width;
+      const pillW = textWidth + 30;
+      
+      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.beginPath();
+      ctx.roundRect(currentX, tagsY, pillW, 36, 10);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(currentX, tagsY, pillW, 36, 10);
+      ctx.stroke();
+
+      ctx.fillStyle = "#FAF9F6";
+      ctx.fillText(tag.toUpperCase(), currentX + 15, tagsY + 24);
+      currentX += pillW + 12;
+    });
+    descEndY += 60; // Push calorie display down to accommodate tags row
   }
 
   const calY = Math.max(710, descEndY + 110);

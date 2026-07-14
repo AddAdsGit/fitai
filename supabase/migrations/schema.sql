@@ -36,6 +36,7 @@ create table public.profiles (
   -- System
   track_micros boolean default true,
   micros jsonb default '[]'::jsonb,
+  tracking_tags jsonb default '[]'::jsonb,
   api_key text unique not null, -- Authentication token for Custom GPT Action
   
   -- Integrations
@@ -66,6 +67,7 @@ create table public.meals (
   carbs integer not null,
   fats integer not null,
   fiber integer default 0 not null,
+  tags text[] default '{}',
   image text,
   meal_description text,
   date date not null, -- E.g., "2026-07-08"
@@ -127,7 +129,7 @@ alter table public.oauth_codes enable row level security;
 
 -- Policies for oauth_codes
 create policy "Allow service_role to manage oauth codes" on public.oauth_codes
-  for all using (true) with check (true);
+  for all to service_role using (true) with check (true);
 
 -- DAILY WELLNESS NOTES TABLE
 create table public.daily_wellness (

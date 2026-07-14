@@ -14,6 +14,7 @@ import { cn } from "../lib/utils";
 import type { Meal } from "../types";
 import { hasNoGeneratedImage, getMealEmoji } from "../utils/helpers";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { DEFAULT_TRACKING_TAGS } from "./SettingsView";
 
 const QUICK_LOG_DEFAULTS: any[] = [];
 
@@ -86,6 +87,12 @@ export const ManualLogModal = ({
   const [showAiMode, setShowAiMode] = useState(initialAiMode || false);
   const [errorMessage, setErrorMessage] = useState("");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    if (mealToEdit && Array.isArray((mealToEdit as any).tags)) {
+      return (mealToEdit as any).tags;
+    }
+    return [];
+  });
 
   const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
   const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
@@ -207,6 +214,11 @@ export const ManualLogModal = ({
                 (import.meta as any).env.VITE_GEMINI_API_KEY ||
                 "";
 
+    const enabledTrackingTags = (profileData?.tracking_tags || DEFAULT_TRACKING_TAGS)
+      .filter((t: any) => t.enabled)
+      .map((t: any) => ({ name: t.name, description: t.description }));
+    const enabledTagsJson = JSON.stringify(enabledTrackingTags);
+
     setIsProcessing(true);
     setErrorMessage("");
     try {
@@ -222,8 +234,12 @@ export const ManualLogModal = ({
         const mimeType = uploadedImage.substring(5, uploadedImage.indexOf(";base64"));
         const base64Data = uploadedImage.substring(commaIndex + 1);
         
-        const imagePrompt = `Analyze the food plate shown in this image. Estimate the meal name, calorie count, protein, carbs, fats, fiber, and description. 
+        const imagePrompt = `Analyze the food plate shown in this image. Estimate the meal name, calorie count, protein, carbs, fats, fiber, description, and assign matching tags. 
 User description/notes if any: "${aiInstruction || "estimate this food plate"}"
+
+List of tags you are allowed to assign (assign ONLY if they apply, read their descriptions):
+${enabledTagsJson}
+
 Return a clean, valid JSON object containing these details, with no markdown, backticks, or other text:
 {
   "name": "Clean meal name",
@@ -232,7 +248,8 @@ Return a clean, valid JSON object containing these details, with no markdown, ba
   "carbs": estimated_carbs_grams,
   "fats": estimated_fats_grams,
   "fiber": estimated_fiber_grams,
-  "description": "Brief description of servings and sides observed."
+  "description": "Brief description of servings and sides observed.",
+  "tags": ["Tag Name 1", "Tag Name 2"]
 }`;
         
         // Use gemini-2.5-flash for multimodal image analysis
@@ -279,6 +296,9 @@ ${mealDescription ? `- Description/Notes: "${mealDescription}"` : ""}
 
 Instruction: "${aiInstruction}"
 
+List of tags you are allowed to assign (assign ONLY if they apply, read their descriptions):
+${enabledTagsJson}
+
 Return a JSON object containing the updated values:
 {
   "name": "updated name (include modifications if relevant)",
@@ -287,11 +307,15 @@ Return a JSON object containing the updated values:
   "carbs": updated_carbs,
   "fats": updated_fats,
   "fiber": updated_fiber,
-  "description": "updated description of the portion or extra toppings/side items"
+  "description": "updated description of the portion or extra toppings/side items",
+  "tags": ["Tag Name 1", "Tag Name 2"]
 }
 Do not return any markdown formatting, backticks, or "json" prefix. Just return the raw JSON string itself.`
           : `You are a nutrition estimator. Estimate the nutritional content of this meal description.
 Meal description: "${aiInstruction}"
+
+List of tags you are allowed to assign (assign ONLY if they apply, read their descriptions):
+${enabledTagsJson}
 
 Return a JSON object with estimated nutritional values:
 {
@@ -301,7 +325,8 @@ Return a JSON object with estimated nutritional values:
   "carbs": estimated_carbs_grams,
   "fats": estimated_fats_grams,
   "fiber": estimated_fiber_grams,
-  "description": "Brief description of serving size, preparation style, and sides"
+  "description": "Brief description of serving size, preparation style, and sides",
+  "tags": ["Tag Name 1", "Tag Name 2"]
 }
 Do not return any markdown formatting, backticks, or "json" prefix. Just return the raw JSON string itself.`;
 
@@ -370,6 +395,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
       if (result.fats !== undefined) setFats(String(Math.max(0, parseInt(result.fats) || 0)));
       if (result.fiber !== undefined) setFiber(String(Math.max(0, parseInt(result.fiber) || 0)));
       if (result.description !== undefined) setMealDescription(result.description);
+      if (result.tags && Array.isArray(result.tags)) setSelectedTags(result.tags);
       setAiInstruction("");
       setShowAiMode(false);
     } catch (err: any) {
@@ -748,6 +774,42 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                         />
                       </div>
                     </div>
+
+                    {/* Row 3: Tags Selector */}
+                    <div className="text-left mt-3.5">
+                      <label className="text-[10px] font-bold text-stone-550 block mb-2 px-1">
+                        Active Tags
+                      </label>
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                        {(profileData?.tracking_tags || DEFAULT_TRACKING_TAGS)
+                          .filter((t: any) => t.enabled)
+                          .map((tag: any) => {
+                            const isSelected = selectedTags.includes(tag.name);
+                            return (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedTags(selectedTags.filter(t => t !== tag.name));
+                                  } else {
+                                    setSelectedTags([...selectedTags, tag.name]);
+                                  }
+                                }}
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all select-none border cursor-pointer active:scale-95",
+                                  isSelected
+                                    ? "bg-stone-900 border-stone-900 text-white shadow-3xs"
+                                    : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                                )}
+                              >
+                                <span className="text-xs">{tag.emoji}</span>
+                                <span>{tag.name}</span>
+                              </button>
+                            );
+                          })}
+                      </div>
+                    </div>
                   </motion.div>
                 ) : (
                   <motion.div
@@ -912,7 +974,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                         type: mealToEdit?.type || "Manual Log",
                         time: time.trim(),
                         image: imageUrl,
-                        meal_description: mealDescription.trim()
+                        meal_description: mealDescription.trim(),
+                        tags: selectedTags
                       });
                       onClose();
                     }}

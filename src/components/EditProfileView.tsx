@@ -1,8 +1,24 @@
-import React from "react";
-import { Camera, User, Smile, Scale, Ruler, Target, Info, Plus, Minus } from "lucide-react";
+import React, { useState } from "react";
+import { Camera, User, Smile, Scale, Ruler, Target, Info, Plus, Minus, Tag, X, ChevronLeft } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import { DefaultAvatar } from "./DefaultAvatar";
+import { DEFAULT_TRACKING_TAGS } from "./SettingsView";
+
+export const COMMON_TAG_TEMPLATES = [
+  { name: "Gluten Free", description: "Apply when meal contains no wheat, barley, rye, or oats" },
+  { name: "Dairy Free", description: "Apply when meal contains no milk, cheese, cream, butter, or yogurt" },
+  { name: "Nut Free", description: "Apply when meal contains no peanuts, tree nuts, or seeds" },
+  { name: "Vegan", description: "Apply when meal contains no animal products" },
+  { name: "Vegetarian", description: "Apply when meal contains no meat or fish" },
+  { name: "Keto", description: "Apply when meal is high fat and carbs are 10g or less" },
+  { name: "Rich in Iron", description: "Apply when meal contains iron-rich foods (e.g. spinach, red meat)" },
+  { name: "Rich in B12", description: "Apply when meal contains B12-rich foods (e.g. fish, eggs, meat)" },
+  { name: "Rich in Omega-3", description: "Apply when meal contains omega-3 rich foods (e.g. salmon, walnuts, chia)" },
+  { name: "Rich in Magnesium", description: "Apply when meal contains magnesium-rich foods (e.g. dark chocolate, avocado, pumpkin seeds)" },
+  { name: "Sugar Free", description: "Apply when meal contains no added or natural sugars" },
+  { name: "Low FODMAP", description: "Apply when meal complies with low FODMAP guidelines" }
+];
 
 export const EditProfileView = ({
   profileData,
@@ -14,6 +30,70 @@ export const EditProfileView = ({
   setProfileData: any;
   setActiveTab: (tab: string) => void;
 }) => {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+
+  const currentTags = profileData.tracking_tags || DEFAULT_TRACKING_TAGS;
+
+  const handleQuickAddTag = (tagName: string) => {
+    if (!tagName) return;
+    const template = COMMON_TAG_TEMPLATES.find((t) => t.name === tagName);
+    if (!template) return;
+    if (currentTags.some((t: any) => t.name.toLowerCase() === tagName.toLowerCase())) {
+      return;
+    }
+    const newTag = {
+      id: `tag_${Date.now()}`,
+      name: template.name,
+      description: template.description,
+      enabled: true
+    };
+    setProfileData({ ...profileData, tracking_tags: [...currentTags, newTag] });
+  };
+
+  const handleToggleTag = (tagId: string) => {
+    const updated = currentTags.map((t: any) =>
+      t.id === tagId ? { ...t, enabled: !t.enabled } : t
+    );
+    setProfileData({ ...profileData, tracking_tags: updated });
+  };
+
+  const handleUpdateTagDesc = (tagId: string, desc: string) => {
+    const updated = currentTags.map((t: any) =>
+      t.id === tagId ? { ...t, description: desc } : t
+    );
+    setProfileData({ ...profileData, tracking_tags: updated });
+  };
+
+  const handleDeleteTag = (tagId: string) => {
+    const updated = currentTags.filter((t: any) => t.id !== tagId);
+    setProfileData({ ...profileData, tracking_tags: updated });
+  };
+
+  const handleRestoreDefaults = () => {
+    setProfileData({ ...profileData, tracking_tags: DEFAULT_TRACKING_TAGS });
+  };
+
+  const handleAddCustomTag = () => {
+    const trimmedName = newName.trim();
+    if (!trimmedName) return;
+    if (currentTags.some((t: any) => t.name.toLowerCase() === trimmedName.toLowerCase())) {
+      return;
+    }
+    const newTag = {
+      id: `custom_${Date.now()}`,
+      name: trimmedName,
+      description: newDesc.trim() || `Apply when meal meets ${trimmedName} guidelines`,
+      enabled: true
+    };
+    setProfileData({ ...profileData, tracking_tags: [...currentTags, newTag] });
+    setNewName("");
+    setNewDesc("");
+    setShowAddForm(false);
+  };
+
   // BMI calculation
   const weight = profileData.weight || 70;
   const height = profileData.height || 170;
@@ -53,23 +133,18 @@ export const EditProfileView = ({
       className="mt-4 relative z-10 pb-32"
     >
       <div className="px-6 space-y-6 max-w-[448px] mx-auto">
-        {/* Navigation Action bar */}
-        <div className="flex justify-between items-center bg-white px-4 py-3 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02]">
+        {/* Minimalist Back Navigation */}
+        <div className="flex items-center justify-between bg-white px-4 py-3.5 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02]">
           <button
             onClick={() => setActiveTab("profile")}
-            className="text-orange-500 font-bold text-sm px-2 py-1 rounded-full hover:bg-orange-50 transition-colors"
+            className="flex items-center gap-1.5 text-stone-500 hover:text-stone-850 transition-colors cursor-pointer border-none bg-transparent active:scale-95"
           >
-            Cancel
+            <ChevronLeft className="w-4 h-4 text-stone-400" />
+            <span className="text-[11px] font-black uppercase tracking-wider">Back to Profile</span>
           </button>
-          <h2 className="text-[14px] font-black tracking-widest uppercase text-[#1a1a1a]">
-            Edit Profile
-          </h2>
-          <button
-            onClick={() => setActiveTab("profile")}
-            className="text-orange-500 font-bold text-sm px-2 py-1 rounded-full hover:bg-orange-50 transition-colors"
-          >
-            Done
-          </button>
+          <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest bg-stone-50 px-2 py-1 rounded-md border border-stone-200/50">
+            Auto-Saved
+          </span>
         </div>
 
         <div className="space-y-5">
@@ -515,6 +590,175 @@ export const EditProfileView = ({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+
+        {/* Card 5: Tracking Tags */}
+          <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
+            <div className="flex items-center justify-between pb-2 border-b border-stone-50">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
+                  <Tag className="w-4 h-4" />
+                </div>
+                <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">Tracking Tags</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRestoreDefaults}
+                className="text-[9px] font-black uppercase text-stone-400 hover:text-stone-600 flex items-center gap-1 cursor-pointer bg-stone-50 px-2 py-1 rounded-lg border border-stone-200/50 shadow-3xs"
+              >
+                Restore Defaults
+              </button>
+            </div>
+
+            <p className="text-[9.5px] text-stone-400 font-semibold leading-normal">
+              Toggle tags that the AI automatically applies to your meals based on ingredients or micro-nutrients. Click a tag to configure its AI rules.
+            </p>
+
+            {/* List of tags as minimalist pills */}
+            <div className="flex flex-wrap gap-2 py-1.5">
+              {currentTags.map((tag: any) => {
+                const isSelected = selectedTagId === tag.id;
+                const isSystemDefault = DEFAULT_TRACKING_TAGS.some(t => t.id === tag.id);
+                return (
+                  <div
+                    key={tag.id}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer shadow-3xs",
+                      tag.enabled
+                        ? isSelected
+                          ? "bg-stone-900 border-stone-900 text-white"
+                          : "bg-stone-100 border-stone-200/60 text-stone-800 hover:bg-stone-200"
+                        : "bg-white border-stone-200 text-stone-400 hover:border-stone-300"
+                    )}
+                    onClick={() => {
+                      setSelectedTagId(isSelected ? null : tag.id);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleTag(tag.id);
+                      }}
+                      className={cn(
+                        "w-3 h-3 rounded-md border flex items-center justify-center transition-colors shrink-0",
+                        tag.enabled ? "bg-stone-900 border-stone-900 text-white" : "border-stone-300 bg-white"
+                      )}
+                    >
+                      {tag.enabled && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
+                    </button>
+
+                    <span>{tag.name}</span>
+
+                    {!isSystemDefault && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTag(tag.id);
+                          if (isSelected) setSelectedTagId(null);
+                        }}
+                        className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Selected Tag description rule editor */}
+            {(() => {
+              const activeSelectedTag = currentTags.find((t: any) => t.id === selectedTagId);
+              if (!activeSelectedTag) return null;
+              return (
+                <div className="bg-stone-50 border border-stone-150 rounded-2xl p-3.5 space-y-2 mt-3 animate-fade-in text-left">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">AI rule for {activeSelectedTag.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTagId(null)}
+                      className="text-[9px] font-black text-stone-400 hover:text-stone-600 uppercase"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <textarea
+                    value={activeSelectedTag.description}
+                    onChange={(e) => handleUpdateTagDesc(activeSelectedTag.id, e.target.value)}
+                    rows={2}
+                    placeholder="Describe guidelines for the AI..."
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-700 focus:outline-none focus:border-stone-400 placeholder:text-stone-300 resize-none leading-relaxed shadow-3xs"
+                  />
+                </div>
+              );
+            })()}
+
+            {/* Add Tags Section */}
+            <div className="space-y-4 pt-3 border-t border-stone-100">
+              <div>
+                <label className="block text-[8px] font-black text-stone-400 uppercase tracking-widest mb-1.5 px-1">Quick Add Tag</label>
+                <select
+                  onChange={(e) => {
+                    handleQuickAddTag(e.target.value);
+                    e.target.value = ""; // Reset
+                  }}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-700 focus:outline-none focus:border-stone-400 cursor-pointer shadow-3xs"
+                >
+                  <option value="">Select common tag...</option>
+                  {COMMON_TAG_TEMPLATES.map((t) => (
+                    <option key={t.name} value={t.name}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                {showAddForm ? (
+                  <div className="space-y-2 border border-stone-150 bg-stone-50 rounded-2xl p-3.5 text-left">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest">Custom Tag</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddForm(false)}
+                        className="text-stone-400 hover:text-stone-600 text-[9px] font-black uppercase"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. Nut Free"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#1a1a1a] focus:outline-none focus:border-stone-400 shadow-3xs"
+                    />
+                    <textarea
+                      placeholder="AI guidelines (e.g. contains no peanut or tree nut)"
+                      rows={1.5}
+                      value={newDesc}
+                      onChange={(e) => setNewDesc(e.target.value)}
+                      className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-755 focus:outline-none focus:border-stone-400 resize-none shadow-3xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomTag}
+                      className="w-full bg-stone-900 text-white hover:bg-stone-850 text-[10px] font-black uppercase tracking-wider py-2 rounded-lg"
+                    >
+                      Add Custom Tag
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(true)}
+                    className="w-full h-9 bg-white border border-dashed border-stone-300 hover:border-stone-400 text-stone-500 hover:text-stone-700 flex items-center justify-center py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-3xs"
+                  >
+                    + Custom Tag
+                  </button>
+                )}
               </div>
             </div>
           </div>

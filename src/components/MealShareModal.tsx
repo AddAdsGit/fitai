@@ -114,6 +114,7 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
       time,
       description: item.meal_description || "",
       loadedImg,
+      tags: item.tags || [],
     });
   };
 

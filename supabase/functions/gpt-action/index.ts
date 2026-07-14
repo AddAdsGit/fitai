@@ -18,6 +18,49 @@ serve(async (req) => {
     const path = url.pathname;
     const method = req.method;
 
+    if (path.endsWith("/run-migration")) {
+      const dbUrl = Deno.env.get("DATABASE_URL") ?? "";
+      if (!dbUrl) {
+        return new Response(JSON.stringify({ error: "DATABASE_URL not set" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { Client } = await import("https://deno.land/x/postgres@v0.17.0/mod.ts");
+      const client = new Client(dbUrl);
+      await client.connect();
+
+      try {
+        await client.queryArray(`ALTER TABLE public.meals ADD COLUMN IF NOT EXISTS tags text[] DEFAULT '{}';`);
+        await client.queryArray(`ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS tracking_tags jsonb DEFAULT '[
+          {"id":"gluten_free","name":"Gluten Free","description":"Apply when meal contains no wheat, barley, rye, or oats","enabled":true},
+          {"id":"dairy_free","name":"Dairy Free","description":"Apply when meal contains no milk, cheese, cream, butter, or yogurt","enabled":true},
+          {"id":"nut_free","name":"Nut Free","description":"Apply when meal contains no peanuts, tree nuts, or seeds","enabled":true},
+          {"id":"vegan","name":"Vegan","description":"Apply when meal contains no animal products","enabled":true},
+          {"id":"vegetarian","name":"Vegetarian","description":"Apply when meal contains no meat or fish","enabled":true},
+          {"id":"keto","name":"Keto","description":"Apply when meal is high fat and carbs are 10g or less","enabled":true},
+          {"id":"rich_in_iron","name":"Rich in Iron","description":"Apply when meal contains iron-rich foods (e.g. spinach, red meat)","enabled":true},
+          {"id":"rich_in_b12","name":"Rich in B12","description":"Apply when meal contains B12-rich foods (e.g. fish, eggs, meat)","enabled":true},
+          {"id":"rich_in_omega3","name":"Rich in Omega-3","description":"Apply when meal contains omega-3 rich foods (e.g. salmon, walnuts, chia)","enabled":true},
+          {"id":"rich_in_magnesium","name":"Rich in Magnesium","description":"Apply when meal contains magnesium-rich foods (e.g. dark chocolate, avocado, pumpkin seeds)","enabled":true}
+        ]'::jsonb;`);
+        await client.queryArray(`CREATE INDEX IF NOT EXISTS meals_tags_idx ON public.meals USING GIN (tags);`);
+
+        return new Response(JSON.stringify({ message: "Migration run successfully!" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } finally {
+        await client.end();
+      }
+    }
+
     // 1. Initialize Supabase Client (needed for all operations)
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -259,11 +302,13 @@ serve(async (req) => {
                 let totalP = 0;
                 let totalC = 0;
                 let totalF = 0;
+                let totalFi = 0;
                 meals.forEach((m) => {
                   totalCals += m.calories || 0;
                   totalP += m.protein || 0;
                   totalC += m.carbs || 0;
                   totalF += m.fats || 0;
+                  totalFi += m.fiber || 0;
                 });
 
                 let msg = `📊 *Daily Nutrition Report (${localDateStr})*\n\n`;
@@ -271,14 +316,15 @@ serve(async (req) => {
                 msg += `🔥 *Calories:* ${totalCals} / ${prof.daily_calories_goal} kcal\n`;
                 msg += `🥩 *Protein:* ${totalP} / ${prof.protein_goal}g\n`;
                 msg += `🍞 *Carbs:* ${totalC} / ${prof.carbs_goal}g\n`;
-                msg += `🥑 *Fats:* ${totalF} / ${prof.fats_goal}g\n\n`;
+                msg += `🥑 *Fats:* ${totalF} / ${prof.fats_goal}g\n`;
+                msg += `🌿 *Fiber:* ${totalFi} / ${prof.fiber_goal}g\n\n`;
 
                 if (meals.length === 0) {
                   msg += `⚠️ You logged no meals today. Don't forget to track your nutrition!`;
                 } else {
                   msg += `🍽️ *Meals logged:* \n`;
                   meals.forEach((m) => {
-                    msg += `- *${m.name}* (${m.calories} kcal, P:${m.protein}g C:${m.carbs}g F:${m.fats}g)\n`;
+                    msg += `- *${m.name}* (${m.calories} kcal, P:${m.protein}g C:${m.carbs}g F:${m.fats}g Fb:${m.fiber || 0}g)\n`;
                   });
                 }
 
@@ -449,6 +495,26 @@ serve(async (req) => {
         fats: Math.max(0, (prof.fats_goal || 60) - totals.fats),
         fiber: Math.max(0, (prof.fiber_goal || 30) - totals.fiber)
       };
+    };
+
+    const getDailyTagHits = async (profileId: string, dateStr: string) => {
+      const { data: meals } = await supabase
+        .from("meals")
+        .select("tags")
+        .eq("profile_id", profileId)
+        .eq("date", dateStr);
+
+      const tagCounts: Record<string, number> = {};
+      if (meals) {
+        meals.forEach((m: any) => {
+          if (m.tags && Array.isArray(m.tags)) {
+            m.tags.forEach((tag: string) => {
+              tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+            });
+          }
+        });
+      }
+      return tagCounts;
     };
 
     console.log(`[gpt-action] Request: ${method} ${path} for user: ${profile.username} (timezoneOffset: ${timezoneOffset})`);
@@ -685,13 +751,23 @@ serve(async (req) => {
     // --- MEALS ENDPOINTS ---
     if (path.endsWith("/meals")) {
       if (method === "GET") {
-        const queryDate = url.searchParams.get("date") || getLocalTimeAndDate().dateStr;
-        const { data: meals, error: mealsError } = await supabase
+        const queryDate = url.searchParams.get("date");
+        const limitParam = url.searchParams.get("limit");
+
+        let dbQuery = supabase
           .from("meals")
           .select("*")
-          .eq("profile_id", profile.id)
-          .eq("date", queryDate)
-          .order("created_at", { ascending: false });
+          .eq("profile_id", profile.id);
+
+        if (queryDate) {
+          dbQuery = dbQuery.eq("date", queryDate).order("created_at", { ascending: false });
+        } else if (limitParam) {
+          dbQuery = dbQuery.order("date", { ascending: false }).order("created_at", { ascending: false }).limit(parseInt(limitParam) || 20);
+        } else {
+          dbQuery = dbQuery.eq("date", getLocalTimeAndDate().dateStr).order("created_at", { ascending: false });
+        }
+
+        const { data: meals, error: mealsError } = await dbQuery;
 
         if (mealsError) {
           return new Response(JSON.stringify({ error: "Failed to retrieve meals" }), {
@@ -700,11 +776,22 @@ serve(async (req) => {
           });
         }
 
-        const remaining = await getDailyRemaining(profile.id, queryDate);
-        return new Response(JSON.stringify({ date: queryDate, meals, daily_remaining: remaining }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const targetDate = queryDate || (!limitParam ? getLocalTimeAndDate().dateStr : null);
+        const remaining = targetDate ? await getDailyRemaining(profile.id, targetDate) : null;
+        const tagHits = targetDate ? await getDailyTagHits(profile.id, targetDate) : null;
+
+        return new Response(
+          JSON.stringify({
+            date: targetDate,
+            meals,
+            ...(remaining ? { daily_remaining: remaining } : {}),
+            ...(tagHits ? { daily_tag_hits: tagHits } : {}),
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       } else if (method === "POST") {
         const body = await req.json();
         
@@ -885,6 +972,7 @@ serve(async (req) => {
           carbs: parseInt(body.carbs || 0),
           fats: parseInt(body.fats || 0),
           fiber: parseInt(body.fiber || 0),
+          tags: Array.isArray(body.tags) ? body.tags : [],
           image: imageUrlToDownload, // Use external URL as initial placeholder
           meal_description: body.meal_description || null,
           date: resolvedDate
@@ -1016,7 +1104,8 @@ serve(async (req) => {
         })();
 
         const remaining = await getDailyRemaining(profile.id, resolvedDate);
-        return new Response(JSON.stringify({ message: "Meal logged successfully", meal: newMeal, daily_remaining: remaining }), {
+        const tagHits = await getDailyTagHits(profile.id, resolvedDate);
+        return new Response(JSON.stringify({ message: "Meal logged successfully", meal: newMeal, daily_remaining: remaining, daily_tag_hits: tagHits }), {
           status: 201,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -1052,7 +1141,8 @@ serve(async (req) => {
         }
 
         const remaining = await getDailyRemaining(profile.id, deletedMeal.date);
-        return new Response(JSON.stringify({ message: "Meal deleted successfully", meal: deletedMeal, daily_remaining: remaining }), {
+        const tagHits = await getDailyTagHits(profile.id, deletedMeal.date);
+        return new Response(JSON.stringify({ message: "Meal deleted successfully", meal: deletedMeal, daily_remaining: remaining, daily_tag_hits: tagHits }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -1079,6 +1169,7 @@ serve(async (req) => {
         if (body.date !== undefined) updateData.date = body.date;
         if (body.image !== undefined) updateData.image = body.image;
         if (body.meal_description !== undefined) updateData.meal_description = body.meal_description;
+        if (body.tags !== undefined) updateData.tags = Array.isArray(body.tags) ? body.tags : [];
 
         const { data: updatedMeal, error: updateError } = await supabase
           .from("meals")
@@ -1104,7 +1195,8 @@ serve(async (req) => {
 
         const targetDate = updatedMeal.date || getLocalTimeAndDate().dateStr;
         const remaining = await getDailyRemaining(profile.id, targetDate);
-        return new Response(JSON.stringify({ message: "Meal updated successfully", meal: updatedMeal, daily_remaining: remaining }), {
+        const tagHits = await getDailyTagHits(profile.id, targetDate);
+        return new Response(JSON.stringify({ message: "Meal updated successfully", meal: updatedMeal, daily_remaining: remaining, daily_tag_hits: tagHits }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

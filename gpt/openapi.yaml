@@ -57,6 +57,26 @@ paths:
                         type: array
                         items:
                           type: string
+                      tracking_tags:
+                        type: array
+                        description: User's custom and default tracking tags
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            name:
+                              type: string
+                            emoji:
+                              type: string
+                            color:
+                              type: string
+                            description:
+                              type: string
+                            enabled:
+                              type: boolean
+                            isDefault:
+                              type: boolean
                       daily_calories_goal:
                         type: integer
                       weight_goal:
@@ -111,6 +131,14 @@ paths:
           required: false
           schema:
             type: string
+        - name: limit
+          in: query
+          description: >-
+            Optional number of recent meals to retrieve across all dates (sorted newest first).
+            Use this to search past history. If specified, 'date' is ignored.
+          required: false
+          schema:
+            type: integer
       responses:
         '200':
           description: Logged meals retrieved successfully
@@ -192,6 +220,11 @@ paths:
                 meal_description:
                   type: string
                   description: Optional detailed notes or description of the meal (e.g., ingredients, prep style).
+                tags:
+                  type: array
+                  description: Array of custom or default tags (e.g., ["High Protein", "Gluten Free"])
+                  items:
+                    type: string
                 openaiFileIdRefs:
                   type: array
                   description: References to images or files uploaded by the user to the chat session. The backend will download these.
@@ -231,6 +264,11 @@ paths:
                         type: integer
                       fiber:
                         type: integer
+                  daily_tag_hits:
+                    type: object
+                    description: Count of each tag consumed on the target date
+                    additionalProperties:
+                      type: integer
     delete:
       x-openai-isConsequential: false
       summary: Delete a logged meal
@@ -268,6 +306,11 @@ paths:
                         type: integer
                       fiber:
                         type: integer
+                  daily_tag_hits:
+                    type: object
+                    description: Count of each tag consumed on the target date
+                    additionalProperties:
+                      type: integer
         '400':
           description: Missing ID parameter
         '404':
@@ -314,6 +357,11 @@ paths:
                 meal_description:
                   type: string
                   description: Optional detailed notes or description of the meal (e.g., ingredients, prep style).
+                tags:
+                  type: array
+                  description: Array of tags to set on the meal
+                  items:
+                    type: string
       responses:
         '200':
           description: Meal updated successfully
@@ -339,6 +387,11 @@ paths:
                         type: integer
                       fiber:
                         type: integer
+                  daily_tag_hits:
+                    type: object
+                    description: Count of each tag consumed on the target date
+                    additionalProperties:
+                      type: integer
         '400':
           description: Missing ID or invalid parameters
         '404':

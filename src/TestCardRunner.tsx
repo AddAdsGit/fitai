@@ -35,22 +35,25 @@ const mockRecipe = {
 
 const mockDay = {
   name: "Sunday Fitness Fuel",
+  date: "2026-07-14",
   calories: 1850,
   protein: 120,
   carbs: 210,
   fats: 55,
   fiber: 28,
   meals: [
-    { name: "Avocado Toast & Eggs", calories: 450, time: "08:30 AM" },
-    { name: "Whey Protein Shake", calories: 220, time: "11:30 AM" },
-    { name: "Chicken Masala Dosa", calories: 580, time: "01:30 PM" },
-    { name: "Greek Yogurt & Berries", calories: 180, time: "05:00 PM" },
-    { name: "Grilled Salmon & Veggies", calories: 420, time: "08:00 PM" }
+    { name: "Avocado Toast & Eggs", calories: 450, time: "08:30 AM", protein: 24, carbs: 38, fats: 22, fiber: 6 },
+    { name: "Whey Protein Shake", calories: 220, time: "11:30 AM", protein: 30, carbs: 5, fats: 3, fiber: 1 },
+    { name: "Chicken Masala Dosa", calories: 580, time: "01:30 PM", protein: 28, carbs: 68, fats: 18, fiber: 4 },
+    { name: "Greek Yogurt & Berries", calories: 180, time: "05:00 PM", protein: 15, carbs: 18, fats: 4, fiber: 3 },
+    { name: "Grilled Salmon & Veggies", calories: 420, time: "08:00 PM", protein: 38, carbs: 12, fats: 20, fiber: 5 },
+    { name: "Post-Workout Casein", calories: 150, time: "10:30 PM", protein: 24, carbs: 2, fats: 1, fiber: 0 }
   ]
 };
 
 const mockProfile = {
-  username: "fitcoder"
+  username: "mk_super_long_developer_designer_username_12345",
+  weight: 78.5
 };
 
 interface TestCardRunnerProps {
@@ -98,8 +101,8 @@ export const TestCardRunner: React.FC<TestCardRunnerProps> = ({ type, format }) 
         display: none !important;
       }
       
-      /* Force canvas container to cover viewport */
-      div[class*="relative"][class*="aspect-square"] {
+      /* Force canvas/card container to cover viewport */
+      div[class*="bg-stone-50"] > div[class*="relative"] {
         width: 100vw !important;
         height: 100vh !important;
         aspect-ratio: auto !important;
@@ -109,14 +112,16 @@ export const TestCardRunner: React.FC<TestCardRunnerProps> = ({ type, format }) 
         border-radius: 0 !important;
         background: transparent !important;
         display: block !important;
+        overflow: visible !important;
       }
-      div[class*="relative"][class*="aspect-square"] > div {
+      div[class*="bg-stone-50"] > div[class*="relative"] > div {
         width: 100vw !important;
         height: 100vh !important;
         border: none !important;
         border-radius: 0 !important;
         background: transparent !important;
         transform: none !important;
+        overflow: visible !important;
       }
       
       /* Stretch canvas to fill screen */
@@ -126,6 +131,18 @@ export const TestCardRunner: React.FC<TestCardRunnerProps> = ({ type, format }) 
         max-width: none !important;
         max-height: none !important;
         border-radius: 0 !important;
+      }
+
+      /* Force HTML card to render at full resolution on the test page */
+      #obsidian-card-capture {
+        transform: scale(2.76923) !important;
+        transform-origin: top left !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 390px !important;
+        height: 693.3px !important;
+        z-index: 99999 !important;
       }
     `;
     document.head.appendChild(styleEl);

@@ -79,27 +79,42 @@ def generate_card(port, card_type, card_format, variation, output_path):
     print(f"Generating {card_type} ({card_format}, variation={variation}) -> {output_path}")
     
     with sync_playwright() as p:
-        # Launch Chromium headlessly
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        # Determine viewport size based on card format to match target high-res output
+        vw, vh = 1080, 1080
+        if card_format == "story":
+            vw, vh = 1080, 1920
+        elif card_format == "portrait":
+            vw, vh = 1080, 1440
+
+        page = browser.new_page(viewport={"width": vw, "height": vh})
         page.goto(url)
         
-        # Wait for the canvas element
-        page.wait_for_selector("canvas", timeout=15000)
+        # Wait for either the HTML card or fallback canvas to load
+        has_html_card = False
+        try:
+            page.wait_for_selector("#obsidian-card-capture", timeout=5000)
+            has_html_card = True
+            print("Found HTML card element (#obsidian-card-capture).")
+        except Exception:
+            page.wait_for_selector("canvas", timeout=15000)
+            print("Found Canvas element fallback.")
         
-        # Wait a little longer for fonts/images to finish loading onto the canvas
-        print("Waiting for canvas fonts & images to render...")
+        # Wait a little longer for fonts and images to render completely
+        print("Waiting for fonts & images to render...")
         time.sleep(3.5)
         
-        # Extract the exact-resolution PNG directly from the canvas element
-        data_url = page.evaluate("document.querySelector('canvas').toDataURL('image/png')")
-        
-        if "," in data_url:
-            base64_data = data_url.split(",")[1]
+        if has_html_card:
+            # Capture the page directly since the viewport matches the card format exactly
+            img_bytes = page.screenshot(animations="disabled")
         else:
-            base64_data = data_url
-            
-        img_bytes = base64.b64decode(base64_data)
+            # Extract the exact-resolution PNG directly from the canvas element
+            data_url = page.evaluate("document.querySelector('canvas').toDataURL('image/png')")
+            if "," in data_url:
+                base64_data = data_url.split(",")[1]
+            else:
+                base64_data = data_url
+            img_bytes = base64.b64decode(base64_data)
         
         # Save output image
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)

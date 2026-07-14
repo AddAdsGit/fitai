@@ -37,7 +37,7 @@ import { InsightsView, ProgressBar } from "./components/InsightsView";
 import { ManualLogModal } from "./components/ManualLogModal";
 import { ProfileView } from "./components/ProfileView";
 import { EditProfileView } from "./components/EditProfileView";
-import { SettingsView } from "./components/SettingsView";
+import { SettingsView, DEFAULT_TRACKING_TAGS } from "./components/SettingsView";
 import { OAuthConsentView } from "./components/OAuthConsentView";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { CalendarPickerModal } from "./components/CalendarPickerModal";
@@ -363,7 +363,8 @@ export default function App() {
     telegramRemindersEnabled: false,
     telegramReportsEnabled: false,
     telegramReminderTimes: ["09:00", "13:00", "20:00"],
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    tracking_tags: []
   };
 
   // Precise selected date tracking states
@@ -423,6 +424,21 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("fitai_meals", JSON.stringify(mealsState));
   }, [mealsState]);
+
+  const dailyTagHits = useMemo(() => {
+    const hits: Record<string, number> = {};
+    mealsState
+      .filter((m) => m.date === selectedDate)
+      .forEach((m) => {
+        if (m.tags && Array.isArray(m.tags)) {
+          m.tags.forEach((tag) => {
+            hits[tag] = (hits[tag] || 0) + 1;
+          });
+        }
+      });
+    return hits;
+  }, [mealsState, selectedDate]);
+
   const [dailyNotes, setDailyNotes] = useState<DailyWellness[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("fitai_daily_notes") || "[]");
@@ -452,10 +468,9 @@ export default function App() {
   const [session, setSession] = useState<any>(null);
   const [showDeveloperBypass, setShowDeveloperBypass] = useState(false);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authMode, setAuthMode] = useState<"login" | "signup" | "forgot">("login");
   const [authLoading, setAuthLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [verificationCode, setVerificationCode] = useState("");
-  const [resolvedEmail, setResolvedEmail] = useState("");
   
   // Router States & Navigation
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
@@ -587,80 +602,71 @@ export default function App() {
     }
   };
 
-  const handleEmailOtpSignIn = async (e: React.FormEvent) => {
+  const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const input = email.trim();
-    if (!input) return;
+    if (!email.trim() || !password.trim()) return;
 
     setAuthLoading(true);
     try {
-      let targetEmail = input;
-
-      // If it's a username (doesn't contain @), look up registered email in profiles table
-      if (!input.includes("@")) {
-        const cleanUsername = input.toLowerCase().replace(/[^a-z0-9_]/g, "");
-        const { data: profile, error: dbErr } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('username', cleanUsername)
-          .maybeSingle();
-
-        if (dbErr) {
-          throw new Error(`Lookup failed: ${dbErr.message}`);
-        }
-
-        if (!profile || !profile.email) {
-          showToast("❌ No registered email found for this username.");
-          setAuthLoading(false);
-          return;
-        }
-
-        targetEmail = profile.email;
-      }
-
-      setResolvedEmail(targetEmail);
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email: targetEmail,
-        options: {
-          emailRedirectTo: window.location.origin,
-        },
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim()
       });
 
       if (error) {
-        showToast(`❌ Failed to send link: ${error.message}`);
+        showToast(`❌ Login failed: ${error.message}`);
       } else {
-        // Mask email for privacy (e.g., jo***@domain.com)
-        const masked = targetEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3");
-        showToast(`✉️ Sent secure sign-in link & code to: ${masked}`);
-        setOtpSent(true);
+        showToast("✨ Signed in successfully!");
       }
     } catch (err: any) {
-      showToast(`❌ Error: ${err.message}`);
+      showToast(`❌ Error signing in: ${err.message}`);
     } finally {
       setAuthLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+  const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const code = verificationCode.trim();
-    if (!code || !resolvedEmail) return;
+    if (!email.trim() || !password.trim()) return;
 
     setAuthLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: resolvedEmail,
-        token: code,
-        type: "email",
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password.trim()
       });
 
       if (error) {
-        showToast(`❌ Verification failed: ${error.message}`);
+        showToast(`❌ Sign up failed: ${error.message}`);
       } else {
-        showToast("✨ Logged in successfully!");
-        setOtpSent(false);
-        setVerificationCode("");
+        if (data.session === null) {
+          showToast("✉️ Check your email to confirm registration!");
+        } else {
+          showToast("✨ Account created successfully!");
+        }
+      }
+    } catch (err: any) {
+      showToast(`❌ Error signing up: ${err.message}`);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setAuthLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/`,
+      });
+
+      if (error) {
+        showToast(`❌ Failed to send reset email: ${error.message}`);
+      } else {
+        showToast("✉️ Check your email for a password reset link!");
+        setAuthMode("login");
       }
     } catch (err: any) {
       showToast(`❌ Error: ${err.message}`);
@@ -848,7 +854,8 @@ export default function App() {
             telegram_reports_enabled: resolvedData.telegramReportsEnabled,
             telegram_reminder_times: resolvedData.telegramReminderTimes,
             timezone: resolvedData.timezone,
-            api_key: resolvedData.api_key
+            api_key: resolvedData.api_key,
+            tracking_tags: resolvedData.tracking_tags
           })
           .eq('id', activeProfileId);
         if (error) {
@@ -916,7 +923,10 @@ export default function App() {
       setSession(session);
       if (session?.user) {
         await handleUserAuthenticated(session.user);
-        if (window.location.hash) {
+        
+        if (event === "PASSWORD_RECOVERY") {
+          navigateTo("/reset-password");
+        } else if (window.location.hash) {
           const url = new URL(window.location.href);
           url.hash = "";
           window.history.replaceState({ path: url.pathname }, "", url.toString());
@@ -1084,7 +1094,8 @@ export default function App() {
             telegramRemindersEnabled: profile.telegram_reminders_enabled || false,
             telegramReportsEnabled: profile.telegram_reports_enabled || false,
             telegramReminderTimes: profile.telegram_reminder_times || ["09:00", "13:00", "20:00"],
-            timezone: profile.timezone || "UTC"
+            timezone: profile.timezone || "UTC",
+            tracking_tags: profile.tracking_tags || []
           });
 
           // Load daily wellness notes if table query was successful
@@ -1440,6 +1451,8 @@ export default function App() {
     setActiveProfileId(null);
     setMealsState([]);
     setRecipesState([]);
+    setDailyNotes([]);
+    setWeightLogs([]);
     setProfileDataState(INITIAL_PROFILE_STATE);
     showToast("🔒 Logged out successfully");
   };
@@ -2207,6 +2220,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
   }
 
   // --- ROUTING HANDLERS ---
+  const localOnboardedKey = activeProfileId ? `fitai_onboarded_${activeProfileId}` : null;
+  const localOnboarded = localOnboardedKey ? localStorage.getItem(localOnboardedKey) === "true" : false;
+  const isOnboarded = localOnboarded || profileData.preferences?.includes("onboarded");
 
   // "/" is the main app — no more Redirecting... screen needed
 
@@ -2383,66 +2399,97 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 <div className="flex-1 h-px bg-stone-200" />
               </div>
 
-              {/* Passwordless Email OTP / Magic Link Form */}
-              {!otpSent ? (
-                <form onSubmit={handleEmailOtpSignIn} className="space-y-3">
+              {/* Standard Email/Password & Forgot Password Forms */}
+              {authMode === "forgot" ? (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="space-y-1 text-center">
+                    <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">
+                      Reset Password
+                    </p>
+                    <p className="text-[9px] text-stone-400 font-medium leading-relaxed">
+                      Enter your email address and we'll send you a link to reset your password.
+                    </p>
+                  </div>
+
                   <input
-                    type="text"
-                    placeholder="Username or email address"
+                    type="email"
+                    placeholder="Email address"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
+                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all"
                   />
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="submit"
+                      disabled={authLoading}
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
+                    >
+                      {authLoading ? "Sending Link..." : "Send Reset Link"}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode("login")}
+                      className="w-full text-center text-[9px] text-stone-400 hover:text-stone-500 font-bold tracking-wider uppercase py-1 bg-transparent border-0 cursor-pointer transition-colors"
+                    >
+                      ← Back to Login
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={authMode === "login" ? handleEmailSignIn : handleEmailSignUp} className="space-y-3">
+                  <input
+                    type="email"
+                    placeholder="Email address"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all"
+                  />
+
+                  <div className="relative">
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all"
+                    />
+                    
+                    {authMode === "login" && (
+                      <div className="text-right mt-1.5 px-1">
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode("forgot")}
+                          className="text-[9px] text-stone-400 hover:text-orange-500 font-bold uppercase tracking-wider transition-colors cursor-pointer bg-transparent border-0"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   <button
                     type="submit"
                     disabled={authLoading}
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer mt-1"
                   >
-                    {authLoading ? "Sending Link..." : "Send Login Link"}
+                    {authLoading 
+                      ? (authMode === "login" ? "Signing In..." : "Creating Account...") 
+                      : (authMode === "login" ? "Sign In" : "Create Account")
+                    }
                   </button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div className="space-y-1.5 text-center">
-                    <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider leading-relaxed">
-                      ✉️ Check your inbox
-                    </p>
-                    <p className="text-[9px] text-stone-400 font-medium leading-relaxed">
-                      Click the link in the email to log in instantly,<br />
-                      or enter the 6-digit code below to connect here.
-                    </p>
-                  </div>
-                  
-                  <input
-                    type="text"
-                    placeholder="6-digit verification code"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, "").substring(0, 6))}
-                    required
-                    maxLength={6}
-                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-center text-sm font-black tracking-widest text-stone-850 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all animate-none"
-                  />
 
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="submit"
-                      disabled={authLoading || verificationCode.length < 6}
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
-                    >
-                      {authLoading ? "Verifying..." : "Verify Code"}
-                    </button>
-                    
+                  <div className="text-center pt-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        setOtpSent(false);
-                        setVerificationCode("");
-                      }}
-                      className="w-full text-center text-[9px] text-stone-400 hover:text-stone-500 font-bold tracking-wider uppercase py-1 bg-transparent border-0 cursor-pointer transition-colors"
+                      onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
+                      className="text-[9px] text-stone-400 hover:text-stone-600 font-bold uppercase tracking-widest transition-colors cursor-pointer bg-transparent border-0"
                     >
-                      ← Back / Change Email
+                      {authMode === "login" ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
                     </button>
                   </div>
                 </form>
@@ -2506,6 +2553,61 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
   // 4. OAuth Consent View (Must render even if activeProfileId is null / user is unauthenticated)
   if (currentPath === "/oauth-consent" || activeTab === "oauth-consent") {
+    // If logged in but data is still loading, show skeleton
+    if (activeProfileId && isDataLoading) {
+      return (
+        <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans p-6 max-w-md mx-auto space-y-8 flex flex-col justify-center items-center">
+          <div className="animate-pulse flex flex-col items-center gap-6 w-full px-4">
+            <div className="w-16 h-16 bg-orange-200/50 rounded-2xl animate-bounce" />
+            <div className="w-48 h-6 bg-orange-200/40 rounded-lg" />
+            <div className="w-56 h-56 bg-orange-200/30 rounded-full flex items-center justify-center">
+              <div className="w-40 h-40 bg-[#FAF9F6] rounded-full" />
+            </div>
+            <div className="w-full h-24 bg-orange-200/20 rounded-[24px]" />
+            <div className="w-full h-12 bg-orange-200/25 rounded-2xl" />
+            <div className="w-full h-32 bg-orange-200/20 rounded-[28px]" />
+          </div>
+        </div>
+      );
+    }
+
+    // Force onboarding if logged in but not onboarded
+    if (activeProfileId && !isOnboarded) {
+      return (
+        <OnboardingWizard
+          activeProfileId={activeProfileId}
+          supabase={supabase}
+          profileData={profileData}
+          onComplete={(completedData) => {
+            if (activeProfileId) {
+              try {
+                localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
+              } catch (e) {
+                console.warn("localStorage is blocked or disabled:", e);
+              }
+            }
+            setProfileDataState((prev: any) => ({
+              ...prev,
+              ...completedData,
+              goals: {
+                ...prev.goals,
+                ...completedData.goals
+              },
+              macros: {
+                ...prev.macros,
+                ...completedData.macros
+              },
+              knowledge: {
+                ...prev.knowledge,
+                ...completedData.knowledge
+              }
+            }));
+          }}
+          triggerToast={showToast}
+        />
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-8 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
         <AnimatePresence>
@@ -2647,10 +2749,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       </div>
     );
   }
-
-  const localOnboardedKey = activeProfileId ? `fitai_onboarded_${activeProfileId}` : null;
-  const localOnboarded = localOnboardedKey ? localStorage.getItem(localOnboardedKey) === "true" : false;
-  const isOnboarded = localOnboarded || profileData.preferences?.includes("onboarded");
 
   if (isSupabaseConfigured && activeProfileId && !isOnboarded) {
     return (
@@ -3111,7 +3209,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                   </div>
                 ) : (
                   activeMeals.map((meal) => {
-                    const isQuickCal = meal.protein === 0 && meal.carbs === 0 && meal.fats === 0;
+                    const isQuickCal = meal.protein === 0 && meal.carbs === 0 && meal.fats === 0 && meal.fiber === 0;
 
                     if (isQuickCal) {
                       return (
@@ -3211,7 +3309,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                                 </span>
                                 <span className="text-[8px] text-stone-300 font-bold">•</span>
                                 <span className="text-[8px] font-extrabold text-stone-500 uppercase tracking-wide block">
-                                  P: {meal.protein}g • C: {meal.carbs}g • F: {meal.fats}g
+                                  P: {meal.protein}g • C: {meal.carbs}g • F: {meal.fats}g • Fiber: {meal.fiber || 0}g
                                 </span>
                               </div>
                             </div>
@@ -3395,6 +3493,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 dailyNotes={dailyNotes}
                 handleSaveDailyNote={handleSaveDailyNote}
                 todayStr={todayStr}
+                dailyTagHits={dailyTagHits}
+                trackingTags={profileData.tracking_tags || []}
               />
             </section>
           </motion.div>
@@ -4669,13 +4769,17 @@ interface WellnessJournalProps {
   dailyNotes: DailyWellness[];
   handleSaveDailyNote: (dateStr: string, text: string) => Promise<void>;
   todayStr: string;
+  dailyTagHits: Record<string, number>;
+  trackingTags: any[];
 }
 
 function WellnessJournal({
   selectedDate,
   dailyNotes,
   handleSaveDailyNote,
-  todayStr
+  todayStr,
+  dailyTagHits,
+  trackingTags
 }: WellnessJournalProps) {
   const activeNoteObj = dailyNotes.find(n => n.date === selectedDate);
   const activeNoteText = activeNoteObj ? activeNoteObj.notes : "";
@@ -4756,6 +4860,42 @@ function WellnessJournal({
           </div>
         )}
       </div>
+
+      {/* Un-editable tag hits summary row */}
+      {(() => {
+        const activeTags = Object.entries(dailyTagHits || {}).filter(([_, count]) => count > 0);
+        if (activeTags.length === 0) return null;
+
+        const getTagInfo = (tagName: string) => {
+          const found = (trackingTags || []).find((t: any) => t.name.toLowerCase() === tagName.toLowerCase());
+          if (found) return found;
+          const defaultFound = DEFAULT_TRACKING_TAGS.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+          return defaultFound || { emoji: "🏷️", color: "#F97316", name: tagName };
+        };
+
+        return (
+          <div className="flex flex-wrap gap-1.5 pt-3.5 border-t border-stone-100 select-none">
+            {activeTags.map(([tagName, count]) => {
+              const info = getTagInfo(tagName);
+              return (
+                <div
+                  key={tagName}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9.5px] font-black uppercase border border-stone-100/50"
+                  style={{
+                    backgroundColor: `${info.color}12`,
+                    borderColor: `${info.color}25`,
+                    color: info.color
+                  }}
+                >
+                  <span>{info.emoji}</span>
+                  <span>{info.name}</span>
+                  <span className="font-extrabold opacity-75">×{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
