@@ -652,19 +652,17 @@ export const EditProfileView = ({
 
                     <span>{tag.name}</span>
 
-                    {!isSystemDefault && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTag(tag.id);
-                          if (isSelected) setSelectedTagId(null);
-                        }}
-                        className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0"
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTag(tag.id);
+                        if (isSelected) setSelectedTagId(null);
+                      }}
+                      className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
                   </div>
                 );
               })}

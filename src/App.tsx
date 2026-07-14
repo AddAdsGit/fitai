@@ -3028,6 +3028,26 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                   />
                 ))}
               </div>
+
+              {/* Daily Tag Hits Summary */}
+              {(() => {
+                const activeTags = Object.entries(dailyTagHits || {}).filter(([_, count]) => (count as number) > 0);
+                if (activeTags.length === 0) return null;
+
+                return (
+                  <div className="mt-5 flex flex-wrap justify-center gap-1.5 select-none">
+                    {activeTags.map(([tagName, count]) => (
+                      <div
+                        key={tagName}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-stone-100/60 border border-stone-200/40 text-stone-500 shadow-3xs"
+                      >
+                        <span>{tagName}</span>
+                        <span className="font-extrabold text-stone-400">×{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
  
             {/* Weight Tracker Section — only visible when not yet logged today */}
@@ -4869,34 +4889,6 @@ function WellnessJournal({
           </div>
         )}
       </div>
-
-      {/* Un-editable tag hits summary row */}
-      {(() => {
-        const activeTags = Object.entries(dailyTagHits || {}).filter(([_, count]) => count > 0);
-        if (activeTags.length === 0) return null;
-
-        const getTagName = (tagName: string) => {
-          const found = (trackingTags || []).find((t: any) => t.name.toLowerCase() === tagName.toLowerCase());
-          return found ? found.name : tagName;
-        };
-
-        return (
-          <div className="flex flex-wrap gap-1.5 pt-3 border-t border-stone-100/80 select-none">
-            {activeTags.map(([tagName, count]) => {
-              const displayName = getTagName(tagName);
-              return (
-                <div
-                  key={tagName}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-stone-50 border border-stone-200/60 text-stone-500"
-                >
-                  <span>{displayName}</span>
-                  <span className="font-extrabold text-stone-400">×{count}</span>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
     </div>
   );
 }
