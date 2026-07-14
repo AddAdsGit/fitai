@@ -417,48 +417,10 @@ export function drawObsidianCard(dc: CardDrawContext): void {
     ctx.fillText(`+ ${mealsList.length - topMeals.length} more meals logged`, 100, moreY + 14);
   }
 
-  // Draw tag hits summary row right above footer divider
-  const activeTags = (Object.entries(
-    mealsList.reduce((acc: Record<string, number>, m: any) => {
-      if (m.tags && Array.isArray(m.tags)) {
-        m.tags.forEach((tag: string) => {
-          acc[tag] = (acc[tag] || 0) + 1;
-        });
-      }
-      return acc;
-    }, {})
-  ) as [string, number][]).filter(([_, count]) => count > 0);
-
   // =================================================================
   // FOOTER — Clean branding
   // =================================================================
   const footerY = H - 100;
-
-  if (activeTags.length > 0) {
-    ctx.font = "800 16px Inter, system-ui, sans-serif";
-    let currentX = 80;
-    const tagsY = footerY - 45;
-    activeTags.slice(0, 5).forEach(([tag, count]) => {
-      const label = `${tag.toUpperCase()} ×${count}`;
-      const textWidth = ctx.measureText(label).width;
-      const pillW = textWidth + 24;
-
-      ctx.fillStyle = "rgba(255, 112, 8, 0.06)";
-      ctx.beginPath();
-      ctx.roundRect(currentX, tagsY, pillW, 30, 8);
-      ctx.fill();
-
-      ctx.strokeStyle = "rgba(255, 112, 8, 0.15)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(currentX, tagsY, pillW, 30, 8);
-      ctx.stroke();
-
-      ctx.fillStyle = "#FF7008";
-      ctx.fillText(label, currentX + 12, tagsY + 20);
-      currentX += pillW + 10;
-    });
-  }
 
   // Subtle divider line
   ctx.strokeStyle = "rgba(42, 24, 16, 0.06)";

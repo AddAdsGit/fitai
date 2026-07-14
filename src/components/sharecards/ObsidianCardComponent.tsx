@@ -370,28 +370,28 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
         <div className="flex flex-col items-center gap-3 my-2 z-10 shrink-0 w-full select-none">
           {/* Hero Centered Master Concentric Rings Widget */}
           {(() => {
-            // Outermost (Thick): Calories (Orange #F97316, radius=51, strokeWidth=6.5)
-            const rCal = 51;
+            // Outermost (Thick): Calories (Orange #F97316, radius=52, strokeWidth=4.5)
+            const rCal = 52;
             const circCal = 2 * Math.PI * rCal;
             const offCal = circCal - Math.min(1, totalCalories / goalCalories) * circCal;
 
-            // Ring 2: Protein (Red #EF4444, radius=42.5, strokeWidth=4.5)
-            const rProt = 42.5;
+            // Ring 2: Protein (Red #EF4444, radius=47, strokeWidth=4)
+            const rProt = 47;
             const circProt = 2 * Math.PI * rProt;
             const offProt = circProt - Math.min(1, protein / targetProtein) * circProt;
 
-            // Ring 3: Carbs (Cyan #0891B2, radius=34, strokeWidth=4.5)
-            const rCarbs = 34;
+            // Ring 3: Carbs (Cyan #0891B2, radius=42, strokeWidth=4)
+            const rCarbs = 42;
             const circCarbs = 2 * Math.PI * rCarbs;
             const offCarbs = circCarbs - Math.min(1, carbs / targetCarbs) * circCarbs;
 
-            // Ring 4: Fats (Amber #EAB308, radius=25.5, strokeWidth=4.5)
-            const rFats = 25.5;
+            // Ring 4: Fats (Amber #EAB308, radius=37, strokeWidth=4)
+            const rFats = 37;
             const circFats = 2 * Math.PI * rFats;
             const offFats = circFats - Math.min(1, fats / targetFats) * circFats;
 
-            // Innermost: Fiber (Emerald #10B981, radius=17, strokeWidth=4.5)
-            const rFib = 17;
+            // Innermost: Fiber (Emerald #10B981, radius=32, strokeWidth=4)
+            const rFib = 32;
             const circFib = 2 * Math.PI * rFib;
             const offFib = circFib - Math.min(1, fiber / targetFiber) * circFib;
 
@@ -407,7 +407,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rCal}
-                    strokeWidth="6"
+                    strokeWidth="4.5"
                     fill="transparent"
                     stroke="rgba(249, 115, 22, 0.12)"
                   />
@@ -416,7 +416,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rCal}
-                    strokeWidth="6"
+                    strokeWidth="4.5"
                     fill="transparent"
                     strokeLinecap="round"
                     stroke="#F97316"
@@ -429,7 +429,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rProt}
-                    strokeWidth="4.5"
+                    strokeWidth="4"
                     fill="transparent"
                     stroke="rgba(239, 68, 68, 0.12)"
                   />
@@ -438,7 +438,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rProt}
-                    strokeWidth="4.5"
+                    strokeWidth="4"
                     fill="transparent"
                     strokeLinecap="round"
                     stroke="#EF4444"
@@ -451,7 +451,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rCarbs}
-                    strokeWidth="4.5"
+                    strokeWidth="4"
                     fill="transparent"
                     stroke="rgba(8, 145, 178, 0.12)"
                   />
@@ -460,7 +460,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rCarbs}
-                    strokeWidth="4.5"
+                    strokeWidth="4"
                     fill="transparent"
                     strokeLinecap="round"
                     stroke="#0891B2"
@@ -473,7 +473,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rFats}
-                    strokeWidth="4.5"
+                    strokeWidth="4"
                     fill="transparent"
                     stroke="rgba(234, 179, 8, 0.12)"
                   />
@@ -482,7 +482,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rFats}
-                    strokeWidth="4.5"
+                    strokeWidth="4"
                     fill="transparent"
                     strokeLinecap="round"
                     stroke="#EAB308"
@@ -495,7 +495,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rFib}
-                    strokeWidth="4.5"
+                    strokeWidth="4"
                     fill="transparent"
                     stroke="rgba(16, 185, 129, 0.12)"
                   />
@@ -504,7 +504,7 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                     cx="60"
                     cy="60"
                     r={rFib}
-                    strokeWidth="4.5"
+                    strokeWidth="4"
                     fill="transparent"
                     strokeLinecap="round"
                     stroke="#10B981"
@@ -720,34 +720,6 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
         </div>
       )}
 
-      {/* Tag Hits Summary Row */}
-      {(() => {
-        const activeTags = (Object.entries(
-          mealsList.reduce((acc: Record<string, number>, m: any) => {
-            if (m.tags && Array.isArray(m.tags)) {
-              m.tags.forEach((tag: string) => {
-                acc[tag] = (acc[tag] || 0) + 1;
-              });
-            }
-            return acc;
-          }, {})
-        ) as [string, number][]).filter(([_, count]) => count > 0);
-
-        if (activeTags.length === 0) return null;
-
-        return (
-          <div className="flex flex-wrap gap-1 px-1 py-1.5 border-t border-stone-200/40 z-10 shrink-0 select-none mt-2">
-            {activeTags.slice(0, 5).map(([tag, count]) => (
-              <div
-                key={tag}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-orange-200/30 bg-orange-500/5 text-orange-600 font-extrabold text-[8px] uppercase tracking-wider"
-              >
-                {tag} ×{count}
-              </div>
-            ))}
-          </div>
-        );
-      })()}
 
       {/* 6. Footer (App branding footprint) */}
       <footer className="border-t border-stone-200/60 pt-3.5 flex justify-between items-center z-10 shrink-0 px-1 mt-1">

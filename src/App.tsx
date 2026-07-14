@@ -798,7 +798,8 @@ export default function App() {
     
     setProfileDataState(resolvedData);
 
-    if (!isDataLoading && resolvedData.agent_config?.trackWeight && resolvedData.weight !== profileDataRef.current.weight) {
+    const wasOnboarded = profileDataRef.current.preferences?.includes("onboarded");
+    if (!isDataLoading && resolvedData.agent_config?.trackWeight && wasOnboarded && resolvedData.weight !== profileDataRef.current.weight) {
       const todayStr = new Date().toLocaleDateString("en-CA");
       setWeightLogs(prev => {
         const filtered = prev.filter(l => l.date !== todayStr);

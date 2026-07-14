@@ -94,16 +94,15 @@ export const InsightsView = ({
   }, [weightLogs, timeRange]);
 
   const weightStats = useMemo(() => {
-    if (!weightLogs || weightLogs.length === 0) {
+    if (!filteredWeightData || filteredWeightData.length === 0) {
       return { start: profileData.weight, current: profileData.weight, goal: profileData.goals.weightGoal, change: 0 };
     }
-    const sorted = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date));
-    const start = sorted[0].weight;
-    const current = sorted[sorted.length - 1].weight;
+    const start = filteredWeightData[0].weight;
+    const current = filteredWeightData[filteredWeightData.length - 1].weight;
     const goal = profileData.goals.weightGoal || 70;
     const change = current - start;
     return { start, current, goal, change };
-  }, [weightLogs, profileData.weight, profileData.goals.weightGoal]);
+  }, [filteredWeightData, profileData.weight, profileData.goals.weightGoal]);
 
   const localFormatDateStr = (date: Date) => {
     const y = date.getFullYear();
