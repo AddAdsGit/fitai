@@ -222,7 +222,7 @@ paths:
                   description: Optional detailed notes or description of the meal (e.g., ingredients, prep style).
                 tags:
                   type: array
-                  description: Array of custom or default tags (e.g., ["High Protein", "Gluten Free"])
+                  description: Array of custom or default tags (e.g., ["Gluten Free", "Rich in Iron"])
                   items:
                     type: string
                 openaiFileIdRefs:

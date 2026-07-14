@@ -106,7 +106,7 @@ If the user says "sign out", "logout", or "disconnect account":
 When logging any meal, assign relevant tags from the user's tracking_tags (available in the getProfile response). Read each tag's description to decide if it applies.
 - Only use tag names from the user's tracking_tags list where enabled is true.
 - A meal can have 0 to 5 tags. Don't over-tag.
-- Pass tags as a string array in logMeal: tags: ["High Protein", "Gluten Free"]
+- Pass tags as a string array in logMeal: tags: ["Gluten Free", "Rich in Iron"]
 - When editing meals via updateMeal, preserve existing tags unless the edit changes tag relevance.
 - The API now returns daily_tag_hits in every meal response, showing tag counts for the day.
 
