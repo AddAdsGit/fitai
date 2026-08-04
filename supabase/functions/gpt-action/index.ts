@@ -477,21 +477,16 @@ serve(async (req) => {
     }
 
     // Parse timezone offset header (in minutes, e.g. -330 for IST +5:30)
-    const timezoneOffsetHeader = req.headers.get("x-timezone-offset");
-    let timezoneOffset = 0;
-    if (timezoneOffsetHeader) {
-      const parsed = parseInt(timezoneOffsetHeader);
-      if (!isNaN(parsed)) {
-        timezoneOffset = parsed;
-      }
-    }
-
     const getLocalTimeAndDate = () => {
-      const localTimeMs = Date.now() - (timezoneOffset * 60 * 1000);
-      const d = new Date(localTimeMs);
-      const dateStr = d.toISOString().split("T")[0];
-      const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-      return { dateStr, timeStr };
+      const userTz = profile?.timezone || "UTC";
+      try {
+        const dateStr = new Intl.DateTimeFormat("en-CA", { timeZone: userTz }).format(new Date());
+        const timeStr = new Intl.DateTimeFormat("en-US", { timeZone: userTz, hour: "numeric", minute: "2-digit", hour12: true }).format(new Date());
+        return { dateStr, timeStr };
+      } catch (_) {
+        const d = new Date();
+        return { dateStr: d.toISOString().split("T")[0], timeStr: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }) };
+      }
     };
 
     const getDailyRemaining = async (profileId: string, dateStr: string) => {
