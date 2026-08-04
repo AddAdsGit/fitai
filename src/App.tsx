@@ -454,6 +454,7 @@ export default function App() {
   const [timePickerTarget, setTimePickerTarget] = useState<"weight" | "digestion" | null>(null);
   const [timePickerInitialTime, setTimePickerInitialTime] = useState("");
 
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [profileData, setProfileDataState] = useState(INITIAL_PROFILE_STATE);
   const [mealsState, setMealsState] = useState<Meal[]>(() => {
     try {
@@ -466,8 +467,10 @@ export default function App() {
   const [recipes, setRecipesState] = useState<Recipe[]>([]);
 
   useEffect(() => {
-    localStorage.setItem("fitai_meals", JSON.stringify(mealsState));
-  }, [mealsState]);
+    if (activeProfileId) {
+      localStorage.setItem(`fitai_meals_${activeProfileId}`, JSON.stringify(mealsState));
+    }
+  }, [mealsState, activeProfileId]);
 
   const dailyTagHits = useMemo(() => {
     const hits: Record<string, number> = {};
@@ -507,7 +510,6 @@ export default function App() {
     localStorage.setItem("fitai_weight_logs", JSON.stringify(weightLogs));
   }, [weightLogs]);
 
-  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [loginUsername, setLoginUsername] = useState("");
   const [session, setSession] = useState<any>(null);
   const [showDeveloperBypass, setShowDeveloperBypass] = useState(false);
