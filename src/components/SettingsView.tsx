@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProUpgradeModal } from "./ProUpgradeModal";
 import { ChatGPTIcon } from "./ChatGPTIcon";
+import { DEFAULT_CUSTOM_GPT_URL, TELEGRAM_BOT_URL } from "../constants/app";
 
 const getOpenApiYaml = (edgeFunctionUrl: string) => `openapi: 3.1.0
 info:
@@ -682,7 +683,7 @@ export const SettingsView = ({
           <div className="text-[10px] font-semibold text-stone-550 space-y-2 pt-2 border-t border-stone-100 leading-relaxed">
             <p className="font-extrabold text-stone-700">How to Connect:</p>
             <ol className="list-decimal pl-4 space-y-1.5">
-              <li>Start a conversation with the official **[FitAI Telegram Bot](https://t.me/FitAILoggerBot)**.</li>
+              <li>Start a conversation with the official <a href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer" className="font-extrabold underline">FitAI Telegram Bot</a>.</li>
               <li>Send `/start` or `/id` to the bot to retrieve your unique numeric **Chat ID**.</li>
               <li>Enter your Chat ID below and click **Send Test Message** to verify the connection.</li>
             </ol>
@@ -857,7 +858,7 @@ export const SettingsView = ({
 
           <div className="space-y-3">
             <a
-              href="https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai"
+              href={DEFAULT_CUSTOM_GPT_URL}
               target="_blank"
               rel="noreferrer"
               className="w-full flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-99 text-center select-none border-none"
@@ -1224,7 +1225,7 @@ export const SettingsView = ({
                 <input
                   type="text"
                   placeholder="https://chatgpt.com/g/g-..."
-                  value={localStorage.getItem("fitai_custom_gpt_url") || "https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai"}
+                  value={localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL}
                   onChange={(e) => {
                     localStorage.setItem("fitai_custom_gpt_url", e.target.value);
                   }}

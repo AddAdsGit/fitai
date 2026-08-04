@@ -5,13 +5,32 @@ export interface Meal {
   type: string;
   calories: number;
   protein: number;
-  carbs: number;
-  fats: number;
+  carbs?: number;
+  fats?: number;
   image: string;
   date: string;
   fiber?: number;
   tags?: string[];
   meal_description?: string;
+  nutrients?: Record<string, number>;
+}
+
+export interface WaterLogItem {
+  id: string;
+  amount: number;
+  time: string;
+}
+
+export interface StoolLogItem {
+  id: string;
+  type: number;
+  time: string;
+}
+
+export interface EnergyLogItem {
+  id: string;
+  level: number;
+  time: string;
 }
 
 export interface DailyWellness {
@@ -19,6 +38,17 @@ export interface DailyWellness {
   profile_id?: string;
   date: string;
   notes: string;
+  water_intake?: number;
+  stool_type?: number | null;
+  stool_size?: string | null;
+  energy_level?: number | null;
+  weight_log_time?: string | null;
+  water_log_time?: string | null;
+  stool_log_time?: string | null;
+  energy_log_time?: string | null;
+  water_logs?: WaterLogItem[];
+  stool_logs?: StoolLogItem[];
+  energy_logs?: EnergyLogItem[];
   created_at?: string;
 }
 
@@ -55,6 +85,9 @@ export interface AgentConfig {
   customArtStyle?: string;
   requireConfirmation?: boolean;
   trackWeight?: boolean;
+  trackWater?: boolean;
+  trackDigestion?: boolean;
+  trackEnergy?: boolean;
   customInstructions?: string;
 }
 
@@ -63,6 +96,16 @@ export interface Knowledge {
   health: string[];
   notes: string[];
   patterns: string[];
+}
+
+export interface TrackedNutrient {
+  id: string;
+  name: string;
+  target: number;
+  unit: string;
+  color: string;
+  enabled: boolean;
+  isDefault: boolean;
 }
 
 export interface Profile {
@@ -81,9 +124,7 @@ export interface Profile {
   daily_calories_goal: number;
   weight_goal: number;
   protein_goal: number;
-  carbs_goal: number;
-  fats_goal: number;
-  fiber_goal: number;
+  tracked_nutrients?: TrackedNutrient[];
   
   // Tags
   tracking_tags: TrackingTag[];
@@ -110,6 +151,7 @@ export interface WeightLog {
   profile_id?: string;
   weight: number;
   date: string;
+  log_time?: string | null;
   created_at?: string;
 }
 

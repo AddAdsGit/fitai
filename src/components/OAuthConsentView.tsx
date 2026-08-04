@@ -4,6 +4,20 @@ import { motion } from "motion/react";
 import { supabase } from "../lib/supabaseClient";
 import { ChatGPTIcon } from "./ChatGPTIcon";
 
+// Mirrors the server-side allowlist in gpt-action/index.ts — only ChatGPT
+// Action callbacks may receive authorization codes.
+const isAllowedRedirectUri = (uri: string): boolean => {
+  try {
+    const u = new URL(uri);
+    return u.protocol === "https:" &&
+      ["chat.openai.com", "chatgpt.com"].includes(u.hostname) &&
+      u.pathname.startsWith("/aip/") &&
+      u.pathname.endsWith("/oauth/callback");
+  } catch {
+    return false;
+  }
+};
+
 export const OAuthConsentView = ({
   setActiveTab,
   triggerToast,
@@ -64,14 +78,15 @@ export const OAuthConsentView = ({
       return;
     }
 
+    if (!isAllowedRedirectUri(redirectUri)) {
+      triggerToast("This connection request has an untrusted redirect address and was blocked.");
+      return;
+    }
+
     setIsApproving(true);
     try {
-      const sessionStr = localStorage.getItem("sb-twrjigbbgioqdpwvkblo-auth-token");
-      let jwtToken = "";
-      if (sessionStr) {
-        const parsed = JSON.parse(sessionStr);
-        jwtToken = parsed?.access_token || "";
-      }
+      const { data: sessionData } = await supabase.auth.getSession();
+      const jwtToken = sessionData.session?.access_token || "";
 
       if (!jwtToken) {
         triggerToast("Session expired. Please log in again.");
@@ -80,7 +95,7 @@ export const OAuthConsentView = ({
       }
 
       const response = await fetch(
-        `https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action/oauth/approve`,
+        `${(import.meta as any).env.VITE_SUPABASE_URL}/functions/v1/gpt-action/oauth/approve`,
         {
           method: "POST",
           headers: {
@@ -122,38 +137,27 @@ export const OAuthConsentView = ({
     }, 1000);
   };
 
-  // Check if user is already logged in & auto-approve
+  // Track the auth session. Approval is NEVER automatic — handing out an
+  // authorization code requires the explicit Approve click below.
   useEffect(() => {
     let isMounted = true;
-    
+
     supabase.auth.getSession().then(({ data }) => {
       if (!isMounted) return;
       setSession(data.session);
       setCheckingSession(false);
-      
-      // Silent OAuth Auto-Approval: Instantly redirect if already logged in!
-      if (data.session && clientId && redirectUri) {
-        setTimeout(() => {
-          if (isMounted) handleApprove();
-        }, 100);
-      }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
       if (!isMounted) return;
       setSession(sess);
-      if (sess && clientId && redirectUri) {
-        setTimeout(() => {
-          if (isMounted) handleApprove();
-        }, 100);
-      }
     });
 
     return () => {
       isMounted = false;
       listener?.subscription.unsubscribe();
     };
-  }, [clientId, redirectUri]);
+  }, []);
 
   // Loading state while checking session
   if (checkingSession) {
@@ -231,20 +235,61 @@ export const OAuthConsentView = ({
     );
   }
 
-  // LOGGED IN — show clean automatic connection status (completely minimal)
+  // LOGGED IN — explicit consent required before releasing an auth code
+  const redirectTrusted = isAllowedRedirectUri(redirectUri);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
       transition={{ duration: 0.2 }}
-      className="px-6 py-12 max-w-[448px] mx-auto text-left font-sans flex flex-col justify-center min-h-[calc(100vh-80px)] animate-none"
+      className="px-6 py-12 max-w-[448px] mx-auto text-left font-sans flex flex-col justify-center min-h-[calc(100vh-80px)]"
     >
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest animate-pulse">
-          Connecting...
-        </span>
+      <div className="bg-white rounded-[32px] p-8 shadow-sm border border-stone-200/60 space-y-6 relative overflow-hidden">
+        <div className="flex items-center justify-center gap-3 relative z-10 py-2">
+          <div className="w-12 h-12 rounded-xl bg-orange-500 flex items-center justify-center shadow-sm">
+            <Sparkles className="text-white w-5 h-5 fill-white" />
+          </div>
+          <span className="text-stone-300 text-sm font-bold">＋</span>
+          <div className="w-12 h-12 rounded-xl bg-stone-900 flex items-center justify-center shadow-sm">
+            <ChatGPTIcon className="text-white w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="space-y-2 text-center relative z-10">
+          <h2 className="text-xl font-black text-stone-900">Connect ChatGPT?</h2>
+          <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider leading-relaxed">
+            ChatGPT will be able to log meals, weight, and wellness data and read your profile goals on your behalf.
+          </p>
+          <p className="text-[10px] text-stone-500 font-bold truncate">
+            {session?.user?.email || ""}
+          </p>
+        </div>
+
+        {!redirectTrusted ? (
+          <p className="text-[10px] text-red-500 text-center font-bold uppercase tracking-wider relative z-10">
+            This request&apos;s redirect address is not a trusted ChatGPT callback. Connection blocked.
+          </p>
+        ) : (
+          <div className="space-y-3 pt-2 relative z-10 flex flex-col gap-2">
+            <button
+              onClick={handleApprove}
+              disabled={isApproving || isRejecting}
+              className="w-full flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-800 disabled:opacity-60 text-white text-xs font-bold py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer shadow-sm"
+            >
+              <Check className="w-4 h-4" />
+              {isApproving ? "Connecting..." : "Approve connection"}
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={isApproving || isRejecting}
+              className="w-full flex items-center justify-center gap-2 bg-stone-100 hover:bg-stone-200 disabled:opacity-60 border border-stone-200/40 text-stone-700 text-xs font-bold py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer"
+            >
+              {isRejecting ? "Cancelling..." : "Cancel"}
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>
   );

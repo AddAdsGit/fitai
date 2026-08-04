@@ -100,11 +100,14 @@ export const ProUpgradeModal = ({ onClose }: { onClose: () => void }) => (
       </div>
 
       <div className="pt-6 mt-auto pb-8">
-        <button className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold py-4 rounded-[24px] shadow-lg shadow-orange-500/20 active:scale-95 transition-transform cursor-pointer">
-          Start 7-Day Free Trial
+        <button
+          disabled
+          className="w-full bg-stone-200 text-stone-500 font-bold py-4 rounded-[24px] cursor-not-allowed"
+        >
+          Coming soon
         </button>
         <div className="text-center text-[10px] text-[#9e9e9e] mt-4 font-medium">
-          Cancel anytime. Auto-renews after 7 days.
+          Pro subscriptions aren&apos;t available yet.
         </div>
       </div>
     </motion.div>

@@ -15,6 +15,8 @@ import {
   X,
   Calendar as CalendarIcon,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Sparkles,
   Camera,
   Check,
@@ -26,9 +28,14 @@ import {
   BookOpen,
   Edit2,
   Share2,
+  Droplet,
+  Activity,
+  Clock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "./lib/utils";
+import { normalizeTrackedNutrients, macroTargetsFromTracked, DEFAULT_TRACKED_NUTRIENTS as DEFAULT_NUTRIENTS_LIST } from "./constants/nutrition";
+import { DEFAULT_CUSTOM_GPT_URL, DAILY_WATER_GOAL_ML } from "./constants/app";
 import { calculateNutritionFromIngredients } from "./utils/nutritionCalculator";
 import { supabase, isSupabaseConfigured } from "./lib/supabaseClient";
 
@@ -41,12 +48,14 @@ import { SettingsView, DEFAULT_TRACKING_TAGS } from "./components/SettingsView";
 import { OAuthConsentView } from "./components/OAuthConsentView";
 import { OnboardingWizard } from "./components/OnboardingWizard";
 import { CalendarPickerModal } from "./components/CalendarPickerModal";
+import { TimePickerModal } from "./components/TimePickerModal";
 import { DefaultAvatar } from "./components/DefaultAvatar";
 import { RecipeShareModal } from "./components/RecipeShareModal";
 import { MealShareModal } from "./components/MealShareModal";
 import { DayShareModal } from "./components/DayShareModal";
 import { PublicShareView } from "./components/PublicShareView";
 import { ChatGPTIcon } from "./components/ChatGPTIcon";
+import { BristolStoolIcon } from "./components/BristolStoolIcons";
 
 
 // Import types & helpers
@@ -180,7 +189,7 @@ export default function App() {
     const plusAction = plusActionTag.split(":")[1] || "ai_logger";
 
     if (plusAction === "gpt_redirect") {
-      const gptUrl = localStorage.getItem("fitai_custom_gpt_url") || "https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai";
+      const gptUrl = localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL;
       window.open(gptUrl.trim(), "_blank");
       return;
     }
@@ -282,6 +291,33 @@ export default function App() {
   const [autoTriggerPhotoScan, setAutoTriggerPhotoScan] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [draftWeight, setDraftWeight] = useState<number | null>(null);
+  const [draftWater, setDraftWater] = useState<number | null>(null);
+  const [draftStoolType, setDraftStoolType] = useState<number | null>(null);
+  const [draftEnergy, setDraftEnergy] = useState<number | null>(null);
+  const [isStoolSliding, setIsStoolSliding] = useState(false);
+  const [isEnergySliding, setIsEnergySliding] = useState(false);
+  const [isWaterStepping, setIsWaterStepping] = useState(false);
+  const waterSteppingTimeoutRef = useRef<any>(null);
+
+  const triggerWaterStepping = () => {
+    setIsWaterStepping(true);
+    if (waterSteppingTimeoutRef.current) clearTimeout(waterSteppingTimeoutRef.current);
+    waterSteppingTimeoutRef.current = setTimeout(() => setIsWaterStepping(false), 1500);
+  };
+
+  const [isWeightStepping, setIsWeightStepping] = useState(false);
+  const weightSteppingTimeoutRef = useRef<any>(null);
+
+  const triggerWeightStepping = () => {
+    setIsWeightStepping(true);
+    if (weightSteppingTimeoutRef.current) clearTimeout(weightSteppingTimeoutRef.current);
+    weightSteppingTimeoutRef.current = setTimeout(() => setIsWeightStepping(false), 1500);
+  };
+
+  const [draftWeightTime, setDraftWeightTime] = useState<string>("");
+  const [draftWaterTime, setDraftWaterTime] = useState<string>("");
+  const [draftStoolTime, setDraftStoolTime] = useState<string>("");
+  const [draftEnergyTime, setDraftEnergyTime] = useState<string>("");
 
   useEffect(() => {
     const savedKey = localStorage.getItem("fitai_gemini_api_key");
@@ -289,6 +325,8 @@ export default function App() {
       localStorage.removeItem("fitai_gemini_api_key");
     }
   }, []);
+
+
 
   useEffect(() => {
     if (!selectedRecipePopup) {
@@ -335,6 +373,8 @@ export default function App() {
       customArtStyle: "",
       requireConfirmation: false,
       trackWeight: true,
+      trackWater: false,
+      trackDigestion: false,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     },
     preferences: ["Gluten Free", "Keto"],
@@ -364,7 +404,8 @@ export default function App() {
     telegramReportsEnabled: false,
     telegramReminderTimes: ["09:00", "13:00", "20:00"],
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    tracking_tags: []
+    tracking_tags: [],
+    tracked_nutrients: DEFAULT_NUTRIENTS_LIST
   };
 
   // Precise selected date tracking states
@@ -409,6 +450,9 @@ export default function App() {
   };
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [timePickerTarget, setTimePickerTarget] = useState<"weight" | "digestion" | null>(null);
+  const [timePickerInitialTime, setTimePickerInitialTime] = useState("");
 
   const [profileData, setProfileDataState] = useState(INITIAL_PROFILE_STATE);
   const [mealsState, setMealsState] = useState<Meal[]>(() => {
@@ -474,6 +518,7 @@ export default function App() {
   
   // Router States & Navigation
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [isVitalsLogOpen, setIsVitalsLogOpen] = useState(false);
 
   // Password Recovery States
   const [newPassword, setNewPassword] = useState("");
@@ -525,7 +570,7 @@ export default function App() {
           supabase.from('profiles').update({ email: user.email }).eq('id', existing.id).then();
         }
       } else {
-        const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+        const newKey = "fit_" + crypto.randomUUID().replace(/-/g, "");
         const baseUsername = user.email ? user.email.split('@')[0] : "user_" + Math.random().toString(36).substring(7);
         
         // Ensure username uniqueness
@@ -557,9 +602,6 @@ export default function App() {
           daily_calories_goal: 2000,
           weight_goal: 70.0,
           protein_goal: 150,
-          carbs_goal: 150,
-          fats_goal: 60,
-          fiber_goal: 30,
           api_key: newKey,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
@@ -737,12 +779,8 @@ export default function App() {
         showToast(`✨ Authenticated bypass for @${username}!`);
       } else {
         // Create a new profile with a generated UUID
-        const newId = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-          const r = (Math.random() * 16) | 0;
-          const v = c === "x" ? r : (r & 0x3) | 0x8;
-          return v.toString(16);
-        });
-        const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+        const newId = crypto.randomUUID();
+        const newKey = "fit_" + crypto.randomUUID().replace(/-/g, "");
         const newProfile = {
           id: newId,
           username,
@@ -755,9 +793,6 @@ export default function App() {
           daily_calories_goal: 2000,
           weight_goal: 70.0,
           protein_goal: 150,
-          carbs_goal: 150,
-          fats_goal: 60,
-          fiber_goal: 30,
           api_key: newKey,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
         };
@@ -798,22 +833,7 @@ export default function App() {
     
     setProfileDataState(resolvedData);
 
-    const wasOnboarded = profileDataRef.current.preferences?.includes("onboarded");
-    if (!isDataLoading && resolvedData.agent_config?.trackWeight && wasOnboarded && resolvedData.weight !== profileDataRef.current.weight) {
-      const todayStr = new Date().toLocaleDateString("en-CA");
-      setWeightLogs(prev => {
-        const filtered = prev.filter(l => l.date !== todayStr);
-        return [...filtered, { weight: resolvedData.weight, date: todayStr }].sort((a, b) => a.date.localeCompare(b.date));
-      });
 
-      if (isSupabaseConfigured && activeProfileId) {
-        supabase.from("weight_logs").upsert({
-          profile_id: activeProfileId,
-          weight: resolvedData.weight,
-          date: todayStr
-        }, { onConflict: "profile_id,date" }).then();
-      }
-    }
 
     if (isSupabaseConfigured && activeProfileId) {
       if (dbUpdateTimeoutRef.current) {
@@ -840,10 +860,14 @@ export default function App() {
             preferences: resolvedData.preferences,
             daily_calories_goal: resolvedData.goals.dailyCalories,
             weight_goal: resolvedData.goals.weightGoal,
-            protein_goal: resolvedData.macros.protein,
-            carbs_goal: resolvedData.macros.carbs,
-            fats_goal: resolvedData.macros.fats,
-            fiber_goal: resolvedData.macros.fiber,
+            protein_goal: resolvedData.macros?.protein || resolvedData.protein_goal,
+            // The macro steppers (EditProfileView) edit `macros`; fold those
+            // targets back into tracked_nutrients so they actually persist.
+            tracked_nutrients: (resolvedData.tracked_nutrients || DEFAULT_NUTRIENTS_LIST).map((n: any) =>
+              resolvedData.macros?.[n.id] !== undefined
+                ? { ...n, target: resolvedData.macros[n.id] }
+                : n
+            ),
             track_micros: resolvedData.trackMicros,
             micros: resolvedData.micros,
             notion_api_key: resolvedData.notionApiKey,
@@ -892,8 +916,12 @@ export default function App() {
         if (session?.user) {
           await handleUserAuthenticated(session.user);
         } else {
-          // Check username-only fallback
-          const savedProfileId = localStorage.getItem("fitai_active_profile_id");
+          // Session-less profile restore exists ONLY for the dev bypass login.
+          // In production a real auth session is required — restoring identity
+          // from localStorage alone would be a session-less auth path.
+          const savedProfileId = import.meta.env.DEV
+            ? localStorage.getItem("fitai_active_profile_id")
+            : null;
           if (savedProfileId) {
             const { data: existing, error } = await supabase
               .from('profiles')
@@ -1078,12 +1106,9 @@ export default function App() {
               dailyCalories: profile.daily_calories_goal,
               weightGoal: profile.weight_goal
             },
-            macros: {
-              protein: profile.protein_goal,
-              carbs: profile.carbs_goal,
-              fats: profile.fats_goal,
-              fiber: profile.fiber_goal
-            },
+            protein_goal: profile.protein_goal,
+            tracked_nutrients: normalizeTrackedNutrients(profile.tracked_nutrients, profile.protein_goal),
+            macros: macroTargetsFromTracked(normalizeTrackedNutrients(profile.tracked_nutrients, profile.protein_goal)),
             trackMicros: profile.track_micros,
             micros: profile.micros || [],
             api_key: profile.api_key,
@@ -1096,14 +1121,24 @@ export default function App() {
             telegramReportsEnabled: profile.telegram_reports_enabled || false,
             telegramReminderTimes: profile.telegram_reminder_times || ["09:00", "13:00", "20:00"],
             timezone: profile.timezone || "UTC",
-            tracking_tags: profile.tracking_tags || []
+            tracking_tags: (() => {
+              const list = [...(profile.tracking_tags || DEFAULT_TRACKING_TAGS)];
+              DEFAULT_TRACKING_TAGS.forEach((defItem) => {
+                const exists = list.some((item: any) => item.id === defItem.id);
+                if (!exists) {
+                  list.push({ ...defItem, enabled: false });
+                }
+              });
+              return list;
+            })()
           });
 
           // Load daily wellness notes if table query was successful
           let initialNotesList: DailyWellness[] = [];
           if (wellnessRes && !wellnessRes.error && wellnessRes.data) {
-            initialNotesList = wellnessRes.data;
-            setDailyNotes(wellnessRes.data);
+            const parsedWellness = wellnessRes.data.map(parseWellnessRow);
+            initialNotesList = parsedWellness;
+            setDailyNotes(parsedWellness);
           }
 
           // Onboarding states removed, handled by OnboardingWizard
@@ -1205,21 +1240,25 @@ export default function App() {
         if (mealsRes.error) {
           console.error("Error loading meals from Supabase:", mealsRes.error);
         } else {
-          const mappedMeals: Meal[] = (mealsRes.data || []).map(m => ({
-            id: m.id,
-            name: m.name,
-            time: m.time,
-            type: m.type,
-            calories: m.calories,
-            protein: m.protein,
-            carbs: m.carbs,
-            fats: m.fats,
-            fiber: m.fiber || 0,
-            image: m.image,
-            meal_description: m.meal_description || "",
-            date: m.date,
-            tags: m.tags || []
-          }));
+          const mappedMeals: Meal[] = (mealsRes.data || []).map(m => {
+            const nut = m.nutrients || {};
+            return {
+              id: m.id,
+              name: m.name,
+              time: m.time,
+              type: m.type,
+              calories: m.calories,
+              protein: m.protein,
+              carbs: nut.carbs !== undefined ? nut.carbs : m.carbs,
+              fats: nut.fats !== undefined ? nut.fats : m.fats,
+              fiber: nut.fiber !== undefined ? nut.fiber : (m.fiber || 0),
+              nutrients: nut,
+              image: m.image,
+              meal_description: m.meal_description || "",
+              date: m.date,
+              tags: m.tags || []
+            };
+          });
 
           if (mappedMeals.length === 0 && profileRes.data?.username === "johndoe") {
             const seedPromises = INITIAL_MEALS.map(m =>
@@ -1230,9 +1269,7 @@ export default function App() {
                 type: m.type,
                 calories: m.calories,
                 protein: m.protein,
-                carbs: m.carbs,
-                fats: m.fats,
-                fiber: m.fiber || 0,
+                nutrients: { carbs: m.carbs || 0, fats: m.fats || 0, fiber: m.fiber || 0 },
                 image: m.image,
                 meal_description: m.meal_description || "",
                 date: m.date
@@ -1250,9 +1287,10 @@ export default function App() {
                   type: m.type,
                   calories: m.calories,
                   protein: m.protein,
-                  carbs: m.carbs,
-                  fats: m.fats,
-                  fiber: m.fiber || 0,
+                  carbs: m.nutrients?.carbs ?? 0,
+                  fats: m.nutrients?.fats ?? 0,
+                  fiber: m.nutrients?.fiber ?? 0,
+                  nutrients: m.nutrients || {},
                   image: m.image,
                   meal_description: m.meal_description || "",
                   date: m.date,
@@ -1303,21 +1341,25 @@ export default function App() {
             .eq('profile_id', activeProfileId)
             .order('created_at', { ascending: false });
           if (!error && data) {
-            const mappedMeals: Meal[] = data.map((m) => ({
-              id: m.id,
-              name: m.name,
-              time: m.time,
-              type: m.type,
-              calories: m.calories,
-              protein: m.protein,
-              carbs: m.carbs,
-              fats: m.fats,
-              fiber: m.fiber || 0,
-              image: m.image,
-              meal_description: m.meal_description || "",
-              date: m.date,
-              tags: m.tags || []
-            }));
+            const mappedMeals: Meal[] = data.map((m) => {
+              const nut = m.nutrients || {};
+              return {
+                id: m.id,
+                name: m.name,
+                time: m.time,
+                type: m.type,
+                calories: m.calories,
+                protein: m.protein,
+                carbs: nut.carbs !== undefined ? nut.carbs : m.carbs,
+                fats: nut.fats !== undefined ? nut.fats : m.fats,
+                fiber: nut.fiber !== undefined ? nut.fiber : (m.fiber || 0),
+                nutrients: nut,
+                image: m.image,
+                meal_description: m.meal_description || "",
+                date: m.date,
+                tags: m.tags || []
+              };
+            });
             setMealsState(mappedMeals);
           }
         }
@@ -1395,12 +1437,9 @@ export default function App() {
                 dailyCalories: profile.daily_calories_goal,
                 weightGoal: profile.weight_goal
               },
-              macros: {
-                protein: profile.protein_goal,
-                carbs: profile.carbs_goal,
-                fats: profile.fats_goal,
-                fiber: profile.fiber_goal
-              },
+              protein_goal: profile.protein_goal,
+              tracked_nutrients: normalizeTrackedNutrients(profile.tracked_nutrients, profile.protein_goal),
+              macros: macroTargetsFromTracked(normalizeTrackedNutrients(profile.tracked_nutrients, profile.protein_goal)),
               trackMicros: profile.track_micros,
               micros: profile.micros || [],
               api_key: profile.api_key,
@@ -1445,13 +1484,16 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    if (activeProfileId) {
-      localStorage.removeItem(`fitai_onboarded_${activeProfileId}`);
-    }
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
-    localStorage.removeItem("fitai_active_profile_id");
+    // Clear ALL app-local data so nothing (meal cache, drafts, oauth params)
+    // leaks into the next account on a shared device.
+    for (const storageKey of Object.keys(localStorage)) {
+      if (storageKey.startsWith("fitai_")) {
+        localStorage.removeItem(storageKey);
+      }
+    }
     setActiveProfileId(null);
     setMealsState([]);
     setRecipesState([]);
@@ -1467,13 +1509,6 @@ export default function App() {
       return;
     }
     
-    const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-    const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
-    const key = preferenceGeminiKey ||
-                localStorage.getItem("fitai_gemini_api_key") || 
-                (import.meta as any).env.VITE_GEMINI_API_KEY ||
-                "";
-
     setIsRecipeAiGenerating(true);
     try {
       const isEditMode = selectedRecipePopup && selectedRecipePopup.id !== "new";
@@ -1544,21 +1579,32 @@ Do not include any extra text, markdown styling, backticks, or "json" prefix. Ju
       }
 
       if (!edgeSuccess) {
-        let response = null;
-        for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
+        const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
+        const preferenceGeminiKey = geminiKeyTag.split(":")[1] || (import.meta.env as any).VITE_GEMINI_API_KEY || (typeof window !== "undefined" ? localStorage.getItem("gemini_api_key") : "");
+        
+        if (preferenceGeminiKey) {
           try {
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${preferenceGeminiKey}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
             });
-            if (response.ok) break;
-          } catch (e) {}
+            if (res.ok) {
+              const json = await res.json();
+              const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                rawText = text;
+                edgeSuccess = true;
+              }
+            }
+          } catch (e) {
+            console.warn("Direct Gemini API fallback error:", e);
+          }
         }
-        if (response && response.ok) {
-          const data = await response.json();
-          rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        }
+      }
+
+      if (!edgeSuccess) {
+        throw new Error("AI generation is unavailable right now. Configure your free Gemini Key in Settings.");
       }
 
       const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
@@ -1600,14 +1646,6 @@ Do not include any extra text, markdown styling, backticks, or "json" prefix. Ju
   };
 
   const handleGenerateAiRecipe = async () => {
-    // 1. Check if Gemini key is available
-    const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-    const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
-    const key = preferenceGeminiKey ||
-                localStorage.getItem("fitai_gemini_api_key") || 
-                (import.meta as any).env.VITE_GEMINI_API_KEY ||
-                "";
-
     setIsGeneratingRecipe(true);
     try {
       // 2. Fetch logged progress for today
@@ -1691,41 +1729,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       }
 
       if (!edgeSuccess) {
-        let response = null;
-        let lastError = "";
-
-        for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
-          try {
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-              })
-            });
-
-            if (response.ok) {
-              lastError = "";
-              break;
-            } else {
-              const errData = await response.json().catch(() => ({}));
-              lastError = errData.error?.message || `HTTP ${response.status} Error`;
-            }
-          } catch (err: any) {
-            lastError = err.message || "Connection failed";
-          }
-        }
-
-        if (!response || !response.ok) {
-          throw new Error(lastError || "Failed to contact Gemini API");
-        }
-
-        const data = await response.json();
-        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        // All Gemini calls go through the authenticated edge function — the
+        // client never talks to Google directly with an API key.
+        throw new Error("AI generation is unavailable right now. Please try again.");
       }
-      
+
       // Clean up text
       let cleaned = rawText.trim();
       if (cleaned.startsWith("```")) {
@@ -1862,9 +1870,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               name: newMealOrRecipe.name,
               calories: newMealOrRecipe.calories,
               protein: newMealOrRecipe.protein,
-              carbs: newMealOrRecipe.carbs,
-              fats: newMealOrRecipe.fats,
-              fiber: (newMealOrRecipe as any).fiber,
+              nutrients: (newMealOrRecipe as any).nutrients || {
+                carbs: newMealOrRecipe.carbs,
+                fats: newMealOrRecipe.fats,
+                fiber: (newMealOrRecipe as any).fiber,
+              },
               image: finalImage,
               type: newMealOrRecipe.type,
               time: formattedTime,
@@ -1876,6 +1886,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
           if (res.ok) {
             const data = await res.json();
+            const nut = data.meal.nutrients || {};
             const mapped: Meal = {
               id: data.meal.id,
               name: data.meal.name,
@@ -1883,9 +1894,10 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               type: data.meal.type,
               calories: data.meal.calories,
               protein: data.meal.protein,
-              carbs: data.meal.carbs,
-              fats: data.meal.fats,
-              fiber: data.meal.fiber || 0,
+              carbs: nut.carbs !== undefined ? nut.carbs : data.meal.carbs,
+              fats: nut.fats !== undefined ? nut.fats : data.meal.fats,
+              fiber: nut.fiber !== undefined ? nut.fiber : (data.meal.fiber || 0),
+              nutrients: nut,
               image: data.meal.image,
               meal_description: data.meal.meal_description || "",
               date: data.meal.date,
@@ -1910,6 +1922,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         carbs: newMealOrRecipe.carbs,
         fats: newMealOrRecipe.fats,
         fiber: (newMealOrRecipe as any).fiber || m.fiber || 0,
+        nutrients: (newMealOrRecipe as any).nutrients || m.nutrients || {
+          carbs: newMealOrRecipe.carbs,
+          fats: newMealOrRecipe.fats,
+          fiber: (newMealOrRecipe as any).fiber,
+        },
         image: finalImage,
         meal_description: newMealOrRecipe.meal_description !== undefined ? newMealOrRecipe.meal_description : m.meal_description,
         tags: (newMealOrRecipe as any).tags !== undefined ? (newMealOrRecipe as any).tags : m.tags
@@ -1931,9 +1948,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             name: newMealOrRecipe.name,
             calories: newMealOrRecipe.calories,
             protein: newMealOrRecipe.protein,
-            carbs: newMealOrRecipe.carbs,
-            fats: newMealOrRecipe.fats,
-            fiber: (newMealOrRecipe as any).fiber,
+            nutrients: (newMealOrRecipe as any).nutrients || {
+              carbs: newMealOrRecipe.carbs,
+              fats: newMealOrRecipe.fats,
+              fiber: (newMealOrRecipe as any).fiber,
+            },
             image: finalImage,
             type: newMealOrRecipe.type,
             time: formattedTime,
@@ -1945,6 +1964,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
         if (res.ok) {
           const data = await res.json();
+          const nut = data.meal.nutrients || {};
           const mapped: Meal = {
             id: data.meal.id,
             name: data.meal.name,
@@ -1952,9 +1972,10 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             type: data.meal.type,
             calories: data.meal.calories,
             protein: data.meal.protein,
-            carbs: data.meal.carbs,
-            fats: data.meal.fats,
-            fiber: data.meal.fiber || 0,
+            carbs: nut.carbs !== undefined ? nut.carbs : data.meal.carbs,
+            fats: nut.fats !== undefined ? nut.fats : data.meal.fats,
+            fiber: nut.fiber !== undefined ? nut.fiber : (data.meal.fiber || 0),
+            nutrients: nut,
             image: data.meal.image || finalImage,
             meal_description: data.meal.meal_description || "",
             date: data.meal.date,
@@ -1972,16 +1993,22 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
 
     // Local / fallback mode
+    const fallbackNutrients = (newMealOrRecipe as any).nutrients || {
+      carbs: newMealOrRecipe.carbs,
+      fats: newMealOrRecipe.fats,
+      fiber: (newMealOrRecipe as any).fiber || 0,
+    };
     const meal: Meal = {
-      id: String(mealsState.length + 1),
+      id: crypto.randomUUID(),
       name: newMealOrRecipe.name,
       time: formattedTime,
       type: newMealOrRecipe.type || "Meal",
       calories: newMealOrRecipe.calories,
       protein: newMealOrRecipe.protein,
-      carbs: newMealOrRecipe.carbs,
-      fats: newMealOrRecipe.fats,
-      fiber: (newMealOrRecipe as any).fiber || 0,
+      carbs: fallbackNutrients.carbs,
+      fats: fallbackNutrients.fats,
+      fiber: fallbackNutrients.fiber,
+      nutrients: fallbackNutrients,
       image: finalImage,
       meal_description: newMealOrRecipe.meal_description || "",
       date: selectedDate,
@@ -1993,27 +2020,56 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
   };
 
   const handleSaveDailyNote = async (dateStr: string, text: string) => {
-    const updatedNotes = [...dailyNotes.filter(n => n.date !== dateStr)];
-    const textTrimmed = text.trim();
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    const waterLogs = existing?.water_logs || [];
+    const stoolLogs = existing?.stool_logs || [];
+    const energyLogs = existing?.energy_logs || [];
+    const hasLog = existing && (existing.water_intake || existing.stool_type !== null || waterLogs.length > 0 || stoolLogs.length > 0 || energyLogs.length > 0);
+    const textTrimmed = text.replace(/\s*<!-- FIT_WELLNESS_META: [\s\S]*? -->/g, "").trim();
+    const formattedNotes = embedWellnessMeta(textTrimmed, waterLogs, stoolLogs, energyLogs);
     
-    if (textTrimmed) {
+    const updatedNotes = [...dailyNotes.filter(n => n.date !== dateStr)];
+    if (textTrimmed || hasLog) {
       updatedNotes.push({
+        ...existing,
         date: dateStr,
-        notes: textTrimmed
+        notes: formattedNotes,
+        water_intake: existing ? (existing.water_intake || 0) : 0,
+        water_logs: waterLogs,
+        stool_type: existing ? existing.stool_type : null,
+        stool_size: existing ? existing.stool_size : null,
+        stool_logs: stoolLogs,
+        energy_level: existing ? existing.energy_level : null,
+        energy_logs: energyLogs,
+        weight_log_time: existing ? existing.weight_log_time : null,
+        water_log_time: existing ? existing.water_log_time : null,
+        stool_log_time: existing ? existing.stool_log_time : null,
+        energy_log_time: existing ? existing.energy_log_time : null
       });
     }
     setDailyNotes(updatedNotes);
 
     if (isSupabaseConfigured && activeProfileId) {
       try {
-        if (textTrimmed) {
+        if (textTrimmed || hasLog) {
           await supabase.from("daily_wellness").upsert({
             profile_id: activeProfileId,
             date: dateStr,
-            notes: textTrimmed
+            notes: formattedNotes,
+            water_intake: existing ? (existing.water_intake || 0) : 0,
+            water_logs: waterLogs,
+            stool_type: existing ? existing.stool_type : null,
+            stool_size: existing ? existing.stool_size : null,
+            stool_logs: stoolLogs,
+            energy_level: existing ? existing.energy_level : null,
+            energy_logs: energyLogs,
+            weight_log_time: existing ? existing.weight_log_time : null,
+            water_log_time: existing ? existing.water_log_time : null,
+            stool_log_time: existing ? existing.stool_log_time : null,
+            energy_log_time: existing ? existing.energy_log_time : null
           }, { onConflict: "profile_id,date" });
         } else {
-          // Delete note if cleared
+          // Delete note if cleared and no other log exists
           await supabase.from("daily_wellness").delete().eq("profile_id", activeProfileId).eq("date", dateStr);
         }
       } catch (err) {
@@ -2150,10 +2206,30 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     (sum, meal) => sum + meal.calories,
     0,
   );
-  const totalProtein = activeMeals.reduce((sum, meal) => sum + meal.protein, 0);
-  const totalCarbs = activeMeals.reduce((sum, meal) => sum + meal.carbs, 0);
-  const totalFats = activeMeals.reduce((sum, meal) => sum + meal.fats, 0);
-  const totalFiber = activeMeals.reduce((sum, meal) => sum + (meal.fiber || 0), 0);
+  const DEFAULT_TRACKED_NUTRIENTS = DEFAULT_NUTRIENTS_LIST;
+
+  const enabledNutrients = useMemo(() => {
+    const fields = profileData.tracked_nutrients || DEFAULT_TRACKED_NUTRIENTS;
+    return fields.filter((f: any) => f.enabled);
+  }, [profileData.tracked_nutrients, DEFAULT_TRACKED_NUTRIENTS]);
+
+  const getLoggedNutrientTotal = (nutrientId: string) => {
+    return activeMeals.reduce((sum, m) => {
+      if (m.nutrients && m.nutrients[nutrientId] !== undefined) {
+        return sum + (m.nutrients[nutrientId] || 0);
+      }
+      if (nutrientId === "protein") return sum + (m.protein || 0);
+      if (nutrientId === "carbs") return sum + (m.carbs || 0);
+      if (nutrientId === "fats") return sum + (m.fats || 0);
+      if (nutrientId === "fiber") return sum + (m.fiber || 0);
+      return sum;
+    }, 0);
+  };
+
+  const totalProtein = getLoggedNutrientTotal("protein");
+  const totalCarbs = getLoggedNutrientTotal("carbs");
+  const totalFats = getLoggedNutrientTotal("fats");
+  const totalFiber = getLoggedNutrientTotal("fiber");
 
   // Compute current streak: count consecutive days with at least one meal, going back from today
   const currentStreak = (() => {
@@ -2659,8 +2735,78 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
-  const handleLogWeight = async (weight: number, dateStr: string) => {
+  const embedWellnessMeta = (
+    notesText: string,
+    waterLogs: any[],
+    stoolLogs: any[],
+    energyLogs: any[]
+  ): string => {
+    const cleanNotes = (notesText || "").replace(/\s*<!-- FIT_WELLNESS_META: [\s\S]*? -->/g, "").trim();
+    const metaObj = {
+      water_logs: waterLogs,
+      stool_logs: stoolLogs,
+      energy_logs: energyLogs
+    };
+    return cleanNotes ? `${cleanNotes}\n\n<!-- FIT_WELLNESS_META: ${JSON.stringify(metaObj)} -->` : `<!-- FIT_WELLNESS_META: ${JSON.stringify(metaObj)} -->`;
+  };
+
+  const extractWellnessMeta = (notesText: string) => {
+    if (!notesText) return null;
+    const match = notesText.match(/<!-- FIT_WELLNESS_META: ([\s\S]*?) -->/);
+    if (match && match[1]) {
+      try {
+        return JSON.parse(match[1]);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const parseWellnessRow = (row: DailyWellness): DailyWellness => {
+    let waterLogs = Array.isArray(row.water_logs) && row.water_logs.length > 0 ? row.water_logs : [];
+    let stoolLogs = Array.isArray(row.stool_logs) && row.stool_logs.length > 0 ? row.stool_logs : [];
+    let energyLogs = Array.isArray(row.energy_logs) && row.energy_logs.length > 0 ? row.energy_logs : [];
+
+    const meta = row.notes ? extractWellnessMeta(row.notes) : null;
+    if (meta) {
+      if (!waterLogs.length && Array.isArray(meta.water_logs) && meta.water_logs.length > 0) {
+        waterLogs = meta.water_logs;
+      }
+      if (!stoolLogs.length && Array.isArray(meta.stool_logs) && meta.stool_logs.length > 0) {
+        stoolLogs = meta.stool_logs;
+      }
+      if (!energyLogs.length && Array.isArray(meta.energy_logs) && meta.energy_logs.length > 0) {
+        energyLogs = meta.energy_logs;
+      }
+    }
+
+    return {
+      ...row,
+      water_logs: waterLogs,
+      stool_logs: stoolLogs,
+      energy_logs: energyLogs
+    };
+  };
+
+  const syncWellnessLogsToNotes = (
+    currentNotes: string,
+    _weight?: number | null,
+    _weightTime?: string | null,
+    _water?: number | null,
+    _stool?: number | null,
+    _stoolTime?: string | null,
+    _energy?: number | null,
+    _energyTime?: string | null,
+    _waterTime?: string | null
+  ): string => {
+    return currentNotes.replace(/\s*<!-- FIT_WELLNESS_META: [\s\S]*? -->/g, "").replace(/\n*--- Wellness Logs ---[\s\S]*$/, "").trim();
+  };
+
+  const handleLogWeight = async (weight: number, dateStr: string, logTime?: string | null) => {
     if (!activeProfileId) return;
+    
+    const timeToLog = logTime !== undefined ? logTime : (draftWeightTime || new Date().toTimeString().slice(0, 5));
     
     const { data: upsertedData, error: upsertError } = await supabase
       .from("weight_logs")
@@ -2668,7 +2814,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         {
           profile_id: activeProfileId,
           date: dateStr,
-          weight: weight
+          weight: weight,
+          log_time: timeToLog
         },
         { onConflict: "profile_id,date" }
       )
@@ -2681,10 +2828,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
 
     const loggedRow = (upsertedData && upsertedData[0]) || {
-      id: Math.random().toString(),
+      id: crypto.randomUUID(),
       profile_id: activeProfileId,
       date: dateStr,
-      weight: weight
+      weight: weight,
+      log_time: timeToLog
     };
 
     setWeightLogs(prev => {
@@ -2707,6 +2855,34 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       }));
     }
 
+    // Sync to notes
+    const existingWellness = dailyNotes.find(n => n.date === dateStr);
+    const waterVal = existingWellness ? (existingWellness.water_intake || 0) : 0;
+    const stoolVal = existingWellness ? existingWellness.stool_type : null;
+    const stoolTime = existingWellness ? existingWellness.stool_log_time : null;
+    const notesText = existingWellness ? existingWellness.notes : "";
+    const syncedNotes = syncWellnessLogsToNotes(notesText, weight, timeToLog, waterVal, stoolVal, stoolTime);
+
+    const { data: wellnessData } = await supabase
+      .from("daily_wellness")
+      .upsert({
+        profile_id: activeProfileId,
+        date: dateStr,
+        notes: syncedNotes,
+        water_intake: waterVal,
+        stool_type: stoolVal,
+        weight_log_time: timeToLog,
+        stool_log_time: stoolTime
+      }, { onConflict: "profile_id,date" })
+      .select();
+
+    if (wellnessData && wellnessData[0]) {
+      setDailyNotes(prev => {
+        const filtered = prev.filter(n => n.date !== dateStr);
+        return [...filtered, wellnessData[0]];
+      });
+    }
+
     showToast("✨ Weight logged successfully");
   };
 
@@ -2715,6 +2891,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
     const logToDelete = weightLogs.find(l => l.id === logId);
     if (!logToDelete) return;
+    const dateStr = logToDelete.date;
 
     const { error: deleteError } = await supabase
       .from("weight_logs")
@@ -2740,8 +2917,461 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       }));
     }
 
+    // Sync to notes
+    const existingWellness = dailyNotes.find(n => n.date === dateStr);
+    const waterVal = existingWellness ? (existingWellness.water_intake || 0) : 0;
+    const stoolVal = existingWellness ? existingWellness.stool_type : null;
+    const stoolTime = existingWellness ? existingWellness.stool_log_time : null;
+    const notesText = existingWellness ? existingWellness.notes : "";
+    const syncedNotes = syncWellnessLogsToNotes(notesText, null, null, waterVal, stoolVal, stoolTime);
+
+    const { data: wellnessData } = await supabase
+      .from("daily_wellness")
+      .upsert({
+        profile_id: activeProfileId,
+        date: dateStr,
+        notes: syncedNotes,
+        water_intake: waterVal,
+        stool_type: stoolVal,
+        weight_log_time: null,
+        stool_log_time: stoolTime
+      }, { onConflict: "profile_id,date" })
+      .select();
+
+    if (wellnessData && wellnessData[0]) {
+      setDailyNotes(prev => {
+        const filtered = prev.filter(n => n.date !== dateStr);
+        return [...filtered, wellnessData[0]];
+      });
+    }
+
     showToast("Weight log removed");
   };
+
+  const handleLogWater = async (waterAmount: number, dateStr: string, logTime?: string) => {
+    if (!activeProfileId) return;
+
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    const notesText = existing ? existing.notes : "";
+    const currentStoolType = existing ? existing.stool_type : null;
+    const currentStoolTime = existing ? existing.stool_log_time : null;
+    const currentEnergyLevel = existing ? existing.energy_level : null;
+    const currentEnergyTime = existing ? existing.energy_log_time : null;
+    const currentStoolLogs = existing?.stool_logs || [];
+    const currentEnergyLogs = existing?.energy_logs || [];
+
+    const weightLogToday = weightLogs.find(w => w.date === dateStr);
+    const weightVal = weightLogToday ? weightLogToday.weight : null;
+    const weightTime = weightLogToday ? weightLogToday.log_time : null;
+
+    const waterTime = logTime || (existing ? existing.water_log_time : null) || new Date().toTimeString().slice(0, 5);
+
+    // Multi-log array logic
+    const existingWaterLogs = existing?.water_logs || [];
+    let updatedWaterLogs: any[] = [];
+    let newTotalWater = 0;
+
+    if (waterAmount === 0) {
+      updatedWaterLogs = [];
+      newTotalWater = 0;
+    } else {
+      const newItem = { id: crypto.randomUUID(), amount: waterAmount, time: waterTime };
+      updatedWaterLogs = [...existingWaterLogs, newItem];
+      newTotalWater = updatedWaterLogs.reduce((acc, item) => acc + (item.amount || 0), 0);
+    }
+
+    const syncedNotes = embedWellnessMeta(notesText, updatedWaterLogs, currentStoolLogs, currentEnergyLogs);
+
+    let upsertedData: any = null;
+    let { data, error } = await supabase
+      .from("daily_wellness")
+      .upsert(
+        {
+          profile_id: activeProfileId,
+          date: dateStr,
+          notes: syncedNotes,
+          water_intake: newTotalWater,
+          water_log_time: waterTime,
+          water_logs: updatedWaterLogs,
+          stool_type: currentStoolType,
+          weight_log_time: weightTime,
+          stool_log_time: currentStoolTime,
+          energy_level: currentEnergyLevel,
+          energy_log_time: currentEnergyTime
+        },
+        { onConflict: "profile_id,date" }
+      )
+      .select();
+
+    upsertedData = data;
+
+    if (error) {
+      console.warn("Retrying water log with fallback payload:", error.message);
+      const fallbackRes = await supabase
+        .from("daily_wellness")
+        .upsert(
+          {
+            profile_id: activeProfileId,
+            date: dateStr,
+            notes: syncedNotes,
+            water_intake: newTotalWater,
+            stool_type: currentStoolType,
+          },
+          { onConflict: "profile_id,date" }
+        )
+        .select();
+
+      if (!fallbackRes.error) {
+        upsertedData = fallbackRes.data;
+      }
+    }
+
+    const dbRow = (upsertedData && upsertedData[0]) || {};
+    const loggedRow: DailyWellness = {
+      ...dbRow,
+      id: dbRow.id || existing?.id || crypto.randomUUID(),
+      profile_id: activeProfileId,
+      date: dateStr,
+      notes: syncedNotes,
+      water_intake: newTotalWater,
+      water_log_time: waterTime,
+      water_logs: updatedWaterLogs,
+      stool_type: currentStoolType,
+      stool_logs: currentStoolLogs,
+      weight_log_time: weightTime,
+      stool_log_time: currentStoolTime,
+      energy_level: currentEnergyLevel,
+      energy_log_time: currentEnergyTime,
+      energy_logs: currentEnergyLogs
+    };
+
+    setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), loggedRow]);
+
+    if (waterAmount === 0) {
+      showToast("✨ Water logs reset");
+    } else {
+      showToast(`💧 +${waterAmount} ml water logged`);
+    }
+  };
+
+  const handleDeleteWaterLogItem = async (itemId: string, dateStr: string) => {
+    if (!activeProfileId) return;
+
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    if (!existing) return;
+
+    const existingWaterLogs = existing.water_logs || [];
+    const updatedWaterLogs = existingWaterLogs.filter(item => item.id !== itemId);
+    const newTotalWater = updatedWaterLogs.reduce((acc, item) => acc + (item.amount || 0), 0);
+    const syncedNotes = embedWellnessMeta(existing.notes, updatedWaterLogs, existing.stool_logs || [], existing.energy_logs || []);
+
+    const { data } = await supabase
+      .from("daily_wellness")
+      .upsert({
+        profile_id: activeProfileId,
+        date: dateStr,
+        notes: syncedNotes,
+        water_intake: newTotalWater,
+        water_logs: updatedWaterLogs,
+        stool_type: existing.stool_type,
+        energy_level: existing.energy_level
+      }, { onConflict: "profile_id,date" })
+      .select();
+
+    const dbRow = (data && data[0]) || {};
+    const updatedRow: DailyWellness = {
+      ...existing,
+      ...dbRow,
+      notes: syncedNotes,
+      water_intake: newTotalWater,
+      water_logs: updatedWaterLogs
+    };
+
+    setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), updatedRow]);
+    showToast("💧 Water entry removed");
+  };
+
+  const handleLogDigestion = async (stoolType: number | null, stoolSize: string | null, dateStr: string, logTime?: string | null) => {
+    if (!activeProfileId) return;
+
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    const notesText = existing ? existing.notes : "";
+    const currentWater = existing ? (existing.water_intake || 0) : 0;
+    const currentWaterLogs = existing?.water_logs || [];
+    const currentEnergyLevel = existing ? existing.energy_level : null;
+    const currentEnergyLogs = existing?.energy_logs || [];
+
+    const timeToLog = stoolType !== null ? (logTime !== undefined ? logTime : (draftStoolTime || new Date().toTimeString().slice(0, 5))) : null;
+
+    const weightLogToday = weightLogs.find(w => w.date === dateStr);
+    const weightVal = weightLogToday ? weightLogToday.weight : null;
+    const weightTime = weightLogToday ? weightLogToday.log_time : null;
+
+    const existingStoolLogs = existing?.stool_logs || [];
+    let updatedStoolLogs: any[] = [];
+    let activeType = stoolType;
+
+    if (stoolType === null) {
+      updatedStoolLogs = [];
+      activeType = null;
+    } else {
+      const newItem = { id: crypto.randomUUID(), type: stoolType, time: timeToLog || new Date().toTimeString().slice(0, 5) };
+      updatedStoolLogs = [...existingStoolLogs, newItem];
+      activeType = stoolType;
+    }
+
+    const syncedNotes = embedWellnessMeta(notesText, currentWaterLogs, updatedStoolLogs, currentEnergyLogs);
+
+    let upsertedData: any = null;
+    let { data, error } = await supabase
+      .from("daily_wellness")
+      .upsert(
+        {
+          profile_id: activeProfileId,
+          date: dateStr,
+          notes: syncedNotes,
+          water_intake: currentWater,
+          stool_type: activeType,
+          stool_size: stoolSize,
+          stool_logs: updatedStoolLogs,
+          weight_log_time: weightTime,
+          stool_log_time: timeToLog
+        },
+        { onConflict: "profile_id,date" }
+      )
+      .select();
+
+    upsertedData = data;
+
+    if (error) {
+      console.warn("Retrying digestion log with fallback payload:", error.message);
+      const fallbackRes = await supabase
+        .from("daily_wellness")
+        .upsert(
+          {
+            profile_id: activeProfileId,
+            date: dateStr,
+            notes: syncedNotes,
+            water_intake: currentWater,
+            stool_type: activeType,
+          },
+          { onConflict: "profile_id,date" }
+        )
+        .select();
+
+      if (!fallbackRes.error) {
+        upsertedData = fallbackRes.data;
+      }
+    }
+
+    const dbRow = (upsertedData && upsertedData[0]) || {};
+    const loggedRow: DailyWellness = {
+      ...dbRow,
+      id: dbRow.id || existing?.id || crypto.randomUUID(),
+      profile_id: activeProfileId,
+      date: dateStr,
+      notes: syncedNotes,
+      water_intake: currentWater,
+      water_logs: currentWaterLogs,
+      stool_type: activeType,
+      stool_size: stoolSize,
+      stool_logs: updatedStoolLogs,
+      weight_log_time: weightTime,
+      stool_log_time: timeToLog,
+      energy_level: currentEnergyLevel,
+      energy_logs: currentEnergyLogs
+    };
+
+    setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), loggedRow]);
+
+    if (stoolType === null) {
+      showToast("✨ Digestion log removed");
+    } else {
+      showToast("🧻 Digestion logged successfully");
+    }
+  };
+
+  const handleDeleteStoolLogItem = async (itemId: string, dateStr: string) => {
+    if (!activeProfileId) return;
+
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    if (!existing) return;
+
+    const existingStoolLogs = existing.stool_logs || [];
+    const updatedStoolLogs = existingStoolLogs.filter(item => item.id !== itemId);
+    const lastItem = updatedStoolLogs[updatedStoolLogs.length - 1];
+    const newStoolType = lastItem ? lastItem.type : null;
+    const newStoolTime = lastItem ? lastItem.time : null;
+    const syncedNotes = embedWellnessMeta(existing.notes, existing.water_logs || [], updatedStoolLogs, existing.energy_logs || []);
+
+    const { data } = await supabase
+      .from("daily_wellness")
+      .upsert({
+        profile_id: activeProfileId,
+        date: dateStr,
+        notes: syncedNotes,
+        stool_type: newStoolType,
+        stool_log_time: newStoolTime,
+        stool_logs: updatedStoolLogs
+      }, { onConflict: "profile_id,date" })
+      .select();
+
+    const dbRow = (data && data[0]) || {};
+    const updatedRow: DailyWellness = {
+      ...existing,
+      ...dbRow,
+      notes: syncedNotes,
+      stool_type: newStoolType,
+      stool_log_time: newStoolTime,
+      stool_logs: updatedStoolLogs
+    };
+
+    setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), updatedRow]);
+    showToast("🧻 Digestion log entry removed");
+  };
+
+  const handleLogEnergy = async (energyLevel: number | null, dateStr: string, logTime?: string | null) => {
+    if (!activeProfileId) return;
+
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    const notesText = existing ? existing.notes : "";
+    const currentWater = existing ? (existing.water_intake || 0) : 0;
+    const currentWaterLogs = existing?.water_logs || [];
+    const currentStoolType = existing ? existing.stool_type : null;
+    const currentStoolTime = existing ? existing.stool_log_time : null;
+    const currentStoolLogs = existing?.stool_logs || [];
+
+    const timeToLog = energyLevel !== null ? (logTime !== undefined ? logTime : (draftEnergyTime || new Date().toTimeString().slice(0, 5))) : null;
+
+    const weightLogToday = weightLogs.find(w => w.date === dateStr);
+    const weightVal = weightLogToday ? weightLogToday.weight : null;
+    const weightTime = weightLogToday ? weightLogToday.log_time : null;
+
+    const existingEnergyLogs = existing?.energy_logs || [];
+    let updatedEnergyLogs: any[] = [];
+    let activeLevel = energyLevel;
+
+    if (energyLevel === null) {
+      updatedEnergyLogs = [];
+      activeLevel = null;
+    } else {
+      const newItem = { id: crypto.randomUUID(), level: energyLevel, time: timeToLog || new Date().toTimeString().slice(0, 5) };
+      updatedEnergyLogs = [...existingEnergyLogs, newItem];
+      activeLevel = energyLevel;
+    }
+
+    const syncedNotes = embedWellnessMeta(notesText, currentWaterLogs, currentStoolLogs, updatedEnergyLogs);
+
+    let upsertedEnergyData: any = null;
+    let { data: energyResData, error: energyError } = await supabase
+      .from("daily_wellness")
+      .upsert(
+        {
+          profile_id: activeProfileId,
+          date: dateStr,
+          notes: syncedNotes,
+          water_intake: currentWater,
+          stool_type: currentStoolType,
+          weight_log_time: weightTime,
+          stool_log_time: currentStoolTime,
+          energy_level: activeLevel,
+          energy_log_time: timeToLog,
+          energy_logs: updatedEnergyLogs
+        },
+        { onConflict: "profile_id,date" }
+      )
+      .select();
+
+    upsertedEnergyData = energyResData;
+
+    if (energyError) {
+      console.warn("Retrying energy log with fallback payload:", energyError.message);
+      const fallbackRes = await supabase
+        .from("daily_wellness")
+        .upsert(
+          {
+            profile_id: activeProfileId,
+            date: dateStr,
+            notes: syncedNotes,
+            water_intake: currentWater,
+            stool_type: currentStoolType,
+          },
+          { onConflict: "profile_id,date" }
+        )
+        .select();
+
+      if (!fallbackRes.error) {
+        upsertedEnergyData = fallbackRes.data;
+      }
+    }
+
+    const dbRow = (upsertedEnergyData && upsertedEnergyData[0]) || {};
+    const loggedRow: DailyWellness = {
+      ...dbRow,
+      id: dbRow.id || existing?.id || crypto.randomUUID(),
+      profile_id: activeProfileId,
+      date: dateStr,
+      notes: syncedNotes,
+      water_intake: currentWater,
+      water_logs: currentWaterLogs,
+      stool_type: currentStoolType,
+      stool_logs: currentStoolLogs,
+      weight_log_time: weightTime,
+      stool_log_time: currentStoolTime,
+      energy_level: activeLevel,
+      energy_log_time: timeToLog,
+      energy_logs: updatedEnergyLogs
+    };
+
+    setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), loggedRow]);
+
+    if (energyLevel === null) {
+      showToast("✨ Energy log removed");
+    } else {
+      showToast("⚡ Vitality logged successfully");
+    }
+  };
+
+  const handleDeleteEnergyLogItem = async (itemId: string, dateStr: string) => {
+    if (!activeProfileId) return;
+
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    if (!existing) return;
+
+    const existingEnergyLogs = existing.energy_logs || [];
+    const updatedEnergyLogs = existingEnergyLogs.filter(item => item.id !== itemId);
+    const lastItem = updatedEnergyLogs[updatedEnergyLogs.length - 1];
+    const newEnergyLevel = lastItem ? lastItem.level : null;
+    const newEnergyTime = lastItem ? lastItem.time : null;
+    const syncedNotes = embedWellnessMeta(existing.notes, existing.water_logs || [], existing.stool_logs || [], updatedEnergyLogs);
+
+    const { data } = await supabase
+      .from("daily_wellness")
+      .upsert({
+        profile_id: activeProfileId,
+        date: dateStr,
+        notes: syncedNotes,
+        energy_level: newEnergyLevel,
+        energy_log_time: newEnergyTime,
+        energy_logs: updatedEnergyLogs
+      }, { onConflict: "profile_id,date" })
+      .select();
+
+    const dbRow = (data && data[0]) || {};
+    const updatedRow: DailyWellness = {
+      ...existing,
+      ...dbRow,
+      notes: syncedNotes,
+      energy_level: newEnergyLevel,
+      energy_log_time: newEnergyTime,
+      energy_logs: updatedEnergyLogs
+    };
+
+    setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), updatedRow]);
+    showToast("⚡ Vitality log entry removed");
+  };
+
+
 
   if (isDataLoading) {
     return (
@@ -2993,41 +3623,24 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
               {/* Macro Progress Bars */}
               <div className="bg-white/60 backdrop-blur-md p-6 rounded-[32px] border border-white/80 shadow-xl shadow-orange-100/20 grid grid-cols-2 gap-x-6 gap-y-6 mt-6">
-                {[
-                  {
-                    name: "Protein",
-                    value: totalProtein,
-                    max: profileData.macros.protein,
-                    color: "#FF7008",
-                  },
-                  {
-                    name: "Carbs",
-                    value: totalCarbs,
-                    max: profileData.macros.carbs,
-                    color: "#006B7D",
-                  },
-                  {
-                    name: "Fats",
-                    value: totalFats,
-                    max: profileData.macros.fats,
-                    color: "#FFB800",
-                  },
-                  {
-                    name: "Fiber",
-                    value: totalFiber,
-                    max: profileData.macros.fiber,
-                    color: "#10B981",
-                  },
-                ].map((macro, idx) => (
-                  <ProgressBar
-                    key={macro.name}
-                    label={macro.name}
-                    value={macro.value}
-                    max={macro.max}
-                    color={macro.color}
-                    index={idx}
-                  />
-                ))}
+                {enabledNutrients.map((macro: any, idx: number) => {
+                  const isOdd = enabledNutrients.length % 2 !== 0;
+                  const isFirstAndOdd = isOdd && idx === 0;
+                  const totalVal = getLoggedNutrientTotal(macro.id);
+                  
+                  return (
+                    <div key={macro.id} className={isFirstAndOdd ? "col-span-2" : ""}>
+                      <ProgressBar
+                        label={macro.name}
+                        value={totalVal}
+                        max={macro.target}
+                        color={macro.color}
+                        unit={macro.unit}
+                        index={idx}
+                      />
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Daily Tag Hits Summary */}
@@ -3050,70 +3663,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 );
               })()}
             </div>
- 
-            {/* Weight Tracker Section — only visible when not yet logged today */}
-            {profileData.agent_config?.trackWeight && (() => {
-              const todayStr = new Date().toLocaleDateString("en-CA");
-              const todayLog = weightLogs.find(l => l.date === todayStr);
-              
-              if (todayLog) return null; // Logged weight appears in Today's Notes
 
-              const baseWeight = (() => {
-                const pastLogs = weightLogs.filter(l => l.date < todayStr);
-                if (pastLogs.length > 0) {
-                  const sortedPast = [...pastLogs].sort((a, b) => b.date.localeCompare(a.date));
-                  return sortedPast[0].weight;
-                }
-                return profileData.weight || 70;
-              })();
-
-              const currentWeight = draftWeight ?? baseWeight;
-
-              return (
-                <section className="px-6 mt-10 relative z-10 text-left">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
-                      Today's Weight
-                    </h3>
-                  </div>
-                  
-                  <div className="flex items-center gap-2.5 w-full">
-                    <div className="flex-1 flex items-center bg-white/60 backdrop-blur-md border border-white/80 rounded-2xl px-2 py-1.5 shadow-sm">
-                      <button
-                        onClick={() => {
-                          setDraftWeight(Math.max(30, Number((currentWeight - 0.1).toFixed(1))));
-                        }}
-                        className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-white/60 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750 select-none">
-                        <span className="text-sm font-black text-stone-850">{currentWeight}</span>
-                        <span className="text-stone-400">kg</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setDraftWeight(Math.min(300, Number((currentWeight + 0.1).toFixed(1))));
-                        }}
-                        className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-white/60 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        await handleLogWeight(currentWeight, todayStr);
-                        setDraftWeight(null);
-                      }}
-                      className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
-                      title="Log Weight"
-                    >
-                      <Check className="w-5 h-5 text-white" />
-                    </button>
-                  </div>
-                </section>
-              );
-            })()}
 
             {/* Today's Consumption Section */}
             <section className="px-6 mt-16 relative z-10">
@@ -3478,11 +4028,748 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               </div>
             </section>
 
+            {/* Daily Vitals Tracking Section */}
+            {(profileData.agent_config?.trackWeight || profileData.agent_config?.trackWater || profileData.agent_config?.trackDigestion || profileData.agent_config?.trackEnergy) && (() => {
+              const wellnessToday = dailyNotes.find(n => n.date === selectedDate);
+              const weightTodayLog = weightLogs.find(l => l.date === selectedDate);
+              const waterIntake = wellnessToday?.water_intake || 0;
+              const stoolType = wellnessToday?.stool_type ?? null;
+              const energyLevel = wellnessToday?.energy_level ?? null;
+
+              const isWeightActive = profileData.agent_config?.trackWeight ?? true;
+              const isWaterActive = profileData.agent_config?.trackWater ?? true;
+              const isDigestionActive = profileData.agent_config?.trackDigestion ?? true;
+              const isEnergyActive = profileData.agent_config?.trackEnergy ?? true;
+
+              const totalActiveVitals = (isWeightActive ? 1 : 0) + (isWaterActive ? 1 : 0) + (isDigestionActive ? 1 : 0) + (isEnergyActive ? 1 : 0);
+
+              const getNowTimeStr = () => new Date().toTimeString().slice(0, 5);
+
+              const waterLogsList = wellnessToday?.water_logs && wellnessToday.water_logs.length > 0
+                ? wellnessToday.water_logs
+                : (waterIntake > 0 ? [{ id: "legacy-water", amount: waterIntake, time: wellnessToday?.water_log_time || getNowTimeStr() }] : []);
+
+              const stoolLogsList = wellnessToday?.stool_logs && wellnessToday.stool_logs.length > 0
+                ? wellnessToday.stool_logs
+                : (stoolType !== null ? [{ id: "legacy-stool", type: stoolType, time: wellnessToday?.stool_log_time || getNowTimeStr() }] : []);
+
+              const energyLogsList = wellnessToday?.energy_logs && wellnessToday.energy_logs.length > 0
+                ? wellnessToday.energy_logs
+                : (energyLevel !== null ? [{ id: "legacy-energy", level: energyLevel, time: wellnessToday?.energy_log_time || getNowTimeStr() }] : []);
+
+              const totalLoggedVitals = 
+                (isWeightActive && weightTodayLog ? 1 : 0) +
+                (isWaterActive ? waterLogsList.length : 0) +
+                (isDigestionActive ? stoolLogsList.length : 0) +
+                (isEnergyActive ? energyLogsList.length : 0);
+
+              const activeWeightTime = draftWeightTime || weightTodayLog?.log_time || getNowTimeStr();
+              const currentWater = draftWater ?? waterIntake;
+              const activeType = draftStoolType ?? stoolType ?? 4;
+              const currentEnergy = draftEnergy ?? energyLevel ?? 3;
+
+              const activeWaterTime = draftWaterTime || wellnessToday?.water_log_time || getNowTimeStr();
+              const activeStoolTime = draftStoolTime || wellnessToday?.stool_log_time || getNowTimeStr();
+              const activeEnergyTime = draftEnergyTime || wellnessToday?.energy_log_time || getNowTimeStr();
+
+              // Digestion mapping helper
+              const isConstipated = stoolType === 1 || stoolType === 2;
+              const isHealthy = stoolType === 3 || stoolType === 4;
+              const isLoose = stoolType !== null && stoolType >= 5;
+
+              const formatInterestingTime = (timeStr?: string | null) => {
+                if (!timeStr) return null;
+                const [hStr, mStr] = timeStr.split(":");
+                const h = parseInt(hStr, 10);
+                if (isNaN(h)) return timeStr;
+                const ampm = h >= 12 ? "PM" : "AM";
+                const h12 = h % 12 || 12;
+                return `${h12}:${mStr} ${ampm}`;
+              };
+
+              return (
+                <section className="px-6 mt-10 relative z-10 text-left space-y-6 animate-fade-in">
+                  
+                  {/* 0. UNIFIED VITALS HEADER & COLLAPSIBLE LOG HISTORY */}
+                  <div className="flex flex-col gap-2 border-b border-stone-200/50 pb-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-3.5 h-3.5 text-orange-500" />
+                        <h3 className="text-[11px] font-black uppercase text-stone-750 tracking-wider">
+                          {selectedDate === todayStr ? "Daily Vitals" : "Logged Vitals History"}
+                        </h3>
+                        {totalLoggedVitals > 0 && (
+                          <span className="text-[9px] font-extrabold bg-orange-100/90 border border-orange-200/60 text-orange-800 px-2 py-0.5 rounded-full">
+                            {totalLoggedVitals} {totalLoggedVitals === 1 ? "entry" : "entries"}
+                          </span>
+                        )}
+                      </div>
+                      {totalLoggedVitals > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setIsVitalsLogOpen(!isVitalsLogOpen)}
+                          className="text-[10px] font-bold text-stone-400 hover:text-stone-700 flex items-center gap-1 cursor-pointer bg-transparent border-none transition-colors select-none"
+                        >
+                          <span>{isVitalsLogOpen ? "Hide Log" : "View Log"}</span>
+                          {isVitalsLogOpen ? <ChevronUp className="w-3 h-3 text-stone-400" /> : <ChevronDown className="w-3 h-3 text-stone-400" />}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Super-Minimalist Collapsible Log History Drawer */}
+                    {isVitalsLogOpen && totalLoggedVitals > 0 && (
+                      <div className="mt-2 flex flex-col gap-1.5 bg-stone-50/80 border border-stone-200/60 rounded-2xl p-2.5 animate-fade-in">
+                        {/* 1. Weight */}
+                        {weightTodayLog && (
+                          <div className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
+                            <div className="flex items-center gap-2">
+                              <Scale className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                              <span className="text-stone-500 font-medium">Weight:</span>
+                              <strong className="text-stone-900 font-black">{weightTodayLog.weight} kg</strong>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {weightTodayLog.log_time && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
+                                  <Clock className="w-2.5 h-2.5 text-stone-400" />
+                                  {formatInterestingTime(weightTodayLog.log_time)}
+                                </span>
+                              )}
+                              {selectedDate === todayStr && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (weightTodayLog.id) {
+                                      await handleDeleteWeight(weightTodayLog.id);
+                                    }
+                                  }}
+                                  className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
+                                  title="Remove weight log"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 2. Water Multi-Logs */}
+                        {waterLogsList.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
+                            <div className="flex items-center gap-2">
+                              <Droplet className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                              <span className="text-stone-500 font-medium">Hydration:</span>
+                              <strong className="text-stone-900 font-black">{item.amount} ml</strong>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {item.time && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
+                                  <Clock className="w-2.5 h-2.5 text-stone-400" />
+                                  {formatInterestingTime(item.time)}
+                                </span>
+                              )}
+                              {selectedDate === todayStr && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (item.id === "legacy-water") {
+                                      await handleLogWater(0, selectedDate);
+                                    } else {
+                                      await handleDeleteWaterLogItem(item.id, selectedDate);
+                                    }
+                                  }}
+                                  className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
+                                  title="Remove water entry"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* 3. Stool (Gut Health) Multi-Logs */}
+                        {stoolLogsList.map((item) => {
+                          const itemConstipated = item.type === 1 || item.type === 2;
+                          const itemHealthy = item.type === 3 || item.type === 4;
+                          return (
+                            <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
+                              <div className="flex items-center gap-2">
+                                <BristolStoolIcon type={item.type} className="w-3.5 h-3.5 shrink-0" />
+                                <span className="text-stone-500 font-medium">Gut Health:</span>
+                                <strong className={cn(
+                                  "font-black",
+                                  itemConstipated ? "text-amber-600" : (itemHealthy ? "text-emerald-600" : "text-blue-600")
+                                )}>
+                                  {itemConstipated ? "Constipated" : (itemHealthy ? "Healthy" : "Loose")}
+                                </strong>
+                                <span className="text-[10px] text-stone-400 font-bold">(Type {item.type})</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {item.time && (
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
+                                    <Clock className="w-2.5 h-2.5 text-stone-400" />
+                                    {formatInterestingTime(item.time)}
+                                  </span>
+                                )}
+                                {selectedDate === todayStr && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (item.id === "legacy-stool") {
+                                        await handleLogDigestion(null, null, selectedDate);
+                                      } else {
+                                        await handleDeleteStoolLogItem(item.id, selectedDate);
+                                      }
+                                    }}
+                                    className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
+                                    title="Remove digestion entry"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* 4. Energy (Vitality) Multi-Logs */}
+                        {energyLogsList.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
+                            <div className="flex items-center gap-2">
+                              <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                              <span className="text-stone-500 font-medium">Vitality:</span>
+                              <strong className="text-stone-900 font-black">
+                                {(() => {
+                                  if (item.level === 1) return "😴 Exhausted";
+                                  if (item.level === 2) return "🥱 Sluggish";
+                                  if (item.level === 3) return "⚡ Steady";
+                                  if (item.level === 4) return "🔥 High Energy";
+                                  return "🚀 Peak Vitality";
+                                })()}
+                              </strong>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {item.time && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
+                                  <Clock className="w-2.5 h-2.5 text-stone-400" />
+                                  {formatInterestingTime(item.time)}
+                                </span>
+                              )}
+                              {selectedDate === todayStr && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (item.id === "legacy-energy") {
+                                      await handleLogEnergy(null, selectedDate);
+                                    } else {
+                                      await handleDeleteEnergyLogItem(item.id, selectedDate);
+                                    }
+                                  }}
+                                  className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
+                                  title="Remove energy entry"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 1. WEIGHT LOG */}
+                  {isWeightActive && (selectedDate !== todayStr || !weightTodayLog) && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
+                          <Scale className="w-3.5 h-3.5 text-stone-400" />
+                          <span>Weight Log</span>
+                        </h3>
+                      </div>
+
+                      {weightTodayLog ? (
+                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs animate-fade-in">
+                          <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
+                            <span className="text-xs text-stone-400 font-medium">Logged Weight:</span>
+                            <span className="text-base font-black text-orange-950">{weightTodayLog.weight}</span>
+                            <span className="text-xs text-stone-400 font-medium">kg</span>
+                            {weightTodayLog.log_time && (
+                              <span className="text-[10px] text-stone-400 font-bold ml-1.5">(at {weightTodayLog.log_time})</span>
+                            )}
+                          </div>
+                          {selectedDate === todayStr && (
+                            <button
+                              onClick={async () => {
+                                if (weightTodayLog.id) {
+                                  await handleDeleteWeight(weightTodayLog.id);
+                                }
+                              }}
+                              className="w-7 h-7 rounded-xl hover:bg-stone-250 text-stone-400 hover:text-stone-600 flex items-center justify-center cursor-pointer border-none transition-all shrink-0 bg-stone-50 border border-stone-200/60 shadow-3xs"
+                              title="Remove weight log"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ) : selectedDate === todayStr ? (
+                        (() => {
+                          const baseWeight = (() => {
+                            const pastLogs = weightLogs.filter(l => l.date < todayStr);
+                            if (pastLogs.length > 0) {
+                              const sortedPast = [...pastLogs].sort((a, b) => b.date.localeCompare(a.date));
+                              return sortedPast[0].weight;
+                            }
+                            return profileData.weight || 70;
+                          })();
+
+                          const currentWeight = draftWeight ?? baseWeight;
+
+                          return (
+                            <div className="flex flex-col gap-2 w-full animate-fade-in">
+                              <div className="flex items-center gap-2.5 w-full">
+                                {/* Left: Time Pill */}
+                                <div className="relative shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setTimePickerTarget("weight");
+                                      setTimePickerInitialTime(activeWeightTime);
+                                      setIsTimePickerOpen(true);
+                                    }}
+                                    className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                  >
+                                    <Clock className="w-3.5 h-3.5 text-stone-400" />
+                                    <span>{activeWeightTime}</span>
+                                  </button>
+                                </div>
+
+                                {/* Middle: Stepper */}
+                                <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDraftWeight(Math.max(30, Number((currentWeight - 0.1).toFixed(1))));
+                                      triggerWeightStepping();
+                                    }}
+                                    className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </button>
+                                  <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750 select-none">
+                                    <span className="text-sm font-black text-stone-850">{currentWeight}</span>
+                                    <span className="text-stone-400">kg</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDraftWeight(Math.min(300, Number((currentWeight + 0.1).toFixed(1))));
+                                      triggerWeightStepping();
+                                    }}
+                                    className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                {/* Right: Log Button */}
+                                <button
+                                  onClick={async () => {
+                                    await handleLogWeight(currentWeight, todayStr, activeWeightTime);
+                                    setDraftWeight(null);
+                                    setDraftWeightTime("");
+                                  }}
+                                  className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                                  title="Log Weight"
+                                >
+                                  <Check className="w-5 h-5 text-white" />
+                                </button>
+                              </div>
+
+                              {/* Transient Micro-Feedback (only while stepping) */}
+                              {isWeightStepping && (
+                                <div className="px-1 text-left animate-fade-in">
+                                  <span className="text-[11px] font-medium text-stone-500">
+                                    {(() => {
+                                      const pastLogs = weightLogs.filter(l => l.date < selectedDate);
+                                      if (pastLogs.length > 0) {
+                                        const sortedPast = [...pastLogs].sort((a, b) => b.date.localeCompare(a.date));
+                                        const prev = sortedPast[0];
+                                        const diff = Number((currentWeight - prev.weight).toFixed(1));
+                                        
+                                        const prevDateObj = new Date(prev.date + "T00:00:00");
+                                        const monthStr = prevDateObj.toLocaleString('en-US', { month: 'short' });
+                                        const dayNum = prevDateObj.getDate();
+                                        const dayName = prevDateObj.toLocaleString('en-US', { weekday: 'short' });
+                                        const dateFormatted = `${monthStr} ${dayNum} (${dayName})`;
+                                        
+                                        if (diff < 0) return `📉 ${diff} kg from last log on ${dateFormatted}`;
+                                        if (diff > 0) return `📈 +${diff} kg from last log on ${dateFormatted}`;
+                                        return `⚖️ Same as last log on ${dateFormatted}`;
+                                      }
+                                      return `⚖️ Baseline weight recorded (${currentWeight} kg)`;
+                                    })()}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
+                          No weight logged for this date
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 2. WATER TRACKER */}
+                  {isWaterActive && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
+                          <Droplet className="w-3.5 h-3.5 text-stone-400" />
+                          <span>Water Log</span>
+                        </h3>
+                      </div>
+
+                      {selectedDate === todayStr ? (
+                        <div className="flex flex-col gap-2 w-full animate-fade-in">
+                          <div className="flex items-center gap-2.5 w-full">
+                            {/* Left: Time Pill */}
+                            <div className="relative shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTimePickerTarget("water");
+                                  setTimePickerInitialTime(activeWaterTime);
+                                  setIsTimePickerOpen(true);
+                                }}
+                                className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                              >
+                                <Clock className="w-3.5 h-3.5 text-stone-400" />
+                                <span>{activeWaterTime}</span>
+                              </button>
+                            </div>
+
+                            {/* Stepper */}
+                            <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDraftWater(Math.max(0, currentWater - 250));
+                                  triggerWaterStepping();
+                                }}
+                                className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750 select-none">
+                                <span className="text-sm font-black text-stone-850">{currentWater}</span>
+                                <span className="text-stone-400">ml</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDraftWater(Math.min(10000, currentWater + 250));
+                                  triggerWaterStepping();
+                                }}
+                                className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Right: Solid Orange Checkmark Button (Zero Friction) */}
+                            <button
+                              onClick={async () => {
+                                await handleLogWater(currentWater, selectedDate, activeWaterTime);
+                                setDraftWater(null);
+                                setDraftWaterTime("");
+                              }}
+                              className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                              title="Log Water"
+                            >
+                              <Check className="w-5 h-5 text-white" />
+                            </button>
+                          </div>
+
+                          {/* Dynamic Motivational Description below (only while stepping) */}
+                          {isWaterStepping && (
+                            <div className="px-1 text-left animate-fade-in">
+                              <span className="text-[11px] font-medium text-stone-500">
+                                {(() => {
+                                  if (currentWater === 0) return `Goal: ${DAILY_WATER_GOAL_ML}ml — tap + to log hydration 💧`;
+                                  const remaining = DAILY_WATER_GOAL_ML - currentWater;
+                                  if (remaining > 0) return `${currentWater}ml logged (${Math.round((currentWater / DAILY_WATER_GOAL_ML) * 100)}%) — ${remaining}ml remaining 🌊`;
+                                  if (remaining === 0) return `Daily goal achieved (${DAILY_WATER_GOAL_ML}ml)! Amazing job 🎉`;
+                                  return `${currentWater}ml logged — daily goal exceeded! 🚀`;
+                                })()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
+                          <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
+                            <span className="text-xs text-stone-400 font-medium">Logged Water:</span>
+                            <span className="text-base font-black text-orange-950">{waterIntake}</span>
+                            <span className="text-xs text-stone-400 font-medium">ml</span>
+                            {wellnessToday?.water_log_time && (
+                              <span className="text-[10px] text-stone-400 font-bold ml-1.5">(at {wellnessToday.water_log_time})</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 3. DIGESTION TRACKER */}
+                  {isDigestionActive && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
+                          <Activity className="w-3.5 h-3.5 text-stone-400" />
+                          <span>Digestion Log</span>
+                        </h3>
+                      </div>
+
+                      {selectedDate === todayStr ? (
+                        <div className="flex flex-col gap-2 w-full animate-fade-in">
+                          <div className="flex items-center gap-2.5 w-full">
+                            {/* Left: Time Pill */}
+                            <div className="relative shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTimePickerTarget("digestion");
+                                  setTimePickerInitialTime(activeStoolTime);
+                                  setIsTimePickerOpen(true);
+                                }}
+                                className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                              >
+                                <Clock className="w-3.5 h-3.5 text-stone-400" />
+                                <span>{activeStoolTime}</span>
+                              </button>
+                            </div>
+
+                            {/* Middle: Clean Slider */}
+                            <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
+                              <input 
+                                type="range" 
+                                min="1" 
+                                max="7" 
+                                value={activeType}
+                                onChange={(e) => setDraftStoolType(parseInt(e.target.value))}
+                                onMouseDown={() => setIsStoolSliding(true)}
+                                onTouchStart={() => setIsStoolSliding(true)}
+                                onMouseUp={() => setTimeout(() => setIsStoolSliding(false), 200)}
+                                onTouchEnd={() => setTimeout(() => setIsStoolSliding(false), 200)}
+                                className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                              />
+                            </div>
+
+                            {/* Right: Action Box */}
+                            <div className="w-12 h-12 [perspective:1000px] shrink-0">
+                              <div className={cn(
+                                "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
+                                isStoolSliding ? "[transform:rotateY(180deg)]" : ""
+                              )}>
+                                
+                                {/* FRONT: Log Button */}
+                                <button
+                                  onClick={async () => {
+                                    await handleLogDigestion(activeType, null, selectedDate, activeStoolTime);
+                                    setDraftStoolType(null);
+                                    setDraftStoolTime("");
+                                  }}
+                                  className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                                  title="Log Digestion"
+                                >
+                                  <Check className="w-5 h-5 text-white" />
+                                </button>
+
+                                {/* BACK: Brown Bristol Stool SVG */}
+                                <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs">
+                                  <BristolStoolIcon type={activeType} className="w-7 h-7" />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Dynamic description below the section (only while sliding) */}
+                          {isStoolSliding && (
+                            <div className="px-1 text-left animate-fade-in">
+                              <span className="text-[11px] font-medium text-stone-500">
+                                {(() => {
+                                  if (activeType === 1) return "Bristol Stool Type 1: Separate hard lumps, like nuts (hard to pass)";
+                                  if (activeType === 2) return "Bristol Stool Type 2: Sausage-shaped, but lumpy";
+                                  if (activeType === 3) return "Bristol Stool Type 3: Like a sausage, with cracks on surface";
+                                  if (activeType === 4) return "Bristol Stool Type 4: Like a sausage or snake, smooth & soft (Optimal)";
+                                  if (activeType === 5) return "Bristol Stool Type 5: Soft blobs with clear-cut edges";
+                                  if (activeType === 6) return "Bristol Stool Type 6: Fluffy pieces with ragged edges, mushy stool";
+                                  return "Bristol Stool Type 7: Watery, no solid pieces (entirely liquid)";
+                                })()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
+                          <div className="flex items-center gap-3 text-left">
+                            <BristolStoolIcon type={stoolType || 4} className="w-7 h-7 shrink-0" />
+                            <div className="flex flex-col">
+                              <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
+                                <span className="text-xs text-stone-400 font-medium">Logged Consistency:</span>
+                                <span className={cn(
+                                  "text-sm font-black",
+                                  isConstipated ? "text-amber-600" : (isHealthy ? "text-emerald-600" : "text-blue-600")
+                                )}>
+                                  {isConstipated ? "Constipated" : (isHealthy ? "Healthy" : "Loose")}
+                                </span>
+                                <span className="text-[10px] text-stone-400 font-bold ml-1">(Type {stoolType})</span>
+                              </div>
+                              {wellnessToday?.stool_log_time && (
+                                <span className="text-[10px] text-stone-400 font-bold">Logged at {wellnessToday.stool_log_time}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 4. ENERGY TRACKER */}
+                  {isEnergyActive && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-stone-400" />
+                          <span>Energy Log</span>
+                        </h3>
+                      </div>
+
+                      {selectedDate === todayStr ? (
+                        <div className="flex flex-col gap-2 w-full animate-fade-in">
+                          <div className="flex items-center gap-2.5 w-full">
+                            {/* Left: Time Pill */}
+                            <div className="relative shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTimePickerTarget("energy");
+                                  setTimePickerInitialTime(activeEnergyTime);
+                                  setIsTimePickerOpen(true);
+                                }}
+                                className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                              >
+                                <Clock className="w-3.5 h-3.5 text-stone-400" />
+                                <span>{activeEnergyTime}</span>
+                              </button>
+                            </div>
+
+                            {/* Middle: Clean 1-5 Slider */}
+                            <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
+                              <input 
+                                type="range" 
+                                min="1" 
+                                max="5" 
+                                value={currentEnergy}
+                                onChange={(e) => setDraftEnergy(parseInt(e.target.value))}
+                                onMouseDown={() => setIsEnergySliding(true)}
+                                onTouchStart={() => setIsEnergySliding(true)}
+                                onMouseUp={() => setTimeout(() => setIsEnergySliding(false), 200)}
+                                onTouchEnd={() => setTimeout(() => setIsEnergySliding(false), 200)}
+                                className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                              />
+                            </div>
+
+                            {/* Right: Action Box */}
+                            <div className="w-12 h-12 [perspective:1000px] shrink-0">
+                              <div className={cn(
+                                "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
+                                isEnergySliding ? "[transform:rotateY(180deg)]" : ""
+                              )}>
+                                
+                                {/* FRONT: Log Button */}
+                                <button
+                                  onClick={async () => {
+                                    await handleLogEnergy(currentEnergy, selectedDate, activeEnergyTime);
+                                    setDraftEnergy(null);
+                                    setDraftEnergyTime("");
+                                  }}
+                                  className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                                  title="Log Energy"
+                                >
+                                  <Check className="w-5 h-5 text-white" />
+                                </button>
+
+                                {/* BACK: Energy Emoji Badge */}
+                                <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs text-lg select-none">
+                                  {(() => {
+                                    if (currentEnergy === 1) return "😴";
+                                    if (currentEnergy === 2) return "🥱";
+                                    if (currentEnergy === 3) return "⚡";
+                                    if (currentEnergy === 4) return "🔥";
+                                    return "🚀";
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Dynamic description below the section (only while sliding) */}
+                          {isEnergySliding && (
+                            <div className="px-1 text-left animate-fade-in">
+                              <span className="text-[11px] font-medium text-stone-500">
+                                {(() => {
+                                  if (currentEnergy === 1) return "Energy Level 1: Extremely tired, struggling to focus";
+                                  if (currentEnergy === 2) return "Energy Level 2: Low vitality, feeling sluggish";
+                                  if (currentEnergy === 3) return "Energy Level 3: Moderate, stable & balanced energy";
+                                  if (currentEnergy === 4) return "Energy Level 4: High vitality, feeling active & clear";
+                                  return "Energy Level 5: Maximum peak performance & focus";
+                                })()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
+                          <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
+                            <span className="text-xs text-stone-400 font-medium">Logged Energy:</span>
+                            <span className="text-base font-black text-orange-950">
+                              {(() => {
+                                if (energyLevel === 1) return "😴 Exhausted";
+                                if (energyLevel === 2) return "🥱 Sluggish";
+                                if (energyLevel === 3) return "⚡ Steady";
+                                if (energyLevel === 4) return "🔥 High Energy";
+                                return "🚀 Peak Vitality";
+                              })()}
+                            </span>
+                            <span className="text-[10px] text-stone-400 font-bold ml-1">(Level {energyLevel})</span>
+                            {wellnessToday?.energy_log_time && (
+                              <span className="text-[10px] text-stone-400 font-bold ml-1.5">(at {wellnessToday.energy_log_time})</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </section>
+              );
+            })()}
+
+
+
+
+
+
+
             {/* Daily Wellness Journal Section */}
             <section className="px-6 mt-10 mb-28 relative z-10">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-orange-500" />
+                <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
                   <span>{selectedDate === todayStr ? "Today's Notes" : "Logged Notes"}</span>
                 </h3>
                 {selectedDate && (
@@ -3491,32 +4778,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                   </span>
                 )}
               </div>
-
-              {/* Weight logged note — plain text matching journal style */}
-              {profileData.agent_config?.trackWeight && (() => {
-                const weightTodayLog = weightLogs.find(l => l.date === selectedDate);
-                if (!weightTodayLog) return null;
-                return (
-                  <div className="flex items-center gap-2 mb-2">
-                    <p className="text-sm font-semibold text-stone-800">
-                      Today's Weight — {weightTodayLog.weight} kg
-                    </p>
-                    {selectedDate === todayStr && (
-                      <button
-                        onClick={async () => {
-                          if (weightTodayLog.id) {
-                            await handleDeleteWeight(weightTodayLog.id);
-                          }
-                        }}
-                        className="w-4 h-4 rounded-full bg-stone-200 hover:bg-stone-300 flex items-center justify-center text-stone-500 hover:text-stone-700 cursor-pointer border-none transition-colors shrink-0"
-                        title="Remove weight log"
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
 
               <WellnessJournal
                 selectedDate={selectedDate}
@@ -4676,7 +5937,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => {
-              window.open("https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai", "_blank");
+              window.open(localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL, "_blank");
             }}
             className="fixed bottom-28 right-6 w-12 h-12 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white flex items-center justify-center shadow-[0_8px_25px_rgba(249,115,22,0.35)] z-40 border border-orange-400/30 cursor-pointer transition-all hover:scale-105 active:scale-95"
             title="Open FitAI Custom GPT"
@@ -4749,6 +6010,32 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
           recenterDaysList(dateStr);
         }}
       />
+
+      {/* Custom Premium Time Picker Modal */}
+      <TimePickerModal
+        isOpen={isTimePickerOpen}
+        onClose={() => {
+          setIsTimePickerOpen(false);
+          setTimePickerTarget(null);
+        }}
+        initialTime={timePickerInitialTime}
+        onSave={(timeStr) => {
+          if (timePickerTarget === "weight") {
+            setDraftWeightTime(timeStr);
+          } else if (timePickerTarget === "digestion") {
+            setDraftStoolTime(timeStr);
+          } else if (timePickerTarget === "energy") {
+            setDraftEnergyTime(timeStr);
+          }
+        }}
+        title={`Set ${
+          timePickerTarget === "weight"
+            ? "Weight"
+            : timePickerTarget === "digestion"
+            ? "Digestion"
+            : "Energy"
+        } Log Time`}
+      />
     </div>
   );
 }
@@ -4811,18 +6098,26 @@ function WellnessJournal({
   dailyTagHits,
   trackingTags
 }: WellnessJournalProps) {
+  const stripMetaComment = (text: string) => {
+    return (text || "")
+      .replace(/\s*<!-- FIT_WELLNESS_META: [\s\S]*? -->/g, "")
+      .replace(/\n*--- Wellness Logs ---[\s\S]*$/, "")
+      .trim();
+  };
+
   const activeNoteObj = dailyNotes.find(n => n.date === selectedDate);
-  const activeNoteText = activeNoteObj ? activeNoteObj.notes : "";
+  const rawNoteText = activeNoteObj ? activeNoteObj.notes : "";
+  const cleanActiveNoteText = stripMetaComment(rawNoteText);
 
   const [isEditingNote, setIsEditingNote] = useState(false);
-  const [draftNote, setDraftNote] = useState(activeNoteText);
+  const [draftNote, setDraftNote] = useState(cleanActiveNoteText);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<number | null>(null);
 
   // Sync draft when database value or selected date changes
   useEffect(() => {
-    setDraftNote(activeNoteText);
-  }, [activeNoteText, selectedDate]);
+    setDraftNote(cleanActiveNoteText);
+  }, [cleanActiveNoteText, selectedDate]);
 
   // Debounced auto-save effect
   const triggerAutoSave = (newVal: string) => {
@@ -4859,18 +6154,18 @@ function WellnessJournal({
   }, [isEditingNote]);
 
   const isReadOnly = selectedDate !== todayStr;
+  const cleanNoteText = cleanActiveNoteText;
 
   return (
-    <div className="flex flex-col gap-4 text-left w-full relative select-none">
-      {/* Editorial Note Area */}
-      <div className="w-full min-h-[80px] flex flex-col justify-start">
+    <div className="flex flex-col gap-3 text-left w-full relative select-none">
+      <div className="w-full min-h-[90px] flex flex-col justify-start">
         {isEditingNote && !isReadOnly ? (
           <textarea
             ref={textareaRef}
             value={draftNote}
             onChange={handleTextareaChange}
             onBlur={handleBlur}
-            placeholder="Tap here to write down how you felt, symptoms, water intake, or notes about today..."
+            placeholder="Tap here to write down how you felt, symptoms, food reactions, or notes about today..."
             className="w-full bg-transparent border-0 outline-none ring-0 focus:ring-0 focus:outline-none p-0 text-sm font-semibold text-stone-800 placeholder-stone-400 resize-none min-h-[90px] leading-relaxed transition-all"
           />
         ) : (
@@ -4881,12 +6176,12 @@ function WellnessJournal({
             className={cn(
               "text-sm leading-relaxed min-h-[90px] py-0.5 transition-colors duration-200 select-text whitespace-pre-line",
               !isReadOnly ? "cursor-text" : "cursor-default",
-              activeNoteText
+              cleanNoteText
                 ? "font-semibold text-stone-800"
                 : "font-medium text-stone-400 italic"
             )}
           >
-            {activeNoteText || (isReadOnly ? "No notes recorded for this date." : "Tap here to write down how you felt, symptoms, water intake, or notes about today...")}
+            {cleanNoteText || (isReadOnly ? "No notes recorded for this date." : "Tap here to write down how you felt, symptoms, food reactions, or notes about today...")}
           </div>
         )}
       </div>

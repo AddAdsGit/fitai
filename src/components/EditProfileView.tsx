@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Camera, User, Smile, Scale, Ruler, Target, Info, Plus, Minus, Tag, X, ChevronLeft } from "lucide-react";
+import { Camera, User, Smile, Scale, Ruler, Target, Info, Plus, Minus, Tag, X, ChevronLeft, Droplet, Activity, Zap, Pencil } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -34,6 +34,7 @@ export const EditProfileView = ({
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+  const [activeInfoKey, setActiveInfoKey] = useState<string | null>(null);
 
   const currentTags = profileData.tracking_tags || DEFAULT_TRACKING_TAGS;
 
@@ -395,6 +396,174 @@ export const EditProfileView = ({
               </div>
               <p className="text-[10px] text-stone-500 leading-relaxed font-medium">{bmiStatus.desc}</p>
             </div>
+
+            {/* Daily Vitals & Trackers Config */}
+            <div className="pt-3 border-t border-stone-100 space-y-3 text-left">
+              <span className="text-[9px] font-black uppercase text-stone-400 tracking-wider block">Daily Vitals & Trackers</span>
+              
+              <div className="grid grid-cols-1 gap-3">
+                {[
+                  {
+                    key: "trackWeight",
+                    defaultOn: true,
+                    label: "Weight Log",
+                    desc: "Track daily body weight & trendlines",
+                    icon: Scale,
+                    hasGoal: false,
+                    hasInfo: false,
+                  },
+                  {
+                    key: "trackWater",
+                    defaultOn: false,
+                    label: "Water Intake",
+                    desc: "Quick-log daily hydration in ml",
+                    icon: Droplet,
+                    hasGoal: true,
+                    goalKey: "dailyWater",
+                    goalDefault: 2500,
+                    goalStep: 250,
+                    goalMin: 500,
+                    goalMax: 10000,
+                    goalLabel: "Daily Hydration Goal",
+                    goalUnit: "ml",
+                    hasInfo: false,
+                  },
+                  {
+                    key: "trackDigestion",
+                    defaultOn: false,
+                    label: "Digestion Log",
+                    desc: "Bristol stool consistency spectrum",
+                    icon: Activity,
+                    hasGoal: false,
+                    hasInfo: true,
+                    infoTitle: "🩺 Bristol Stool Scale Guide",
+                    infoContent: "The Bristol Stool Scale (Types 1–7) is the medical standard for evaluating gut motility and digestive health.\n\n• Types 1–2: Hard, lumpy stool (Constipation / dehydration)\n• Types 3–4: Smooth, soft sausage shape (Optimal gut motility)\n• Types 5–7: Fluffy or liquid stool (Inflammation / loose bowel)\n\nLogging your stool daily helps track food intolerances, fiber response, and gut balance.",
+                  },
+                  {
+                    key: "trackEnergy",
+                    defaultOn: false,
+                    label: "Energy Level",
+                    desc: "1 to 5 vitality & mood spectrum",
+                    icon: Zap,
+                    hasGoal: false,
+                    hasInfo: true,
+                    infoTitle: "⚡ Energy & Vitality Spectrum",
+                    infoContent: "The 1 to 5 Vitality Spectrum tracks subjective daily energy levels:\n\n1: 😴 Exhausted / Drained\n2: 🥱 Sluggish / Heavy\n3: ⚡ Steady / Normal\n4: 🔥 High Energy / Active\n5: 🚀 Peak Vitality / Unstoppable\n\nTracking energy helps uncover how your macro ratios, sleep, and meal timing impact daily performance.",
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isEnabled = profileData.agent_config?.[item.key] ?? item.defaultOn;
+                  
+                  return (
+                    <div
+                      key={item.key}
+                      className={cn(
+                        "p-3.5 rounded-2xl border transition-all shadow-3xs flex flex-col gap-2.5",
+                        isEnabled ? "bg-white border-stone-200/90" : "bg-stone-50 border-stone-100"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-stone-50 border border-stone-200/60 flex items-center justify-center text-stone-600 shrink-0">
+                            <Icon className="w-4 h-4 text-stone-500" />
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-stone-850">{item.label}</span>
+                              {/* Minimalist Info Icon - ONLY for Digestion & Energy */}
+                              {item.hasInfo && (
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveInfoKey(item.key)}
+                                  className="w-4 h-4 rounded-full flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer border-none bg-transparent active:scale-90"
+                                  title="Learn more"
+                                >
+                                  <Info className="w-3 h-3 text-stone-400 hover:text-orange-500 transition-colors" />
+                                </button>
+                              )}
+                            </div>
+                            <span className="text-[9.5px] font-medium text-stone-400">{item.desc}</span>
+                          </div>
+                        </div>
+
+                        {/* Toggle Switch */}
+                        <button
+                          type="button"
+                          onClick={() => setProfileData({
+                            ...profileData,
+                            agent_config: {
+                              ...profileData.agent_config,
+                              [item.key]: !isEnabled,
+                            }
+                          })}
+                          className={cn(
+                            "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border-none shrink-0",
+                            isEnabled ? "bg-orange-500" : "bg-stone-200"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "bg-white w-5 h-5 rounded-full shadow-sm transform transition-transform duration-200",
+                              isEnabled ? "translate-x-5" : "translate-x-0"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Expanded Uncollapsable Goal Config (when toggle is enabled) */}
+                      {isEnabled && item.hasGoal && (
+                        <div className="pt-2.5 border-t border-stone-150 flex items-center justify-between animate-fade-in">
+                          <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">{item.goalLabel}</span>
+                          <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 rounded-xl px-2 py-1 shadow-3xs">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentVal = profileData.goals?.[item.goalKey] ?? item.goalDefault;
+                                const newVal = Math.max(item.goalMin, currentVal - item.goalStep);
+                                setProfileData({
+                                  ...profileData,
+                                  goals: { ...profileData.goals, [item.goalKey]: newVal }
+                                });
+                              }}
+                              className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <input
+                              type="number"
+                              value={profileData.goals?.[item.goalKey] ?? item.goalDefault}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || item.goalMin;
+                                setProfileData({
+                                  ...profileData,
+                                  goals: { ...profileData.goals, [item.goalKey]: val }
+                                });
+                              }}
+                              className="bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <span className="text-[10px] font-bold text-stone-400">{item.goalUnit}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentVal = profileData.goals?.[item.goalKey] ?? item.goalDefault;
+                                const newVal = Math.min(item.goalMax, currentVal + item.goalStep);
+                                setProfileData({
+                                  ...profileData,
+                                  goals: { ...profileData.goals, [item.goalKey]: newVal }
+                                });
+                              }}
+                              className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Card 4: Goals & Targets */}
@@ -488,63 +657,6 @@ export const EditProfileView = ({
               </div>
             </div>
 
-            {/* Weight Tracking Switch Toggle */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 flex items-center justify-between shadow-2xs">
-              <div className="flex flex-col text-left">
-                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Weight Tracker</span>
-                <span className="text-[9px] font-bold text-stone-400">Log progress & show history charts</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setProfileData({
-                  ...profileData,
-                  agent_config: {
-                    ...profileData.agent_config,
-                    trackWeight: !(profileData.agent_config?.trackWeight ?? false)
-                  }
-                })}
-                className={cn(
-                  "w-12 h-6 rounded-full p-1 transition-colors duration-200 cursor-pointer border-none",
-                  (profileData.agent_config?.trackWeight ?? false) ? "bg-orange-500" : "bg-stone-200"
-                )}
-              >
-                <div
-                  className={cn(
-                    "bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200",
-                    (profileData.agent_config?.trackWeight ?? false) ? "translate-x-6" : "translate-x-0"
-                  )}
-                />
-              </button>
-            </div>
-
-            {/* Preferred Meal Times */}
-            <div className="space-y-3 pt-2">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Preferred Meal Times</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: "Breakfast", key: "breakfastTime", defaultVal: "08:30" },
-                  { label: "Lunch", key: "lunchTime", defaultVal: "13:30" },
-                  { label: "Dinner", key: "dinnerTime", defaultVal: "20:30" },
-                ].map((t) => (
-                  <div key={t.key} className="bg-stone-50 border border-stone-200/60 rounded-2xl p-3 flex flex-col justify-between shadow-2xs">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-stone-500">{t.label}</span>
-                    <input
-                      type="time"
-                      value={profileData.agent_config?.[t.key] || t.defaultVal}
-                      onChange={(e) => setProfileData({
-                        ...profileData,
-                        agent_config: {
-                          ...profileData.agent_config,
-                          [t.key]: e.target.value
-                        }
-                      })}
-                      className="mt-2 w-full bg-white border border-stone-200 rounded-xl px-2 py-1.5 text-xs font-black text-stone-850 focus:outline-none focus:border-orange-500 shadow-3xs"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* Macros Grid */}
             <div className="space-y-2">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">Macro Split Targets</label>
@@ -616,42 +728,57 @@ export const EditProfileView = ({
               Toggle tags that the AI automatically applies to your meals based on ingredients or micro-nutrients. Click a tag to configure its AI rules.
             </p>
 
-            {/* List of tags as minimalist pills */}
+            {/* List of tags as tactile pill buttons */}
             <div className="flex flex-wrap gap-2 py-1.5">
               {currentTags.map((tag: any) => {
                 const isSelected = selectedTagId === tag.id;
-                const isSystemDefault = DEFAULT_TRACKING_TAGS.some(t => t.id === tag.id);
                 return (
                   <div
                     key={tag.id}
                     className={cn(
-                      "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-200 cursor-pointer shadow-3xs",
+                      "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-extrabold border transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-3xs",
                       tag.enabled
                         ? isSelected
-                          ? "bg-stone-900 border-stone-900 text-white"
-                          : "bg-stone-100 border-stone-200/60 text-stone-800 hover:bg-stone-200"
-                        : "bg-white border-stone-200 text-stone-400 hover:border-stone-300"
+                          ? "bg-stone-900 border-stone-900 text-white shadow-sm"
+                          : "bg-emerald-50/80 border-emerald-300/80 text-emerald-950 hover:bg-emerald-100/80"
+                        : "bg-stone-50/70 border-stone-200/80 text-stone-400 hover:border-stone-300 opacity-65 hover:opacity-100"
                     )}
-                    onClick={() => {
-                      setSelectedTagId(isSelected ? null : tag.id);
-                    }}
+                    onClick={() => handleToggleTag(tag.id)}
+                    title={tag.enabled ? "Enabled — tap to disable" : "Disabled — tap to enable"}
                   >
+                    {/* Glowing Green Dot Indicator */}
+                    <span
+                      className={cn(
+                        "w-2 h-2 rounded-full transition-all shrink-0",
+                        tag.enabled
+                          ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+                          : "bg-stone-300"
+                      )}
+                    />
+
+                    <span>{tag.name}</span>
+
+                    {/* Edit AI Rule Icon Button */}
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleToggleTag(tag.id);
+                        setSelectedTagId(isSelected ? null : tag.id);
                       }}
                       className={cn(
-                        "w-3 h-3 rounded-md border flex items-center justify-center transition-colors shrink-0",
-                        tag.enabled ? "bg-stone-900 border-stone-900 text-white" : "border-stone-300 bg-white"
+                        "p-1 rounded-full transition-colors shrink-0 ml-0.5 border-none cursor-pointer flex items-center justify-center",
+                        isSelected
+                          ? "bg-white/20 text-white"
+                          : tag.enabled
+                          ? "text-emerald-700 hover:bg-emerald-200/60"
+                          : "text-stone-400 hover:bg-stone-200/60"
                       )}
+                      title="Edit AI rule"
                     >
-                      {tag.enabled && <div className="w-1.5 h-1.5 bg-white rounded-sm" />}
+                      <Pencil className="w-2.5 h-2.5" />
                     </button>
 
-                    <span>{tag.name}</span>
-
+                    {/* Delete Tag Button */}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -660,6 +787,7 @@ export const EditProfileView = ({
                         if (isSelected) setSelectedTagId(null);
                       }}
                       className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0"
+                      title="Delete tag"
                     >
                       <X className="w-2.5 h-2.5" />
                     </button>
@@ -696,72 +824,98 @@ export const EditProfileView = ({
             })()}
 
             {/* Add Tags Section */}
-            <div className="space-y-4 pt-3 border-t border-stone-100">
-              <div>
-                <label className="block text-[8px] font-black text-stone-400 uppercase tracking-widest mb-1.5 px-1">Quick Add Tag</label>
-                <select
-                  onChange={(e) => {
-                    handleQuickAddTag(e.target.value);
-                    e.target.value = ""; // Reset
-                  }}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-700 focus:outline-none focus:border-stone-400 cursor-pointer shadow-3xs"
-                >
-                  <option value="">Select common tag...</option>
-                  {COMMON_TAG_TEMPLATES.map((t) => (
-                    <option key={t.name} value={t.name}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                {showAddForm ? (
-                  <div className="space-y-2 border border-stone-150 bg-stone-50 rounded-2xl p-3.5 text-left">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest">Custom Tag</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddForm(false)}
-                        className="text-stone-400 hover:text-stone-600 text-[9px] font-black uppercase"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="e.g. Nut Free"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#1a1a1a] focus:outline-none focus:border-stone-400 shadow-3xs"
-                    />
-                    <textarea
-                      placeholder="AI guidelines (e.g. contains no peanut or tree nut)"
-                      rows={1.5}
-                      value={newDesc}
-                      onChange={(e) => setNewDesc(e.target.value)}
-                      className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-755 focus:outline-none focus:border-stone-400 resize-none shadow-3xs"
-                    />
+            {/* Add Custom Tag Section */}
+            <div className="pt-3 border-t border-stone-100">
+              {showAddForm ? (
+                <div className="space-y-2 border border-stone-150 bg-stone-50 rounded-2xl p-3.5 text-left">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest">Custom Tag</span>
                     <button
                       type="button"
-                      onClick={handleAddCustomTag}
-                      className="w-full bg-stone-900 text-white hover:bg-stone-850 text-[10px] font-black uppercase tracking-wider py-2 rounded-lg"
+                      onClick={() => setShowAddForm(false)}
+                      className="text-stone-400 hover:text-stone-600 text-[9px] font-black uppercase"
                     >
-                      Add Custom Tag
+                      Cancel
                     </button>
                   </div>
-                ) : (
+                  <input
+                    type="text"
+                    placeholder="e.g. Nut Free"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#1a1a1a] focus:outline-none focus:border-stone-400 shadow-3xs"
+                  />
+                  <textarea
+                    placeholder="AI guidelines (e.g. contains no peanut or tree nut)"
+                    rows={1.5}
+                    value={newDesc}
+                    onChange={(e) => setNewDesc(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-755 focus:outline-none focus:border-stone-400 resize-none shadow-3xs"
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowAddForm(true)}
-                    className="w-full h-9 bg-white border border-dashed border-stone-300 hover:border-stone-400 text-stone-500 hover:text-stone-700 flex items-center justify-center py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-3xs"
+                    onClick={handleAddCustomTag}
+                    className="w-full bg-stone-900 text-white hover:bg-stone-850 text-[10px] font-black uppercase tracking-wider py-2 rounded-lg"
                   >
-                    + Custom Tag
+                    Add Custom Tag
                   </button>
-                )}
-              </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(true)}
+                  className="w-full h-9 bg-white border border-dashed border-stone-300 hover:border-stone-400 text-stone-500 hover:text-stone-700 flex items-center justify-center py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-3xs"
+                >
+                  + Custom Tag
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Context Info Modal Popup Dialog (for Digestion and Energy) */}
+      {activeInfoKey && (() => {
+        const infoMap: Record<string, { title: string; desc: string }> = {
+          trackDigestion: {
+            title: "🩺 Bristol Stool Scale Guide",
+            desc: "The Bristol Stool Scale (Types 1–7) is the clinical standard for evaluating gut motility & digestive health.\n\n• Types 1–2: Hard, lumpy stool (Constipation / dehydration)\n• Types 3–4: Smooth, soft sausage shape (Optimal gut motility)\n• Types 5–7: Fluffy or liquid stool (Inflammation / loose bowel)\n\nLogging your stool daily helps track food intolerances, fiber response, and gut health trends over time.",
+          },
+          trackEnergy: {
+            title: "⚡ Energy & Vitality Spectrum",
+            desc: "The 1 to 5 Vitality Spectrum tracks subjective daily energy levels:\n\n1: 😴 Exhausted / Drained\n2: 🥱 Sluggish / Heavy\n3: ⚡ Steady / Normal\n4: 🔥 High Energy / Active\n5: 🚀 Peak Vitality / Unstoppable\n\nTracking energy helps uncover how macro ratios, hydration, and sleep impact your daily performance.",
+          },
+        };
+        const info = infoMap[activeInfoKey];
+        if (!info) return null;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-stone-200/80 text-left space-y-4 animate-scale-in">
+              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                <h3 className="text-sm font-black text-stone-850 tracking-tight">{info.title}</h3>
+                <button
+                  type="button"
+                  onClick={() => setActiveInfoKey(null)}
+                  className="w-7 h-7 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center border-none cursor-pointer transition-all active:scale-95"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-stone-600 leading-relaxed whitespace-pre-line font-medium">
+                {info.desc}
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveInfoKey(null)}
+                className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs py-3 rounded-2xl shadow-sm border-none cursor-pointer transition-all active:scale-98"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </motion.div>
   );
 };

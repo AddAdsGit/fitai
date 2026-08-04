@@ -7,6 +7,20 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
 };
 
+// Only ChatGPT Action callback URLs may receive OAuth codes/tokens. An open
+// redirect here means a crafted link can exfiltrate a user's permanent api_key.
+const isAllowedRedirectUri = (uri: string): boolean => {
+  try {
+    const u = new URL(uri);
+    return u.protocol === "https:" &&
+      ["chat.openai.com", "chatgpt.com"].includes(u.hostname) &&
+      u.pathname.startsWith("/aip/") &&
+      u.pathname.endsWith("/oauth/callback");
+  } catch (_) {
+    return false;
+  }
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -17,49 +31,6 @@ serve(async (req) => {
     const url = new URL(req.url);
     const path = url.pathname;
     const method = req.method;
-
-    if (path.endsWith("/run-migration")) {
-      const dbUrl = Deno.env.get("DATABASE_URL") ?? "";
-      if (!dbUrl) {
-        return new Response(JSON.stringify({ error: "DATABASE_URL not set" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { Client } = await import("https://deno.land/x/postgres@v0.17.0/mod.ts");
-      const client = new Client(dbUrl);
-      await client.connect();
-
-      try {
-        await client.queryArray(`ALTER TABLE public.meals ADD COLUMN IF NOT EXISTS tags text[] DEFAULT '{}';`);
-        await client.queryArray(`ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS tracking_tags jsonb DEFAULT '[
-          {"id":"gluten_free","name":"Gluten Free","description":"Apply when meal contains no wheat, barley, rye, or oats","enabled":true},
-          {"id":"dairy_free","name":"Dairy Free","description":"Apply when meal contains no milk, cheese, cream, butter, or yogurt","enabled":true},
-          {"id":"nut_free","name":"Nut Free","description":"Apply when meal contains no peanuts, tree nuts, or seeds","enabled":true},
-          {"id":"vegan","name":"Vegan","description":"Apply when meal contains no animal products","enabled":true},
-          {"id":"vegetarian","name":"Vegetarian","description":"Apply when meal contains no meat or fish","enabled":true},
-          {"id":"keto","name":"Keto","description":"Apply when meal is high fat and carbs are 10g or less","enabled":true},
-          {"id":"rich_in_iron","name":"Rich in Iron","description":"Apply when meal contains iron-rich foods (e.g. spinach, red meat)","enabled":true},
-          {"id":"rich_in_b12","name":"Rich in B12","description":"Apply when meal contains B12-rich foods (e.g. fish, eggs, meat)","enabled":true},
-          {"id":"rich_in_omega3","name":"Rich in Omega-3","description":"Apply when meal contains omega-3 rich foods (e.g. salmon, walnuts, chia)","enabled":true},
-          {"id":"rich_in_magnesium","name":"Rich in Magnesium","description":"Apply when meal contains magnesium-rich foods (e.g. dark chocolate, avocado, pumpkin seeds)","enabled":true}
-        ]'::jsonb;`);
-        await client.queryArray(`CREATE INDEX IF NOT EXISTS meals_tags_idx ON public.meals USING GIN (tags);`);
-
-        return new Response(JSON.stringify({ message: "Migration run successfully!" }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      } finally {
-        await client.end();
-      }
-    }
 
     // 1. Initialize Supabase Client (needed for all operations)
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -76,6 +47,13 @@ serve(async (req) => {
 
       if (!clientId || !redirectUri || !state) {
         return new Response(JSON.stringify({ error: "Missing required parameters: client_id, redirect_uri, state" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!isAllowedRedirectUri(redirectUri)) {
+        return new Response(JSON.stringify({ error: "redirect_uri is not an allowed ChatGPT callback URL" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -117,6 +95,13 @@ serve(async (req) => {
 
       if (!client_id || !redirect_uri) {
         return new Response(JSON.stringify({ error: "Missing client_id or redirect_uri in body" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!isAllowedRedirectUri(redirect_uri)) {
+        return new Response(JSON.stringify({ error: "redirect_uri is not an allowed ChatGPT callback URL" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -199,6 +184,17 @@ serve(async (req) => {
         });
       }
 
+      // The token exchange must present the same client_id/redirect_uri the
+      // code was issued for (RFC 6749 §4.1.3) — otherwise a stolen code could
+      // be redeemed by a different client.
+      if (oauthRecord.client_id !== clientId || oauthRecord.redirect_uri !== redirectUri) {
+        await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
+        return new Response(JSON.stringify({ error: "client_id or redirect_uri does not match the authorization request" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
 
       const { data: userProfile, error: profileErr } = await supabase
@@ -226,7 +222,14 @@ serve(async (req) => {
 
     // D. GET or POST /telegram/cron (Bypass standard user authentication)
     if (path.endsWith("/telegram/cron")) {
-      const cronSecret = Deno.env.get("CRON_SECRET") || "fitai_cron_secret_2026";
+      const cronSecret = Deno.env.get("CRON_SECRET");
+      if (!cronSecret) {
+        // Fail closed: without a configured secret the cron endpoint stays off.
+        return new Response(JSON.stringify({ error: "Cron endpoint not configured" }), {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const requestSecret = url.searchParams.get("secret");
       if (requestSecret !== cronSecret) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -251,7 +254,9 @@ serve(async (req) => {
       const results = [];
 
       for (const prof of activeProfiles) {
-        const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN") || prof.telegram_bot_token;
+        // The user's own bot wins — their chat_id is paired with THEIR bot; the
+        // global env token is only a fallback for users without one.
+        const botToken = prof.telegram_bot_token || Deno.env.get("TELEGRAM_BOT_TOKEN");
         const chatId = prof.telegram_chat_id;
         if (!botToken || !chatId) continue;
 
@@ -300,31 +305,45 @@ serve(async (req) => {
               if (!mealsErr && meals) {
                 let totalCals = 0;
                 let totalP = 0;
-                let totalC = 0;
-                let totalF = 0;
-                let totalFi = 0;
+                const nutrientTotals: Record<string, number> = {};
                 meals.forEach((m) => {
                   totalCals += m.calories || 0;
                   totalP += m.protein || 0;
-                  totalC += m.carbs || 0;
-                  totalF += m.fats || 0;
-                  totalFi += m.fiber || 0;
+                  if (m.nutrients && typeof m.nutrients === "object") {
+                    for (const [key, value] of Object.entries(m.nutrients)) {
+                      if (key === "protein") continue;
+                      nutrientTotals[key] = (nutrientTotals[key] || 0) + (Number(value) || 0);
+                    }
+                  }
                 });
+
+                const tracked = (Array.isArray(prof.tracked_nutrients) ? prof.tracked_nutrients : [])
+                  .filter((n: any) => n && n.enabled !== false && n.id !== "protein");
+                const nutrientEmoji: Record<string, string> = { carbs: "🍞", fats: "🥑", fiber: "🌿" };
 
                 let msg = `📊 *Daily Nutrition Report (${localDateStr})*\n\n`;
                 msg += `👤 *User:* ${prof.display_name}\n\n`;
                 msg += `🔥 *Calories:* ${totalCals} / ${prof.daily_calories_goal} kcal\n`;
                 msg += `🥩 *Protein:* ${totalP} / ${prof.protein_goal}g\n`;
-                msg += `🍞 *Carbs:* ${totalC} / ${prof.carbs_goal}g\n`;
-                msg += `🥑 *Fats:* ${totalF} / ${prof.fats_goal}g\n`;
-                msg += `🌿 *Fiber:* ${totalFi} / ${prof.fiber_goal}g\n\n`;
+                for (const n of tracked) {
+                  const emoji = nutrientEmoji[n.id] || "🔸";
+                  msg += `${emoji} *${n.name || n.id}:* ${nutrientTotals[n.id] || 0} / ${n.target || 0}${n.unit || "g"}\n`;
+                }
+                msg += `\n`;
 
                 if (meals.length === 0) {
                   msg += `⚠️ You logged no meals today. Don't forget to track your nutrition!`;
                 } else {
                   msg += `🍽️ *Meals logged:* \n`;
                   meals.forEach((m) => {
-                    msg += `- *${m.name}* (${m.calories} kcal, P:${m.protein}g C:${m.carbs}g F:${m.fats}g Fb:${m.fiber || 0}g)\n`;
+                    const parts = [`${m.calories} kcal`, `P:${m.protein || 0}g`];
+                    if (m.nutrients && typeof m.nutrients === "object") {
+                      for (const [key, value] of Object.entries(m.nutrients)) {
+                        if (key === "protein") continue;
+                        parts.push(`${key.charAt(0).toUpperCase()}${key.slice(1, 2)}:${Number(value) || 0}g`);
+                      }
+                    }
+                    msg += `- *${m.name}* (${parts.join(" ")})\n`;
                   });
                 }
 
@@ -458,7 +477,7 @@ serve(async (req) => {
     const getDailyRemaining = async (profileId: string, dateStr: string) => {
       const { data: prof } = await supabase
         .from("profiles")
-        .select("daily_calories_goal, protein_goal, carbs_goal, fats_goal, fiber_goal")
+        .select("daily_calories_goal, protein_goal, tracked_nutrients")
         .eq("id", profileId)
         .single();
 
@@ -466,35 +485,42 @@ serve(async (req) => {
 
       const { data: meals } = await supabase
         .from("meals")
-        .select("calories, protein, carbs, fats, fiber")
+        .select("calories, protein, nutrients")
         .eq("profile_id", profileId)
         .eq("date", dateStr);
 
-      const totals = {
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fats: 0,
-        fiber: 0
-      };
+      // Targets come from the tracked_nutrients config (protein_goal stays first-class).
+      const tracked: { id: string; target: number; enabled: boolean }[] =
+        Array.isArray(prof.tracked_nutrients) ? prof.tracked_nutrients : [];
+      const targets: Record<string, number> = {};
+      for (const n of tracked) {
+        if (n && n.enabled !== false && n.id) targets[n.id] = n.target || 0;
+      }
+      targets.protein = prof.protein_goal || targets.protein || 150;
 
+      const totals: Record<string, number> = { calories: 0, protein: 0 };
       if (meals) {
         meals.forEach((m: any) => {
           totals.calories += m.calories || 0;
           totals.protein += m.protein || 0;
-          totals.carbs += m.carbs || 0;
-          totals.fats += m.fats || 0;
-          totals.fiber += m.fiber || 0;
+          if (m.nutrients && typeof m.nutrients === "object") {
+            for (const [key, value] of Object.entries(m.nutrients)) {
+              if (key === "protein") continue; // first-class column wins
+              totals[key] = (totals[key] || 0) + (Number(value) || 0);
+            }
+          }
         });
       }
 
-      return {
+      const remaining: Record<string, number> = {
         calories: Math.max(0, (prof.daily_calories_goal || 2000) - totals.calories),
-        protein: Math.max(0, (prof.protein_goal || 150) - totals.protein),
-        carbs: Math.max(0, (prof.carbs_goal || 150) - totals.carbs),
-        fats: Math.max(0, (prof.fats_goal || 60) - totals.fats),
-        fiber: Math.max(0, (prof.fiber_goal || 30) - totals.fiber)
+        protein: Math.max(0, targets.protein - totals.protein),
       };
+      for (const [id, target] of Object.entries(targets)) {
+        if (id === "protein") continue;
+        remaining[id] = Math.max(0, target - (totals[id] || 0));
+      }
+      return remaining;
     };
 
     const getDailyTagHits = async (profileId: string, dateStr: string) => {
@@ -524,7 +550,34 @@ serve(async (req) => {
     // --- PROFILE ENDPOINTS ---
     if (path.endsWith("/profile")) {
       if (method === "GET") {
-        return new Response(JSON.stringify({ profile }), {
+        // Projection: the GPT only needs goals/bio data. Never return api_key,
+        // integration credentials, or preference entries that embed secrets.
+        const safePreferences = (profile.preferences || []).filter(
+          (p: string) => typeof p === "string" && !p.includes("api_key") && !p.includes(":sk-") && !p.startsWith("gemini_")
+        );
+        const safeProfile = {
+          id: profile.id,
+          username: profile.username,
+          display_name: profile.display_name,
+          description: profile.description,
+          height: profile.height,
+          weight: profile.weight,
+          dob: profile.dob,
+          gender: profile.gender,
+          preferences: safePreferences,
+          knowledge_preferences: profile.knowledge_preferences || [],
+          knowledge_health: profile.knowledge_health || [],
+          knowledge_notes: profile.knowledge_notes || [],
+          knowledge_patterns: profile.knowledge_patterns || [],
+          tracking_tags: profile.tracking_tags || [],
+          daily_calories_goal: profile.daily_calories_goal,
+          weight_goal: profile.weight_goal,
+          protein_goal: profile.protein_goal,
+          tracked_nutrients: profile.tracked_nutrients || [],
+          agent_config: profile.agent_config || {},
+          timezone: profile.timezone,
+        };
+        return new Response(JSON.stringify({ profile: safeProfile }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -598,7 +651,7 @@ serve(async (req) => {
 
     // --- LOGOUT ENDPOINT ---
     if (path.endsWith("/logout") && method === "POST") {
-      const newKey = "fit_" + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+      const newKey = "fit_" + crypto.randomUUID().replace(/-/g, "");
       const { error: updateErr } = await supabase
         .from("profiles")
         .update({ api_key: newKey })
@@ -636,36 +689,75 @@ serve(async (req) => {
           });
         }
 
-        return new Response(JSON.stringify({ date: queryDate, notes: record ? record.notes : "" }), {
+        return new Response(JSON.stringify({
+          date: queryDate,
+          notes: record ? record.notes : "",
+          water_intake: record ? record.water_intake : 0,
+          stool_type: record ? record.stool_type : null,
+          stool_size: record ? record.stool_size : null,
+          energy_level: record ? record.energy_level : null,
+          water_log_time: record ? record.water_log_time : null,
+          stool_log_time: record ? record.stool_log_time : null,
+          energy_log_time: record ? record.energy_log_time : null,
+        }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } else if (method === "POST" || method === "PATCH") {
         const body = await req.json();
         const targetDate = body.date || getLocalTimeAndDate().dateStr;
-        const notesContent = body.notes || "";
 
-        const { data: record, error: upsertError } = await supabase
-          .from("daily_wellness")
-          .upsert(
-            {
-              profile_id: profile.id,
-              date: targetDate,
-              notes: notesContent,
-            },
-            { onConflict: "profile_id,date" }
-          )
-          .select("*")
-          .single();
+        // Only touch fields the caller actually sent — omitted fields keep their
+        // stored values (previously an omitted `notes` wiped the day's notes).
+        const fields: Record<string, unknown> = {};
+        if (body.notes !== undefined) fields.notes = body.notes;
+        if (body.water_intake !== undefined) fields.water_intake = parseInt(body.water_intake) || 0;
+        if (body.stool_type !== undefined) fields.stool_type = body.stool_type === null ? null : parseInt(body.stool_type);
+        if (body.stool_size !== undefined) fields.stool_size = body.stool_size;
+        if (body.energy_level !== undefined) fields.energy_level = body.energy_level === null ? null : parseInt(body.energy_level);
+        if (body.water_log_time !== undefined) fields.water_log_time = body.water_log_time;
+        if (body.stool_log_time !== undefined) fields.stool_log_time = body.stool_log_time;
+        if (body.energy_log_time !== undefined) fields.energy_log_time = body.energy_log_time;
 
-        if (upsertError) {
-          return new Response(JSON.stringify({ error: "Failed to save daily wellness notes", details: upsertError }), {
+        if (Object.keys(fields).length === 0) {
+          return new Response(JSON.stringify({ error: "No valid fields provided. Allowed: notes, water_intake, stool_type, stool_size, energy_level, water_log_time, stool_log_time, energy_log_time" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        return new Response(JSON.stringify({ message: "Daily wellness notes saved successfully", record }), {
+        const { data: existing } = await supabase
+          .from("daily_wellness")
+          .select("id")
+          .eq("profile_id", profile.id)
+          .eq("date", targetDate)
+          .maybeSingle();
+
+        let record: any = null;
+        let saveError: any = null;
+        if (existing) {
+          ({ data: record, error: saveError } = await supabase
+            .from("daily_wellness")
+            .update(fields)
+            .eq("id", existing.id)
+            .select("*")
+            .single());
+        } else {
+          ({ data: record, error: saveError } = await supabase
+            .from("daily_wellness")
+            .insert({ profile_id: profile.id, date: targetDate, notes: "", ...fields })
+            .select("*")
+            .single());
+        }
+
+        if (saveError) {
+          return new Response(JSON.stringify({ error: "Failed to save daily wellness data", details: saveError }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ message: "Daily wellness data saved successfully", record }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -712,6 +804,7 @@ serve(async (req) => {
               profile_id: profile.id,
               date: targetDate,
               weight: weightVal,
+              ...(body.log_time !== undefined ? { log_time: body.log_time } : {}),
             },
             { onConflict: "profile_id,date" }
           )
@@ -925,8 +1018,6 @@ serve(async (req) => {
           }
         }
 
-        let finalImageUrl = imageUrlToDownload;
-
         // Resolve time using user-supplied value, body.timezone, or timezoneOffset header
         let resolvedTime = body.time;
         if (!resolvedTime) {
@@ -962,16 +1053,32 @@ serve(async (req) => {
           }
         }
 
+        // Nutrients live in a jsonb map (dynamic-nutrients model); protein and
+        // calories stay first-class columns. Flat carbs/fats/fiber fields are
+        // still accepted for backward compatibility with older GPT configs.
+        const nutrients: Record<string, number> = {};
+        if (body.nutrients && typeof body.nutrients === "object") {
+          for (const [key, value] of Object.entries(body.nutrients)) {
+            const num = Number(value);
+            if (!isNaN(num)) nutrients[key] = num;
+          }
+        }
+        if (body.carbs !== undefined) nutrients.carbs = parseInt(body.carbs) || 0;
+        if (body.fats !== undefined) nutrients.fats = parseInt(body.fats) || 0;
+        if (body.fiber !== undefined) nutrients.fiber = parseInt(body.fiber) || 0;
+        const proteinValue = body.protein !== undefined
+          ? parseInt(body.protein) || 0
+          : Number(nutrients.protein) || 0;
+        delete nutrients.protein;
+
         const mealData = {
           profile_id: profile.id,
           name: body.name,
           time: resolvedTime,
           type: body.type || "Meal",
           calories: parseInt(body.calories),
-          protein: parseInt(body.protein || 0),
-          carbs: parseInt(body.carbs || 0),
-          fats: parseInt(body.fats || 0),
-          fiber: parseInt(body.fiber || 0),
+          protein: proteinValue,
+          nutrients,
           tags: Array.isArray(body.tags) ? body.tags : [],
           image: imageUrlToDownload, // Use external URL as initial placeholder
           meal_description: body.meal_description || null,
@@ -998,19 +1105,10 @@ serve(async (req) => {
           try {
             let finalImageUrl = imageUrlToDownload;
 
-            // 1. Download & upload image to Supabase Storage in the background
+            // 1. Download & upload image to Supabase Storage in the background.
+            // The "meal-images" bucket is provisioned once (Supabase dashboard /
+            // migration), not created per-request.
             if (imageUrlToDownload && imageUrlToDownload.startsWith("http")) {
-              try {
-                // Ensure the public bucket exists (ignore errors if already exists)
-                await supabase.storage.createBucket("meal-images", {
-                  public: true,
-                  fileSizeLimit: 10485760, // 10MB
-                  allowedMimeTypes: ["image/png", "image/jpeg", "image/gif", "image/webp"]
-                });
-              } catch (_) {
-                // Bucket already exists
-              }
-
               try {
                 const response = await fetch(imageUrlToDownload);
                 if (response.ok) {
@@ -1061,8 +1159,8 @@ serve(async (req) => {
                       "Name": { title: [{ text: { content: newMeal.name } }] },
                       "Calories": { number: newMeal.calories },
                       "Protein (g)": { number: newMeal.protein },
-                      "Carbs (g)": { number: newMeal.carbs },
-                      "Fats (g)": { number: newMeal.fats },
+                      "Carbs (g)": { number: newMeal.nutrients?.carbs ?? 0 },
+                      "Fats (g)": { number: newMeal.nutrients?.fats ?? 0 },
                       "Date": { date: { start: newMeal.date } },
                       "Time": { rich_text: [{ text: { content: newMeal.time } }] }
                     }
@@ -1161,9 +1259,32 @@ serve(async (req) => {
         if (body.name !== undefined) updateData.name = body.name;
         if (body.calories !== undefined) updateData.calories = parseInt(body.calories);
         if (body.protein !== undefined) updateData.protein = parseInt(body.protein);
-        if (body.carbs !== undefined) updateData.carbs = parseInt(body.carbs);
-        if (body.fats !== undefined) updateData.fats = parseInt(body.fats);
-        if (body.fiber !== undefined) updateData.fiber = parseInt(body.fiber);
+
+        // Nutrient updates merge into the existing jsonb map rather than replacing it.
+        const nutrientUpdates: Record<string, number> = {};
+        if (body.nutrients && typeof body.nutrients === "object") {
+          for (const [key, value] of Object.entries(body.nutrients)) {
+            const num = Number(value);
+            if (!isNaN(num)) nutrientUpdates[key] = num;
+          }
+        }
+        if (body.carbs !== undefined) nutrientUpdates.carbs = parseInt(body.carbs);
+        if (body.fats !== undefined) nutrientUpdates.fats = parseInt(body.fats);
+        if (body.fiber !== undefined) nutrientUpdates.fiber = parseInt(body.fiber);
+        if (nutrientUpdates.protein !== undefined) {
+          if (updateData.protein === undefined) updateData.protein = nutrientUpdates.protein;
+          delete nutrientUpdates.protein;
+        }
+        if (Object.keys(nutrientUpdates).length > 0) {
+          const { data: existingNutrients } = await supabase
+            .from("meals")
+            .select("nutrients")
+            .eq("id", mealId)
+            .eq("profile_id", profile.id)
+            .maybeSingle();
+          updateData.nutrients = { ...(existingNutrients?.nutrients || {}), ...nutrientUpdates };
+        }
+
         if (body.type !== undefined) updateData.type = body.type;
         if (body.time !== undefined) updateData.time = body.time;
         if (body.date !== undefined) updateData.date = body.date;
@@ -1203,8 +1324,6 @@ serve(async (req) => {
       }
     }
 
-
-
     // --- RECIPES ENDPOINTS ---
     if (path.endsWith("/recipes")) {
       if (method === "GET") {
@@ -1243,11 +1362,12 @@ serve(async (req) => {
           protein: parseInt(body.protein || 0),
           carbs: parseInt(body.carbs || 0),
           fats: parseInt(body.fats || 0),
+          fiber: parseInt(body.fiber || 0),
+          description: body.description || null,
           tags: Array.isArray(body.tags) ? body.tags : [],
           image: body.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
           ingredients: Array.isArray(body.ingredients) ? body.ingredients : [],
-          instructions: body.instructions || "",
-          micros: body.micros || []
+          instructions: body.instructions || ""
         };
 
         const { data: newRecipe, error: insertError } = await supabase
@@ -1273,7 +1393,7 @@ serve(async (req) => {
     // --- TELEGRAM ENDPOINTS ---
     if (path.endsWith("/telegram/test") && method === "POST") {
       const body = await req.json();
-      const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN") || body.telegram_bot_token || profile.telegram_bot_token;
+      const botToken = body.telegram_bot_token || profile.telegram_bot_token || Deno.env.get("TELEGRAM_BOT_TOKEN");
       const chatId = body.telegram_chat_id || profile.telegram_chat_id;
 
       if (!botToken || !chatId) {

@@ -6,3 +6,17 @@ coverage/
 *.log
 .vercel
 .env
+.env.*
+!.env.example
+
+# Secrets & local-only notes — never commit keys (see docs/context/known-issues.md #1)
+env.md
+
+# Local tooling
+.venv/
+supabase/.temp/
+
+# Generated sample assets
+card_samples/
+.claude/
+

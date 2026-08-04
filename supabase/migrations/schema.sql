@@ -25,13 +25,16 @@ create table public.profiles (
   agent_memory text[] default '{}',
   agent_config jsonb default '{"showGptWidget": true, "generateImages": true, "refinePhotos": false, "artStyle": "gourmet", "trackWeight": true, "customInstructions": "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."}'::jsonb,
   
-  -- Goals
+  -- Goals (carbs/fats/fiber targets moved into tracked_nutrients — 20260715000000_dynamic_nutrients.sql)
   daily_calories_goal integer default 2000,
   weight_goal numeric(5,2) default 70.00,
   protein_goal integer default 150,
-  carbs_goal integer default 150,
-  fats_goal integer default 60,
-  fiber_goal integer default 30,
+  tracked_nutrients jsonb default '[
+    {"id": "protein", "name": "Protein", "target": 150, "unit": "g", "color": "#F97316", "enabled": true, "isDefault": true},
+    {"id": "carbs", "name": "Carbs", "target": 150, "unit": "g", "color": "#0891B2", "enabled": true, "isDefault": true},
+    {"id": "fats", "name": "Fats", "target": 60, "unit": "g", "color": "#EAB308", "enabled": true, "isDefault": true},
+    {"id": "fiber", "name": "Fiber", "target": 30, "unit": "g", "color": "#10B981", "enabled": true, "isDefault": true}
+  ]'::jsonb,
   
   -- System
   track_micros boolean default true,
@@ -64,9 +67,7 @@ create table public.meals (
   type text not null, -- E.g., "Breakfast"
   calories integer not null,
   protein integer not null,
-  carbs integer not null,
-  fats integer not null,
-  fiber integer default 0 not null,
+  nutrients jsonb default '{}'::jsonb, -- carbs/fats/fiber + custom, keyed by nutrient id (20260715000000)
   tags text[] default '{}',
   image text,
   meal_description text,
@@ -85,11 +86,11 @@ create table public.recipes (
   carbs integer not null,
   fats integer not null,
   fiber integer default 0 not null,
+  description text,
   tags text[] default '{}',
   image text,
   ingredients text[] default '{}',
   instructions text,
-  micros jsonb default '[]'::jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -137,6 +138,17 @@ create table public.daily_wellness (
   profile_id uuid references public.profiles(id) on delete cascade not null,
   date date not null,
   notes text not null,
+  water_intake integer default 0 not null,
+  stool_type integer,
+  stool_size text,
+  weight_log_time text,
+  water_log_time text,
+  stool_log_time text,
+  energy_level integer,
+  energy_log_time text,
+  water_logs jsonb default '[]'::jsonb,
+  stool_logs jsonb default '[]'::jsonb,
+  energy_logs jsonb default '[]'::jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   unique(profile_id, date)
 );
@@ -168,5 +180,45 @@ create policy "Anyone can view shared items" on public.shares
 
 create policy "Authenticated users can create shares" on public.shares
   for insert with check (auth.role() = 'authenticated');
+
+-- Create weight_logs table
+create table public.weight_logs (
+  id uuid default gen_random_uuid() primary key,
+  profile_id uuid references public.profiles(id) on delete cascade not null,
+  weight numeric(5,2) not null,
+  date date not null,
+  log_time text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique(profile_id, date)
+);
+
+-- Enable RLS
+alter table public.weight_logs enable row level security;
+
+-- Policies for weight_logs
+create policy "Users can perform all actions on their own weight logs" on public.weight_logs
+  for all using (auth.uid() = profile_id) with check (auth.uid() = profile_id);
+
+-- Create index for performance
+create index weight_logs_profile_id_date_idx on public.weight_logs(profile_id, date);
+
+-- OAUTH CODES TABLE (ChatGPT OAuth bridge; short-lived authorization codes)
+-- NOTE: created directly on the live DB before migrations were disciplined —
+-- no timestamped migration creates it. Kept here so the snapshot matches production.
+create table public.oauth_codes (
+  id uuid default gen_random_uuid() primary key,
+  code text unique not null,
+  profile_id uuid references public.profiles(id) on delete cascade not null,
+  client_id text,
+  redirect_uri text,
+  expires_at timestamp with time zone not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.oauth_codes enable row level security;
+
+create policy "Allow service_role to manage oauth codes" on public.oauth_codes
+  for all to service_role using (true) with check (true);
+
 
 

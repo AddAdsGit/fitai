@@ -15,6 +15,7 @@ import {
 import { DefaultAvatar } from "./DefaultAvatar";
 import { ChatGPTIcon } from "./ChatGPTIcon";
 import { TERMS_AND_CONDITIONS } from "../constants/terms";
+import { DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
 
 interface BodyMetrics {
   name: string;
@@ -404,11 +405,6 @@ export const OnboardingWizard = ({
     
     const fallbackBio = `Hey, I'm ${metrics.name}! I'm tracking my nutrition to ${goalText}. Currently focusing on keeping ${metrics.activityLevel.toLowerCase()} and maintaining a target of ${cal} kcal daily.`;
 
-    const key = localStorage.getItem("fitai_gemini_api_key") || 
-                (import.meta as any).env.VITE_GEMINI_API_KEY || "";
-
-    if (!key) return fallbackBio;
-
     try {
       const prompt = `Write a brief, engaging, friendly first-person profile bio (maximum 2 sentences) for a user on a fitness app.
 Details:
@@ -424,22 +420,12 @@ Details:
 
 Make it sound casual, optimistic, and clean. Do not include quotes or meta-commentary. Just output the bio.`;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 105, temperature: 0.7 }
-          }),
-        }
-      );
+      const { data, error } = await supabase.functions.invoke("gemini", {
+        body: { prompt }
+      });
+      if (error) return fallbackBio;
 
-      if (!response.ok) return fallbackBio;
-
-      const data = await response.json();
-      const generated = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      const generated = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       return generated || fallbackBio;
     } catch (err) {
       console.error("AI Bio Generation Error:", err);
@@ -509,9 +495,10 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
         daily_calories_goal: targets.calories,
         weight_goal: metrics.targetWeight,
         protein_goal: targets.protein,
-        carbs_goal: targets.carbs,
-        fats_goal: targets.fats,
-        fiber_goal: targets.fiber
+        tracked_nutrients: DEFAULT_TRACKED_NUTRIENTS.map((n) => ({
+          ...n,
+          target: { protein: targets.protein, carbs: targets.carbs, fats: targets.fats, fiber: targets.fiber }[n.id] ?? n.target
+        }))
       })
       .eq('id', activeProfileId);
 
@@ -545,7 +532,11 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
         carbs: targets.carbs,
         fats: targets.fats,
         fiber: targets.fiber
-      }
+      },
+      tracked_nutrients: DEFAULT_TRACKED_NUTRIENTS.map((n) => ({
+        ...n,
+        target: { protein: targets.protein, carbs: targets.carbs, fats: targets.fats, fiber: targets.fiber }[n.id] ?? n.target
+      }))
     };
   };
 

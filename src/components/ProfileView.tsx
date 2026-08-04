@@ -191,10 +191,6 @@ export const ProfileView = ({
   }, [mealsState, logSearchQuery]);
 
   const handleGenerateRecipeFromMeal = async (meal: Meal) => {
-    const key = localStorage.getItem("fitai_gemini_api_key") ||
-                (import.meta as any).env.VITE_GEMINI_API_KEY ||
-                "";
-
     setIsGeneratingRecipe(true);
     try {
       const prompt = `You are an expert chef and nutritionist. Convert this logged meal into a detailed, professional recipe.
@@ -202,8 +198,8 @@ Logged Meal:
 - Name: "${meal.name}"
 - Calories: ${meal.calories} kcal
 - Protein: ${meal.protein}g
-- Carbs: ${meal.carbs}g
-- Fats: ${meal.fats}g
+- Carbs: ${meal.nutrients?.carbs ?? meal.carbs ?? 0}g
+- Fats: ${meal.nutrients?.fats ?? meal.fats ?? 0}g
 ${meal.meal_description ? `- Description/Notes: "${meal.meal_description}"` : ""}
 
 Please generate:
@@ -247,37 +243,9 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
       }
 
       if (!edgeSuccess) {
-        let response = null;
-        let lastError = "";
-
-        for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
-          try {
-            response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }]
-              })
-            });
-
-            if (response.ok) {
-              lastError = "";
-              break;
-            } else {
-              const errData = await response.json().catch(() => ({}));
-              lastError = errData.error?.message || `HTTP ${response.status} Error`;
-            }
-          } catch (err: any) {
-            lastError = err.message || "Connection failed";
-          }
-        }
-
-        if (!response || !response.ok) {
-          throw new Error(lastError || "Failed to contact Gemini API");
-        }
-
-        const resJson = await response.json();
-        rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        // All Gemini calls go through the authenticated edge function — the
+        // client never talks to Google directly with an API key.
+        throw new Error("AI generation is unavailable right now. Please try again.");
       }
       let cleaned = rawText.trim();
       if (cleaned.startsWith("```")) {
@@ -292,14 +260,14 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
         time: result.time || "20 mins",
         calories: meal.calories,
         protein: meal.protein,
-        carbs: meal.carbs,
-        fats: meal.fats,
-        fiber: meal.fiber || 0,
+        carbs: meal.nutrients?.carbs ?? meal.carbs ?? 0,
+        fats: meal.nutrients?.fats ?? meal.fats ?? 0,
+        fiber: meal.nutrients?.fiber ?? meal.fiber ?? 0,
         tags: ["AI Generated", meal.type || "Meal"],
         image: meal.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
         ingredients: result.ingredients || [],
         instructions: result.instructions || "No instructions generated.",
-        micros: result.micros || [],
+        // micros intentionally not persisted — recipes.micros does not exist in the live DB
         description: result.description || meal.meal_description || ""
       };
 

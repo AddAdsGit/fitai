@@ -1,20 +1,23 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# FitAI
 
-# Run and deploy your AI Studio app
+Mobile-first nutrition and fitness tracker. Meals are logged either in the web app or through a ChatGPT Custom GPT that calls the `gpt-action` Supabase edge function; the web app (React 19 + Vite + Tailwind 4, deployed on Vercel) is the dashboard.
 
-This contains everything you need to run your app locally.
+## Getting started
 
-View your app in AI Studio: https://ai.studio/apps/18f716aa-4e70-4a03-8265-5804380511ef
+```bash
+npm install
+cp .env.example .env   # fill in VITE_SUPABASE_URL and the *anon* key
+npm run dev            # Vite dev server on :3000
+```
 
-## Run Locally
+- `npm run lint` — TypeScript check (`tsc --noEmit`). **This is the real error gate**; `npm run build` does not type-check.
+- `npm run build` — production build.
+- Edge functions deploy with `supabase functions deploy gpt-action`.
 
-**Prerequisites:**  Node.js
+## Project knowledge
 
+All durable context (architecture, schema state, API surface, known issues, decisions, conventions) lives in [`docs/context/`](docs/context/README.md) — start there. AI assistants load [`CLAUDE.md`](CLAUDE.md) automatically, which points to the same folder.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Secrets
+
+Frontend env vars (`VITE_*`) are public — only the Supabase **anon** key belongs there. Function secrets live in `supabase secrets`; deployment env vars in Vercel. Nothing secret is committed to this repo.

@@ -15,6 +15,7 @@ import type { Meal } from "../types";
 import { hasNoGeneratedImage, getMealEmoji } from "../utils/helpers";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { DEFAULT_TRACKING_TAGS } from "./SettingsView";
+import { TimePickerModal } from "./TimePickerModal";
 
 const QUICK_LOG_DEFAULTS: any[] = [];
 
@@ -73,6 +74,7 @@ export const ManualLogModal = ({
   });
 
   const isEditing = !!mealToEdit;
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [segment, setSegment] = useState<"quick" | "detailed">(() => {
     if (mealToEdit) return "detailed";
     if (initialSegment) return initialSegment;
@@ -97,6 +99,23 @@ export const ManualLogModal = ({
   const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
   const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
   const hasGeminiKey = !!preferenceGeminiKey;
+
+  const convert24hTo12h = (time24: string): string => {
+    const [hoursStr, minutesStr] = time24.split(":");
+    const hours = parseInt(hoursStr, 10);
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutesStr} ${ampm}`;
+  };
+
+  const convert12hTo24h = (time12: string): string => {
+    const [timeVal, modifier] = time12.split(" ");
+    let [hoursStr, minutesStr] = timeVal.split(":");
+    let hours = parseInt(hoursStr, 10);
+    if (modifier === "PM" && hours < 12) hours += 12;
+    if (modifier === "AM" && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, "0")}:${minutesStr}`;
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -207,12 +226,10 @@ export const ManualLogModal = ({
   const handleRefineWithAi = async () => {
     if (!aiInstruction.trim() && !uploadedImage) return;
 
+    // Only the user's own key (from their profile preferences) may be used for
+    // direct multimodal calls; the app never ships or caches its own key.
     const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-    const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
-    const key = preferenceGeminiKey ||
-                localStorage.getItem("fitai_gemini_api_key") ||
-                (import.meta as any).env.VITE_GEMINI_API_KEY ||
-                "";
+    const key = geminiKeyTag.split(":")[1] || "";
 
     const enabledTrackingTags = (profileData?.tracking_tags || DEFAULT_TRACKING_TAGS)
       .filter((t: any) => t.enabled)
@@ -346,39 +363,9 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
         }
 
         if (!edgeSuccess) {
-          let response = null;
-          let lastError = "";
-
-          for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
-            try {
-              response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: prompt }] }]
-                })
-              });
-
-              if (response.ok) {
-                lastError = "";
-                break;
-              } else {
-                const errData = await response.json().catch(() => ({}));
-                lastError = errData.error?.message || `HTTP ${response.status} Error`;
-              }
-            } catch (err: any) {
-              lastError = err.message || "Connection failed";
-            }
-          }
-
-          if (!response || !response.ok) {
-            throw new Error(lastError || "Failed to contact Gemini API");
-          }
-
-          const data = await response.json();
-          rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          // All text-generation Gemini calls go through the authenticated edge
+          // function — the client never talks to Google directly with an API key.
+          throw new Error("AI generation is unavailable right now. Please try again.");
         }
       }
 
@@ -715,13 +702,16 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                         <label className="text-[9px] font-black uppercase text-stone-400 tracking-wider block mb-1 flex items-center gap-1">
                           <Clock className="w-3 h-3" /> Log Time
                         </label>
-                        <input
-                          type="text"
-                          placeholder="12:30 PM"
-                          value={time}
-                          onChange={(e) => setTime(e.target.value)}
-                          className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 text-center focus:outline-none focus:border-orange-500"
-                        />
+                        <div className="relative w-full">
+                          <button
+                            type="button"
+                            onClick={() => setIsTimePickerOpen(true)}
+                            className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 text-xs font-bold text-stone-900 flex items-center justify-center gap-2 hover:bg-stone-100 transition-all cursor-pointer"
+                          >
+                            <Clock className="w-3.5 h-3.5 text-stone-400" />
+                            <span>{time}</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -992,6 +982,16 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
           </div>
         )}
       </motion.div>
+
+      <TimePickerModal
+        isOpen={isTimePickerOpen}
+        onClose={() => setIsTimePickerOpen(false)}
+        initialTime={time.includes("M") ? convert12hTo24h(time) : time}
+        onSave={(timeStr) => {
+          setTime(convert24hTo12h(timeStr));
+        }}
+        title="Set Meal Log Time"
+      />
     </div>
   );
 };

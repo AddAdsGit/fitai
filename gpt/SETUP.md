@@ -28,6 +28,8 @@ This folder contains everything you need to create and configure the FitAI Custo
 2. Copy everything inside it
 3. Paste it into the **"Instructions"** text box in ChatGPT
 
+> ⚠️ **ChatGPT's Instructions box has an 8,000-character limit.** `instructions.md` is kept under that (currently ~7,000 chars) — check `wc -c gpt/instructions.md` after any edit and trim if it exceeds 8,000, or ChatGPT will truncate/reject it.
+
 ---
 
 ### Step 3 — Add the Action
