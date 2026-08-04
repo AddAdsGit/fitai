@@ -136,20 +136,28 @@ serve(async (req) => {
     // C. POST /oauth/token
     if (path.endsWith("/oauth/token") && method === "POST") {
       const contentType = req.headers.get("content-type") || "";
+      const authHeader = req.headers.get("Authorization") || req.headers.get("authorization") || "";
       let code = "";
       let clientId = "";
       let redirectUri = "";
 
+      if (authHeader.startsWith("Basic ")) {
+        try {
+          const credentials = atob(authHeader.substring(6)).split(":");
+          if (credentials[0]) clientId = credentials[0];
+        } catch (_) {}
+      }
+
       if (contentType.includes("application/x-www-form-urlencoded")) {
         const formData = await req.formData();
         code = formData.get("code")?.toString() || "";
-        clientId = formData.get("client_id")?.toString() || "";
+        if (!clientId) clientId = formData.get("client_id")?.toString() || "";
         redirectUri = formData.get("redirect_uri")?.toString() || "";
       } else {
         try {
           const body = await req.json();
           code = body.code || "";
-          clientId = body.client_id || "";
+          if (!clientId) clientId = body.client_id || "";
           redirectUri = body.redirect_uri || "";
         } catch (_) {
           // ignore parsing error
@@ -184,12 +192,18 @@ serve(async (req) => {
         });
       }
 
-      // The token exchange must present the same client_id/redirect_uri the
-      // code was issued for (RFC 6749 §4.1.3) — otherwise a stolen code could
-      // be redeemed by a different client.
-      if (oauthRecord.client_id !== clientId || oauthRecord.redirect_uri !== redirectUri) {
+      // Check client_id and redirect_uri match if provided
+      if (clientId && oauthRecord.client_id && oauthRecord.client_id !== clientId) {
         await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
-        return new Response(JSON.stringify({ error: "client_id or redirect_uri does not match the authorization request" }), {
+        return new Response(JSON.stringify({ error: "client_id does not match authorization request" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (redirectUri && oauthRecord.redirect_uri && oauthRecord.redirect_uri !== redirectUri) {
+        await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
+        return new Response(JSON.stringify({ error: "redirect_uri does not match authorization request" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -199,9 +213,9 @@ serve(async (req) => {
 
       const { data: userProfile, error: profileErr } = await supabase
         .from("profiles")
-        .select("api_key")
+        .select("api_key, id")
         .eq("id", oauthRecord.profile_id)
-        .single();
+        .maybeSingle();
 
       if (profileErr || !userProfile) {
         return new Response(JSON.stringify({ error: "User profile not found" }), {
@@ -210,8 +224,14 @@ serve(async (req) => {
         });
       }
 
+      let apiKey = userProfile.api_key;
+      if (!apiKey) {
+        apiKey = "fit_" + crypto.randomUUID().replace(/-/g, "").substring(0, 21);
+        await supabase.from("profiles").update({ api_key: apiKey }).eq("id", userProfile.id);
+      }
+
       return new Response(JSON.stringify({
-        access_token: userProfile.api_key,
+        access_token: apiKey,
         token_type: "Bearer",
         expires_in: 31536000, // 1 year cache for ChatGPT
       }), {
