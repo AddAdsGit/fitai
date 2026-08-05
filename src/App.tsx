@@ -527,6 +527,7 @@ export default function App() {
   // Router States & Navigation
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [isVitalsLogOpen, setIsVitalsLogOpen] = useState(false);
+  const [activeVitalDrawer, setActiveVitalDrawer] = useState<"water" | "digestion" | "energy" | "weight" | null>(null);
 
   // Password Recovery States
   const [newPassword, setNewPassword] = useState("");
@@ -2985,14 +2986,14 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     let updatedWaterLogs: any[] = [];
     let newTotalWater = 0;
 
-    if (waterAmount === 0) {
-      updatedWaterLogs = [];
-      newTotalWater = 0;
-    } else {
-      const newItem = { id: crypto.randomUUID(), amount: waterAmount, time: waterTime };
-      updatedWaterLogs = [...existingWaterLogs, newItem];
-      newTotalWater = updatedWaterLogs.reduce((acc, item) => acc + (item.amount || 0), 0);
+    if (waterAmount <= 0) {
+      showToast("⚠️ Please enter a water amount greater than 0 ml");
+      return;
     }
+
+    const newItem = { id: crypto.randomUUID(), amount: waterAmount, time: waterTime };
+    updatedWaterLogs = [...existingWaterLogs, newItem];
+    newTotalWater = updatedWaterLogs.reduce((acc, item) => acc + (item.amount || 0), 0);
 
     const syncedNotes = embedWellnessMeta(notesText, updatedWaterLogs, currentStoolLogs, currentEnergyLogs);
 
@@ -3679,8 +3680,465 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             </div>
 
 
+
+            {/* Minimalist Compact Vitals Dock (Above Today's Consumption) */}
+            {(profileData.agent_config?.trackWeight || profileData.agent_config?.trackWater || profileData.agent_config?.trackDigestion || profileData.agent_config?.trackEnergy) && (() => {
+              const wellnessToday = dailyNotes.find(n => n.date === selectedDate);
+              const weightTodayLog = weightLogs.find(l => l.date === selectedDate);
+              const waterIntake = wellnessToday?.water_intake || 0;
+              const stoolType = wellnessToday?.stool_type ?? null;
+              const energyLevel = wellnessToday?.energy_level ?? null;
+
+              const isWeightActive = profileData.agent_config?.trackWeight ?? true;
+              const isWaterActive = profileData.agent_config?.trackWater ?? true;
+              const isDigestionActive = profileData.agent_config?.trackDigestion ?? true;
+              const isEnergyActive = profileData.agent_config?.trackEnergy ?? true;
+
+              const getNowTimeStr = () => new Date().toTimeString().slice(0, 5);
+
+              const waterLogsList = wellnessToday?.water_logs && wellnessToday.water_logs.length > 0
+                ? wellnessToday.water_logs
+                : (waterIntake > 0 ? [{ id: "legacy-water", amount: waterIntake, time: wellnessToday?.water_log_time || getNowTimeStr() }] : []);
+
+              const stoolLogsList = wellnessToday?.stool_logs && wellnessToday.stool_logs.length > 0
+                ? wellnessToday.stool_logs
+                : (stoolType !== null ? [{ id: "legacy-stool", type: stoolType, time: wellnessToday?.stool_log_time || getNowTimeStr() }] : []);
+
+              const energyLogsList = wellnessToday?.energy_logs && wellnessToday.energy_logs.length > 0
+                ? wellnessToday.energy_logs
+                : (energyLevel !== null ? [{ id: "legacy-energy", level: energyLevel, time: wellnessToday?.energy_log_time || getNowTimeStr() }] : []);
+
+              const totalLoggedVitals = 
+                (isWeightActive && weightTodayLog ? 1 : 0) +
+                (isWaterActive ? waterLogsList.length : 0) +
+                (isDigestionActive ? stoolLogsList.length : 0) +
+                (isEnergyActive ? energyLogsList.length : 0);
+
+              const activeWeightTime = draftWeightTime || weightTodayLog?.log_time || getNowTimeStr();
+              const currentWater = draftWater ?? (waterIntake > 0 ? waterIntake : 250);
+              const activeType = draftStoolType ?? stoolType ?? 4;
+              const currentEnergy = draftEnergy ?? energyLevel ?? 3;
+
+              const activeWaterTime = draftWaterTime || wellnessToday?.water_log_time || getNowTimeStr();
+              const activeStoolTime = draftStoolTime || wellnessToday?.stool_log_time || getNowTimeStr();
+              const activeEnergyTime = draftEnergyTime || wellnessToday?.energy_log_time || getNowTimeStr();
+
+              const formatInterestingTime = (timeStr?: string | null) => {
+                if (!timeStr) return null;
+                const [hStr, mStr] = timeStr.split(":");
+                const h = parseInt(hStr, 10);
+                if (isNaN(h)) return timeStr;
+                const ampm = h >= 12 ? "PM" : "AM";
+                const h12 = h % 12 || 12;
+                return `${h12}:${mStr} ${ampm}`;
+              };
+
+              return (
+                <section className="px-6 mt-8 relative z-10 text-left space-y-3">
+                  {/* Dock Container */}
+                  <div className="bg-stone-50/80 backdrop-blur-md border border-stone-200/70 rounded-3xl p-3 shadow-3xs">
+                    {/* Top Row Header */}
+                    <div className="flex items-center justify-between px-1.5 mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-3.5 h-3.5 text-stone-500" />
+                        <h3 className="text-[10px] font-black uppercase text-stone-600 tracking-wider">
+                          Daily Vitals
+                        </h3>
+                        {totalLoggedVitals > 0 && (
+                          <span className="text-[9px] font-black bg-stone-200/80 text-stone-700 px-2 py-0.5 rounded-full">
+                            {totalLoggedVitals} {totalLoggedVitals === 1 ? "entry" : "entries"}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[9px] font-extrabold text-stone-400 uppercase tracking-widest">
+                        {selectedDate === todayStr ? "Today" : selectedDate}
+                      </span>
+                    </div>
+
+                    {/* 4-Pill Grid */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {/* 1. Water Pill */}
+                      {isWaterActive && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveVitalDrawer(activeVitalDrawer === "water" ? null : "water")}
+                          className={cn(
+                            "flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer select-none",
+                            activeVitalDrawer === "water"
+                              ? "bg-stone-900 text-white border-stone-900 shadow-sm"
+                              : "bg-white/90 hover:bg-stone-100/60 text-stone-750 border-stone-200/80 shadow-3xs"
+                          )}
+                        >
+                          <div className="flex items-center gap-1">
+                            <Droplet className={cn("w-3.5 h-3.5", activeVitalDrawer === "water" ? "text-amber-400" : "text-stone-500")} />
+                            <span className="text-[10px] font-black uppercase tracking-wider">Water</span>
+                          </div>
+                          <span className="text-[10px] font-extrabold mt-0.5 opacity-80 truncate max-w-full">
+                            {waterIntake > 0 ? `${waterIntake}ml` : "Log"}
+                          </span>
+                        </button>
+                      )}
+
+                      {/* 2. Digestion Pill */}
+                      {isDigestionActive && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveVitalDrawer(activeVitalDrawer === "digestion" ? null : "digestion")}
+                          className={cn(
+                            "flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer select-none",
+                            activeVitalDrawer === "digestion"
+                              ? "bg-stone-900 text-white border-stone-900 shadow-sm"
+                              : "bg-white/90 hover:bg-stone-100/60 text-stone-750 border-stone-200/80 shadow-3xs"
+                          )}
+                        >
+                          <div className="flex items-center gap-1">
+                            <Activity className={cn("w-3.5 h-3.5", activeVitalDrawer === "digestion" ? "text-amber-400" : "text-stone-500")} />
+                            <span className="text-[10px] font-black uppercase tracking-wider">Stool</span>
+                          </div>
+                          <span className="text-[10px] font-extrabold mt-0.5 opacity-80 truncate max-w-full">
+                            {stoolType !== null ? `Type ${stoolType}` : "Log"}
+                          </span>
+                        </button>
+                      )}
+
+                      {/* 3. Energy Pill */}
+                      {isEnergyActive && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveVitalDrawer(activeVitalDrawer === "energy" ? null : "energy")}
+                          className={cn(
+                            "flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer select-none",
+                            activeVitalDrawer === "energy"
+                              ? "bg-stone-900 text-white border-stone-900 shadow-sm"
+                              : "bg-white/90 hover:bg-stone-100/60 text-stone-750 border-stone-200/80 shadow-3xs"
+                          )}
+                        >
+                          <div className="flex items-center gap-1">
+                            <Zap className={cn("w-3.5 h-3.5", activeVitalDrawer === "energy" ? "text-amber-400" : "text-stone-500")} />
+                            <span className="text-[10px] font-black uppercase tracking-wider">Energy</span>
+                          </div>
+                          <span className="text-[10px] font-extrabold mt-0.5 opacity-80 truncate max-w-full">
+                            {energyLevel !== null ? `Lvl ${energyLevel}` : "Log"}
+                          </span>
+                        </button>
+                      )}
+
+                      {/* 4. Weight Pill */}
+                      {isWeightActive && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveVitalDrawer(activeVitalDrawer === "weight" ? null : "weight")}
+                          className={cn(
+                            "flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all cursor-pointer select-none",
+                            activeVitalDrawer === "weight"
+                              ? "bg-stone-900 text-white border-stone-900 shadow-sm"
+                              : "bg-white/90 hover:bg-stone-100/60 text-stone-750 border-stone-200/80 shadow-3xs"
+                          )}
+                        >
+                          <div className="flex items-center gap-1">
+                            <Scale className={cn("w-3.5 h-3.5", activeVitalDrawer === "weight" ? "text-amber-400" : "text-stone-500")} />
+                            <span className="text-[10px] font-black uppercase tracking-wider">Weight</span>
+                          </div>
+                          <span className="text-[10px] font-extrabold mt-0.5 opacity-80 truncate max-w-full">
+                            {weightTodayLog ? `${weightTodayLog.weight}kg` : "Log"}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* EXPANDABLE ACCORDION DRAWER */}
+                    <AnimatePresence>
+                      {activeVitalDrawer && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden mt-3 pt-3 border-t border-stone-200/60"
+                        >
+                          {/* WATER DRAWER */}
+                          {activeVitalDrawer === "water" && (
+                            <div className="space-y-3 animate-fade-in text-left">
+                              {/* Quick Presets */}
+                              <div className="flex items-center gap-2">
+                                {[250, 500, 750, 1000].map((preset) => (
+                                  <button
+                                    key={preset}
+                                    type="button"
+                                    onClick={async () => {
+                                      await handleLogWater(preset, selectedDate, getNowTimeStr());
+                                    }}
+                                    className="flex-1 py-1.5 rounded-xl bg-white border border-stone-200/80 hover:bg-stone-100 text-[10px] font-extrabold text-stone-750 cursor-pointer shadow-3xs transition-all active:scale-95"
+                                  >
+                                    +{preset}ml
+                                  </button>
+                                ))}
+                              </div>
+
+                              {/* Manual Input Row */}
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-2 py-1 shadow-3xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => setDraftWater(Math.max(50, currentWater - 250))}
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer bg-transparent border-none"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </button>
+                                  <div className="flex-1 text-center text-xs font-black text-stone-850">
+                                    {currentWater} ml
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDraftWater(currentWater + 250)}
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer bg-transparent border-none"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (currentWater <= 0) {
+                                      showToast("⚠️ Please enter a water amount greater than 0 ml");
+                                      return;
+                                    }
+                                    await handleLogWater(currentWater, selectedDate, activeWaterTime);
+                                    setDraftWater(null);
+                                  }}
+                                  className="h-10 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold cursor-pointer border-none shadow-xs transition-all shrink-0 active:scale-95 flex items-center gap-1"
+                                >
+                                  <Check className="w-3.5 h-3.5 text-white" />
+                                  <span>Log</span>
+                                </button>
+                              </div>
+
+                              {/* History List */}
+                              {waterLogsList.length > 0 && (
+                                <div className="space-y-1.5 pt-1">
+                                  <span className="text-[9px] font-black uppercase text-stone-400 tracking-wider block">Today's Logs</span>
+                                  {waterLogsList.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/60 rounded-xl px-3 py-1.5 text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <Droplet className="w-3 h-3 text-stone-500" />
+                                        <span className="font-extrabold text-stone-850">{item.amount} ml</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-bold text-stone-400">{formatInterestingTime(item.time)}</span>
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            await handleDeleteWaterLogItem(item.id, selectedDate);
+                                          }}
+                                          className="text-stone-400 hover:text-red-500 cursor-pointer border-none bg-transparent p-0.5"
+                                          title="Delete entry"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* DIGESTION DRAWER */}
+                          {activeVitalDrawer === "digestion" && (
+                            <div className="space-y-3 animate-fade-in text-left">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-white border border-stone-200/80 rounded-2xl p-2.5 shadow-3xs flex items-center gap-2">
+                                  <input 
+                                    type="range" 
+                                    min="1" 
+                                    max="7" 
+                                    value={activeType}
+                                    onChange={(e) => setDraftStoolType(parseInt(e.target.value))}
+                                    className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                                  />
+                                  <BristolStoolIcon type={activeType} className="w-6 h-6 shrink-0" />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await handleLogDigestion(activeType, null, selectedDate, activeStoolTime);
+                                    setDraftStoolType(null);
+                                  }}
+                                  className="h-10 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold cursor-pointer border-none shadow-xs transition-all shrink-0 active:scale-95 flex items-center gap-1"
+                                >
+                                  <Check className="w-3.5 h-3.5 text-white" />
+                                  <span>Log Type {activeType}</span>
+                                </button>
+                              </div>
+
+                              {/* History List */}
+                              {stoolLogsList.length > 0 && (
+                                <div className="space-y-1.5 pt-1">
+                                  <span className="text-[9px] font-black uppercase text-stone-400 tracking-wider block">Today's Logs</span>
+                                  {stoolLogsList.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/60 rounded-xl px-3 py-1.5 text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <BristolStoolIcon type={item.type} className="w-3.5 h-3.5 shrink-0" />
+                                        <span className="font-extrabold text-stone-850">Type {item.type}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-bold text-stone-400">{formatInterestingTime(item.time)}</span>
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            await handleDeleteStoolLogItem(item.id, selectedDate);
+                                          }}
+                                          className="text-stone-400 hover:text-red-500 cursor-pointer border-none bg-transparent p-0.5"
+                                          title="Delete entry"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* ENERGY DRAWER */}
+                          {activeVitalDrawer === "energy" && (
+                            <div className="space-y-3 animate-fade-in text-left">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-white border border-stone-200/80 rounded-2xl p-2.5 shadow-3xs flex items-center gap-2">
+                                  <input 
+                                    type="range" 
+                                    min="1" 
+                                    max="5" 
+                                    value={currentEnergy}
+                                    onChange={(e) => setDraftEnergy(parseInt(e.target.value))}
+                                    className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                                  />
+                                  <span className="text-base">
+                                    {currentEnergy === 1 ? "😴" : currentEnergy === 2 ? "🥱" : currentEnergy === 3 ? "⚡" : currentEnergy === 4 ? "🔥" : "🚀"}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await handleLogEnergy(currentEnergy, selectedDate, activeEnergyTime);
+                                    setDraftEnergy(null);
+                                  }}
+                                  className="h-10 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold cursor-pointer border-none shadow-xs transition-all shrink-0 active:scale-95 flex items-center gap-1"
+                                >
+                                  <Check className="w-3.5 h-3.5 text-white" />
+                                  <span>Log Level {currentEnergy}</span>
+                                </button>
+                              </div>
+
+                              {/* History List */}
+                              {energyLogsList.length > 0 && (
+                                <div className="space-y-1.5 pt-1">
+                                  <span className="text-[9px] font-black uppercase text-stone-400 tracking-wider block">Today's Logs</span>
+                                  {energyLogsList.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/60 rounded-xl px-3 py-1.5 text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <Zap className="w-3 h-3 text-amber-500" />
+                                        <span className="font-extrabold text-stone-850">Level {item.level}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-bold text-stone-400">{formatInterestingTime(item.time)}</span>
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            await handleDeleteEnergyLogItem(item.id, selectedDate);
+                                          }}
+                                          className="text-stone-400 hover:text-red-500 cursor-pointer border-none bg-transparent p-0.5"
+                                          title="Delete entry"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* WEIGHT DRAWER */}
+                          {activeVitalDrawer === "weight" && (
+                            <div className="space-y-3 animate-fade-in text-left">
+                              {weightTodayLog ? (
+                                <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs">
+                                  <div className="flex items-baseline gap-1 text-xs font-bold text-stone-850">
+                                    <span className="text-stone-400 font-medium">Logged Weight:</span>
+                                    <span className="text-sm font-black text-orange-950">{weightTodayLog.weight} kg</span>
+                                    {weightTodayLog.log_time && (
+                                      <span className="text-[9px] text-stone-400 font-bold ml-1">({formatInterestingTime(weightTodayLog.log_time)})</span>
+                                    )}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (weightTodayLog.id) {
+                                        await handleDeleteWeight(weightTodayLog.id);
+                                      }
+                                    }}
+                                    className="text-stone-400 hover:text-red-500 cursor-pointer border-none bg-transparent p-1"
+                                    title="Delete weight log"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-2 py-1 shadow-3xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const w = draftWeight ?? (profileData.weight || 70);
+                                        setDraftWeight(Math.max(30, Number((w - 0.1).toFixed(1))));
+                                      }}
+                                      className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer bg-transparent border-none"
+                                    >
+                                      <Minus className="w-3.5 h-3.5" />
+                                    </button>
+                                    <div className="flex-1 text-center text-xs font-black text-stone-850">
+                                      {draftWeight ?? (profileData.weight || 70)} kg
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const w = draftWeight ?? (profileData.weight || 70);
+                                        setDraftWeight(Math.min(300, Number((w + 0.1).toFixed(1))));
+                                      }}
+                                      className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer bg-transparent border-none"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const w = draftWeight ?? (profileData.weight || 70);
+                                      await handleLogWeight(w, selectedDate, activeWeightTime);
+                                      setDraftWeight(null);
+                                    }}
+                                    className="h-10 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold cursor-pointer border-none shadow-xs transition-all shrink-0 active:scale-95 flex items-center gap-1"
+                                  >
+                                    <Check className="w-3.5 h-3.5 text-white" />
+                                    <span>Log Weight</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </section>
+              );
+            })()}
+
             {/* Today's Consumption Section */}
-            <section className="px-6 mt-16 relative z-10">
+            <section className="px-6 mt-6 relative z-10">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-black tracking-tight text-orange-950">
                   {selectedDate === todayStr ? "Today's Consumption" : "Logged Consumption"}
@@ -4042,737 +4500,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               </div>
             </section>
 
-            {/* Daily Vitals Tracking Section */}
-            {(profileData.agent_config?.trackWeight || profileData.agent_config?.trackWater || profileData.agent_config?.trackDigestion || profileData.agent_config?.trackEnergy) && (() => {
-              const wellnessToday = dailyNotes.find(n => n.date === selectedDate);
-              const weightTodayLog = weightLogs.find(l => l.date === selectedDate);
-              const waterIntake = wellnessToday?.water_intake || 0;
-              const stoolType = wellnessToday?.stool_type ?? null;
-              const energyLevel = wellnessToday?.energy_level ?? null;
-
-              const isWeightActive = profileData.agent_config?.trackWeight ?? true;
-              const isWaterActive = profileData.agent_config?.trackWater ?? true;
-              const isDigestionActive = profileData.agent_config?.trackDigestion ?? true;
-              const isEnergyActive = profileData.agent_config?.trackEnergy ?? true;
-
-              const totalActiveVitals = (isWeightActive ? 1 : 0) + (isWaterActive ? 1 : 0) + (isDigestionActive ? 1 : 0) + (isEnergyActive ? 1 : 0);
-
-              const getNowTimeStr = () => new Date().toTimeString().slice(0, 5);
-
-              const waterLogsList = wellnessToday?.water_logs && wellnessToday.water_logs.length > 0
-                ? wellnessToday.water_logs
-                : (waterIntake > 0 ? [{ id: "legacy-water", amount: waterIntake, time: wellnessToday?.water_log_time || getNowTimeStr() }] : []);
-
-              const stoolLogsList = wellnessToday?.stool_logs && wellnessToday.stool_logs.length > 0
-                ? wellnessToday.stool_logs
-                : (stoolType !== null ? [{ id: "legacy-stool", type: stoolType, time: wellnessToday?.stool_log_time || getNowTimeStr() }] : []);
-
-              const energyLogsList = wellnessToday?.energy_logs && wellnessToday.energy_logs.length > 0
-                ? wellnessToday.energy_logs
-                : (energyLevel !== null ? [{ id: "legacy-energy", level: energyLevel, time: wellnessToday?.energy_log_time || getNowTimeStr() }] : []);
-
-              const totalLoggedVitals = 
-                (isWeightActive && weightTodayLog ? 1 : 0) +
-                (isWaterActive ? waterLogsList.length : 0) +
-                (isDigestionActive ? stoolLogsList.length : 0) +
-                (isEnergyActive ? energyLogsList.length : 0);
-
-              const activeWeightTime = draftWeightTime || weightTodayLog?.log_time || getNowTimeStr();
-              const currentWater = draftWater ?? waterIntake;
-              const activeType = draftStoolType ?? stoolType ?? 4;
-              const currentEnergy = draftEnergy ?? energyLevel ?? 3;
-
-              const activeWaterTime = draftWaterTime || wellnessToday?.water_log_time || getNowTimeStr();
-              const activeStoolTime = draftStoolTime || wellnessToday?.stool_log_time || getNowTimeStr();
-              const activeEnergyTime = draftEnergyTime || wellnessToday?.energy_log_time || getNowTimeStr();
-
-              // Digestion mapping helper
-              const isConstipated = stoolType === 1 || stoolType === 2;
-              const isHealthy = stoolType === 3 || stoolType === 4;
-              const isLoose = stoolType !== null && stoolType >= 5;
-
-              const formatInterestingTime = (timeStr?: string | null) => {
-                if (!timeStr) return null;
-                const [hStr, mStr] = timeStr.split(":");
-                const h = parseInt(hStr, 10);
-                if (isNaN(h)) return timeStr;
-                const ampm = h >= 12 ? "PM" : "AM";
-                const h12 = h % 12 || 12;
-                return `${h12}:${mStr} ${ampm}`;
-              };
-
-              return (
-                <section className="px-6 mt-10 relative z-10 text-left space-y-6 animate-fade-in">
-                  
-                  {/* 0. UNIFIED VITALS HEADER & COLLAPSIBLE LOG HISTORY */}
-                  <div className="flex flex-col gap-2 border-b border-stone-200/50 pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-3.5 h-3.5 text-orange-500" />
-                        <h3 className="text-[11px] font-black uppercase text-stone-750 tracking-wider">
-                          {selectedDate === todayStr ? "Daily Vitals" : "Logged Vitals History"}
-                        </h3>
-                        {totalLoggedVitals > 0 && (
-                          <span className="text-[9px] font-extrabold bg-orange-100/90 border border-orange-200/60 text-orange-800 px-2 py-0.5 rounded-full">
-                            {totalLoggedVitals} {totalLoggedVitals === 1 ? "entry" : "entries"}
-                          </span>
-                        )}
-                      </div>
-                      {totalLoggedVitals > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setIsVitalsLogOpen(!isVitalsLogOpen)}
-                          className="text-[10px] font-bold text-stone-400 hover:text-stone-700 flex items-center gap-1 cursor-pointer bg-transparent border-none transition-colors select-none"
-                        >
-                          <span>{isVitalsLogOpen ? "Hide Log" : "View Log"}</span>
-                          {isVitalsLogOpen ? <ChevronUp className="w-3 h-3 text-stone-400" /> : <ChevronDown className="w-3 h-3 text-stone-400" />}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Super-Minimalist Collapsible Log History Drawer */}
-                    {isVitalsLogOpen && totalLoggedVitals > 0 && (
-                      <div className="mt-2 flex flex-col gap-1.5 bg-stone-50/80 border border-stone-200/60 rounded-2xl p-2.5 animate-fade-in">
-                        {/* 1. Weight */}
-                        {weightTodayLog && (
-                          <div className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
-                            <div className="flex items-center gap-2">
-                              <Scale className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                              <span className="text-stone-500 font-medium">Weight:</span>
-                              <strong className="text-stone-900 font-black">{weightTodayLog.weight} kg</strong>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {weightTodayLog.log_time && (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
-                                  <Clock className="w-2.5 h-2.5 text-stone-400" />
-                                  {formatInterestingTime(weightTodayLog.log_time)}
-                                </span>
-                              )}
-                              {selectedDate === todayStr && (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (weightTodayLog.id) {
-                                      await handleDeleteWeight(weightTodayLog.id);
-                                    }
-                                  }}
-                                  className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
-                                  title="Remove weight log"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 2. Water Multi-Logs */}
-                        {waterLogsList.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
-                            <div className="flex items-center gap-2">
-                              <Droplet className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-                              <span className="text-stone-500 font-medium">Hydration:</span>
-                              <strong className="text-stone-900 font-black">{item.amount} ml</strong>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {item.time && (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
-                                  <Clock className="w-2.5 h-2.5 text-stone-400" />
-                                  {formatInterestingTime(item.time)}
-                                </span>
-                              )}
-                              {selectedDate === todayStr && (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (item.id === "legacy-water") {
-                                      await handleLogWater(0, selectedDate);
-                                    } else {
-                                      await handleDeleteWaterLogItem(item.id, selectedDate);
-                                    }
-                                  }}
-                                  className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
-                                  title="Remove water entry"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* 3. Stool (Gut Health) Multi-Logs */}
-                        {stoolLogsList.map((item) => {
-                          const itemConstipated = item.type === 1 || item.type === 2;
-                          const itemHealthy = item.type === 3 || item.type === 4;
-                          return (
-                            <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
-                              <div className="flex items-center gap-2">
-                                <BristolStoolIcon type={item.type} className="w-3.5 h-3.5 shrink-0" />
-                                <span className="text-stone-500 font-medium">Gut Health:</span>
-                                <strong className={cn(
-                                  "font-black",
-                                  itemConstipated ? "text-amber-600" : (itemHealthy ? "text-emerald-600" : "text-blue-600")
-                                )}>
-                                  {itemConstipated ? "Constipated" : (itemHealthy ? "Healthy" : "Loose")}
-                                </strong>
-                                <span className="text-[10px] text-stone-400 font-bold">(Type {item.type})</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {item.time && (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
-                                    <Clock className="w-2.5 h-2.5 text-stone-400" />
-                                    {formatInterestingTime(item.time)}
-                                  </span>
-                                )}
-                                {selectedDate === todayStr && (
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      if (item.id === "legacy-stool") {
-                                        await handleLogDigestion(null, null, selectedDate);
-                                      } else {
-                                        await handleDeleteStoolLogItem(item.id, selectedDate);
-                                      }
-                                    }}
-                                    className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
-                                    title="Remove digestion entry"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {/* 4. Energy (Vitality) Multi-Logs */}
-                        {energyLogsList.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
-                            <div className="flex items-center gap-2">
-                              <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                              <span className="text-stone-500 font-medium">Vitality:</span>
-                              <strong className="text-stone-900 font-black">
-                                {(() => {
-                                  if (item.level === 1) return "😴 Exhausted";
-                                  if (item.level === 2) return "🥱 Sluggish";
-                                  if (item.level === 3) return "⚡ Steady";
-                                  if (item.level === 4) return "🔥 High Energy";
-                                  return "🚀 Peak Vitality";
-                                })()}
-                              </strong>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {item.time && (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
-                                  <Clock className="w-2.5 h-2.5 text-stone-400" />
-                                  {formatInterestingTime(item.time)}
-                                </span>
-                              )}
-                              {selectedDate === todayStr && (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (item.id === "legacy-energy") {
-                                      await handleLogEnergy(null, selectedDate);
-                                    } else {
-                                      await handleDeleteEnergyLogItem(item.id, selectedDate);
-                                    }
-                                  }}
-                                  className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
-                                  title="Remove energy entry"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 1. WEIGHT LOG */}
-                  {isWeightActive && (selectedDate !== todayStr || !weightTodayLog) && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                          <Scale className="w-3.5 h-3.5 text-stone-400" />
-                          <span>Weight Log</span>
-                        </h3>
-                      </div>
-
-                      {weightTodayLog ? (
-                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs animate-fade-in">
-                          <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
-                            <span className="text-xs text-stone-400 font-medium">Logged Weight:</span>
-                            <span className="text-base font-black text-orange-950">{weightTodayLog.weight}</span>
-                            <span className="text-xs text-stone-400 font-medium">kg</span>
-                            {weightTodayLog.log_time && (
-                              <span className="text-[10px] text-stone-400 font-bold ml-1.5">(at {weightTodayLog.log_time})</span>
-                            )}
-                          </div>
-                          {selectedDate === todayStr && (
-                            <button
-                              onClick={async () => {
-                                if (weightTodayLog.id) {
-                                  await handleDeleteWeight(weightTodayLog.id);
-                                }
-                              }}
-                              className="w-7 h-7 rounded-xl hover:bg-stone-250 text-stone-400 hover:text-stone-600 flex items-center justify-center cursor-pointer border-none transition-all shrink-0 bg-stone-50 border border-stone-200/60 shadow-3xs"
-                              title="Remove weight log"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ) : selectedDate === todayStr ? (
-                        (() => {
-                          const baseWeight = (() => {
-                            const pastLogs = weightLogs.filter(l => l.date < todayStr);
-                            if (pastLogs.length > 0) {
-                              const sortedPast = [...pastLogs].sort((a, b) => b.date.localeCompare(a.date));
-                              return sortedPast[0].weight;
-                            }
-                            return profileData.weight || 70;
-                          })();
-
-                          const currentWeight = draftWeight ?? baseWeight;
-
-                          return (
-                            <div className="flex flex-col gap-2 w-full animate-fade-in">
-                              <div className="flex items-center gap-2.5 w-full">
-                                {/* Left: Time Pill */}
-                                <div className="relative shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setTimePickerTarget("weight");
-                                      setTimePickerInitialTime(activeWeightTime);
-                                      setIsTimePickerOpen(true);
-                                    }}
-                                    className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                                  >
-                                    <Clock className="w-3.5 h-3.5 text-stone-400" />
-                                    <span>{activeWeightTime}</span>
-                                  </button>
-                                </div>
-
-                                {/* Middle: Stepper */}
-                                <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDraftWeight(Math.max(30, Number((currentWeight - 0.1).toFixed(1))));
-                                      triggerWeightStepping();
-                                    }}
-                                    className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                                  >
-                                    <Minus className="w-3.5 h-3.5" />
-                                  </button>
-                                  <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750 select-none">
-                                    <span className="text-sm font-black text-stone-850">{currentWeight}</span>
-                                    <span className="text-stone-400">kg</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDraftWeight(Math.min(300, Number((currentWeight + 0.1).toFixed(1))));
-                                      triggerWeightStepping();
-                                    }}
-                                    className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-
-                                {/* Right: Log Button */}
-                                <button
-                                  onClick={async () => {
-                                    await handleLogWeight(currentWeight, todayStr, activeWeightTime);
-                                    setDraftWeight(null);
-                                    setDraftWeightTime("");
-                                  }}
-                                  className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
-                                  title="Log Weight"
-                                >
-                                  <Check className="w-5 h-5 text-white" />
-                                </button>
-                              </div>
-
-                              {/* Transient Micro-Feedback (only while stepping) */}
-                              {isWeightStepping && (
-                                <div className="px-1 text-left animate-fade-in">
-                                  <span className="text-[11px] font-medium text-stone-500">
-                                    {(() => {
-                                      const pastLogs = weightLogs.filter(l => l.date < selectedDate);
-                                      if (pastLogs.length > 0) {
-                                        const sortedPast = [...pastLogs].sort((a, b) => b.date.localeCompare(a.date));
-                                        const prev = sortedPast[0];
-                                        const diff = Number((currentWeight - prev.weight).toFixed(1));
-                                        
-                                        const prevDateObj = new Date(prev.date + "T00:00:00");
-                                        const monthStr = prevDateObj.toLocaleString('en-US', { month: 'short' });
-                                        const dayNum = prevDateObj.getDate();
-                                        const dayName = prevDateObj.toLocaleString('en-US', { weekday: 'short' });
-                                        const dateFormatted = `${monthStr} ${dayNum} (${dayName})`;
-                                        
-                                        if (diff < 0) return `📉 ${diff} kg from last log on ${dateFormatted}`;
-                                        if (diff > 0) return `📈 +${diff} kg from last log on ${dateFormatted}`;
-                                        return `⚖️ Same as last log on ${dateFormatted}`;
-                                      }
-                                      return `⚖️ Baseline weight recorded (${currentWeight} kg)`;
-                                    })()}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
-                          No weight logged for this date
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 2. WATER TRACKER */}
-                  {isWaterActive && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                          <Droplet className="w-3.5 h-3.5 text-stone-400" />
-                          <span>Water Log</span>
-                        </h3>
-                      </div>
-
-                      {selectedDate === todayStr ? (
-                        <div className="flex flex-col gap-2 w-full animate-fade-in">
-                          <div className="flex items-center gap-2.5 w-full">
-                            {/* Left: Time Pill */}
-                            <div className="relative shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTimePickerTarget("water");
-                                  setTimePickerInitialTime(activeWaterTime);
-                                  setIsTimePickerOpen(true);
-                                }}
-                                className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                              >
-                                <Clock className="w-3.5 h-3.5 text-stone-400" />
-                                <span>{activeWaterTime}</span>
-                              </button>
-                            </div>
-
-                            {/* Stepper */}
-                            <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDraftWater(Math.max(0, currentWater - 250));
-                                  triggerWaterStepping();
-                                }}
-                                className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                              >
-                                <Minus className="w-3.5 h-3.5" />
-                              </button>
-                              <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750 select-none">
-                                <span className="text-sm font-black text-stone-850">{currentWater}</span>
-                                <span className="text-stone-400">ml</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDraftWater(Math.min(10000, currentWater + 250));
-                                  triggerWaterStepping();
-                                }}
-                                className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            {/* Right: Solid Orange Checkmark Button (Zero Friction) */}
-                            <button
-                              onClick={async () => {
-                                await handleLogWater(currentWater, selectedDate, activeWaterTime);
-                                setDraftWater(null);
-                                setDraftWaterTime("");
-                              }}
-                              className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
-                              title="Log Water"
-                            >
-                              <Check className="w-5 h-5 text-white" />
-                            </button>
-                          </div>
-
-                          {/* Dynamic Motivational Description below (only while stepping) */}
-                          {isWaterStepping && (
-                            <div className="px-1 text-left animate-fade-in">
-                              <span className="text-[11px] font-medium text-stone-500">
-                                {(() => {
-                                  if (currentWater === 0) return `Goal: ${DAILY_WATER_GOAL_ML}ml — tap + to log hydration 💧`;
-                                  const remaining = DAILY_WATER_GOAL_ML - currentWater;
-                                  if (remaining > 0) return `${currentWater}ml logged (${Math.round((currentWater / DAILY_WATER_GOAL_ML) * 100)}%) — ${remaining}ml remaining 🌊`;
-                                  if (remaining === 0) return `Daily goal achieved (${DAILY_WATER_GOAL_ML}ml)! Amazing job 🎉`;
-                                  return `${currentWater}ml logged — daily goal exceeded! 🚀`;
-                                })()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
-                          <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
-                            <span className="text-xs text-stone-400 font-medium">Logged Water:</span>
-                            <span className="text-base font-black text-orange-950">{waterIntake}</span>
-                            <span className="text-xs text-stone-400 font-medium">ml</span>
-                            {wellnessToday?.water_log_time && (
-                              <span className="text-[10px] text-stone-400 font-bold ml-1.5">(at {wellnessToday.water_log_time})</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 3. DIGESTION TRACKER */}
-                  {isDigestionActive && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                          <Activity className="w-3.5 h-3.5 text-stone-400" />
-                          <span>Digestion Log</span>
-                        </h3>
-                      </div>
-
-                      {selectedDate === todayStr ? (
-                        <div className="flex flex-col gap-2 w-full animate-fade-in">
-                          <div className="flex items-center gap-2.5 w-full">
-                            {/* Left: Time Pill */}
-                            <div className="relative shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTimePickerTarget("digestion");
-                                  setTimePickerInitialTime(activeStoolTime);
-                                  setIsTimePickerOpen(true);
-                                }}
-                                className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                              >
-                                <Clock className="w-3.5 h-3.5 text-stone-400" />
-                                <span>{activeStoolTime}</span>
-                              </button>
-                            </div>
-
-                            {/* Middle: Clean Slider */}
-                            <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
-                              <input 
-                                type="range" 
-                                min="1" 
-                                max="7" 
-                                value={activeType}
-                                onChange={(e) => setDraftStoolType(parseInt(e.target.value))}
-                                onMouseDown={() => setIsStoolSliding(true)}
-                                onTouchStart={() => setIsStoolSliding(true)}
-                                onMouseUp={() => setTimeout(() => setIsStoolSliding(false), 200)}
-                                onTouchEnd={() => setTimeout(() => setIsStoolSliding(false), 200)}
-                                className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                              />
-                            </div>
-
-                            {/* Right: Action Box */}
-                            <div className="w-12 h-12 [perspective:1000px] shrink-0">
-                              <div className={cn(
-                                "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
-                                isStoolSliding ? "[transform:rotateY(180deg)]" : ""
-                              )}>
-                                
-                                {/* FRONT: Log Button */}
-                                <button
-                                  onClick={async () => {
-                                    await handleLogDigestion(activeType, null, selectedDate, activeStoolTime);
-                                    setDraftStoolType(null);
-                                    setDraftStoolTime("");
-                                  }}
-                                  className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
-                                  title="Log Digestion"
-                                >
-                                  <Check className="w-5 h-5 text-white" />
-                                </button>
-
-                                {/* BACK: Brown Bristol Stool SVG */}
-                                <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs">
-                                  <BristolStoolIcon type={activeType} className="w-7 h-7" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Dynamic description below the section (only while sliding) */}
-                          {isStoolSliding && (
-                            <div className="px-1 text-left animate-fade-in">
-                              <span className="text-[11px] font-medium text-stone-500">
-                                {(() => {
-                                  if (activeType === 1) return "Bristol Stool Type 1: Separate hard lumps, like nuts (hard to pass)";
-                                  if (activeType === 2) return "Bristol Stool Type 2: Sausage-shaped, but lumpy";
-                                  if (activeType === 3) return "Bristol Stool Type 3: Like a sausage, with cracks on surface";
-                                  if (activeType === 4) return "Bristol Stool Type 4: Like a sausage or snake, smooth & soft (Optimal)";
-                                  if (activeType === 5) return "Bristol Stool Type 5: Soft blobs with clear-cut edges";
-                                  if (activeType === 6) return "Bristol Stool Type 6: Fluffy pieces with ragged edges, mushy stool";
-                                  return "Bristol Stool Type 7: Watery, no solid pieces (entirely liquid)";
-                                })()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
-                          <div className="flex items-center gap-3 text-left">
-                            <BristolStoolIcon type={stoolType || 4} className="w-7 h-7 shrink-0" />
-                            <div className="flex flex-col">
-                              <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
-                                <span className="text-xs text-stone-400 font-medium">Logged Consistency:</span>
-                                <span className={cn(
-                                  "text-sm font-black",
-                                  isConstipated ? "text-amber-600" : (isHealthy ? "text-emerald-600" : "text-blue-600")
-                                )}>
-                                  {isConstipated ? "Constipated" : (isHealthy ? "Healthy" : "Loose")}
-                                </span>
-                                <span className="text-[10px] text-stone-400 font-bold ml-1">(Type {stoolType})</span>
-                              </div>
-                              {wellnessToday?.stool_log_time && (
-                                <span className="text-[10px] text-stone-400 font-bold">Logged at {wellnessToday.stool_log_time}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 4. ENERGY TRACKER */}
-                  {isEnergyActive && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                          <Zap className="w-3.5 h-3.5 text-stone-400" />
-                          <span>Energy Log</span>
-                        </h3>
-                      </div>
-
-                      {selectedDate === todayStr ? (
-                        <div className="flex flex-col gap-2 w-full animate-fade-in">
-                          <div className="flex items-center gap-2.5 w-full">
-                            {/* Left: Time Pill */}
-                            <div className="relative shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTimePickerTarget("energy");
-                                  setTimePickerInitialTime(activeEnergyTime);
-                                  setIsTimePickerOpen(true);
-                                }}
-                                className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                              >
-                                <Clock className="w-3.5 h-3.5 text-stone-400" />
-                                <span>{activeEnergyTime}</span>
-                              </button>
-                            </div>
-
-                            {/* Middle: Clean 1-5 Slider */}
-                            <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
-                              <input 
-                                type="range" 
-                                min="1" 
-                                max="5" 
-                                value={currentEnergy}
-                                onChange={(e) => setDraftEnergy(parseInt(e.target.value))}
-                                onMouseDown={() => setIsEnergySliding(true)}
-                                onTouchStart={() => setIsEnergySliding(true)}
-                                onMouseUp={() => setTimeout(() => setIsEnergySliding(false), 200)}
-                                onTouchEnd={() => setTimeout(() => setIsEnergySliding(false), 200)}
-                                className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                              />
-                            </div>
-
-                            {/* Right: Action Box */}
-                            <div className="w-12 h-12 [perspective:1000px] shrink-0">
-                              <div className={cn(
-                                "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
-                                isEnergySliding ? "[transform:rotateY(180deg)]" : ""
-                              )}>
-                                
-                                {/* FRONT: Log Button */}
-                                <button
-                                  onClick={async () => {
-                                    await handleLogEnergy(currentEnergy, selectedDate, activeEnergyTime);
-                                    setDraftEnergy(null);
-                                    setDraftEnergyTime("");
-                                  }}
-                                  className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
-                                  title="Log Energy"
-                                >
-                                  <Check className="w-5 h-5 text-white" />
-                                </button>
-
-                                {/* BACK: Energy Emoji Badge */}
-                                <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs text-lg select-none">
-                                  {(() => {
-                                    if (currentEnergy === 1) return "😴";
-                                    if (currentEnergy === 2) return "🥱";
-                                    if (currentEnergy === 3) return "⚡";
-                                    if (currentEnergy === 4) return "🔥";
-                                    return "🚀";
-                                  })()}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Dynamic description below the section (only while sliding) */}
-                          {isEnergySliding && (
-                            <div className="px-1 text-left animate-fade-in">
-                              <span className="text-[11px] font-medium text-stone-500">
-                                {(() => {
-                                  if (currentEnergy === 1) return "Energy Level 1: Extremely tired, struggling to focus";
-                                  if (currentEnergy === 2) return "Energy Level 2: Low vitality, feeling sluggish";
-                                  if (currentEnergy === 3) return "Energy Level 3: Moderate, stable & balanced energy";
-                                  if (currentEnergy === 4) return "Energy Level 4: High vitality, feeling active & clear";
-                                  return "Energy Level 5: Maximum peak performance & focus";
-                                })()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
-                          <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
-                            <span className="text-xs text-stone-400 font-medium">Logged Energy:</span>
-                            <span className="text-base font-black text-orange-950">
-                              {(() => {
-                                if (energyLevel === 1) return "😴 Exhausted";
-                                if (energyLevel === 2) return "🥱 Sluggish";
-                                if (energyLevel === 3) return "⚡ Steady";
-                                if (energyLevel === 4) return "🔥 High Energy";
-                                return "🚀 Peak Vitality";
-                              })()}
-                            </span>
-                            <span className="text-[10px] text-stone-400 font-bold ml-1">(Level {energyLevel})</span>
-                            {wellnessToday?.energy_log_time && (
-                              <span className="text-[10px] text-stone-400 font-bold ml-1.5">(at {wellnessToday.energy_log_time})</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                </section>
-              );
-            })()}
+            {/* Daily Wellness Journal Section */}
 
 
 
