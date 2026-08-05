@@ -525,6 +525,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   
   // Router States & Navigation
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [isVitalsLogOpen, setIsVitalsLogOpen] = useState(false);
   const [activeVitalDrawer, setActiveVitalDrawer] = useState<"water" | "digestion" | "energy" | "weight" | null>(null);
 
