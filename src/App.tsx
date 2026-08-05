@@ -4298,31 +4298,26 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                     )}
                   </div>
 
-                  {/* TACTILE VITALS SWITCH BAR (ON-DEMAND TOGGLE UX) */}
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar select-none pt-1">
+                  {/* ULTRA-COMPACT MONOCHROMATIC VITALS SEGMENTED TRACK */}
+                  <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100/90 border border-stone-200/60 rounded-2xl select-none mt-1">
                     {isWeightActive && (
                       <button
                         type="button"
                         onClick={() => setOpenVitalsCards(prev => ({ ...prev, weight: !prev.weight }))}
                         className={cn(
-                          "px-3 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer border shrink-0 select-none active:scale-95",
+                          "py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer border-none active:scale-95",
                           openVitalsCards.weight
-                            ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
+                            ? "bg-white text-stone-900 shadow-2xs font-black"
                             : weightTodayLog
-                            ? "bg-orange-50 text-orange-800 border-orange-200/80"
-                            : "bg-white text-stone-700 border-stone-200/80 hover:border-stone-300 hover:bg-stone-50"
+                            ? "text-stone-900 font-bold hover:bg-white/60"
+                            : "text-stone-500 hover:text-stone-800 hover:bg-white/40"
                         )}
+                        title="Toggle Weight Card"
                       >
-                        <Scale className={cn("w-3.5 h-3.5", openVitalsCards.weight ? "text-white" : "text-orange-500")} />
-                        <span>Weight</span>
-                        {weightTodayLog ? (
-                          <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded-full", openVitalsCards.weight ? "bg-white/20 text-white" : "bg-orange-100 text-orange-900")}>
-                            {weightTodayLog.weight}kg
-                          </span>
-                        ) : (
-                          <span className={cn("text-[10px] font-black opacity-60", openVitalsCards.weight ? "text-white" : "text-stone-400")}>
-                            {openVitalsCards.weight ? "▲" : "▼"}
-                          </span>
+                        <Scale className="w-3.5 h-3.5 shrink-0 text-stone-600" />
+                        <span className="truncate">Weight</span>
+                        {weightTodayLog && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-stone-800 shrink-0" />
                         )}
                       </button>
                     )}
@@ -4332,24 +4327,19 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                         type="button"
                         onClick={() => setOpenVitalsCards(prev => ({ ...prev, water: !prev.water }))}
                         className={cn(
-                          "px-3 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer border shrink-0 select-none active:scale-95",
+                          "py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer border-none active:scale-95",
                           openVitalsCards.water
-                            ? "bg-cyan-500 text-white border-cyan-500 shadow-md shadow-cyan-500/20"
+                            ? "bg-white text-stone-900 shadow-2xs font-black"
                             : waterIntake > 0
-                            ? "bg-cyan-50 text-cyan-800 border-cyan-200/80"
-                            : "bg-white text-stone-700 border-stone-200/80 hover:border-stone-300 hover:bg-stone-50"
+                            ? "text-stone-900 font-bold hover:bg-white/60"
+                            : "text-stone-500 hover:text-stone-800 hover:bg-white/40"
                         )}
+                        title="Toggle Water Card"
                       >
-                        <Droplet className={cn("w-3.5 h-3.5", openVitalsCards.water ? "text-white" : "text-cyan-500")} />
-                        <span>Water</span>
-                        {waterIntake > 0 ? (
-                          <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded-full", openVitalsCards.water ? "bg-white/20 text-white" : "bg-cyan-100 text-cyan-900")}>
-                            {waterIntake}ml
-                          </span>
-                        ) : (
-                          <span className={cn("text-[10px] font-black opacity-60", openVitalsCards.water ? "text-white" : "text-stone-400")}>
-                            {openVitalsCards.water ? "▲" : "▼"}
-                          </span>
+                        <Droplet className="w-3.5 h-3.5 shrink-0 text-stone-600" />
+                        <span className="truncate">Water</span>
+                        {waterIntake > 0 && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-stone-800 shrink-0" />
                         )}
                       </button>
                     )}
@@ -4359,24 +4349,19 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                         type="button"
                         onClick={() => setOpenVitalsCards(prev => ({ ...prev, digestion: !prev.digestion }))}
                         className={cn(
-                          "px-3 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer border shrink-0 select-none active:scale-95",
+                          "py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer border-none active:scale-95",
                           openVitalsCards.digestion
-                            ? "bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-600/20"
+                            ? "bg-white text-stone-900 shadow-2xs font-black"
                             : stoolType !== null
-                            ? "bg-amber-50 text-amber-900 border-amber-200/80"
-                            : "bg-white text-stone-700 border-stone-200/80 hover:border-stone-300 hover:bg-stone-50"
+                            ? "text-stone-900 font-bold hover:bg-white/60"
+                            : "text-stone-500 hover:text-stone-800 hover:bg-white/40"
                         )}
+                        title="Toggle Digestion Card"
                       >
-                        <Activity className={cn("w-3.5 h-3.5", openVitalsCards.digestion ? "text-white" : "text-amber-600")} />
-                        <span>Digestion</span>
-                        {stoolType !== null ? (
-                          <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded-full", openVitalsCards.digestion ? "bg-white/20 text-white" : "bg-amber-100 text-amber-900")}>
-                            Type {stoolType}
-                          </span>
-                        ) : (
-                          <span className={cn("text-[10px] font-black opacity-60", openVitalsCards.digestion ? "text-white" : "text-stone-400")}>
-                            {openVitalsCards.digestion ? "▲" : "▼"}
-                          </span>
+                        <Activity className="w-3.5 h-3.5 shrink-0 text-stone-600" />
+                        <span className="truncate">Digestion</span>
+                        {stoolType !== null && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-stone-800 shrink-0" />
                         )}
                       </button>
                     )}
@@ -4386,24 +4371,19 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                         type="button"
                         onClick={() => setOpenVitalsCards(prev => ({ ...prev, energy: !prev.energy }))}
                         className={cn(
-                          "px-3 py-2 rounded-2xl text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer border shrink-0 select-none active:scale-95",
+                          "py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer border-none active:scale-95",
                           openVitalsCards.energy
-                            ? "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20"
+                            ? "bg-white text-stone-900 shadow-2xs font-black"
                             : energyLevel !== null
-                            ? "bg-amber-50 text-amber-800 border-amber-200/80"
-                            : "bg-white text-stone-700 border-stone-200/80 hover:border-stone-300 hover:bg-stone-50"
+                            ? "text-stone-900 font-bold hover:bg-white/60"
+                            : "text-stone-500 hover:text-stone-800 hover:bg-white/40"
                         )}
+                        title="Toggle Energy Card"
                       >
-                        <Zap className={cn("w-3.5 h-3.5", openVitalsCards.energy ? "text-white" : "text-amber-500")} />
-                        <span>Energy</span>
-                        {energyLevel !== null ? (
-                          <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded-full", openVitalsCards.energy ? "bg-white/20 text-white" : "bg-amber-100 text-amber-900")}>
-                            Lvl {energyLevel}
-                          </span>
-                        ) : (
-                          <span className={cn("text-[10px] font-black opacity-60", openVitalsCards.energy ? "text-white" : "text-stone-400")}>
-                            {openVitalsCards.energy ? "▲" : "▼"}
-                          </span>
+                        <Zap className="w-3.5 h-3.5 shrink-0 text-stone-600" />
+                        <span className="truncate">Energy</span>
+                        {energyLevel !== null && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-stone-800 shrink-0" />
                         )}
                       </button>
                     )}
