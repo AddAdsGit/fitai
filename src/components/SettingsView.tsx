@@ -10,20 +10,128 @@ const getOpenApiYaml = (edgeFunctionUrl: string) => `openapi: 3.1.0
 info:
   title: FitAI GPT Sync Action API
   description: |
-    API for synchronizing user profiles, food/nutrition logs, recipes, and memories with the FitAI dashboard.
+    API for synchronizing user profiles, food/nutrition logs, and recipes with the FitAI dashboard.
+    
+    CRITICAL BEHAVIORAL RULES FOR THE CUSTOM GPT:
+    1. Recipe Modifications & Extras: If the user logs a meal that modifies a stored recipe (e.g., "burrito with extra chicken and rice"), the GPT must:
+       a. Call GET /recipes to list recipes, matching the base item ("burrito").
+       b. Retrieve the macros for the base recipe.
+       c. Estimate the nutritional values of the extras specified (e.g., extra chicken and rice).
+       d. Sum the base macros and the extras macros to compute the new total.
+       e. Log the combined meal via POST /meals using the combined macros and appending the extra description to the name (e.g. "Burrito with extra chicken and rice").
+    2. Editing Logged Meals by Instruction: If the user wants to adjust a logged meal (e.g., "actually, make that breakfast 2 eggs instead of 1"), the GPT must:
+       a. Call GET /meals?date=YYYY-MM-DD to find the target meal.
+       b. Estimate the updated calorie/macro totals based on the change request.
+       c. Call PATCH /meals?id=<id> with the updated calorie/macro numbers.
+    3. Deleting Logged Meals: If the user requests to delete or remove a logged item, the GPT must call GET /meals to find the ID and invoke DELETE /meals?id=<id>.
   version: 1.0.0
 servers:
   - url: ${edgeFunctionUrl}
+    description: FitAI Webhook Action API (Proxied via fitpush.vercel.app)
 paths:
   /profile:
     get:
       summary: Retrieve the user's profile details
+      description: Fetches bio, preferences, weight/height info, calorie goal, and tracked nutrient targets.
       operationId: getProfile
       responses:
         '200':
-          description: Returns profile metadata including goals, agent_config, agent_memory, and knowledge (preferences, health, notes, patterns).
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      username:
+                        type: string
+                      display_name:
+                        type: string
+                      description:
+                        type: string
+                      height:
+                        type: integer
+                      weight:
+                        type: number
+                      preferences:
+                        type: array
+                        items:
+                          type: string
+                      tracking_tags:
+                        type: array
+                        description: User's custom and default tracking tags
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            name:
+                              type: string
+                            emoji:
+                              type: string
+                            color:
+                              type: string
+                            description:
+                              type: string
+                            enabled:
+                              type: boolean
+                            isDefault:
+                              type: boolean
+                      daily_calories_goal:
+                        type: integer
+                      weight_goal:
+                        type: number
+                      protein_goal:
+                        type: integer
+                      tracked_nutrients:
+                        type: array
+                        description: Nutrients the user tracks, with per-nutrient daily targets (e.g. carbs, fats, fiber, plus custom ones).
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            name:
+                              type: string
+                            target:
+                              type: number
+                            unit:
+                              type: string
+                            enabled:
+                              type: boolean
+                      agent_memory:
+                        type: array
+                        description: Conversation preferences like tone, response style (e.g., "be brief")
+                        items:
+                          type: string
+                      telegram_reminders_enabled:
+                        type: boolean
+                        description: Whether Telegram reminders are enabled
+                      telegram_reminder_times:
+                        type: array
+                        description: Scheduled Telegram reminder times
+                        items:
+                          type: string
+                      telegram_reports_enabled:
+                        type: boolean
+                        description: Whether daily Telegram reports are enabled
+                      dob:
+                        type: string
+                        description: Date of birth
+                      gender:
+                        type: string
+                        description: Gender
+                      timezone:
+                        type: string
+                        description: User's timezone (Olson string)
     post:
-      summary: Update user profile details
+      x-openai-isConsequential: false
+      summary: Update user profile
+      description: Modify user specifications such as display name, body metrics, goals, or preferences.
       operationId: updateProfile
       requestBody:
         required: true
@@ -38,71 +146,111 @@ paths:
                   type: integer
                 weight:
                   type: number
+                description:
+                  type: string
+                gender:
+                  type: string
                 daily_calories_goal:
                   type: integer
                 weight_goal:
                   type: number
                 preferences:
                   type: array
-                  description: Dietary tags (e.g. Keto, Vegan, Gluten Free)
                   items:
                     type: string
-                telegram_reminders_enabled:
-                  type: boolean
-                  description: Enable or disable daily/periodic logging reminder pings.
-                telegram_reports_enabled:
-                  type: boolean
-                  description: Enable or disable the end-of-day summary reports.
-                telegram_reminder_times:
-                  type: array
-                  description: Array of time strings in 24-hour HH:MM format when reminders should be sent (e.g. ["09:00", "20:00"]).
-                  items:
-                    type: string
+                protein_goal:
+                  type: integer
+                  description: Daily protein target in grams
                 timezone:
                   type: string
-                  description: The user's local timezone (e.g. "Asia/Kolkata", "America/New_York").
+                  description: User's timezone as Olson string (e.g., "America/New_York", "Asia/Kolkata")
                 knowledge_preferences:
                   type: array
-                  description: Factual food likes/dislikes (e.g. "likes eggs")
+                  description: User's food likes, dislikes, desired macros, and meal-time preferences.
                   items:
                     type: string
                 knowledge_health:
                   type: array
-                  description: Medical/allergy facts (e.g. "lactose intolerant")
+                  description: Allergies, intolerances, medical symptoms, and health conditions.
                   items:
                     type: string
                 knowledge_notes:
                   type: array
-                  description: General routines or dietary observations (e.g. "usually eats late")
+                  description: Daily schedules, water goals, habits, and miscellaneous notes.
                   items:
                     type: string
                 knowledge_patterns:
                   type: array
-                  description: Multi-log health correlations (e.g. "biryani from restaurant X causes bloating")
+                  description: Detected correlations between food and wellbeing (e.g., "Biryani causes bloating").
                   items:
                     type: string
                 agent_memory:
                   type: array
-                  description: Tone and style choices for the agent (e.g. "prefers brief replies")
+                  description: Tone, response length, and other conversation preferences (e.g., "be brief", "use metric").
                   items:
                     type: string
+                telegram_reminders_enabled:
+                  type: boolean
+                  description: Enable or disable Telegram meal-logging reminders.
+                telegram_reminder_times:
+                  type: array
+                  description: Times to send Telegram reminders (e.g., ["09:00", "20:00"]).
+                  items:
+                    type: string
+                telegram_reports_enabled:
+                  type: boolean
+                  description: Enable or disable daily Telegram summary reports.
       responses:
         '200':
           description: Profile updated successfully
   /meals:
     get:
       summary: Get logged meals for a specific date
+      description: Fetch all breakfast, lunch, dinner, or other logged items for a given day.
       operationId: getMeals
       parameters:
         - name: date
           in: query
+          description: The target log date in YYYY-MM-DD format. Defaults to today's date.
+          required: false
           schema:
             type: string
+        - name: limit
+          in: query
+          description: >-
+            Optional number of recent meals to retrieve across all dates (sorted newest first).
+            Use this to search past history. If specified, 'date' is ignored.
+          required: false
+          schema:
+            type: integer
       responses:
         '200':
           description: Logged meals retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  meals:
+                    type: array
+                    items:
+                      type: object
+                  daily_remaining:
+                    type: object
+                    description: Remaining amounts for calories, protein, and every nutrient the user tracks (e.g. carbs, fats, fiber, plus custom ones), keyed by nutrient id.
+                    additionalProperties:
+                      type: number
+                  daily_tag_hits:
+                    type: object
+                    description: Count of each tag consumed on the queried date
+                    additionalProperties:
+                      type: integer
     post:
+      x-openai-isConsequential: false
       summary: Log a new meal
+      description: Record a consumed item, specifying name, macros (protein, carbs, fats), and calorie count. Trigger automatic Notion & Google Sheets sync if configured.
       operationId: logMeal
       requestBody:
         required: true
@@ -116,43 +264,136 @@ paths:
               properties:
                 name:
                   type: string
+                  description: The name of the meal (e.g. "Avocado Toast with Egg")
                 calories:
                   type: integer
+                  description: Total calories in kcal
                 protein:
                   type: integer
+                  description: Protein in grams
+                nutrients:
+                  type: object
+                  description: Map of nutrient id to grams consumed, covering the user's tracked nutrients (see GET /profile tracked_nutrients). Always include carbs, fats, and fiber; add any custom tracked nutrients the user has enabled (e.g. {"carbs":45,"fats":12,"fiber":8,"iron":2}).
+                  additionalProperties:
+                    type: number
                 carbs:
                   type: integer
+                  description: Legacy alias for nutrients.carbs; prefer the nutrients object
                 fats:
                   type: integer
+                  description: Legacy alias for nutrients.fats; prefer the nutrients object
+                fiber:
+                  type: integer
+                  description: Legacy alias for nutrients.fiber; prefer the nutrients object
                 type:
                   type: string
+                  description: Categorization of the log (e.g. "Breakfast", "Lunch", "Dinner", "Snack")
                 time:
                   type: string
+                  description: Time of consumption (e.g. "8:30 AM")
                 date:
                   type: string
+                  description: Target date in YYYY-MM-DD format. Defaults to today.
+                image:
+                  type: string
+                  description: >-
+                    Leave this field EMPTY. Do NOT pass any image URL here — not from the user's upload, not from a web search.
+                    The server automatically fetches a real matching food photo for every meal using the meal name.
+                    Only pass a value here if the user explicitly provides a direct public image URL themselves.
                 timezone:
                   type: string
+                  description: The user's timezone identifier (e.g., "America/New_York", "Asia/Kolkata"). If provided, it is used to resolve the current local date and time if they are not explicitly specified.
+                meal_description:
+                  type: string
+                  description: Optional detailed notes or description of the meal (e.g., ingredients, prep style).
+                tags:
+                  type: array
+                  description: Array of custom or default tags (e.g., ["Gluten Free", "Rich in Iron"])
+                  items:
+                    type: string
+                openaiFileIdRefs:
+                  type: array
+                  description: References to images or files uploaded by the user to the chat session. The backend will download these.
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      mime_type:
+                        type: string
+                      download_link:
+                        type: string
       responses:
         '201':
           description: Meal logged successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  meal:
+                    type: object
+                  daily_remaining:
+                    type: object
+                    description: Remaining amounts for calories, protein, and every nutrient the user tracks (e.g. carbs, fats, fiber, plus custom ones), keyed by nutrient id.
+                    additionalProperties:
+                      type: number
+                  daily_tag_hits:
+                    type: object
+                    description: Count of each tag consumed on the target date
+                    additionalProperties:
+                      type: integer
     delete:
+      x-openai-isConsequential: false
       summary: Delete a logged meal
+      description: Remove a logged meal entry from the dashboard by its unique ID.
       operationId: deleteMeal
       parameters:
         - name: id
           in: query
+          description: The unique UUID of the meal to delete.
           required: true
           schema:
             type: string
       responses:
         '200':
           description: Meal deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  meal:
+                    type: object
+                  daily_remaining:
+                    type: object
+                    description: Remaining amounts for calories, protein, and every nutrient the user tracks (e.g. carbs, fats, fiber, plus custom ones), keyed by nutrient id.
+                    additionalProperties:
+                      type: number
+                  daily_tag_hits:
+                    type: object
+                    description: Count of each tag consumed on the target date
+                    additionalProperties:
+                      type: integer
+        '400':
+          description: Missing ID parameter
+        '404':
+          description: Meal not found
     patch:
+      x-openai-isConsequential: false
       summary: Update a logged meal
+      description: Modify properties of an existing logged meal by its unique ID.
       operationId: updateMeal
       parameters:
         - name: id
           in: query
+          description: The unique UUID of the meal to update.
           required: true
           schema:
             type: string
@@ -169,72 +410,168 @@ paths:
                   type: integer
                 protein:
                   type: integer
+                nutrients:
+                  type: object
+                  description: Map of nutrient id to grams; provided keys are merged into the meal's existing nutrients (e.g. {"carbs":45,"fiber":8}).
+                  additionalProperties:
+                    type: number
                 carbs:
                   type: integer
+                  description: Legacy alias for nutrients.carbs; prefer the nutrients object
                 fats:
                   type: integer
+                  description: Legacy alias for nutrients.fats; prefer the nutrients object
+                fiber:
+                  type: integer
+                  description: Legacy alias for nutrients.fiber; prefer the nutrients object
                 type:
                   type: string
                 time:
                   type: string
                 date:
                   type: string
+                image:
+                  type: string
+                meal_description:
+                  type: string
+                  description: Optional detailed notes or description of the meal (e.g., ingredients, prep style).
+                tags:
+                  type: array
+                  description: Array of tags to set on the meal
+                  items:
+                    type: string
       responses:
         '200':
           description: Meal updated successfully
-  /recipes:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  meal:
+                    type: object
+                  daily_remaining:
+                    type: object
+                    description: Remaining amounts for calories, protein, and every nutrient the user tracks (e.g. carbs, fats, fiber, plus custom ones), keyed by nutrient id.
+                    additionalProperties:
+                      type: number
+                  daily_tag_hits:
+                    type: object
+                    description: Count of each tag consumed on the target date
+                    additionalProperties:
+                      type: integer
+        '400':
+          description: Missing ID or invalid parameters
+        '404':
+          description: Meal not found
+  /daily-wellness:
     get:
-      summary: List user recipes
-      operationId: getRecipes
+      summary: Get daily wellness notes
+      description: Retrieve wellness and health notes for a specific date.
+      operationId: getDailyWellness
+      parameters:
+        - name: date
+          in: query
+          description: The target date in YYYY-MM-DD format. Defaults to today's date.
+          required: false
+          schema:
+            type: string
       responses:
         '200':
-          description: Recipes retrieved successfully
+          description: Wellness notes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  notes:
+                    type: string
+                  water_intake:
+                    type: integer
+                    description: Water consumed so far in ml
+                  stool_type:
+                    type: integer
+                    description: Bristol stool scale type (1-7), if logged
+                  stool_size:
+                    type: string
+                    description: Stool size (e.g. "small", "medium", "large"), if logged
+                  energy_level:
+                    type: integer
+                    description: Daily energy & vitality level (1-5), if logged
+                  water_log_time:
+                    type: string
+                    description: Time water was logged (HH:MM format)
+                  stool_log_time:
+                    type: string
+                    description: Time stool consistency was logged (HH:MM format)
+                  energy_log_time:
+                    type: string
+                    description: Time energy level was logged (HH:MM format)
     post:
-      summary: Save a new custom recipe
-      operationId: saveRecipe
+      summary: Save daily wellness data
+      description: Create or update the wellness log for a specific date. Only provided fields are changed; omitted fields keep their existing values.
+      operationId: saveDailyWellness
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - name
               properties:
-                name:
+                date:
                   type: string
-                time:
+                  description: Optional target date in YYYY-MM-DD format. Defaults to today.
+                notes:
                   type: string
-                calories:
+                  description: The text content of the daily wellness or health note.
+                water_intake:
                   type: integer
-                protein:
+                  description: Total water consumed in ml for the day
+                stool_type:
                   type: integer
-                carbs:
-                  type: integer
-                fats:
-                  type: integer
-                tags:
-                  type: array
-                  items:
-                    type: string
-                ingredients:
-                  type: array
-                  items:
-                    type: string
-                instructions:
+                  description: Bristol stool scale type (1-7)
+                stool_size:
                   type: string
+                  description: Stool size (e.g. "small", "medium", "large")
+                energy_level:
+                  type: integer
+                  description: Daily energy level on 1-5 scale (1=Exhausted, 2=Sluggish, 3=Steady, 4=High, 5=Peak)
+                water_log_time:
+                  type: string
+                  description: Optional time water was logged in HH:MM format
+                stool_log_time:
+                  type: string
+                  description: Optional time stool was logged in HH:MM format
+                energy_log_time:
+                  type: string
+                  description: Optional time energy was logged in HH:MM format
       responses:
-        '201':
-          description: Recipe saved successfully
+        '200':
+          description: Daily wellness notes saved successfully
   /weight:
     get:
       summary: Get weight history logs
+      description: Retrieve the history of logged weights for the user, sorted chronologically.
       operationId: getWeightLogs
       responses:
         '200':
           description: Weight logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  weight_logs:
+                    type: array
+                    items:
+                      type: object
     post:
       summary: Log a weight entry
+      description: Log or update the user's weight for a specific date (defaults to today). Automatically updates current profile weight if it is the most recent log.
       operationId: logWeight
       requestBody:
         required: true
@@ -251,24 +588,34 @@ paths:
                 weight:
                   type: number
                   description: Weight in kg (e.g. 78.5)
+                log_time:
+                  type: string
+                  description: Time the weight was recorded in HH:MM format
       responses:
         '200':
           description: Weight log saved successfully
-  /daily-wellness:
-    get:
-      summary: Get daily wellness/health notes for a specific date
-      operationId: getDailyWellness
-      parameters:
-        - name: date
-          in: query
-          schema:
-            type: string
+  /logout:
+    post:
+      x-openai-isConsequential: true
+      summary: Revoke access token / Log out
+      description: Rotates the user's API key, immediately invalidating the current ChatGPT connection on the server.
+      operationId: logoutUser
       responses:
         '200':
-          description: Wellness notes retrieved successfully
+          description: Logged out successfully
+  /recipes:
+    get:
+      summary: List user recipes
+      description: Retrieve stored recipes with their instructions and ingredients.
+      operationId: getRecipes
+      responses:
+        '200':
+          description: Recipes retrieved successfully
     post:
-      summary: Save or update daily wellness notes
-      operationId: saveDailyWellness
+      x-openai-isConsequential: false
+      summary: Save a new custom recipe
+      description: Store a custom dish outline, including cooking time, macros, tags, ingredients, and instructions.
+      operationId: saveRecipe
       requestBody:
         required: true
         content:
@@ -276,17 +623,42 @@ paths:
             schema:
               type: object
               required:
-                - notes
+                - name
               properties:
-                date:
+                name:
                   type: string
-                  description: YYYY-MM-DD. Defaults to today.
-                notes:
+                time:
                   type: string
-                  description: The text content of the daily wellness or health note.
+                  description: E.g., "25 mins"
+                calories:
+                  type: integer
+                protein:
+                  type: integer
+                carbs:
+                  type: integer
+                fats:
+                  type: integer
+                fiber:
+                  type: integer
+                description:
+                  type: string
+                  description: Short summary of the dish
+                tags:
+                  type: array
+                  items:
+                    type: string
+                ingredients:
+                  type: array
+                  items:
+                    type: string
+                instructions:
+                  type: string
+                image:
+                  type: string
+                  description: URL of a recipe image
       responses:
-        '200':
-          description: Daily wellness notes saved successfully
+        '201':
+          description: Recipe saved successfully
 components:
   schemas: {}
   securitySchemes:
@@ -294,7 +666,8 @@ components:
       type: http
       scheme: bearer
 security:
-  - BearerAuth: []`;
+  - BearerAuth: []
+`;
 
 export const DEFAULT_TRACKING_TAGS = [
   { id: 'gluten_free', name: 'Gluten Free', description: 'Apply when meal contains no wheat, barley, rye, or oats', enabled: true },

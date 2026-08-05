@@ -161,6 +161,12 @@ const TimelineImage = ({ src, alt, fallbackEmoji }: { src: string; alt: string; 
   );
 };
 
+const isOAuthCallback = () => {
+  const hash = window.location.hash || "";
+  const search = window.location.search || "";
+  return hash.includes("access_token=") || hash.includes("refresh_token=") || search.includes("code=");
+};
+
 export default function App() {
   const [shareId, setShareId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -910,65 +916,71 @@ export default function App() {
       return;
     }
 
-    const initAuth = async () => {
-      setIsSessionLoading(true);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        if (session?.user) {
-          await handleUserAuthenticated(session.user);
-        } else {
-          // Session-less profile restore exists ONLY for the dev bypass login.
-          // In production a real auth session is required — restoring identity
-          // from localStorage alone would be a session-less auth path.
-          const savedProfileId = import.meta.env.DEV
-            ? localStorage.getItem("fitai_active_profile_id")
-            : null;
-          if (savedProfileId) {
-            const { data: existing, error } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('id', savedProfileId)
-              .maybeSingle();
+    let isMounted = true;
 
-            if (!error && existing) {
-              setActiveProfileId(existing.id);
-            } else {
-              setActiveProfileId(null);
-              localStorage.removeItem("fitai_active_profile_id");
+    const init = async () => {
+      // 1. Get initial session
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      
+      let resolvedSession = initialSession;
+      
+      // 2. If no initial session, but it is an OAuth callback or we have a local token,
+      // wait a brief period for onAuthStateChange to deliver the session.
+      if (!resolvedSession) {
+        const hasLocalToken = !!localStorage.getItem("sb-twrjigbbgioqdpwvkblo-auth-token");
+        const isOAuth = isOAuthCallback();
+        if (hasLocalToken || isOAuth) {
+          // Wait up to 1.5 seconds for the session to be resolved
+          let count = 0;
+          while (count < 15 && isMounted) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              resolvedSession = session;
+              break;
             }
-          } else {
-            setActiveProfileId(null);
+            await new Promise(resolve => setTimeout(resolve, 100));
+            count++;
           }
         }
-      } catch (err) {
-        console.error("Auth initialization error:", err);
-      } finally {
+      }
+
+      if (!isMounted) return;
+
+      if (resolvedSession?.user) {
+        setIsDataLoading(true);
+        await handleUserAuthenticated(resolvedSession.user);
+      } else {
+        setActiveProfileId(null);
+        localStorage.removeItem("fitai_active_profile_id");
+      }
+
+      if (isMounted) {
         setIsSessionLoading(false);
       }
     };
 
-    initAuth();
+    init();
 
+    // Set up auth state change listener for subsequent events (like logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
-      if (session?.user) {
-        await handleUserAuthenticated(session.user);
-        
-        if (event === "PASSWORD_RECOVERY") {
-          navigateTo("/reset-password");
-        } else if (window.location.hash) {
-          const url = new URL(window.location.href);
-          url.hash = "";
-          window.history.replaceState({ path: url.pathname }, "", url.toString());
-        }
-      } else if (event === "SIGNED_OUT") {
+      if (event === "SIGNED_OUT") {
         setActiveProfileId(null);
         localStorage.removeItem("fitai_active_profile_id");
+        setIsSessionLoading(false);
+      } else if (event === "PASSWORD_RECOVERY") {
+        navigateTo("/reset-password");
+      } else if (event === "SIGNED_IN" && !isSessionLoading) {
+        // Handle post-startup sign ins
+        setIsDataLoading(true);
+        await handleUserAuthenticated(session?.user);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Redirect / session handling rules

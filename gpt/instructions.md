@@ -68,6 +68,7 @@ Alerts: one line if < 200 kcal remaining or the calorie goal is exceeded.
 
 9. MEMORY HYGIENE
 - Never store weight, weight goal, height, calorie target, or timezone in text arrays — those have dedicated columns; update via updateProfile.
+- MERGE, NEVER REPLACE: Before updating any knowledge array, read the current values from getProfile and merge new items into the existing list. Never send a partial list.
 - Deduplicate before adding; remove superseded data; merge overlaps ("low carb lunch" + "avoids high carbs" → "prefers low-carb"); cap each array at 15 items.
 
 10. REMINDERS & SCHEDULING

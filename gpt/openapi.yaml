@@ -95,6 +95,31 @@ paths:
                               type: string
                             enabled:
                               type: boolean
+                      agent_memory:
+                        type: array
+                        description: Conversation preferences like tone, response style (e.g., "be brief")
+                        items:
+                          type: string
+                      telegram_reminders_enabled:
+                        type: boolean
+                        description: Whether Telegram reminders are enabled
+                      telegram_reminder_times:
+                        type: array
+                        description: Scheduled Telegram reminder times
+                        items:
+                          type: string
+                      telegram_reports_enabled:
+                        type: boolean
+                        description: Whether daily Telegram reports are enabled
+                      dob:
+                        type: string
+                        description: Date of birth
+                      gender:
+                        type: string
+                        description: Gender
+                      timezone:
+                        type: string
+                        description: User's timezone (Olson string)
     post:
       x-openai-isConsequential: false
       summary: Update user profile
@@ -125,6 +150,48 @@ paths:
                   type: array
                   items:
                     type: string
+                protein_goal:
+                  type: integer
+                  description: Daily protein target in grams
+                timezone:
+                  type: string
+                  description: User's timezone as Olson string (e.g., "America/New_York", "Asia/Kolkata")
+                knowledge_preferences:
+                  type: array
+                  description: User's food likes, dislikes, desired macros, and meal-time preferences.
+                  items:
+                    type: string
+                knowledge_health:
+                  type: array
+                  description: Allergies, intolerances, medical symptoms, and health conditions.
+                  items:
+                    type: string
+                knowledge_notes:
+                  type: array
+                  description: Daily schedules, water goals, habits, and miscellaneous notes.
+                  items:
+                    type: string
+                knowledge_patterns:
+                  type: array
+                  description: Detected correlations between food and wellbeing (e.g., "Biryani causes bloating").
+                  items:
+                    type: string
+                agent_memory:
+                  type: array
+                  description: Tone, response length, and other conversation preferences (e.g., "be brief", "use metric").
+                  items:
+                    type: string
+                telegram_reminders_enabled:
+                  type: boolean
+                  description: Enable or disable Telegram meal-logging reminders.
+                telegram_reminder_times:
+                  type: array
+                  description: Times to send Telegram reminders (e.g., ["09:00", "20:00"]).
+                  items:
+                    type: string
+                telegram_reports_enabled:
+                  type: boolean
+                  description: Enable or disable daily Telegram summary reports.
       responses:
         '200':
           description: Profile updated successfully
@@ -167,6 +234,11 @@ paths:
                     description: Remaining amounts for calories, protein, and every nutrient the user tracks (e.g. carbs, fats, fiber, plus custom ones), keyed by nutrient id.
                     additionalProperties:
                       type: number
+                  daily_tag_hits:
+                    type: object
+                    description: Count of each tag consumed on the queried date
+                    additionalProperties:
+                      type: integer
     post:
       x-openai-isConsequential: false
       summary: Log a new meal
@@ -508,6 +580,9 @@ paths:
                 weight:
                   type: number
                   description: Weight in kg (e.g. 78.5)
+                log_time:
+                  type: string
+                  description: Time the weight was recorded in HH:MM format
       responses:
         '200':
           description: Weight log saved successfully
@@ -570,6 +645,9 @@ paths:
                     type: string
                 instructions:
                   type: string
+                image:
+                  type: string
+                  description: URL of a recipe image
       responses:
         '201':
           description: Recipe saved successfully

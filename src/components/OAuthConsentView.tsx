@@ -268,9 +268,24 @@ export const OAuthConsentView = ({
         </div>
 
         {!redirectTrusted ? (
-          <p className="text-[10px] text-red-500 text-center font-bold uppercase tracking-wider relative z-10">
-            This request&apos;s redirect address is not a trusted ChatGPT callback. Connection blocked.
-          </p>
+          <div className="space-y-4 pt-2 relative z-10 flex flex-col gap-2">
+            <p className="text-[10px] text-red-500 text-center font-bold uppercase tracking-wider">
+              This request&apos;s redirect address is not a trusted ChatGPT callback. Connection blocked.
+            </p>
+            <button
+              onClick={() => {
+                if (navigateTo) {
+                  navigateTo("/");
+                } else {
+                  window.history.pushState(null, "", "/");
+                  window.dispatchEvent(new Event("pushstate-changed"));
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold py-3.5 rounded-2xl active:scale-98 transition-all cursor-pointer shadow-sm"
+            >
+              Go to Dashboard
+            </button>
+          </div>
         ) : (
           <div className="space-y-3 pt-2 relative z-10 flex flex-col gap-2">
             <button

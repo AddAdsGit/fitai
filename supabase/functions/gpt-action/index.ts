@@ -171,10 +171,13 @@ serve(async (req) => {
         });
       }
 
+      // Atomic delete-and-return: prevents replay attacks by consuming the code
+      // in a single operation (no read-then-delete race window).
       const { data: oauthRecord, error: fetchError } = await supabase
         .from("oauth_codes")
-        .select("*")
+        .delete()
         .eq("code", code)
+        .select("*")
         .maybeSingle();
 
       if (fetchError || !oauthRecord) {
@@ -185,7 +188,6 @@ serve(async (req) => {
       }
 
       if (new Date(oauthRecord.expires_at).getTime() < Date.now()) {
-        await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
         return new Response(JSON.stringify({ error: "Authorization code has expired" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -194,7 +196,6 @@ serve(async (req) => {
 
       // Check client_id and redirect_uri match if provided
       if (clientId && oauthRecord.client_id && oauthRecord.client_id !== clientId) {
-        await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
         return new Response(JSON.stringify({ error: "client_id does not match authorization request" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -202,14 +203,11 @@ serve(async (req) => {
       }
 
       if (redirectUri && oauthRecord.redirect_uri && oauthRecord.redirect_uri !== redirectUri) {
-        await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
         return new Response(JSON.stringify({ error: "redirect_uri does not match authorization request" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      await supabase.from("oauth_codes").delete().eq("id", oauthRecord.id);
 
       const { data: userProfile, error: profileErr } = await supabase
         .from("profiles")
@@ -476,7 +474,13 @@ serve(async (req) => {
       });
     }
 
+    // Scrub sensitive credential from the in-memory profile object so it
+    // cannot accidentally leak via error serialization or logging.
+    delete profile.api_key;
+
     // Parse timezone offset header (in minutes, e.g. -330 for IST +5:30)
+    const timezoneOffset = req.headers.get("x-timezone-offset") || req.headers.get("X-Timezone-Offset") || "";
+
     const getLocalTimeAndDate = () => {
       const userTz = profile?.timezone || "UTC";
       try {
@@ -590,6 +594,10 @@ serve(async (req) => {
           protein_goal: profile.protein_goal,
           tracked_nutrients: profile.tracked_nutrients || [],
           agent_config: profile.agent_config || {},
+          agent_memory: profile.agent_memory || [],
+          telegram_reminders_enabled: profile.telegram_reminders_enabled ?? false,
+          telegram_reminder_times: profile.telegram_reminder_times || [],
+          telegram_reports_enabled: profile.telegram_reports_enabled ?? false,
           timezone: profile.timezone,
         };
         return new Response(JSON.stringify({ profile: safeProfile }), {
@@ -604,9 +612,11 @@ serve(async (req) => {
         if (body.display_name !== undefined) updateData.display_name = body.display_name;
         if (body.height !== undefined) updateData.height = body.height;
         if (body.weight !== undefined) updateData.weight = body.weight;
+        if (body.description !== undefined) updateData.description = body.description;
         if (body.gender !== undefined) updateData.gender = body.gender;
         if (body.daily_calories_goal !== undefined) updateData.daily_calories_goal = body.daily_calories_goal;
         if (body.weight_goal !== undefined) updateData.weight_goal = body.weight_goal;
+        if (body.protein_goal !== undefined) updateData.protein_goal = body.protein_goal;
         if (body.preferences !== undefined) updateData.preferences = body.preferences;
         if (body.telegram_reminders_enabled !== undefined) updateData.telegram_reminders_enabled = body.telegram_reminders_enabled;
         if (body.telegram_reports_enabled !== undefined) updateData.telegram_reports_enabled = body.telegram_reports_enabled;
@@ -619,28 +629,60 @@ serve(async (req) => {
           return Array.isArray(incoming) ? incoming.map(String) : [String(incoming)];
         };
 
+        // Server-side merge: incoming items are merged with existing values,
+        // deduplicated (case-insensitive), and capped at 15 to prevent data
+        // loss when the GPT sends a partial list.
+        const mergeArray = (existing: string[], incoming: string[]): string[] => {
+          const seen = new Set<string>();
+          const merged: string[] = [];
+          for (const item of [...existing, ...incoming]) {
+            const key = item.trim().toLowerCase();
+            if (key && !seen.has(key)) {
+              seen.add(key);
+              merged.push(item.trim());
+            }
+          }
+          return merged.slice(0, 15);
+        };
+
         const incomingPrefs = body.knowledge_preferences ?? body.knowledge?.preferences;
         if (incomingPrefs !== undefined) {
-          updateData.knowledge_preferences = toArray(incomingPrefs);
+          updateData.knowledge_preferences = mergeArray(
+            profile.knowledge_preferences || [], toArray(incomingPrefs)
+          );
         }
 
         const incomingHealth = body.knowledge_health ?? body.knowledge?.health;
         if (incomingHealth !== undefined) {
-          updateData.knowledge_health = toArray(incomingHealth);
+          updateData.knowledge_health = mergeArray(
+            profile.knowledge_health || [], toArray(incomingHealth)
+          );
         }
 
         const incomingNotes = body.knowledge_notes ?? body.knowledge?.notes;
         if (incomingNotes !== undefined) {
-          updateData.knowledge_notes = toArray(incomingNotes);
+          updateData.knowledge_notes = mergeArray(
+            profile.knowledge_notes || [], toArray(incomingNotes)
+          );
         }
 
         const incomingPatterns = body.knowledge_patterns ?? body.knowledge?.patterns;
         if (incomingPatterns !== undefined) {
-          updateData.knowledge_patterns = toArray(incomingPatterns);
+          updateData.knowledge_patterns = mergeArray(
+            profile.knowledge_patterns || [], toArray(incomingPatterns)
+          );
         }
 
         if (body.agent_memory !== undefined) {
-          updateData.agent_memory = toArray(body.agent_memory);
+          updateData.agent_memory = mergeArray(
+            profile.agent_memory || [], toArray(body.agent_memory)
+          );
+        }
+        if (body.tracked_nutrients !== undefined) {
+          updateData.tracked_nutrients = body.tracked_nutrients;
+        }
+        if (body.tracking_tags !== undefined) {
+          updateData.tracking_tags = body.tracking_tags;
         }
 
         const { data: updatedProfile, error: updateError } = await supabase
