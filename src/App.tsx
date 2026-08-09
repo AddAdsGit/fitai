@@ -31,6 +31,7 @@ import {
   Droplet,
   Activity,
   Clock,
+  List,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "./lib/utils";
@@ -55,7 +56,19 @@ import { MealShareModal } from "./components/MealShareModal";
 import { DayShareModal } from "./components/DayShareModal";
 import { PublicShareView } from "./components/PublicShareView";
 import { ChatGPTIcon } from "./components/ChatGPTIcon";
-import { BristolStoolIcon } from "./components/BristolStoolIcons";
+import { BristolStoolIcon, GutIcon, GreyPoopIcon } from "./components/BristolStoolIcons";
+import { DailyVitalsSection } from "./components/DailyVitalsSection";
+import { VitalsModal } from "./components/VitalsModal";
+import { FloatingWidget } from "./components/FloatingWidget";
+import { WellnessJournal } from "./components/WellnessJournal";
+import { ConsumptionSection } from "./components/ConsumptionSection";
+import { BottomNav } from "./components/BottomNav";
+import { GoalConfigPopup } from "./components/GoalConfigPopup";
+import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
+import { Header } from "./components/Header";
+import { CalendarStrip } from "./components/CalendarStrip";
+import { AuthScreen } from "./components/AuthScreen";
+import { DailyProgressSection } from "./components/DailyProgressSection";
 
 
 // Import types & helpers
@@ -131,35 +144,6 @@ const INITIAL_RECIPES: Recipe[] = [
 ];
 
 // Components and helper utilities extracted to ./components and ./utils
-
-const TimelineImage = ({ src, alt, fallbackEmoji }: { src: string; alt: string; fallbackEmoji: string }) => {
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState(false);
-
-  return (
-    <div className="absolute inset-0 w-full h-full">
-      {/* Fallback Emoji/Placeholder rendered always in the background */}
-      <div className="absolute inset-0 bg-[#F4F3EF]/90 flex items-center justify-center select-none z-0">
-        <span className="text-7xl sm:text-8xl group-hover:scale-110 transition-transform duration-700 opacity-[0.85] filter drop-shadow-xs">
-          {fallbackEmoji}
-        </span>
-      </div>
-      {/* Actual Image on top, fading in when loaded */}
-      {!error && (
-        <img
-          src={src}
-          alt={alt}
-          onLoad={() => setLoaded(true)}
-          onError={() => setError(true)}
-          className={cn(
-            "absolute inset-0 w-full h-full object-cover transition-all duration-700 group-hover:scale-105 z-10",
-            loaded ? "opacity-100" : "opacity-0"
-          )}
-        />
-      )}
-    </div>
-  );
-};
 
 const isOAuthCallback = () => {
   const hash = window.location.hash || "";
@@ -324,6 +308,7 @@ export default function App() {
   const [draftWaterTime, setDraftWaterTime] = useState<string>("");
   const [draftStoolTime, setDraftStoolTime] = useState<string>("");
   const [draftEnergyTime, setDraftEnergyTime] = useState<string>("");
+  const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
 
   useEffect(() => {
     const savedKey = localStorage.getItem("fitai_gemini_api_key");
@@ -527,12 +512,8 @@ export default function App() {
   // Router States & Navigation
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [isVitalsLogOpen, setIsVitalsLogOpen] = useState(false);
-  const [openVitalsCards, setOpenVitalsCards] = useState<Record<string, boolean>>({
-    weight: false,
-    water: false,
-    digestion: false,
-    energy: false
-  });
+  const [activeVitalsTab, setActiveVitalsTab] = useState<"weight" | "water" | "digestion" | "energy" | null>(null);
+  const [expandedCardLogs, setExpandedCardLogs] = useState<{ [key: string]: boolean }>({ water: true, digestion: true, energy: true, weight: true });
 
   // Password Recovery States
   const [newPassword, setNewPassword] = useState("");
@@ -899,6 +880,14 @@ export default function App() {
           .eq('id', activeProfileId);
         if (error) {
           console.error("Error updating profile in Supabase:", error);
+        } else if (resolvedData.weight && resolvedData.weight !== profileDataRef.current?.weight) {
+          const todayStr = new Date().toISOString().split("T")[0];
+          supabase.from("weight_logs").upsert({
+            profile_id: activeProfileId,
+            date: todayStr,
+            weight: resolvedData.weight,
+            log_time: new Date().toTimeString().slice(0, 5)
+          }, { onConflict: "profile_id,date" }).then();
         }
       }, 800) as any;
     }
@@ -2251,11 +2240,26 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
   const totalFats = getLoggedNutrientTotal("fats");
   const totalFiber = getLoggedNutrientTotal("fiber");
 
-  // Compute current streak: count consecutive days with at least one meal, going back from today
+  // Compute current streak: count consecutive days with at least one meal, checking today or yesterday
   const currentStreak = (() => {
+    if (!mealsState || mealsState.length === 0) return 0;
     const datesWithLogs = new Set(mealsState.map((m) => m.date));
+    const today = new Date(todayStr + "T00:00:00");
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = formatDateStr(yesterday);
+
+    let startD: Date | null = null;
+    if (datesWithLogs.has(todayStr)) {
+      startD = today;
+    } else if (datesWithLogs.has(yesterdayStr)) {
+      startD = yesterday;
+    } else {
+      return 0;
+    }
+
     let streak = 0;
-    const d = new Date(todayStr + "T00:00:00");
+    const d = new Date(startD);
     while (datesWithLogs.has(formatDateStr(d))) {
       streak++;
       d.setDate(d.getDate() - 1);
@@ -2442,218 +2446,27 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
     
     return (
-      <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-8 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
-        <AnimatePresence>
-          {toastMessage && (
-            <motion.div
-              initial={{ opacity: 0, y: -40, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              transition={{ type: "spring", damping: 20, stiffness: 300 }}
-              className="fixed top-8 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-[380px] z-[250] pointer-events-auto"
-            >
-              <div className="bg-stone-900/95 backdrop-blur-md text-white text-xs font-bold py-3.5 px-4 rounded-2xl shadow-2xl border border-white/10 flex items-center justify-between gap-3 font-sans">
-                <span className="flex-1 tracking-tight leading-tight">{toastMessage}</span>
-                <button
-                  onClick={() => setToastMessage(null)}
-                  className="w-5 h-5 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="my-auto space-y-8 py-12">
-          {/* Logo */}
-          <div className="flex flex-col items-center gap-3" onClick={() => navigateTo("/")} style={{ cursor: 'pointer' }}>
-            <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center">
-              <Sparkles className="text-white w-8 h-8 fill-white" />
-            </div>
-            <h1 className="text-3xl font-black tracking-tight text-center mt-2">
-              Fit<span className="text-orange-500">AI</span>
-            </h1>
-            <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest text-center">
-              Personalized Nutrition Engine
-            </p>
-          </div>
-
-
-
-          {/* Authentication Actions */}
-          <div className="space-y-5">
-            <>
-              {/* Google Authentication Button */}
-              <button
-                onClick={handleGoogleLogin}
-                className="w-full bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 text-xs font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-sm cursor-pointer"
-              >
-                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-                </svg>
-                Continue with Google
-              </button>
-
-              {/* Subtle Divider */}
-              <div className="flex items-center gap-3 my-2">
-                <div className="flex-1 h-px bg-stone-200" />
-                <span className="text-[9px] font-black tracking-widest text-stone-300 uppercase">OR</span>
-                <div className="flex-1 h-px bg-stone-200" />
-              </div>
-
-              {/* Standard Email/Password & Forgot Password Forms */}
-              {authMode === "forgot" ? (
-                <form onSubmit={handleForgotPassword} className="space-y-4">
-                  <div className="space-y-1 text-center">
-                    <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">
-                      Reset Password
-                    </p>
-                    <p className="text-[9px] text-stone-400 font-medium leading-relaxed">
-                      Enter your email address and we'll send you a link to reset your password.
-                    </p>
-                  </div>
-
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all"
-                  />
-
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="submit"
-                      disabled={authLoading}
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer"
-                    >
-                      {authLoading ? "Sending Link..." : "Send Reset Link"}
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode("login")}
-                      className="w-full text-center text-[9px] text-stone-400 hover:text-stone-500 font-bold tracking-wider uppercase py-1 bg-transparent border-0 cursor-pointer transition-colors"
-                    >
-                      ← Back to Login
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <form onSubmit={authMode === "login" ? handleEmailSignIn : handleEmailSignUp} className="space-y-3">
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all"
-                  />
-
-                  <div className="relative">
-                    <input
-                      type="password"
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200/50 shadow-sm transition-all"
-                    />
-                    
-                    {authMode === "login" && (
-                      <div className="text-right mt-1.5 px-1">
-                        <button
-                          type="button"
-                          onClick={() => setAuthMode("forgot")}
-                          className="text-[9px] text-stone-400 hover:text-orange-500 font-bold uppercase tracking-wider transition-colors cursor-pointer bg-transparent border-0"
-                        >
-                          Forgot Password?
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={authLoading}
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all shadow-lg shadow-orange-200/40 disabled:opacity-60 disabled:pointer-events-none cursor-pointer mt-1"
-                  >
-                    {authLoading 
-                      ? (authMode === "login" ? "Signing In..." : "Creating Account...") 
-                      : (authMode === "login" ? "Sign In" : "Create Account")
-                    }
-                  </button>
-
-                  <div className="text-center pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
-                      className="text-[9px] text-stone-400 hover:text-stone-600 font-bold uppercase tracking-widest transition-colors cursor-pointer bg-transparent border-0"
-                    >
-                      {authMode === "login" ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-
-                {/* Minimal Developer Mode Bypass */}
-                {import.meta.env.DEV && (
-                  <>
-                    <div className="text-center pt-2">
-                      <button
-                        onClick={() => setShowDeveloperBypass(!showDeveloperBypass)}
-                        className="text-[8px] text-stone-400 hover:text-stone-500 font-bold uppercase tracking-widest transition-colors cursor-pointer bg-transparent border-0"
-                      >
-                        {showDeveloperBypass ? "Close Developer Bypass" : "Developer Bypass"}
-                      </button>
-                    </div>
-
-                    {/* Username Input Form (Conditional Bypass) */}
-                    <AnimatePresence>
-                      {showDeveloperBypass && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="space-y-3 pt-2 overflow-hidden"
-                        >
-                          <input
-                            type="text"
-                            placeholder="Enter developer username (e.g. johndoe)"
-                            value={loginUsername}
-                            onChange={(e) => setLoginUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleLoginSubmit();
-                            }}
-                            className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
-                          />
-                          <button
-                            onClick={handleLoginSubmit}
-                            disabled={!loginUsername.trim()}
-                            className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-                          >
-                            Bypass Authentication
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </>
-                )}
-              </>
-            </div>
-        </div>
-
-        {/* Footer info */}
-        <div className="text-center text-[8px] text-stone-300 font-bold tracking-widest uppercase">
-          © 2026 FitAI. All rights reserved.
-        </div>
-      </div>
+      <AuthScreen
+        toastMessage={toastMessage}
+        setToastMessage={setToastMessage}
+        navigateTo={navigateTo}
+        handleGoogleLogin={handleGoogleLogin}
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        handleForgotPassword={handleForgotPassword}
+        handleEmailSignIn={handleEmailSignIn}
+        handleEmailSignUp={handleEmailSignUp}
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+        authLoading={authLoading}
+        showDeveloperBypass={showDeveloperBypass}
+        setShowDeveloperBypass={setShowDeveloperBypass}
+        loginUsername={loginUsername}
+        setLoginUsername={setLoginUsername}
+        handleLoginSubmit={handleLoginSubmit}
+      />
     );
   }
 
@@ -2827,7 +2640,32 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     if (!activeProfileId) return;
     
     const timeToLog = logTime !== undefined ? logTime : (draftWeightTime || new Date().toTimeString().slice(0, 5));
-    
+    const localId = crypto.randomUUID();
+
+    const loggedRow: WeightLog = {
+      id: localId,
+      profile_id: activeProfileId,
+      date: dateStr,
+      weight: weight,
+      log_time: timeToLog
+    };
+
+    // 1. Optimistic Update Local State & localStorage IMMEDIATELY (Never lose data!)
+    setWeightLogs(prev => {
+      const filtered = prev.filter(l => l.date !== dateStr);
+      const updated = [...filtered, loggedRow].sort((a, b) => a.date.localeCompare(b.date));
+      try {
+        localStorage.setItem("fitai_weight_logs", JSON.stringify(updated));
+      } catch (_) {}
+      return updated;
+    });
+
+    setProfileDataState((prev: any) => ({
+      ...prev,
+      weight: weight
+    }));
+
+    // 2. Persist to Supabase weight_logs table
     const { data: upsertedData, error: upsertError } = await supabase
       .from("weight_logs")
       .upsert(
@@ -2842,40 +2680,28 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       .select();
 
     if (upsertError) {
-      showToast("❌ Failed to save weight log");
-      console.error(upsertError);
-      return;
+      console.warn("Supabase weight_log upsert warning (retaining local log):", upsertError.message);
+    } else if (upsertedData && upsertedData[0]) {
+      setWeightLogs(prev => {
+        const filtered = prev.filter(l => l.date !== dateStr);
+        const updated = [...filtered, upsertedData[0]].sort((a, b) => a.date.localeCompare(b.date));
+        try {
+          localStorage.setItem("fitai_weight_logs", JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
+      });
     }
 
-    const loggedRow = (upsertedData && upsertedData[0]) || {
-      id: crypto.randomUUID(),
-      profile_id: activeProfileId,
-      date: dateStr,
-      weight: weight,
-      log_time: timeToLog
-    };
-
-    setWeightLogs(prev => {
-      const filtered = prev.filter(l => l.date !== dateStr);
-      return [...filtered, loggedRow];
-    });
-
-    const { data: latest } = await supabase
-      .from("weight_logs")
-      .select("weight,date")
-      .eq("profile_id", activeProfileId)
-      .order("date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (latest && latest.date === dateStr) {
-      setProfileData((prev: any) => ({
-        ...prev,
-        weight: weight
-      }));
+    // 3. Keep profiles table weight column in sync with latest logged weight!
+    if (isSupabaseConfigured) {
+      supabase
+        .from("profiles")
+        .update({ weight: weight })
+        .eq("id", activeProfileId)
+        .then();
     }
 
-    // Sync to notes
+    // 4. Sync to daily wellness notes
     const existingWellness = dailyNotes.find(n => n.date === dateStr);
     const waterVal = existingWellness ? (existingWellness.water_intake || 0) : 0;
     const stoolVal = existingWellness ? existingWellness.stool_type : null;
@@ -2899,7 +2725,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     if (wellnessData && wellnessData[0]) {
       setDailyNotes(prev => {
         const filtered = prev.filter(n => n.date !== dateStr);
-        return [...filtered, wellnessData[0]];
+        const updated = [...filtered, wellnessData[0]];
+        try {
+          localStorage.setItem("fitai_daily_notes", JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
       });
     }
 
@@ -3476,44 +3306,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-from)_0%,_transparent_40%)] from-orange-50/30 pointer-events-none" />
 
       {/* Dynamic Header */}
-      <header
-        id="header-main"
-        className="px-6 pt-8 flex items-center justify-between relative z-10"
-      >
-        <div id="brand-logo" className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-orange-500 shadow-lg shadow-orange-200 flex items-center justify-center">
-            <Flame className="text-white w-5 h-5" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-orange-400">
-            FitAI
-          </h1>
-        </div>
-        <div id="user-stats" className="flex items-center gap-3">
-          <motion.div
-            id="streak-counter"
-            whileHover={{ scale: 1.05 }}
-            className="flex items-center gap-1.5 bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-orange-100/50"
-          >
-            <span className="text-orange-500 text-lg">🔥</span>
-            <span className="font-bold text-orange-900">{currentStreak}</span>
-          </motion.div>
-          <button
-            id="profile-avatar"
-            onClick={() => setActiveTab("profile")}
-            className="w-10 h-10 rounded-full border-2 border-orange-500 p-0.5 overflow-hidden shadow-md cursor-pointer hover:scale-105 transition-transform flex items-center justify-center bg-stone-100"
-          >
-            {profileData.imageUrl ? (
-              <img
-                src={profileData.imageUrl}
-                alt="User"
-                className="w-full h-full object-cover rounded-full pointer-events-none"
-              />
-            ) : (
-              <DefaultAvatar />
-            )}
-          </button>
-        </div>
-      </header>
+      <Header
+        currentStreak={currentStreak}
+        profileData={profileData}
+        setActiveTab={setActiveTab}
+      />
 
       <AnimatePresence mode="wait">
         {activeTab === "home" && (
@@ -3525,1351 +3322,100 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             transition={{ duration: 0.3 }}
           >
             {/* Calendar Strip */}
-            <div id="calendar-strip" className="px-6 mt-8 relative z-10 space-y-4">
-              {/* Date Selector & Snap-to-Today Header */}
-              <div className="flex justify-between items-center px-1">
-                <span className="text-xs font-black uppercase tracking-widest text-stone-500">
-                  {getFormattedSelectedDate()}
-                </span>
-                <div className="flex items-center gap-2">
-                  {selectedDate !== todayStr && (
-                    <button
-                      onClick={() => {
-                        setSelectedDate(todayStr);
-                        recenterDaysList(todayStr);
-                      }}
-                      className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl shadow-md active:scale-95 transition-all cursor-pointer border-none flex items-center gap-1 shrink-0"
-                    >
-                      Shift to Today
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setIsDatePickerOpen(true)}
-                    className="w-8 h-8 rounded-xl bg-white hover:bg-stone-50 border border-stone-200/60 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all border-none"
-                    title="Choose Date"
-                  >
-                    <CalendarIcon className="w-4 h-4 text-stone-500" />
-                  </button>
-                  <button
-                    onClick={handleShareDay}
-                    className="w-8 h-8 rounded-xl bg-white hover:bg-stone-50 border border-stone-200/60 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all"
-                    title="Share day summary"
-                  >
-                    <Share2 className="w-4 h-4 text-stone-500" />
-                  </button>
-                </div>
-              </div>
+            <CalendarStrip
+              getFormattedSelectedDate={getFormattedSelectedDate}
+              selectedDate={selectedDate}
+              todayStr={todayStr}
+              setSelectedDate={setSelectedDate}
+              recenterDaysList={recenterDaysList}
+              setIsDatePickerOpen={setIsDatePickerOpen}
+              handleShareDay={handleShareDay}
+              daysList={daysList}
+            />
 
-              {/* Day Strips */}
-              <div className="flex justify-between items-center overflow-x-auto pb-4 scrollbar-hide gap-3">
-                {daysList.map((day, idx) => {
-                  const isActive = day.fullDate === selectedDate;
-                  const d = new Date(day.fullDate + "T00:00:00");
-                  const shortDayName = d.toLocaleDateString("en-US", { weekday: "short" }).toLowerCase();
-                  const shortMonthName = d.toLocaleDateString("en-US", { month: "short" }).toLowerCase();
-                  return (
-                    <motion.button
-                      key={idx}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => {
-                        setSelectedDate(day.fullDate);
-                      }}
-                      className={cn(
-                        "flex flex-col items-center justify-center min-w-[58px] py-3.5 rounded-2xl transition-all duration-300 shadow-sm grow cursor-pointer shrink-0",
-                        isActive
-                          ? "bg-orange-500 text-white shadow-lg shadow-orange-200 ring-4 ring-orange-50"
-                          : "bg-white/60 backdrop-blur-sm text-gray-500 border border-orange-50/50 hover:bg-white/90",
-                      )}
-                    >
-                      <span className="text-[10px] font-black opacity-60 tracking-tighter">
-                        {shortDayName}
-                      </span>
-                      <span className="text-lg font-black leading-none my-1">{day.date}</span>
-                      <span className="text-[9px] font-black opacity-60 tracking-wider">
-                        {shortMonthName}
-                      </span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Main Content Area */}
-            <div className="px-6 mt-4 relative z-10">
-              {/* Circular Progress for Calories */}
-              <div className="relative w-full aspect-square max-w-[280px] mx-auto flex items-center justify-center my-8">
-                <svg
-                  className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-xl"
-                  viewBox="0 0 240 240"
-                >
-                  <circle
-                    cx="120"
-                    cy="120"
-                    r="104"
-                    strokeWidth="20"
-                    fill="transparent"
-                    className="stroke-orange-100/50"
-                  />
-                  <motion.circle
-                    cx="120"
-                    cy="120"
-                    r="104"
-                    strokeWidth="20"
-                    fill="transparent"
-                    strokeLinecap="round"
-                    className="stroke-orange-500"
-                    initial={{ strokeDashoffset: Math.PI * 2 * 104 }}
-                    animate={{
-                      strokeDashoffset:
-                        Math.PI * 2 * 104 -
-                        Math.min(1, totalCalories / profileData.goals.dailyCalories) *
-                          (Math.PI * 2 * 104),
-                    }}
-                    strokeDasharray={Math.PI * 2 * 104}
-                    transition={{ duration: 1.5, ease: "easeOut" }}
-                  />
-                </svg>
-                <div className="text-center z-10 bg-white/40 backdrop-blur-md w-40 h-40 rounded-full flex flex-col items-center justify-center shadow-inner border border-white/50">
-                  <div className="text-5xl font-black mb-1 text-orange-950 px-2 truncate selection:bg-orange-500 select-none">
-                    {totalCalories.toLocaleString()}
-                  </div>
-                  <div className="h-1.5 w-8 bg-orange-500 rounded-full mb-1" />
-                  <div className="text-orange-900/50 font-black tracking-[0.1em] text-[10px] uppercase">
-                    / {profileData.goals.dailyCalories.toLocaleString()}{" "}
-                    KCAL
-                  </div>
-                </div>
-              </div>
-
-              {/* Macro Progress Bars */}
-              <div className="bg-white/60 backdrop-blur-md p-6 rounded-[32px] border border-white/80 shadow-xl shadow-orange-100/20 grid grid-cols-2 gap-x-6 gap-y-6 mt-6">
-                {enabledNutrients.map((macro: any, idx: number) => {
-                  const isOdd = enabledNutrients.length % 2 !== 0;
-                  const isFirstAndOdd = isOdd && idx === 0;
-                  const totalVal = getLoggedNutrientTotal(macro.id);
-                  
-                  return (
-                    <div key={macro.id} className={isFirstAndOdd ? "col-span-2" : ""}>
-                      <ProgressBar
-                        label={macro.name}
-                        value={totalVal}
-                        max={macro.target}
-                        color={macro.color}
-                        unit={macro.unit}
-                        index={idx}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Daily Tag Hits Summary */}
-              {(() => {
-                const activeTags = Object.entries(dailyTagHits || {}).filter(([_, count]) => (count as number) > 0);
-                if (activeTags.length === 0) return null;
-
-                return (
-                  <div className="mt-5 flex flex-wrap justify-center gap-1.5 select-none">
-                    {activeTags.map(([tagName, count]) => (
-                      <div
-                        key={tagName}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider bg-stone-100/60 border border-stone-200/40 text-stone-500 shadow-3xs"
-                      >
-                        <span>{tagName}</span>
-                        <span className="font-extrabold text-stone-400">×{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-
-
-            {/* Today's Consumption Section */}
-            <section className="px-6 mt-16 relative z-10">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-black tracking-tight text-orange-950">
-                  {selectedDate === todayStr ? "Today's Consumption" : "Logged Consumption"}
-                </h3>
-                {selectedDate === todayStr && (
-                  <div className="flex gap-2">
-                    {/* Quick Add Zap Button */}
-                    <button
-                      onClick={() => setShowQuickAdd(!showQuickAdd)}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-sm border-none ${
-                        showQuickAdd
-                          ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10"
-                          : "bg-stone-100 hover:bg-stone-200 text-stone-500 shadow-stone-200/10"
-                      }`}
-                      title="Quick Add"
-                    >
-                      <Zap className="w-4 h-4" />
-                    </button>
-                    {/* Log Meal Plus Button */}
-                    <button
-                      onClick={handleLogMealClick}
-                      className="w-8 h-8 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-sm shadow-orange-500/10 border-none"
-                      title="Log Meal"
-                    >
-                      <Plus className="w-4 h-4 text-white" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Collapsible Quick Add Row */}
-              <AnimatePresence>
-                {showQuickAdd && selectedDate === todayStr && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="pb-6">
-                    <div className="flex gap-2.5 items-center w-full">
-                      <input
-                        type="text"
-                        placeholder="Add item..."
-                        value={customCalName}
-                        onChange={(e) => setCustomCalName(e.target.value)}
-                        className="flex-1 h-12 bg-white/60 backdrop-blur-md border border-white/80 rounded-2xl px-4 text-xs font-bold text-stone-900 placeholder-stone-400 focus:outline-none shadow-sm focus:ring-1 focus:ring-orange-500/10 transition-all text-left"
-                      />
-                      <input
-                        type="number"
-                        placeholder="kcal"
-                        value={customCalVal}
-                        onChange={(e) => setCustomCalVal(e.target.value)}
-                        className="w-20 h-12 bg-white/60 backdrop-blur-md border border-white/80 rounded-2xl text-center text-xs font-bold text-stone-900 placeholder-stone-400 focus:outline-none shadow-sm focus:ring-1 focus:ring-orange-500/10 transition-all"
-                      />
-                      <button
-                        onClick={() => {
-                          const name = customCalName.trim();
-                          const kcalStr = customCalVal.trim();
-                          const kcalVal = parseInt(kcalStr);
-
-                          if (!name && !kcalStr) {
-                            showToast("Enter an item name or calories");
-                            return;
-                          }
-
-                          if (kcalStr && kcalVal > 0) {
-                            onAddMeal({
-                              name: name || "Quick Add",
-                              calories: kcalVal,
-                              protein: 0,
-                              carbs: 0,
-                              fats: 0,
-                              type: "Quick Cal",
-                            });
-                            showToast(`Logged "${name || "Quick Add"}" — ${kcalVal} kcal`);
-                            setCustomCalName("");
-                            setCustomCalVal("");
-                          } else {
-                            const ingredientsList = name
-                              .split(/,|and|\+/)
-                              .map((i) => i.trim())
-                              .filter(Boolean);
-                            
-                            const nutrition = calculateNutritionFromIngredients(name, ingredientsList);
-                            
-                            onAddMeal({
-                              name,
-                              calories: nutrition.calories,
-                              protein: nutrition.protein,
-                              carbs: nutrition.carbs,
-                              fats: nutrition.fats,
-                              type: "Quick Cal",
-                            });
-                            
-                            showToast(`AI Estimated: ${nutrition.calories} kcal, ${nutrition.protein}g Protein`);
-                            setCustomCalName("");
-                            setCustomCalVal("");
-                          }
-                        }}
-                        className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
-                        title="Quick Add"
-                      >
-                        <Check className="w-5 h-5 text-white" />
-                      </button>
-                    </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="space-y-6">
-                {activeMeals.length === 0 ? (
-                  <div className="text-center py-12 px-6">
-                    <p className="text-sm font-bold text-stone-500">No logs for this date yet</p>
-                    <p className="text-[10px] text-stone-400 mt-1 font-medium leading-relaxed">
-                      All meals, quick calories, or recipe favorites logged on this date will show up here.
-                    </p>
-                  </div>
-                ) : (
-                  activeMeals.map((meal) => {
-                    const isQuickCal = meal.protein === 0 && meal.carbs === 0 && meal.fats === 0 && meal.fiber === 0;
-
-                    if (isQuickCal) {
-                      return (
-                        <motion.div
-                          key={meal.id}
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.99 }}
-                          onClick={() => handleEditMeal(meal)}
-                          className="bg-white/80 backdrop-blur-md rounded-2xl border border-white/90 p-4 shadow-3xs flex items-center justify-between gap-4 relative z-10 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-xl bg-orange-100/50 flex items-center justify-center text-orange-600 shrink-0">
-                              <Zap className="w-4 h-4 fill-orange-500 text-orange-500" />
-                            </div>
-                            <div className="text-left min-w-0">
-                              <h4 className="text-xs font-black text-stone-850 truncate leading-tight">
-                                {meal.name}
-                              </h4>
-                              {meal.meal_description && (
-                                <p className="text-[9px] text-stone-500 font-semibold mt-0.5 line-clamp-1">
-                                  {meal.meal_description}
-                                </p>
-                              )}
-                              <span className="text-[8px] font-bold text-stone-400 block mt-0.5 uppercase tracking-wider">
-                                {meal.time}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <span className="text-sm font-black text-orange-600 block">
-                                {meal.calories} kcal
-                              </span>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleShareMeal(meal);
-                              }}
-                              className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-orange-50 text-stone-400 hover:text-orange-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40 shrink-0"
-                              title="Share meal"
-                            >
-                              <Share2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteMeal(meal);
-                              }}
-                              className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40 shrink-0"
-                              title="Delete log"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </motion.div>
-                      );
-                    }
-
-                    const hasImage = true;
-
-                    if (!hasImage) {
-                      const getMealEmoji = (typeStr: string) => {
-                        const t = typeStr?.toLowerCase() || "";
-                        if (t.includes("breakfast") || t.includes("morning")) return "🥞";
-                        if (t.includes("lunch") || t.includes("afternoon")) return "🥗";
-                        if (t.includes("dinner") || t.includes("night") || t.includes("evening")) return "🥩";
-                        if (t.includes("snack") || t.includes("bite") || t.includes("tea")) return "🍎";
-                        return "🍽️";
-                      };
-                      const mealEmoji = getMealEmoji(meal.type);
-
-                      return (
-                        <motion.div
-                          key={meal.id}
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.99 }}
-                          onClick={() => handleEditMeal(meal)}
-                          className="bg-white/80 backdrop-blur-md rounded-2xl border border-white/90 p-4 shadow-3xs flex items-center justify-between gap-4 relative z-10 cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="w-9 h-9 rounded-xl bg-stone-100/60 flex items-center justify-center text-sm shrink-0 border border-stone-200/20">
-                              {mealEmoji}
-                            </div>
-                            <div className="text-left min-w-0">
-                              <h4 className="text-xs font-black text-stone-850 truncate leading-tight">
-                                {meal.name}
-                              </h4>
-                              {meal.meal_description && (
-                                <p className="text-[9px] text-stone-500 font-semibold mt-0.5 line-clamp-1">
-                                  {meal.meal_description}
-                                </p>
-                              )}
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
-                                <span className="text-[8px] font-bold text-stone-400 block uppercase tracking-wider">
-                                  {meal.time}
-                                </span>
-                                <span className="text-[8px] text-stone-300 font-bold">•</span>
-                                <span className="text-[8px] font-extrabold text-stone-500 uppercase tracking-wide block">
-                                  P: {meal.protein}g • C: {meal.carbs}g • F: {meal.fats}g • Fiber: {meal.fiber || 0}g
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="text-right mr-1">
-                              <span className="text-xs font-black text-stone-700 block">
-                                +{meal.calories} kcal
-                              </span>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleShareMeal(meal);
-                              }}
-                              className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-orange-50 text-stone-400 hover:text-orange-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40"
-                              title="Share meal"
-                            >
-                              <Share2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteMeal(meal);
-                              }}
-                              className="w-7 h-7 rounded-lg bg-stone-50 hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center cursor-pointer transition-colors border border-stone-200/40"
-                              title="Delete log"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </motion.div>
-                      );
-                    }
-
-                    return (
-                      <motion.div
-                        key={meal.id}
-                        whileHover={{ y: -4, scale: 1.01 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleEditMeal(meal)}
-                        className="relative rounded-[32px] overflow-hidden aspect-[4/3] sm:aspect-video shadow-xl shadow-orange-200/30 group cursor-pointer"
-                      >
-                        {meal.image && !hasNoGeneratedImage(meal.image) ? (
-                          <TimelineImage
-                            src={meal.image}
-                            alt={meal.name}
-                            fallbackEmoji={getMealEmoji(meal.name, meal.type)}
-                          />
-                        ) : (
-                          <div className="absolute inset-0 bg-[#F4F3EF]/90 flex items-center justify-center select-none">
-                            <span className="text-7xl sm:text-8xl group-hover:scale-110 transition-transform duration-700 opacity-[0.85] filter drop-shadow-xs">
-                              {getMealEmoji(meal.name, meal.type)}
-                            </span>
-                          </div>
-                        )}
-                        <div className={cn(
-                          "absolute inset-0 bg-gradient-to-t z-10 pointer-events-none",
-                          meal.image && !hasNoGeneratedImage(meal.image)
-                            ? "from-black/90 via-black/40 to-black/20"
-                            : "from-stone-900/75 via-stone-900/25 to-transparent"
-                        )} />
-
-                        {/* Top Bar: Time, Calories, and Delete */}
-                        <div className="absolute top-5 left-5 right-5 flex justify-between items-center z-20">
-                          <div className="backdrop-blur-md bg-white/10 px-3 py-1.5 rounded-full border border-white/10">
-                            <span className="text-[10px] font-black uppercase tracking-[0.1em] text-white">
-                              {meal.time}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="backdrop-blur-md bg-orange-500/90 text-white px-3 py-1.5 rounded-full font-black flex items-center gap-1 shadow-lg border border-orange-400/50">
-                              <span className="text-sm">{meal.calories}</span>
-                              <span className="text-[9px] uppercase tracking-wider opacity-90">
-                                Kcal
-                              </span>
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleShareMeal(meal);
-                              }}
-                              className="w-8 h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-orange-500/80 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
-                              title="Share meal"
-                            >
-                              <Share2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteMeal(meal);
-                              }}
-                              className="w-8 h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-red-550/85 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
-                              title="Delete log"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Bottom Content: Name and Macros */}
-                        <div className="absolute bottom-5 left-5 right-5 text-left font-sans z-20">
-                          <h4 className="text-white text-xl sm:text-2xl font-black mb-1 leading-tight tracking-tight shadow-sm">
-                            {meal.name}
-                          </h4>
-                          {meal.meal_description && (
-                            <p className="text-[10px] text-white/75 font-semibold italic mb-3 line-clamp-1 truncate">
-                              "{meal.meal_description}"
-                            </p>
-                          )}
-
-                          <div className="flex gap-4">
-                            {[
-                              { l: "Protein", v: meal.protein },
-                              { l: "Carbs", v: meal.carbs },
-                              { l: "Fats", v: meal.fats },
-                            ].map((m) => (
-                              <div key={m.l} className="flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-white/70 shadow-sm" />
-                                <div className="flex items-baseline gap-1">
-                                  <span className="text-[10px] font-black uppercase tracking-wider text-white/50">
-                                    {m.l}
-                                  </span>
-                                  <span className="text-sm font-bold text-white">
-                                    {m.v}g
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </motion.div>
-                    );
-                  })
-                )}
-              </div>
-            </section>
+            {/* Daily Intake Progress Section (Calorie Ring & 2x2 Macros) */}
+            <DailyProgressSection
+              totalCalories={totalCalories}
+              profileData={profileData}
+              enabledNutrients={enabledNutrients}
+              getLoggedNutrientTotal={getLoggedNutrientTotal}
+              dailyTagHits={dailyTagHits}
+            />
 
             {/* Daily Vitals Tracking Section */}
-            {(profileData.agent_config?.trackWeight || profileData.agent_config?.trackWater || profileData.agent_config?.trackDigestion || profileData.agent_config?.trackEnergy) && (() => {
-              const wellnessToday = dailyNotes.find(n => n.date === selectedDate);
-              const weightTodayLog = weightLogs.find(l => l.date === selectedDate);
-              const waterIntake = wellnessToday?.water_intake || 0;
-              const stoolType = wellnessToday?.stool_type ?? null;
-              const energyLevel = wellnessToday?.energy_level ?? null;
+            <DailyVitalsSection
+              profileData={profileData}
+              selectedDate={selectedDate}
+              todayStr={todayStr}
+              dailyNotes={dailyNotes}
+              weightLogs={weightLogs}
+              isVitalsLogOpen={isVitalsLogOpen}
+              setIsVitalsLogOpen={setIsVitalsLogOpen}
+              activeVitalsTab={activeVitalsTab}
+              setActiveVitalsTab={setActiveVitalsTab}
+              draftWeight={draftWeight}
+              setDraftWeight={setDraftWeight}
+              draftWeightTime={draftWeightTime}
+              setDraftWeightTime={setDraftWeightTime}
+              draftWater={draftWater}
+              setDraftWater={setDraftWater}
+              draftWaterTime={draftWaterTime}
+              setDraftWaterTime={setDraftWaterTime}
+              draftStoolType={draftStoolType}
+              setDraftStoolType={setDraftStoolType}
+              draftStoolTime={draftStoolTime}
+              setDraftStoolTime={setDraftStoolTime}
+              draftEnergy={draftEnergy}
+              setDraftEnergy={setDraftEnergy}
+              draftEnergyTime={draftEnergyTime}
+              setDraftEnergyTime={setDraftEnergyTime}
+              isWeightStepping={isWeightStepping}
+              isWaterStepping={isWaterStepping}
+              isStoolSliding={isStoolSliding}
+              setIsStoolSliding={setIsStoolSliding}
+              isEnergySliding={isEnergySliding}
+              setIsEnergySliding={setIsEnergySliding}
+              triggerWeightStepping={triggerWeightStepping}
+              triggerWaterStepping={triggerWaterStepping}
+              setTimePickerTarget={setTimePickerTarget}
+              setTimePickerInitialTime={setTimePickerInitialTime}
+              setIsTimePickerOpen={setIsTimePickerOpen}
+              handleLogWeight={handleLogWeight}
+              handleDeleteWeight={handleDeleteWeight}
+              handleLogWater={handleLogWater}
+              handleDeleteWaterLogItem={handleDeleteWaterLogItem}
+              handleLogDigestion={handleLogDigestion}
+              handleDeleteStoolLogItem={handleDeleteStoolLogItem}
+              handleLogEnergy={handleLogEnergy}
+              handleDeleteEnergyLogItem={handleDeleteEnergyLogItem}
+              DAILY_WATER_GOAL_ML={DAILY_WATER_GOAL_ML}
+            />
 
-              const isWeightActive = profileData.agent_config?.trackWeight ?? true;
-              const isWaterActive = profileData.agent_config?.trackWater ?? true;
-              const isDigestionActive = profileData.agent_config?.trackDigestion ?? true;
-              const isEnergyActive = profileData.agent_config?.trackEnergy ?? true;
+            {/* Meal Stream / Meal Logs Section */}
+            <ConsumptionSection
+              totalCalories={totalCalories}
+              profileData={profileData}
+              enabledNutrients={enabledNutrients}
+              getLoggedNutrientTotal={getLoggedNutrientTotal}
+              dailyTagHits={dailyTagHits}
+              selectedDate={selectedDate}
+              todayStr={todayStr}
+              showQuickAdd={showQuickAdd}
+              setShowQuickAdd={setShowQuickAdd}
+              customCalName={customCalName}
+              setCustomCalName={setCustomCalName}
+              customCalVal={customCalVal}
+              setCustomCalVal={setCustomCalVal}
+              handleLogMealClick={handleLogMealClick}
+              onAddMeal={onAddMeal}
+              showToast={showToast}
+              activeMeals={activeMeals}
+              handleEditMeal={handleEditMeal}
+              handleShareMeal={handleShareMeal}
+              handleDeleteMeal={handleDeleteMeal}
+            />
 
-              const totalActiveVitals = (isWeightActive ? 1 : 0) + (isWaterActive ? 1 : 0) + (isDigestionActive ? 1 : 0) + (isEnergyActive ? 1 : 0);
-
-              const getNowTimeStr = () => new Date().toTimeString().slice(0, 5);
-
-              const waterLogsList = wellnessToday?.water_logs && wellnessToday.water_logs.length > 0
-                ? wellnessToday.water_logs
-                : (waterIntake > 0 ? [{ id: "legacy-water", amount: waterIntake, time: wellnessToday?.water_log_time || getNowTimeStr() }] : []);
-
-              const stoolLogsList = wellnessToday?.stool_logs && wellnessToday.stool_logs.length > 0
-                ? wellnessToday.stool_logs
-                : (stoolType !== null ? [{ id: "legacy-stool", type: stoolType, time: wellnessToday?.stool_log_time || getNowTimeStr() }] : []);
-
-              const energyLogsList = wellnessToday?.energy_logs && wellnessToday.energy_logs.length > 0
-                ? wellnessToday.energy_logs
-                : (energyLevel !== null ? [{ id: "legacy-energy", level: energyLevel, time: wellnessToday?.energy_log_time || getNowTimeStr() }] : []);
-
-              const totalLoggedVitals = 
-                (isWeightActive && weightTodayLog ? 1 : 0) +
-                (isWaterActive ? waterLogsList.length : 0) +
-                (isDigestionActive ? stoolLogsList.length : 0) +
-                (isEnergyActive ? energyLogsList.length : 0);
-
-              const activeWeightTime = draftWeightTime || weightTodayLog?.log_time || getNowTimeStr();
-              const currentWater = draftWater ?? waterIntake;
-              const activeType = draftStoolType ?? stoolType ?? 4;
-              const currentEnergy = draftEnergy ?? energyLevel ?? 3;
-
-              const activeWaterTime = draftWaterTime || wellnessToday?.water_log_time || getNowTimeStr();
-              const activeStoolTime = draftStoolTime || wellnessToday?.stool_log_time || getNowTimeStr();
-              const activeEnergyTime = draftEnergyTime || wellnessToday?.energy_log_time || getNowTimeStr();
-
-              // Digestion mapping helper
-              const isConstipated = stoolType === 1 || stoolType === 2;
-              const isHealthy = stoolType === 3 || stoolType === 4;
-              const isLoose = stoolType !== null && stoolType >= 5;
-
-              const formatInterestingTime = (timeStr?: string | null) => {
-                if (!timeStr) return null;
-                const [hStr, mStr] = timeStr.split(":");
-                const h = parseInt(hStr, 10);
-                if (isNaN(h)) return timeStr;
-                const ampm = h >= 12 ? "PM" : "AM";
-                const h12 = h % 12 || 12;
-                return `${h12}:${mStr} ${ampm}`;
-              };
-
-              return (
-                <section className="px-6 mt-10 relative z-10 text-left space-y-6 animate-fade-in">
-                  
-                  {/* 0. UNIFIED VITALS HEADER & COLLAPSIBLE LOG HISTORY */}
-                  <div className="flex flex-col gap-2 border-b border-stone-200/50 pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Activity className="w-3.5 h-3.5 text-orange-500" />
-                        <h3 className="text-[11px] font-black uppercase text-stone-750 tracking-wider">
-                          {selectedDate === todayStr ? "Daily Vitals" : "Logged Vitals History"}
-                        </h3>
-                        {totalLoggedVitals > 0 && (
-                          <span className="text-[9px] font-extrabold bg-orange-100/90 border border-orange-200/60 text-orange-800 px-2 py-0.5 rounded-full">
-                            {totalLoggedVitals} {totalLoggedVitals === 1 ? "entry" : "entries"}
-                          </span>
-                        )}
-                      </div>
-                      {totalLoggedVitals > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setIsVitalsLogOpen(!isVitalsLogOpen)}
-                          className="text-[10px] font-bold text-stone-400 hover:text-stone-700 flex items-center gap-1 cursor-pointer bg-transparent border-none transition-colors select-none"
-                        >
-                          <span>{isVitalsLogOpen ? "Hide Log" : "View Log"}</span>
-                          {isVitalsLogOpen ? <ChevronUp className="w-3 h-3 text-stone-400" /> : <ChevronDown className="w-3 h-3 text-stone-400" />}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Super-Minimalist Collapsible Log History Drawer */}
-                    {isVitalsLogOpen && totalLoggedVitals > 0 && (
-                      <div className="mt-2 flex flex-col gap-1.5 bg-stone-50/80 border border-stone-200/60 rounded-2xl p-2.5 animate-fade-in">
-                        {/* 1. Weight */}
-                        {weightTodayLog && (
-                          <div className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
-                            <div className="flex items-center gap-2">
-                              <Scale className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                              <span className="text-stone-500 font-medium">Weight:</span>
-                              <strong className="text-stone-900 font-black">{weightTodayLog.weight} kg</strong>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {weightTodayLog.log_time && (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
-                                  <Clock className="w-2.5 h-2.5 text-stone-400" />
-                                  {formatInterestingTime(weightTodayLog.log_time)}
-                                </span>
-                              )}
-                              {selectedDate === todayStr && (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (weightTodayLog.id) {
-                                      await handleDeleteWeight(weightTodayLog.id);
-                                    }
-                                  }}
-                                  className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
-                                  title="Remove weight log"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 2. Water Multi-Logs */}
-                        {waterLogsList.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
-                            <div className="flex items-center gap-2">
-                              <Droplet className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-                              <span className="text-stone-500 font-medium">Hydration:</span>
-                              <strong className="text-stone-900 font-black">{item.amount} ml</strong>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {item.time && (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
-                                  <Clock className="w-2.5 h-2.5 text-stone-400" />
-                                  {formatInterestingTime(item.time)}
-                                </span>
-                              )}
-                              {selectedDate === todayStr && (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (item.id === "legacy-water") {
-                                      await handleLogWater(0, selectedDate);
-                                    } else {
-                                      await handleDeleteWaterLogItem(item.id, selectedDate);
-                                    }
-                                  }}
-                                  className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
-                                  title="Remove water entry"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* 3. Stool (Gut Health) Multi-Logs */}
-                        {stoolLogsList.map((item) => {
-                          const itemConstipated = item.type === 1 || item.type === 2;
-                          const itemHealthy = item.type === 3 || item.type === 4;
-                          return (
-                            <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
-                              <div className="flex items-center gap-2">
-                                <BristolStoolIcon type={item.type} className="w-3.5 h-3.5 shrink-0" />
-                                <span className="text-stone-500 font-medium">Gut Health:</span>
-                                <strong className={cn(
-                                  "font-black",
-                                  itemConstipated ? "text-amber-600" : (itemHealthy ? "text-emerald-600" : "text-blue-600")
-                                )}>
-                                  {itemConstipated ? "Constipated" : (itemHealthy ? "Healthy" : "Loose")}
-                                </strong>
-                                <span className="text-[10px] text-stone-400 font-bold">(Type {item.type})</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {item.time && (
-                                  <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
-                                    <Clock className="w-2.5 h-2.5 text-stone-400" />
-                                    {formatInterestingTime(item.time)}
-                                  </span>
-                                )}
-                                {selectedDate === todayStr && (
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      if (item.id === "legacy-stool") {
-                                        await handleLogDigestion(null, null, selectedDate);
-                                      } else {
-                                        await handleDeleteStoolLogItem(item.id, selectedDate);
-                                      }
-                                    }}
-                                    className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
-                                    title="Remove digestion entry"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {/* 4. Energy (Vitality) Multi-Logs */}
-                        {energyLogsList.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3 py-2 text-xs transition-all">
-                            <div className="flex items-center gap-2">
-                              <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                              <span className="text-stone-500 font-medium">Vitality:</span>
-                              <strong className="text-stone-900 font-black">
-                                {(() => {
-                                  if (item.level === 1) return "😴 Exhausted";
-                                  if (item.level === 2) return "🥱 Sluggish";
-                                  if (item.level === 3) return "⚡ Steady";
-                                  if (item.level === 4) return "🔥 High Energy";
-                                  return "🚀 Peak Vitality";
-                                })()}
-                              </strong>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {item.time && (
-                                <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-stone-500 bg-stone-100 border border-stone-200/50 px-2 py-0.5 rounded-md">
-                                  <Clock className="w-2.5 h-2.5 text-stone-400" />
-                                  {formatInterestingTime(item.time)}
-                                </span>
-                              )}
-                              {selectedDate === todayStr && (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (item.id === "legacy-energy") {
-                                      await handleLogEnergy(null, selectedDate);
-                                    } else {
-                                      await handleDeleteEnergyLogItem(item.id, selectedDate);
-                                    }
-                                  }}
-                                  className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0"
-                                  title="Remove energy entry"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ULTRA-COMPACT MONOCHROMATIC VITALS SEGMENTED TRACK */}
-                  <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100/90 border border-stone-200/60 rounded-2xl select-none mt-1">
-                    {isWeightActive && (
-                      <button
-                        type="button"
-                        onClick={() => setOpenVitalsCards(prev => ({ ...prev, weight: !prev.weight }))}
-                        className={cn(
-                          "py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer border-none active:scale-95",
-                          openVitalsCards.weight
-                            ? "bg-white text-stone-900 shadow-2xs font-black"
-                            : weightTodayLog
-                            ? "text-stone-900 font-bold hover:bg-white/60"
-                            : "text-stone-500 hover:text-stone-800 hover:bg-white/40"
-                        )}
-                        title="Toggle Weight Card"
-                      >
-                        <Scale className="w-3.5 h-3.5 shrink-0 text-stone-600" />
-                        <span className="truncate">Weight</span>
-                        {weightTodayLog && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-stone-800 shrink-0" />
-                        )}
-                      </button>
-                    )}
-
-                    {isWaterActive && (
-                      <button
-                        type="button"
-                        onClick={() => setOpenVitalsCards(prev => ({ ...prev, water: !prev.water }))}
-                        className={cn(
-                          "py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer border-none active:scale-95",
-                          openVitalsCards.water
-                            ? "bg-white text-stone-900 shadow-2xs font-black"
-                            : waterIntake > 0
-                            ? "text-stone-900 font-bold hover:bg-white/60"
-                            : "text-stone-500 hover:text-stone-800 hover:bg-white/40"
-                        )}
-                        title="Toggle Water Card"
-                      >
-                        <Droplet className="w-3.5 h-3.5 shrink-0 text-stone-600" />
-                        <span className="truncate">Water</span>
-                        {waterIntake > 0 && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-stone-800 shrink-0" />
-                        )}
-                      </button>
-                    )}
-
-                    {isDigestionActive && (
-                      <button
-                        type="button"
-                        onClick={() => setOpenVitalsCards(prev => ({ ...prev, digestion: !prev.digestion }))}
-                        className={cn(
-                          "py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer border-none active:scale-95",
-                          openVitalsCards.digestion
-                            ? "bg-white text-stone-900 shadow-2xs font-black"
-                            : stoolType !== null
-                            ? "text-stone-900 font-bold hover:bg-white/60"
-                            : "text-stone-500 hover:text-stone-800 hover:bg-white/40"
-                        )}
-                        title="Toggle Digestion Card"
-                      >
-                        <Activity className="w-3.5 h-3.5 shrink-0 text-stone-600" />
-                        <span className="truncate">Digestion</span>
-                        {stoolType !== null && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-stone-800 shrink-0" />
-                        )}
-                      </button>
-                    )}
-
-                    {isEnergyActive && (
-                      <button
-                        type="button"
-                        onClick={() => setOpenVitalsCards(prev => ({ ...prev, energy: !prev.energy }))}
-                        className={cn(
-                          "py-2 px-1 rounded-xl text-[11px] font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer border-none active:scale-95",
-                          openVitalsCards.energy
-                            ? "bg-white text-stone-900 shadow-2xs font-black"
-                            : energyLevel !== null
-                            ? "text-stone-900 font-bold hover:bg-white/60"
-                            : "text-stone-500 hover:text-stone-800 hover:bg-white/40"
-                        )}
-                        title="Toggle Energy Card"
-                      >
-                        <Zap className="w-3.5 h-3.5 shrink-0 text-stone-600" />
-                        <span className="truncate">Energy</span>
-                        {energyLevel !== null && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-stone-800 shrink-0" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* 1. WEIGHT LOG (POPS OUT WHEN TOGGLED) */}
-                  {isWeightActive && openVitalsCards.weight && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                          <Scale className="w-3.5 h-3.5 text-stone-400" />
-                          <span>Weight Log</span>
-                        </h3>
-                      </div>
-
-                      {weightTodayLog ? (
-                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs animate-fade-in">
-                          <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
-                            <span className="text-xs text-stone-400 font-medium">Logged Weight:</span>
-                            <span className="text-base font-black text-orange-950">{weightTodayLog.weight}</span>
-                            <span className="text-xs text-stone-400 font-medium">kg</span>
-                            {weightTodayLog.log_time && (
-                              <span className="text-[10px] text-stone-400 font-bold ml-1.5">(at {weightTodayLog.log_time})</span>
-                            )}
-                          </div>
-                          {selectedDate === todayStr && (
-                            <button
-                              onClick={async () => {
-                                if (weightTodayLog.id) {
-                                  await handleDeleteWeight(weightTodayLog.id);
-                                }
-                              }}
-                              className="w-7 h-7 rounded-xl hover:bg-stone-250 text-stone-400 hover:text-stone-600 flex items-center justify-center cursor-pointer border-none transition-all shrink-0 bg-stone-50 border border-stone-200/60 shadow-3xs"
-                              title="Remove weight log"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      ) : selectedDate === todayStr ? (
-                        (() => {
-                          const baseWeight = (() => {
-                            const pastLogs = weightLogs.filter(l => l.date < todayStr);
-                            if (pastLogs.length > 0) {
-                              const sortedPast = [...pastLogs].sort((a, b) => b.date.localeCompare(a.date));
-                              return sortedPast[0].weight;
-                            }
-                            return profileData.weight || 70;
-                          })();
-
-                          const currentWeight = draftWeight ?? baseWeight;
-
-                          return (
-                            <div className="flex flex-col gap-2 w-full animate-fade-in">
-                              <div className="flex items-center gap-2.5 w-full">
-                                {/* Left: Time Pill */}
-                                <div className="relative shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setTimePickerTarget("weight");
-                                      setTimePickerInitialTime(activeWeightTime);
-                                      setIsTimePickerOpen(true);
-                                    }}
-                                    className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                                  >
-                                    <Clock className="w-3.5 h-3.5 text-stone-400" />
-                                    <span>{activeWeightTime}</span>
-                                  </button>
-                                </div>
-
-                                {/* Middle: Stepper */}
-                                <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDraftWeight(Math.max(30, Number((currentWeight - 0.1).toFixed(1))));
-                                      triggerWeightStepping();
-                                    }}
-                                    className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                                  >
-                                    <Minus className="w-3.5 h-3.5" />
-                                  </button>
-                                  <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750 select-none">
-                                    <span className="text-sm font-black text-stone-850">{currentWeight}</span>
-                                    <span className="text-stone-400">kg</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setDraftWeight(Math.min(300, Number((currentWeight + 0.1).toFixed(1))));
-                                      triggerWeightStepping();
-                                    }}
-                                    className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-
-                                {/* Right: Log Button */}
-                                <button
-                                  onClick={async () => {
-                                    await handleLogWeight(currentWeight, todayStr, activeWeightTime);
-                                    setDraftWeight(null);
-                                    setDraftWeightTime("");
-                                  }}
-                                  className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
-                                  title="Log Weight"
-                                >
-                                  <Check className="w-5 h-5 text-white" />
-                                </button>
-                              </div>
-
-                              {/* Transient Micro-Feedback (only while stepping) */}
-                              {isWeightStepping && (
-                                <div className="px-1 text-left animate-fade-in">
-                                  <span className="text-[11px] font-medium text-stone-500">
-                                    {(() => {
-                                      const pastLogs = weightLogs.filter(l => l.date < selectedDate);
-                                      if (pastLogs.length > 0) {
-                                        const sortedPast = [...pastLogs].sort((a, b) => b.date.localeCompare(a.date));
-                                        const prev = sortedPast[0];
-                                        const diff = Number((currentWeight - prev.weight).toFixed(1));
-                                        
-                                        const prevDateObj = new Date(prev.date + "T00:00:00");
-                                        const monthStr = prevDateObj.toLocaleString('en-US', { month: 'short' });
-                                        const dayNum = prevDateObj.getDate();
-                                        const dayName = prevDateObj.toLocaleString('en-US', { weekday: 'short' });
-                                        const dateFormatted = `${monthStr} ${dayNum} (${dayName})`;
-                                        
-                                        if (diff < 0) return `📉 ${diff} kg from last log on ${dateFormatted}`;
-                                        if (diff > 0) return `📈 +${diff} kg from last log on ${dateFormatted}`;
-                                        return `⚖️ Same as last log on ${dateFormatted}`;
-                                      }
-                                      return `⚖️ Baseline weight recorded (${currentWeight} kg)`;
-                                    })()}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
-                          No weight logged for this date
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 2. WATER TRACKER (POPS OUT WHEN TOGGLED) */}
-                  {isWaterActive && openVitalsCards.water && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                          <Droplet className="w-3.5 h-3.5 text-stone-400" />
-                          <span>Water Log</span>
-                        </h3>
-                      </div>
-
-                      {selectedDate === todayStr ? (
-                        <div className="flex flex-col gap-2 w-full animate-fade-in">
-                          <div className="flex items-center gap-2.5 w-full">
-                            {/* Left: Time Pill */}
-                            <div className="relative shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTimePickerTarget("water");
-                                  setTimePickerInitialTime(activeWaterTime);
-                                  setIsTimePickerOpen(true);
-                                }}
-                                className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                              >
-                                <Clock className="w-3.5 h-3.5 text-stone-400" />
-                                <span>{activeWaterTime}</span>
-                              </button>
-                            </div>
-
-                            {/* Stepper */}
-                            <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDraftWater(Math.max(0, currentWater - 250));
-                                  triggerWaterStepping();
-                                }}
-                                className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                              >
-                                <Minus className="w-3.5 h-3.5" />
-                              </button>
-                              <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750 select-none">
-                                <span className="text-sm font-black text-stone-850">{currentWater}</span>
-                                <span className="text-stone-400">ml</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDraftWater(Math.min(10000, currentWater + 250));
-                                  triggerWaterStepping();
-                                }}
-                                className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            {/* Right: Solid Orange Checkmark Button (Zero Friction) */}
-                            <button
-                              onClick={async () => {
-                                await handleLogWater(currentWater, selectedDate, activeWaterTime);
-                                setDraftWater(null);
-                                setDraftWaterTime("");
-                              }}
-                              className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
-                              title="Log Water"
-                            >
-                              <Check className="w-5 h-5 text-white" />
-                            </button>
-                          </div>
-
-                          {/* Dynamic Motivational Description below (only while stepping) */}
-                          {isWaterStepping && (
-                            <div className="px-1 text-left animate-fade-in">
-                              <span className="text-[11px] font-medium text-stone-500">
-                                {(() => {
-                                  if (currentWater === 0) return `Goal: ${DAILY_WATER_GOAL_ML}ml — tap + to log hydration 💧`;
-                                  const remaining = DAILY_WATER_GOAL_ML - currentWater;
-                                  if (remaining > 0) return `${currentWater}ml logged (${Math.round((currentWater / DAILY_WATER_GOAL_ML) * 100)}%) — ${remaining}ml remaining 🌊`;
-                                  if (remaining === 0) return `Daily goal achieved (${DAILY_WATER_GOAL_ML}ml)! Amazing job 🎉`;
-                                  return `${currentWater}ml logged — daily goal exceeded! 🚀`;
-                                })()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
-                          <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
-                            <span className="text-xs text-stone-400 font-medium">Logged Water:</span>
-                            <span className="text-base font-black text-orange-950">{waterIntake}</span>
-                            <span className="text-xs text-stone-400 font-medium">ml</span>
-                            {wellnessToday?.water_log_time && (
-                              <span className="text-[10px] text-stone-400 font-bold ml-1.5">(at {wellnessToday.water_log_time})</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 3. DIGESTION TRACKER (POPS OUT WHEN TOGGLED) */}
-                  {isDigestionActive && openVitalsCards.digestion && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                          <Activity className="w-3.5 h-3.5 text-stone-400" />
-                          <span>Digestion Log</span>
-                        </h3>
-                      </div>
-
-                      {selectedDate === todayStr ? (
-                        <div className="flex flex-col gap-2 w-full animate-fade-in">
-                          <div className="flex items-center gap-2.5 w-full">
-                            {/* Left: Time Pill */}
-                            <div className="relative shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTimePickerTarget("digestion");
-                                  setTimePickerInitialTime(activeStoolTime);
-                                  setIsTimePickerOpen(true);
-                                }}
-                                className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                              >
-                                <Clock className="w-3.5 h-3.5 text-stone-400" />
-                                <span>{activeStoolTime}</span>
-                              </button>
-                            </div>
-
-                            {/* Middle: Clean Slider */}
-                            <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
-                              <input 
-                                type="range" 
-                                min="1" 
-                                max="7" 
-                                value={activeType}
-                                onChange={(e) => setDraftStoolType(parseInt(e.target.value))}
-                                onMouseDown={() => setIsStoolSliding(true)}
-                                onTouchStart={() => setIsStoolSliding(true)}
-                                onMouseUp={() => setTimeout(() => setIsStoolSliding(false), 200)}
-                                onTouchEnd={() => setTimeout(() => setIsStoolSliding(false), 200)}
-                                className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                              />
-                            </div>
-
-                            {/* Right: Action Box */}
-                            <div className="w-12 h-12 [perspective:1000px] shrink-0">
-                              <div className={cn(
-                                "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
-                                isStoolSliding ? "[transform:rotateY(180deg)]" : ""
-                              )}>
-                                
-                                {/* FRONT: Log Button */}
-                                <button
-                                  onClick={async () => {
-                                    await handleLogDigestion(activeType, null, selectedDate, activeStoolTime);
-                                    setDraftStoolType(null);
-                                    setDraftStoolTime("");
-                                  }}
-                                  className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
-                                  title="Log Digestion"
-                                >
-                                  <Check className="w-5 h-5 text-white" />
-                                </button>
-
-                                {/* BACK: Brown Bristol Stool SVG */}
-                                <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs">
-                                  <BristolStoolIcon type={activeType} className="w-7 h-7" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Dynamic description below the section (only while sliding) */}
-                          {isStoolSliding && (
-                            <div className="px-1 text-left animate-fade-in">
-                              <span className="text-[11px] font-medium text-stone-500">
-                                {(() => {
-                                  if (activeType === 1) return "Bristol Stool Type 1: Separate hard lumps, like nuts (hard to pass)";
-                                  if (activeType === 2) return "Bristol Stool Type 2: Sausage-shaped, but lumpy";
-                                  if (activeType === 3) return "Bristol Stool Type 3: Like a sausage, with cracks on surface";
-                                  if (activeType === 4) return "Bristol Stool Type 4: Like a sausage or snake, smooth & soft (Optimal)";
-                                  if (activeType === 5) return "Bristol Stool Type 5: Soft blobs with clear-cut edges";
-                                  if (activeType === 6) return "Bristol Stool Type 6: Fluffy pieces with ragged edges, mushy stool";
-                                  return "Bristol Stool Type 7: Watery, no solid pieces (entirely liquid)";
-                                })()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
-                          <div className="flex items-center gap-3 text-left">
-                            <BristolStoolIcon type={stoolType || 4} className="w-7 h-7 shrink-0" />
-                            <div className="flex flex-col">
-                              <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
-                                <span className="text-xs text-stone-400 font-medium">Logged Consistency:</span>
-                                <span className={cn(
-                                  "text-sm font-black",
-                                  isConstipated ? "text-amber-600" : (isHealthy ? "text-emerald-600" : "blue-600")
-                                )}>
-                                  {isConstipated ? "Constipated" : (isHealthy ? "Healthy" : "Loose")}
-                                </span>
-                                <span className="text-[10px] text-stone-400 font-bold ml-1">(Type {stoolType})</span>
-                              </div>
-                              {wellnessToday?.stool_log_time && (
-                                <span className="text-[10px] text-stone-400 font-bold">Logged at {wellnessToday.stool_log_time}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 4. ENERGY TRACKER (POPS OUT WHEN TOGGLED) */}
-                  {isEnergyActive && openVitalsCards.energy && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                          <Zap className="w-3.5 h-3.5 text-stone-400" />
-                          <span>Energy Log</span>
-                        </h3>
-                      </div>
-
-                      {selectedDate === todayStr ? (
-                        <div className="flex flex-col gap-2 w-full animate-fade-in">
-                          <div className="flex items-center gap-2.5 w-full">
-                            {/* Left: Time Pill */}
-                            <div className="relative shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTimePickerTarget("energy");
-                                  setTimePickerInitialTime(activeEnergyTime);
-                                  setIsTimePickerOpen(true);
-                                }}
-                                className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                              >
-                                <Clock className="w-3.5 h-3.5 text-stone-400" />
-                                <span>{activeEnergyTime}</span>
-                              </button>
-                            </div>
-
-                            {/* Middle: Clean 1-5 Slider */}
-                            <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
-                              <input 
-                                type="range" 
-                                min="1" 
-                                max="5" 
-                                value={currentEnergy}
-                                onChange={(e) => setDraftEnergy(parseInt(e.target.value))}
-                                onMouseDown={() => setIsEnergySliding(true)}
-                                onTouchStart={() => setIsEnergySliding(true)}
-                                onMouseUp={() => setTimeout(() => setIsEnergySliding(false), 200)}
-                                onTouchEnd={() => setTimeout(() => setIsEnergySliding(false), 200)}
-                                className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                              />
-                            </div>
-
-                            {/* Right: Action Box */}
-                            <div className="w-12 h-12 [perspective:1000px] shrink-0">
-                              <div className={cn(
-                                "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
-                                isEnergySliding ? "[transform:rotateY(180deg)]" : ""
-                              )}>
-                                
-                                {/* FRONT: Log Button */}
-                                <button
-                                  onClick={async () => {
-                                    await handleLogEnergy(currentEnergy, selectedDate, activeEnergyTime);
-                                    setDraftEnergy(null);
-                                    setDraftEnergyTime("");
-                                  }}
-                                  className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
-                                  title="Log Energy"
-                                >
-                                  <Check className="w-5 h-5 text-white" />
-                                </button>
-
-                                {/* BACK: Energy Emoji Badge */}
-                                <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs text-lg select-none">
-                                  {(() => {
-                                    if (currentEnergy === 1) return "😴";
-                                    if (currentEnergy === 2) return "🥱";
-                                    if (currentEnergy === 3) return "⚡";
-                                    if (currentEnergy === 4) return "🔥";
-                                    return "🚀";
-                                  })()}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Dynamic description below the section (only while sliding) */}
-                          {isEnergySliding && (
-                            <div className="px-1 text-left animate-fade-in">
-                              <span className="text-[11px] font-medium text-stone-500">
-                                {(() => {
-                                  if (currentEnergy === 1) return "Energy Level 1: Extremely tired, struggling to focus";
-                                  if (currentEnergy === 2) return "Energy Level 2: Low vitality, feeling sluggish";
-                                  if (currentEnergy === 3) return "Energy Level 3: Moderate, stable & balanced energy";
-                                  if (currentEnergy === 4) return "Energy Level 4: High vitality, feeling active & clear";
-                                  return "Energy Level 5: Maximum peak performance & focus";
-                                })()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
-                          <div className="flex items-baseline gap-1 text-sm font-bold text-stone-850">
-                            <span className="text-xs text-stone-400 font-medium">Logged Energy:</span>
-                            <span className="text-base font-black text-orange-950">
-                              {(() => {
-                                if (energyLevel === 1) return "😴 Exhausted";
-                                if (energyLevel === 2) return "🥱 Sluggish";
-                                if (energyLevel === 3) return "⚡ Steady";
-                                if (energyLevel === 4) return "🔥 High Energy";
-                                return "🚀 Peak Vitality";
-                              })()}
-                            </span>
-                            <span className="text-[10px] text-stone-400 font-bold ml-1">(Level {energyLevel})</span>
-                            {wellnessToday?.energy_log_time && (
-                              <span className="text-[10px] text-stone-400 font-bold ml-1.5">(at {wellnessToday.energy_log_time})</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                </section>
-              );
-            })()}
+            {/* Daily Wellness Journal Section */}
 
 
 
@@ -5765,230 +4311,22 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
 
       {/* Dynamic World-Class Goals Dial Sliders Picker Popups */}
-      <AnimatePresence>
-        {activeGoalConfigPopup && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/65 backdrop-blur-md z-[100] flex items-end justify-center font-sans"
-          >
-            {/* Slide up sheet panel */}
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="bg-white rounded-t-[36px] w-full max-w-[448px] overflow-hidden flex flex-col shadow-2xl p-6 space-y-6"
-            >
-              {/* Header block with visual theme */}
-              <div className="flex justify-between items-center pb-2 border-b border-black/[0.04]">
-                <div className="text-left">
-                  <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1">
-                    <Target className="w-4 h-4 text-orange-500" />
-                    {activeGoalConfigPopup === "dailyCalories" ? "Calorie Target" : "Target Weight"}
-                  </h4>
-                  <p className="text-[10px] text-stone-500 font-bold">
-                    Slide/tap adjustments with real-time visual indicator
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActiveGoalConfigPopup(null)}
-                  className="w-8 h-8 rounded-full bg-stone-100/80 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Slider panel content */}
-              {activeGoalConfigPopup === "dailyCalories" ? (
-                /* CALORIE SLIDER DIAL */
-                <div className="space-y-6 text-center py-4">
-                  <div className="inline-block bg-orange-50 px-4 py-2.5 rounded-3xl border border-orange-100">
-                    <div className="text-3xl font-black text-orange-600 font-mono">
-                      {goalConfigValue.toLocaleString()} <span className="text-xs font-extrabold text-orange-950">kcal</span>
-                    </div>
-                    <span className="text-[8px] font-black text-orange-700/60 uppercase tracking-widest">
-                      Estimated Daily Requirement
-                    </span>
-                  </div>
-
-                  {/* Range Dial Slider */}
-                  <div className="px-4">
-                    <input
-                      type="range"
-                      min={1200}
-                      max={3500}
-                      step={50}
-                      value={goalConfigValue}
-                      onChange={(e) => setGoalConfigValue(parseInt(e.target.value))}
-                      className="w-full accent-orange-500 h-2 bg-stone-100 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-[8px] font-bold text-stone-400 font-mono mt-1">
-                      <span>1,200 kcal</span>
-                      <span>2,000 kcal</span>
-                      <span>3,500 kcal</span>
-                    </div>
-                  </div>
-
-                  {/* Preset config shortcuts (Surplus, Maintenance, Deficit) */}
-                  <div className="space-y-2">
-                    <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">
-                      Target Presets
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        onClick={() => setGoalConfigValue(1600)}
-                        className="p-2.5 bg-stone-100 hover:bg-orange-50 hover:text-orange-600 rounded-xl text-[9px] font-black uppercase tracking-wider text-stone-800 transition-all border border-transparent hover:border-orange-200/50 cursor-pointer"
-                      >
-                        🔥 Burning Burn <br /> (1600 cal)
-                      </button>
-                      <button
-                        onClick={() => setGoalConfigValue(2000)}
-                        className="p-2.5 bg-stone-100 hover:bg-orange-50 hover:text-orange-600 rounded-xl text-[9px] font-black uppercase tracking-wider text-stone-800 transition-all border border-transparent hover:border-orange-200/50 cursor-pointer"
-                      >
-                        🥗 Balance Lean <br /> (2000 cal)
-                      </button>
-                      <button
-                        onClick={() => setGoalConfigValue(2600)}
-                        className="p-2.5 bg-stone-100 hover:bg-orange-50 hover:text-orange-600 rounded-xl text-[9px] font-black uppercase tracking-wider text-stone-800 transition-all border border-transparent hover:border-orange-200/50 cursor-pointer"
-                      >
-                        💪 Muscle Build <br /> (2600 cal)
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* WEIGHT ACCORDION SCALE SLIDER */
-                <div className="space-y-6 text-center py-4">
-                  <div className="inline-block bg-blue-50 px-4 py-2.5 rounded-3xl border border-blue-100">
-                    <div className="text-3xl font-black text-blue-600 font-mono">
-                      {goalConfigValue} <span className="text-xs font-extrabold text-blue-950">kg</span>
-                    </div>
-                    <span className="text-[8px] font-black text-blue-700/60 uppercase tracking-widest">
-                      Your Target Body Mass
-                    </span>
-                  </div>
-
-                  {/* Weight slider scale */}
-                  <div className="px-4">
-                    <input
-                      type="range"
-                      min={40}
-                      max={120}
-                      step={1}
-                      value={goalConfigValue}
-                      onChange={(e) => setGoalConfigValue(parseInt(e.target.value))}
-                      className="w-full accent-blue-500 h-2 bg-stone-100 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-[8px] font-bold text-stone-400 font-mono mt-1">
-                      <span>40 kg</span>
-                      <span>80 kg</span>
-                      <span>120 kg</span>
-                    </div>
-                  </div>
-
-                  {/* Speed Dial discrete increments */}
-                  <div className="flex justify-center gap-3 items-center">
-                    <button
-                      onClick={() => setGoalConfigValue(Math.max(40, goalConfigValue - 1))}
-                      className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 hover:bg-blue-100 text-blue-600 text-sm font-black transition-all flex items-center justify-center cursor-pointer"
-                    >
-                      -1
-                    </button>
-                    <span className="text-[9px] font-black text-blue-950">Fine Adjustment</span>
-                    <button
-                      onClick={() => setGoalConfigValue(Math.min(120, goalConfigValue + 1))}
-                      className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 hover:bg-blue-100 text-blue-600 text-sm font-black transition-all flex items-center justify-center cursor-pointer"
-                    >
-                      +1
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons footer */}
-              <button
-                onClick={() => {
-                  if (activeGoalConfigPopup) {
-                    setProfileData({
-                      ...profileData,
-                      goals: {
-                        ...profileData.goals,
-                        [activeGoalConfigPopup]: goalConfigValue,
-                      },
-                    });
-                  }
-                  setToastMessage(`Goal updated to ${goalConfigValue.toLocaleString()} successfully! ✨`);
-                  setActiveGoalConfigPopup(null);
-                }}
-                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[11px] py-3 rounded-2xl font-black uppercase tracking-wider shadow-md shadow-orange-500/10 hover:shadow-orange-500/15 cursor-pointer text-center"
-              >
-                Apply goal configuration 🚀
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <GoalConfigPopup
+        activeGoalConfigPopup={activeGoalConfigPopup}
+        setActiveGoalConfigPopup={setActiveGoalConfigPopup}
+        goalConfigValue={goalConfigValue}
+        setGoalConfigValue={setGoalConfigValue}
+        profileData={profileData}
+        setProfileData={setProfileData}
+        setToastMessage={setToastMessage}
+      />
 
       {/* Log Deletion Confirmation Modal */}
-      <AnimatePresence>
-        {mealPendingDelete && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-[100] backdrop-blur-[2px] flex items-center justify-center p-6 font-sans"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 15 }}
-              className="bg-white rounded-[32px] p-6 max-w-sm w-full shadow-2xl border border-stone-100 text-left space-y-4"
-            >
-              <div className="flex items-center gap-3 text-left">
-                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-500 shrink-0">
-                  <Trash2 className="w-5 h-5 text-red-500" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-stone-900">Delete meal log?</h3>
-                  <p className="text-[10px] text-stone-400 font-semibold mt-0.5">This action cannot be undone.</p>
-                </div>
-              </div>
-
-              <div className="bg-stone-50 border border-stone-200/50 rounded-2xl p-3.5 text-left">
-                <div className="text-[11px] font-black text-stone-800 leading-snug truncate">
-                  {mealPendingDelete.name}
-                </div>
-                <div className="text-[9px] font-bold text-stone-500 mt-1 flex items-center gap-1.5">
-                  <span className="text-orange-600 font-extrabold">{mealPendingDelete.calories} kcal</span>
-                  <span className="text-stone-300">•</span>
-                  <span>{mealPendingDelete.time}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setMealPendingDelete(null)}
-                  className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer select-none"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    confirmDeleteMeal(mealPendingDelete);
-                  }}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer select-none shadow-md shadow-red-500/10"
-                >
-                  Delete Log
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <DeleteConfirmModal
+        mealPendingDelete={mealPendingDelete}
+        setMealPendingDelete={setMealPendingDelete}
+        confirmDeleteMeal={confirmDeleteMeal}
+      />
 
       {/* Manual Calorie Log Modal */}
       <AnimatePresence>
@@ -6038,78 +4376,59 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         )}
       </AnimatePresence>
 
-      {/* Floating ChatGPT Action Widget */}
-      <AnimatePresence>
-        {(profileData.agent_config?.showGptWidget ?? true) && (activeTab === "home" || activeTab === "profile") && (
-          <motion.button
-            initial={{ scale: 0, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0, opacity: 0, y: 20 }}
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              window.open(localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL, "_blank");
-            }}
-            className="fixed bottom-28 right-6 w-12 h-12 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white flex items-center justify-center shadow-[0_8px_25px_rgba(249,115,22,0.35)] z-40 border border-orange-400/30 cursor-pointer transition-all hover:scale-105 active:scale-95"
-            title="Open FitAI Custom GPT"
-          >
-            <ChatGPTIcon className="w-5.5 h-5.5 text-white" />
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {/* Configurable Single-Action Floating Widget & Vitals Modal */}
+      <FloatingWidget
+        isVisible={profileData.agent_config?.showGptWidget ?? true}
+        actionType={profileData.agent_config?.floatingWidgetAction || "gpt"}
+        onExecuteAction={(action) => {
+          if (action === "gpt") {
+            window.open(localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL, "_blank");
+          } else if (action === "voice") {
+            setManualLogInitialAiMode(true);
+            setManualLogInitialSegment("detailed");
+            setIsCameraFullScreen(true);
+          } else if (action === "camera") {
+            setManualLogInitialAiMode(true);
+            setManualLogInitialSegment("detailed");
+            setAutoTriggerPhotoScan(true);
+            setIsCameraFullScreen(true);
+          } else if (action === "vitals") {
+            setIsVitalsModalOpen(true);
+          } else if (action === "manual") {
+            setManualLogInitialAiMode(false);
+            setManualLogInitialSegment("quick");
+            setIsCameraFullScreen(true);
+          }
+        }}
+      />
+
+      {/* Universal Vitals Modal Sheet (Portaled to document.body) */}
+      <VitalsModal
+        isOpen={isVitalsModalOpen}
+        onClose={() => setIsVitalsModalOpen(false)}
+        profileData={profileData}
+        selectedDate={selectedDate}
+        todayStr={todayStr}
+        dailyNotes={dailyNotes}
+        weightLogs={weightLogs}
+        handleLogWeight={handleLogWeight}
+        handleDeleteWeight={handleDeleteWeight}
+        handleLogWater={handleLogWater}
+        handleDeleteWaterLogItem={handleDeleteWaterLogItem}
+        handleLogDigestion={handleLogDigestion}
+        handleDeleteStoolLogItem={handleDeleteStoolLogItem}
+        handleLogEnergy={handleLogEnergy}
+        handleDeleteEnergyLogItem={handleDeleteEnergyLogItem}
+      />
 
       {/* Bottom Navigation */}
-      {activeTab !== "oauth-consent" && (
-        <nav
-          id="bottom-nav"
-          className="fixed bottom-6 left-6 right-6 max-w-[calc(448px-3rem)] mx-auto z-50"
-        >
-          <div
-            id="nav-container"
-            className="backdrop-blur-2xl bg-white/80 shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-[24px] p-2 flex items-center justify-between gap-2 border border-white/50 w-full"
-          >
-            <NavButton
-              id="nav-home"
-              icon={Home}
-              label="Home"
-              active={activeTab === "home"}
-              onClick={() => setActiveTab("home")}
-            />
-
-            <div className="flex-1 flex justify-center">
-              {selectedDate === todayStr ? (
-                <motion.button
-                  id="fab-add-food"
-                  onClick={handleLogMealClick}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-full h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-[16px] shadow-[0_8px_30px_rgb(251,146,60,0.4)] flex items-center justify-center text-white relative overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_white_0%,_transparent_40%)] opacity-30" />
-                  <Plus className="w-7 h-7 stroke-[3px]" />
-                </motion.button>
-              ) : (
-                <div
-                  id="fab-disabled"
-                  className="w-full h-14 bg-stone-50 border border-stone-200/50 rounded-[16px] flex flex-col items-center justify-center text-stone-400 select-none opacity-60"
-                  title="Logs are only editable on today's date"
-                >
-                  <Plus className="w-5 h-5 stroke-[2px]" />
-                  <span className="text-[7px] font-black uppercase tracking-widest mt-0.5">Locked</span>
-                </div>
-              )}
-            </div>
-
-            <NavButton
-              id="nav-profile"
-              icon={User}
-              label="Profile"
-              active={activeTab === "profile"}
-              onClick={() => setActiveTab("profile")}
-            />
-          </div>
-        </nav>
-      )}
+      <BottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        selectedDate={selectedDate}
+        todayStr={todayStr}
+        handleLogMealClick={handleLogMealClick}
+      />
 
       {/* Custom Premium Calendar Date Picker Modal */}
       <CalendarPickerModal
@@ -6147,155 +4466,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             : "Energy"
         } Log Time`}
       />
-    </div>
-  );
-}
-
-function NavButton({
-  id,
-  icon: Icon,
-  label,
-  active,
-  onClick,
-}: {
-  id: string;
-  icon: any;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      id={id}
-      onClick={onClick}
-      className={cn(
-        "flex flex-col items-center justify-center gap-1 flex-1 h-14 rounded-[16px] transition-all duration-300 relative",
-        active
-          ? "text-orange-600"
-          : "text-orange-950/30 hover:text-orange-600/60",
-      )}
-    >
-      {active && (
-        <motion.div
-          layoutId="active-nav-bg"
-          className="absolute inset-0 bg-orange-100/50 rounded-[16px] -z-10"
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        />
-      )}
-      <Icon
-        className={cn("w-5 h-5", active ? "stroke-[2.5px]" : "stroke-[2px]")}
-      />
-      <span className="text-[8px] font-black uppercase tracking-[0.1em]">
-        {label}
-      </span>
-    </button>
-  );
-}
-
-interface WellnessJournalProps {
-  selectedDate: string;
-  dailyNotes: DailyWellness[];
-  handleSaveDailyNote: (dateStr: string, text: string) => Promise<void>;
-  todayStr: string;
-  dailyTagHits: Record<string, number>;
-  trackingTags: any[];
-}
-
-function WellnessJournal({
-  selectedDate,
-  dailyNotes,
-  handleSaveDailyNote,
-  todayStr,
-  dailyTagHits,
-  trackingTags
-}: WellnessJournalProps) {
-  const stripMetaComment = (text: string) => {
-    return (text || "")
-      .replace(/\s*<!-- FIT_WELLNESS_META: [\s\S]*? -->/g, "")
-      .replace(/\n*--- Wellness Logs ---[\s\S]*$/, "")
-      .trim();
-  };
-
-  const activeNoteObj = dailyNotes.find(n => n.date === selectedDate);
-  const rawNoteText = activeNoteObj ? activeNoteObj.notes : "";
-  const cleanActiveNoteText = stripMetaComment(rawNoteText);
-
-  const [isEditingNote, setIsEditingNote] = useState(false);
-  const [draftNote, setDraftNote] = useState(cleanActiveNoteText);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const saveTimeoutRef = useRef<number | null>(null);
-
-  // Sync draft when database value or selected date changes
-  useEffect(() => {
-    setDraftNote(cleanActiveNoteText);
-  }, [cleanActiveNoteText, selectedDate]);
-
-  // Debounced auto-save effect
-  const triggerAutoSave = (newVal: string) => {
-    if (saveTimeoutRef.current) {
-      window.clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = window.setTimeout(() => {
-      handleSaveDailyNote(selectedDate, newVal);
-    }, 1000);
-  };
-
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setDraftNote(val);
-    triggerAutoSave(val);
-  };
-
-  const handleBlur = () => {
-    if (saveTimeoutRef.current) {
-      window.clearTimeout(saveTimeoutRef.current);
-    }
-    handleSaveDailyNote(selectedDate, draftNote);
-    setIsEditingNote(false);
-  };
-
-  // Auto focus when entering edit mode
-  useEffect(() => {
-    if (isEditingNote && textareaRef.current) {
-      textareaRef.current.focus();
-      // Move cursor to the end of the text
-      const len = textareaRef.current.value.length;
-      textareaRef.current.setSelectionRange(len, len);
-    }
-  }, [isEditingNote]);
-
-  const isReadOnly = selectedDate !== todayStr;
-  const cleanNoteText = cleanActiveNoteText;
-
-  return (
-    <div className="flex flex-col gap-3 text-left w-full relative select-none">
-      <div className="w-full min-h-[90px] flex flex-col justify-start">
-        {isEditingNote && !isReadOnly ? (
-          <textarea
-            ref={textareaRef}
-            value={draftNote}
-            onChange={handleTextareaChange}
-            onBlur={handleBlur}
-            placeholder="Tap here to write down how you felt, symptoms, food reactions, or notes about today..."
-            className="w-full bg-transparent border-0 outline-none ring-0 focus:ring-0 focus:outline-none p-0 text-sm font-semibold text-stone-800 placeholder-stone-400 resize-none min-h-[90px] leading-relaxed transition-all"
-          />
-        ) : (
-          <div
-            onClick={() => {
-              if (!isReadOnly) setIsEditingNote(true);
-            }}
-            className={cn(
-              "text-sm leading-relaxed min-h-[90px] py-0.5 transition-colors duration-200 select-text whitespace-pre-line",
-              !isReadOnly ? "cursor-text" : "cursor-default",
-              cleanNoteText
-                ? "font-semibold text-stone-800"
-                : "font-medium text-stone-400 italic"
-            )}
-          >
-            {cleanNoteText || (isReadOnly ? "No notes recorded for this date." : "Tap here to write down how you felt, symptoms, food reactions, or notes about today...")}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

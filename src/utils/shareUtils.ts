@@ -1,20 +1,28 @@
 // FitAI Sharing Utilities — URL-safe JSON Compression & Base64 Coding
 
 export interface SharedItemPayload {
-  n: string;       // Name (e.g., "Protein Pancakes")
-  c: number;       // Calories
-  p: number;       // Protein
-  cb: number;      // Carbs
-  f: number;       // Fats
-  fb?: number;     // Fiber
+  n: string;       // Name (e.g., "Protein Pancakes" or "7-Day Digest")
+  c: number;       // Calories (or Avg Calories)
+  p: number;       // Protein (or Avg Protein)
+  cb: number;      // Carbs (or Avg Carbs)
+  f: number;       // Fats (or Avg Fats)
+  fb?: number;     // Fiber (or Avg Fiber)
   img?: string;    // Image URL
-  t?: string;      // Log Time / Prep Time
+  t?: string;      // Log Time / Prep Time / Period Range ("7D", "30D")
   ing?: string[];  // Ingredients (recipe only)
   ins?: string;    // Instructions (recipe only)
   tags?: string[]; // Tags (recipe only)
   mls?: { n: string; c: number }[]; // Meals list for day summary
   lc?: number;     // Log count (recipe only)
   d?: string;      // Description (recipe description or meal description)
+  // Insights period & milestone fields:
+  streak?: number;
+  bestStreak?: number;
+  weightChange?: number;
+  weightCurrent?: number;
+  compliancePct?: number;
+  milestoneTitle?: string;
+  milestoneSub?: string;
 }
 
 /**
@@ -128,7 +136,7 @@ export function decodeBase64ToPayload(base64: string): SharedItemPayload | null 
  * Helper to build the share URL on fitpush.vercel.app
  */
 export function generateShareUrl(
-  type: "meal" | "recipe" | "day",
+  type: "meal" | "recipe" | "day" | "period" | "milestone",
   payload: SharedItemPayload,
   dbShareId?: string
 ): string {

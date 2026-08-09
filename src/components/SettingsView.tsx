@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw } from "lucide-react";
+import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw, Sliders, Heart, Mic } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProUpgradeModal } from "./ProUpgradeModal";
@@ -670,16 +670,9 @@ security:
 `;
 
 export const DEFAULT_TRACKING_TAGS = [
-  { id: 'gluten_free', name: 'Gluten Free', description: 'Apply when meal contains no wheat, barley, rye, or oats', enabled: true },
-  { id: 'dairy_free', name: 'Dairy Free', description: 'Apply when meal contains no milk, cheese, cream, butter, or yogurt', enabled: true },
-  { id: 'nut_free', name: 'Nut Free', description: 'Apply when meal contains no peanuts, tree nuts, or seeds', enabled: true },
+  { id: 'gluten_free', name: 'Gluten Free', description: 'Apply when meal contains no wheat, barley, rye, or gluten', enabled: true },
+  { id: 'lactose_free', name: 'Lactose Free', description: 'Apply when meal contains no lactose or dairy products', enabled: true },
   { id: 'vegan', name: 'Vegan', description: 'Apply when meal contains no animal products', enabled: true },
-  { id: 'vegetarian', name: 'Vegetarian', description: 'Apply when meal contains no meat or fish', enabled: true },
-  { id: 'keto', name: 'Keto', description: 'Apply when meal is high fat and carbs are 10g or less', enabled: true },
-  { id: 'rich_in_iron', name: 'Rich in Iron', description: 'Apply when meal contains iron-rich foods (e.g. spinach, red meat)', enabled: true },
-  { id: 'rich_in_b12', name: 'Rich in B12', description: 'Apply when meal contains B12-rich foods (e.g. fish, eggs, meat)', enabled: true },
-  { id: 'rich_in_omega3', name: 'Rich in Omega-3', description: 'Apply when meal contains omega-3 rich foods (e.g. salmon, walnuts, chia)', enabled: true },
-  { id: 'rich_in_magnesium', name: 'Rich in Magnesium', description: 'Apply when meal contains magnesium-rich foods (e.g. dark chocolate, avocado, pumpkin seeds)', enabled: true },
 ];
 
 export const SettingsView = ({
@@ -697,7 +690,7 @@ export const SettingsView = ({
   session: any;
 }) => {
   const [showPro, setShowPro] = useState(false);
-  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "logging" | "gemini" | null>(null);
+  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "logging" | "gemini" | "floating_widget" | null>(null);
 
   const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gpt-action`;
@@ -1261,32 +1254,6 @@ export const SettingsView = ({
             </div>
 
             <div className="space-y-5 pt-3 border-t border-stone-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold text-stone-700 block">Show ChatGPT Floating Widget</span>
-                  <span className="text-[9px] text-stone-400 font-medium block leading-tight">Display a quick access button on your homepage</span>
-                </div>
-                <button
-                  onClick={() => {
-                    const current = profileData.agent_config || {};
-                    const isEnabled = current.showGptWidget ?? true;
-                    setProfileData({
-                      ...profileData,
-                      agent_config: { ...current, showGptWidget: !isEnabled }
-                    });
-                    triggerToast(!isEnabled ? "💬 Floating widget enabled!" : "💬 Floating widget hidden");
-                  }}
-                  className={`w-10 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative flex items-center cursor-pointer ${
-                    (profileData.agent_config?.showGptWidget ?? true) ? "bg-emerald-500" : "bg-stone-200"
-                  }`}
-                >
-                  <div
-                    className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
-                      (profileData.agent_config?.showGptWidget ?? true) ? "translate-x-4" : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-stone-50">
                 <div>
@@ -1615,6 +1582,201 @@ export const SettingsView = ({
     );
   }
 
+  if (activeSubView === "floating_widget") {
+    const isWidgetEnabled = profileData.agent_config?.showGptWidget ?? true;
+    const currentAction = profileData.agent_config?.floatingWidgetAction || "gpt";
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
+      >
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveSubView(null)}
+            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <h2 className="text-xl font-black text-[#1a1a1a]">Floating Button Actions</h2>
+        </div>
+
+        {/* Master Toggle Card */}
+        <div className="bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-black text-stone-900 block">Show Floating Action Button</span>
+              <span className="text-[10px] text-stone-400 font-semibold block leading-tight mt-0.5">
+                Display floating quick action button on Home & Profile screens
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                const current = profileData.agent_config || {};
+                const isEnabled = current.showGptWidget ?? true;
+                setProfileData({
+                  ...profileData,
+                  agent_config: { ...current, showGptWidget: !isEnabled }
+                });
+                triggerToast(!isEnabled ? "💬 Floating button enabled!" : "💬 Floating button hidden");
+              }}
+              className={`w-10 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative flex items-center cursor-pointer ${
+                isWidgetEnabled ? "bg-emerald-500" : "bg-stone-200"
+              }`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
+                  isWidgetEnabled ? "translate-x-4" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Live Interactive Button Preview Card */}
+        <div className="bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-3">
+          <div className="flex justify-between items-center pb-2 border-b border-stone-100">
+            <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
+              Live Floating Button Preview
+            </span>
+            <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 uppercase font-mono">
+              {currentAction}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between bg-stone-50/70 rounded-2xl p-4 border border-stone-150">
+            <div>
+              <span className="text-xs font-black text-stone-900 block">
+                {currentAction === "gpt" ? "FitAI Custom GPT" :
+                 currentAction === "voice" ? "AI Voice Logger" :
+                 currentAction === "camera" ? "AI Photo Logger" :
+                 currentAction === "vitals" ? "Daily Vitals Tracker" :
+                 "Detailed Manual Log"}
+              </span>
+              <span className="text-[10px] text-stone-400 font-semibold block mt-0.5">
+                {currentAction === "gpt" ? "Orange Theme • 💬 Custom GPT" :
+                 currentAction === "voice" ? "Emerald Theme • 🎙️ Natural Voice" :
+                 currentAction === "camera" ? "Purple Theme • 📸 AI Scanner" :
+                 currentAction === "vitals" ? "Red Theme • 💓 Vitals Sheet" :
+                 "Dark Theme • ✏️ Manual Form"}
+              </span>
+            </div>
+
+            {/* Live Floating FAB Button */}
+            <div className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center shadow-md text-white border border-white/20 shrink-0",
+              currentAction === "vitals" ? "bg-gradient-to-tr from-rose-500 to-red-500" :
+              currentAction === "voice" ? "bg-gradient-to-tr from-emerald-500 to-teal-500" :
+              currentAction === "camera" ? "bg-gradient-to-tr from-purple-500 to-indigo-500" :
+              currentAction === "manual" ? "bg-stone-900" :
+              "bg-gradient-to-tr from-orange-500 to-amber-500"
+            )}>
+              {currentAction === "voice" && <Mic className="w-5.5 h-5.5 text-white" />}
+              {currentAction === "camera" && <Camera className="w-5.5 h-5.5 text-white" />}
+              {currentAction === "vitals" && <Heart className="w-5.5 h-5.5 text-white fill-white" />}
+              {currentAction === "manual" && <Edit2 className="w-5.5 h-5.5 text-white" />}
+              {currentAction === "gpt" && <ChatGPTIcon className="w-5.5 h-5.5 text-white" />}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Selection List (Exact same UI as Plus Button Actions) */}
+        <div>
+          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
+            Floating Button Default Action
+          </h3>
+          <p className="text-[10px] text-stone-450 font-bold px-3 mb-4 leading-normal">
+            Choose what action triggers automatically when you tap the Floating Action button on your screen.
+          </p>
+
+          <div className="space-y-3">
+            {[
+              {
+                id: "gpt",
+                title: "FitAI Custom GPT (Default)",
+                description: "Launches and opens your Custom ChatGPT fitness companion.",
+                icon: Bot,
+              },
+              {
+                id: "voice",
+                title: "AI Voice Logger",
+                description: "Speak meal details out loud in natural language.",
+                icon: Mic,
+              },
+              {
+                id: "camera",
+                title: "AI Photo Logger",
+                description: "Snap food photo to auto-estimate calories & macros.",
+                icon: Camera,
+              },
+              {
+                id: "vitals",
+                title: "Daily Vitals Tracker",
+                description: "Log weight, water intake, stool scale, & energy level.",
+                icon: Heart,
+              },
+              {
+                id: "manual",
+                title: "Detailed Manual Log",
+                description: "Opens standard text fields to manually input calories and macros.",
+                icon: Edit2,
+              },
+            ].map((opt) => {
+              const isSelected = currentAction === opt.id;
+              const IconComp = opt.icon;
+
+              return (
+                <motion.div
+                  key={opt.id}
+                  onClick={() => {
+                    const current = profileData.agent_config || {};
+                    setProfileData({
+                      ...profileData,
+                      agent_config: { ...current, floatingWidgetAction: opt.id }
+                    });
+                    triggerToast(`Saved Floating preference: ${opt.title} ⚡`);
+                  }}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  className={cn(
+                    "flex items-center justify-between p-4 rounded-3xl border transition-all cursor-pointer select-none",
+                    isSelected
+                      ? "bg-orange-50/70 border-orange-200/60 shadow-xs"
+                      : "bg-white border-stone-100 hover:border-stone-200 shadow-3xs"
+                  )}
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className={cn(
+                      "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                      isSelected ? "bg-orange-500 text-white" : "bg-stone-50 text-stone-550 border border-stone-100"
+                    )}>
+                      <IconComp className="w-4 h-4" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <h4 className={cn("text-xs font-black leading-tight", isSelected ? "text-orange-950" : "text-stone-850")}>
+                        {opt.title}
+                      </h4>
+                      <p className="text-[9.5px] text-stone-400 font-semibold mt-0.5 leading-snug">
+                        {opt.description}
+                      </p>
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white shrink-0 shadow-xs">
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
   // --- Main Settings View ---
   return (
     <>
@@ -1655,6 +1817,37 @@ export const SettingsView = ({
               </div>
               <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
                 <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
+                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+
+            {/* Floating Button Actions */}
+            <div
+              onClick={() => setActiveSubView("floating_widget")}
+              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group border-t border-stone-50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-550 shrink-0">
+                  <Sliders className="w-4 h-4 text-orange-550" />
+                </div>
+                <div>
+                  <div className="font-bold text-[#1a1a1a] text-xs">Floating Button Actions</div>
+                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
+                    Configure what happens when you tap the floating action button
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
+                <span className="text-stone-500 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">
+                  {(() => {
+                    const act = profileData.agent_config?.floatingWidgetAction || "gpt";
+                    return act === "gpt" ? "GPT" :
+                           act === "voice" ? "Voice" :
+                           act === "camera" ? "Camera" :
+                           act === "vitals" ? "Vitals" :
+                           "Form";
+                  })()}
+                </span>
                 <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>

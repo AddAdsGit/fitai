@@ -82,6 +82,7 @@ export const ManualLogModal = ({
     return "quick";
   });
   const [searchQuery, setSearchQuery] = useState("");
+  const [pastFoodFilter, setPastFoodFilter] = useState<"all" | "recipes" | "recent">("all");
   const [aiInstruction, setAiInstruction] = useState("");
   const [imageUrl, setImageUrl] = useState(mealToEdit?.image || "");
   const [showImagePanel, setShowImagePanel] = useState(false);
@@ -144,7 +145,8 @@ export const ManualLogModal = ({
   const hasAnyValues = !!(name.trim() || calories || protein || carbs || fats);
 
   const quickLogItems = useMemo(() => {
-    const itemsMap = new Map<string, QuickLogItem>();
+    const items: QuickLogItem[] = [];
+    const seenNames = new Set<string>();
     const getKey = (n: string) => n.trim().toLowerCase();
 
     // Calculate count of each meal logged in history
@@ -156,12 +158,34 @@ export const ManualLogModal = ({
       });
     }
 
-    // 1. Add user history items first (most recent)
+    // 1. Add all saved user recipes first
+    if (recipesState) {
+      recipesState.forEach(recipe => {
+        const key = getKey(recipe.name);
+        seenNames.add(key);
+        items.push({
+          name: recipe.name,
+          calories: recipe.calories,
+          protein: recipe.protein,
+          carbs: recipe.carbs,
+          fats: recipe.fats,
+          image: recipe.image || "",
+          type: "Recipe",
+          meal_description: recipe.description || "",
+          fiber: recipe.fiber || 0,
+          logCount: mealCounts.get(key) || 0,
+          source: "recipe"
+        });
+      });
+    }
+
+    // 2. Add user recent meal logs
     if (mealsState) {
       mealsState.forEach(item => {
         const key = getKey(item.name);
-        if (!itemsMap.has(key)) {
-          itemsMap.set(key, {
+        if (!seenNames.has(key)) {
+          seenNames.add(key);
+          items.push({
             name: item.name,
             calories: item.calories,
             protein: item.protein,
@@ -178,50 +202,38 @@ export const ManualLogModal = ({
       });
     }
 
-    // 2. Add recipes
-    if (recipesState) {
-      recipesState.forEach(recipe => {
-        const key = getKey(recipe.name);
-        if (!itemsMap.has(key)) {
-          itemsMap.set(key, {
-            name: recipe.name,
-            calories: recipe.calories,
-            protein: recipe.protein,
-            carbs: recipe.carbs,
-            fats: recipe.fats,
-            image: recipe.image || "",
-            type: "Recipe",
-            meal_description: recipe.description || "",
-            fiber: recipe.fiber || 0,
-            logCount: 0,
-            source: "recipe"
-          });
-        }
-      });
-    }
-
     // 3. Add system defaults
     QUICK_LOG_DEFAULTS.forEach(item => {
       const key = getKey(item.name);
-      if (!itemsMap.has(key)) {
-        itemsMap.set(key, {
+      if (!seenNames.has(key)) {
+        seenNames.add(key);
+        items.push({
           ...item,
           source: "recent"
         });
       }
     });
 
-    return Array.from(itemsMap.values());
+    return items;
   }, [mealsState, recipesState]);
 
   const filteredQuickItems = useMemo(() => {
-    if (!searchQuery.trim()) return quickLogItems;
-    const q = searchQuery.toLowerCase();
-    return quickLogItems.filter(item => 
-      item.name.toLowerCase().includes(q) || 
-      (item.meal_description || "").toLowerCase().includes(q)
-    );
-  }, [quickLogItems, searchQuery]);
+    let result = quickLogItems;
+    if (pastFoodFilter === "recipes") {
+      result = result.filter(item => item.source === "recipe");
+    } else if (pastFoodFilter === "recent") {
+      result = result.filter(item => item.source === "recent");
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(item => 
+        item.name.toLowerCase().includes(q) || 
+        (item.meal_description || "").toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [quickLogItems, pastFoodFilter, searchQuery]);
 
   const handleRefineWithAi = async () => {
     if (!aiInstruction.trim() && !uploadedImage) return;
@@ -407,7 +419,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 220 }}
-        className="bg-white/85 backdrop-blur-xl border-t border-x border-white/60 rounded-t-[36px] w-full max-w-md p-6 space-y-6 relative z-10 shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-white border-t border-x border-stone-200/80 rounded-t-[36px] w-full max-w-md p-6 space-y-5 relative z-10 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col max-h-[90vh]"
       >
         <div className="flex justify-between items-center pb-2 border-b border-black/[0.04] shrink-0">
           <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1.5 font-sans">
@@ -472,11 +484,53 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                 )}
               </div>
 
+              {/* Filter Overlay Chips Bar: All | Recipes | Recent Logs */}
+              <div className="flex items-center gap-1.5 pt-0.5 pb-1">
+                <button
+                  type="button"
+                  onClick={() => setPastFoodFilter("all")}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-[9px] font-black tracking-wider uppercase transition-all cursor-pointer border select-none",
+                    pastFoodFilter === "all"
+                      ? "bg-stone-900 border-stone-900 text-white shadow-3xs"
+                      : "bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100"
+                  )}
+                >
+                  All ({quickLogItems.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPastFoodFilter("recipes")}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-[9px] font-black tracking-wider uppercase transition-all cursor-pointer border flex items-center gap-1 select-none",
+                    pastFoodFilter === "recipes"
+                      ? "bg-orange-500 border-orange-500 text-white shadow-3xs"
+                      : "bg-orange-50/70 border-orange-200/80 text-orange-700 hover:bg-orange-100/80"
+                  )}
+                >
+                  <span>📖 Recipes</span>
+                  <span className="text-[8px] font-mono opacity-90">({quickLogItems.filter(i => i.source === "recipe").length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPastFoodFilter("recent")}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-[9px] font-black tracking-wider uppercase transition-all cursor-pointer border flex items-center gap-1 select-none",
+                    pastFoodFilter === "recent"
+                      ? "bg-stone-900 border-stone-900 text-white shadow-3xs"
+                      : "bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100"
+                  )}
+                >
+                  <span>🍲 Past Foods</span>
+                  <span className="text-[8px] font-mono opacity-90">({quickLogItems.filter(i => i.source === "recent").length})</span>
+                </button>
+              </div>
+
               {/* Food Items List */}
-              <div className="space-y-3.5 max-h-[380px] overflow-y-auto pr-0.5">
+              <div className="space-y-3.5 max-h-[360px] overflow-y-auto pr-0.5">
                 {filteredQuickItems.length === 0 ? (
                   <div className="text-center py-8 text-stone-450 text-[10px] font-bold">
-                    No matching food items found.
+                    No matching {pastFoodFilter === "recipes" ? "recipes" : pastFoodFilter === "recent" ? "past foods" : "food items"} found.
                   </div>
                 ) : (
                   filteredQuickItems.map((item, index) => {
@@ -503,17 +557,17 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                           )}
 
                           <div className="text-left min-w-0 flex-1 space-y-1.5">
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <h5 className="text-[12px] font-black text-stone-900 truncate leading-snug">
                                 {item.name}
                               </h5>
                               {item.source === "recipe" ? (
-                                <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-orange-50 border border-orange-100 text-orange-600 leading-none">
-                                  Recipe
+                                <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-orange-500 border border-orange-500 text-white shadow-3xs leading-none">
+                                  📖 Recipe
                                 </span>
                               ) : (
                                 <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200/50 text-stone-500 leading-none">
-                                  Recent
+                                  🕒 Recent
                                 </span>
                               )}
                               
@@ -829,7 +883,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                       onChange={(e) => setAiInstruction(e.target.value)}
                       rows={4}
                       autoFocus
-                      className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-4 py-3.5 text-xs font-semibold text-stone-900 focus:outline-none focus:border-orange-400 placeholder-stone-350 resize-none leading-relaxed"
+                      className="w-full bg-white border-2 border-orange-400/80 focus:border-orange-500 focus:outline-none focus:ring-0 rounded-2xl px-4 py-3.5 text-xs font-semibold text-stone-900 placeholder-stone-400 resize-none leading-relaxed shadow-3xs"
                     />
 
                     {/* Multimodal Camera Scan Controls */}
@@ -842,7 +896,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                               setErrorMessage("Please configure your Gemini API Key in Settings to use photo recognition.");
                             }
                           }}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-stone-50 border border-stone-200 hover:bg-stone-100/70 rounded-xl text-[10px] font-black uppercase text-stone-600 cursor-pointer transition-all select-none active:scale-[0.98]"
+                          className="flex-1 flex items-center justify-center gap-1.5 py-3 bg-white border border-stone-200 hover:bg-stone-50 rounded-2xl text-[10px] font-black uppercase text-stone-700 cursor-pointer transition-all select-none active:scale-[0.98] shadow-3xs"
                         >
                           <Camera className="w-3.5 h-3.5 text-stone-500" />
                           <span>Scan Plate</span>
@@ -864,7 +918,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                               setErrorMessage("Please configure your Gemini API Key in Settings to use photo recognition.");
                             }
                           }}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-stone-50 border border-stone-200 hover:bg-stone-100/70 rounded-xl text-[10px] font-black uppercase text-stone-600 cursor-pointer transition-all select-none active:scale-[0.98]"
+                          className="flex-1 flex items-center justify-center gap-1.5 py-3 bg-white border border-stone-200 hover:bg-stone-50 rounded-2xl text-[10px] font-black uppercase text-stone-700 cursor-pointer transition-all select-none active:scale-[0.98] shadow-3xs"
                         >
                           <svg className="w-3.5 h-3.5 text-stone-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -922,7 +976,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                   <button
                     type="button"
                     onClick={() => { setShowAiMode(false); setAiInstruction(""); setErrorMessage(""); }}
-                    className="flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-stone-600 bg-stone-100 hover:bg-stone-200/85 active:scale-[0.98] transition-all duration-200 cursor-pointer text-center"
+                    className="flex-1 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest text-stone-700 bg-stone-100 hover:bg-stone-200 border border-stone-200/60 active:scale-[0.98] transition-all duration-200 cursor-pointer text-center"
                   >
                     Manual Log
                   </button>
@@ -930,7 +984,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                     type="button"
                     onClick={handleRefineWithAi}
                     disabled={(!aiInstruction.trim() && !uploadedImage) || isProcessing}
-                    className="flex-1 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 disabled:opacity-40 text-white text-xs py-3 rounded-2xl font-black uppercase tracking-widest text-center shadow-md shadow-orange-500/10 active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center select-none"
+                    className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-xs py-3.5 rounded-2xl font-black uppercase tracking-widest text-center shadow-md shadow-orange-500/25 active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center select-none font-bold"
                   >
                     {isProcessing ? "Calculating..." : "Generate"}
                   </button>
@@ -947,7 +1001,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                   <button
                     type="button"
                     onClick={() => setShowAiMode(true)}
-                    className="flex-1 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-white bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:brightness-110 active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center shadow-md shadow-orange-500/10"
+                    className="flex-1 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest text-white bg-orange-500 hover:bg-orange-600 active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center shadow-md shadow-orange-500/25"
                   >
                     {mealToEdit || hasAnyValues ? "AI Editor" : "AI Logger"}
                   </button>

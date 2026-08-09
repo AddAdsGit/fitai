@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   BookOpen, BarChart2, Target, Search, Filter, X, Utensils,
   Plus, Minus, Sparkles, Check, Info, Scale, Ruler, Database, Camera,
-  User, Smile,
+  User, Smile, ChevronDown, Wand2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -18,8 +19,10 @@ import {
   CartesianGrid,
 } from "recharts";
 import { hasNoGeneratedImage, getMealEmoji } from "../utils/helpers";
+import { normalizeTrackedNutrients, DEFAULT_TRACKED_NUTRIENTS as DEFAULT_NUTRIENT_CONSTANTS } from "../constants/nutrition";
 import { InsightsView } from "./InsightsView";
 import { DefaultAvatar } from "./DefaultAvatar";
+import { DEFAULT_TRACKING_TAGS } from "./SettingsView";
 
 const RecipeImage = ({ src, alt, fallbackEmoji }: { src: string; alt: string; fallbackEmoji: string }) => {
   const [loaded, setLoaded] = useState(false);
@@ -82,7 +85,7 @@ export const ProfileView = ({
   onDeleteWeight?: (id: string) => void;
   onLogout?: () => void;
 }) => {
-  const [profileTab, setProfileTab] = useState<"meals" | "insights" | "agent-brain">("meals");
+  const [profileTab, setProfileTab] = useState<"insights" | "meals" | "agent-brain">("insights");
   
   // V3.2 Restructured Agent Brain States (Combined Single Notepad)
   const getCombinedMemoriesText = () => {
@@ -205,15 +208,17 @@ ${meal.meal_description ? `- Description/Notes: "${meal.meal_description}"` : ""
 Please generate:
 1. A refined, gourmet recipe name (e.g., instead of "chicken rice", write "Herb-Marinated Chicken Breast with Jasmine Rice").
 2. Prep / cook time (e.g. "25 mins").
-3. A list of specific ingredients with quantities that would match the macros listed above. Take the notes/description above into account when generating ingredients!
-4. Step-by-step cooking instructions.
-5. 2-3 micronutrients with estimated values (e.g. Iron, Vitamin C) in the format below.
-6. A brief description of the recipe.
+3. 2-4 relevant dietary tags (e.g., ["High Protein", "Gluten Free", "Low Carb", "Quick & Easy"]).
+4. A list of specific ingredients with quantities that would match the macros listed above. Take the notes/description above into account when generating ingredients!
+5. Step-by-step cooking instructions.
+6. 2-3 micronutrients with estimated values (e.g. Iron, Vitamin C) in the format below.
+7. A brief description of the recipe.
 
 Return a JSON object matching this structure:
 {
   "name": "gourmet recipe name",
   "time": "prep time (e.g. 20 mins)",
+  "tags": ["High Protein", "Gluten Free"],
   "ingredients": ["ingredient 1 with quantity", "ingredient 2 with quantity"],
   "instructions": "Step-by-step instructions text with numbered steps",
   "description": "Brief 1-sentence summary of the dish.",
@@ -253,6 +258,15 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
       }
       const result = JSON.parse(cleaned);
 
+      // Build tags array dynamically combining AI tags, meal tags, and auto high-protein badge
+      const recipeTags = Array.from(
+        new Set([
+          ...(result.tags || []),
+          ...(meal.tags || []),
+          meal.protein >= 25 ? "High Protein" : "",
+        ].filter(Boolean))
+      );
+
       // Build final recipe object
       const recipeData = {
         profile_id: activeProfileId,
@@ -263,7 +277,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
         carbs: meal.nutrients?.carbs ?? meal.carbs ?? 0,
         fats: meal.nutrients?.fats ?? meal.fats ?? 0,
         fiber: meal.nutrients?.fiber ?? meal.fiber ?? 0,
-        tags: ["AI Generated", meal.type || "Meal"],
+        tags: recipeTags.length > 0 ? recipeTags : ["High Protein"],
         image: meal.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80",
         ingredients: result.ingredients || [],
         instructions: result.instructions || "No instructions generated.",
@@ -320,10 +334,63 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
     }
   };
 
-  // Recipes Filters state
+  // Recipes & Logs Multi-Toggle & Search expansion states
+  const [showRecipesFilter, setShowRecipesFilter] = useState(true);
+  const [showLogsFilter, setShowLogsFilter] = useState(true);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [selectedMealPopup, setSelectedMealPopup] = useState<Meal | null>(null);
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [recipeSearch, setRecipeSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showLabelsDropdown, setShowLabelsDropdown] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isSearchExpanded && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchExpanded]);
+
+  // Clean, authoritative dietary tags (never raw onboarding flags or system timezones)
+  const availableDietaryTags = useMemo(() => {
+    const source = profileData.tracking_tags && profileData.tracking_tags.length > 0
+      ? profileData.tracking_tags
+      : DEFAULT_TRACKING_TAGS;
+    return source
+      .map((t: any) => (typeof t === "string" ? t : t.name))
+      .filter((name: string) => name && !name.includes("/") && name !== "onboarded");
+  }, [profileData.tracking_tags]);
+
+  // Dynamic Tracked Nutrients List (Per Dynamic Nutrients Rule)
+  const activeTrackedNutrients = useMemo(() => {
+    return normalizeTrackedNutrients(profileData.tracked_nutrients, profileData.goals?.dailyProtein);
+  }, [profileData.tracked_nutrients, profileData.goals?.dailyProtein]);
+
+  // Meal frequency & duplicate tracking map
+  const mealFrequencyMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    (mealsState || []).forEach((m) => {
+      const key = m.name.trim().toLowerCase();
+      map[key] = (map[key] || 0) + 1;
+    });
+    return map;
+  }, [mealsState]);
+
+  const existingRecipeNames = useMemo(() => {
+    return new Set((recipes || []).map((r) => r.name.trim().toLowerCase()));
+  }, [recipes]);
+
+  const uniquePastLogs = useMemo(() => {
+    if (!mealsState) return [];
+    const map = new Map<string, Meal>();
+    mealsState.forEach((m) => {
+      const key = m.name.trim().toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, m);
+      }
+    });
+    return Array.from(map.values());
+  }, [mealsState]);
 
   const filteredRecipes = recipes.filter((r) => {
     const sMatch =
@@ -335,6 +402,23 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
       : true;
     return sMatch && tMatch;
   });
+
+  const filteredPastLogs = useMemo(() => {
+    return uniquePastLogs.filter((m) => {
+      // HIDE past log if it ALREADY exists as a saved Recipe!
+      const isAlreadySaved = existingRecipeNames.has(m.name.trim().toLowerCase());
+      if (isAlreadySaved) return false;
+
+      const sMatch =
+        m.name.toLowerCase().includes(recipeSearch.toLowerCase()) ||
+        (m.type || "").toLowerCase().includes(recipeSearch.toLowerCase()) ||
+        (m.meal_description || "").toLowerCase().includes(recipeSearch.toLowerCase());
+      const tMatch = selectedTags.length > 0
+        ? selectedTags.every((st) => (m.tags || []).some((t) => t.toLowerCase() === st.toLowerCase()))
+        : true;
+      return sMatch && tMatch;
+    });
+  }, [uniquePastLogs, recipeSearch, selectedTags, existingRecipeNames]);
 
   const updateGoal = (field: string, value: number) => {
     setProfileData({
@@ -374,46 +458,40 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
             )}
           </div>
           <div className="flex-1 flex justify-around">
-            {profileData.agent_config?.trackWeight ? (
-              <div
-                onClick={() => setProfileTab("insights")}
-                className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 p-1 px-2.5 rounded-xl transition-all select-none"
-              >
-                <div className="text-xl font-black text-[#1a1a1a]">
-                  {profileData.weight}
-                </div>
-                <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
-                  Weight(kg)
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center">
-                <div className="text-xl font-black text-[#1a1a1a]">
-                  {profileData.weight}
-                </div>
-                <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
-                  Weight(kg)
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col items-center">
+            <div
+              onClick={() => openGoalConfig("dailyCalories")}
+              className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 p-1 px-2 rounded-xl transition-all select-none"
+              title="Tap to edit daily calorie goal"
+            >
               <div className="text-xl font-black text-[#1a1a1a]">
-                {profileData.height}
+                {profileData.goals?.dailyCalories || profileData.daily_calories_goal || 2000}
               </div>
               <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
-                Height(cm)
+                Goal(kcal)
               </div>
             </div>
-            <div className="flex flex-col items-center">
+            <div
+              onClick={() => setProfileTab("insights")}
+              className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 p-1 px-2 rounded-xl transition-all select-none"
+              title="Tap to view weight progress & log weight"
+            >
               <div className="text-xl font-black text-[#1a1a1a]">
-                {Math.abs(
-                  new Date(
-                    Date.now() - new Date(profileData.dob).getTime(),
-                  ).getUTCFullYear() - 1970,
-                )}
+                {profileData.weight || 0}
               </div>
               <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
-                Age
+                Weight(kg)
+              </div>
+            </div>
+            <div
+              onClick={() => openGoalConfig("weightGoal")}
+              className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 p-1 px-2 rounded-xl transition-all select-none"
+              title="Tap to edit weight goal"
+            >
+              <div className="text-xl font-black text-[#1a1a1a]">
+                {profileData.goals?.weightGoal || profileData.weight_goal || profileData.weight || 0}
+              </div>
+              <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
+                Target(kg)
               </div>
             </div>
           </div>
@@ -464,17 +542,6 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
 
       <div className="flex justify-between border-b border-black/5 mt-6 px-4">
         <button
-          onClick={() => setProfileTab("meals")}
-          className={cn(
-            "flex-1 py-3 flex justify-center border-b-[3px] transition-colors",
-            profileTab === "meals"
-              ? "border-[#1a1a1a] text-[#1a1a1a]"
-              : "border-transparent text-[#9e9e9e]",
-          )}
-        >
-          <BookOpen className="w-6 h-6" />
-        </button>
-        <button
           onClick={() => setProfileTab("insights")}
           className={cn(
             "flex-1 py-3 flex justify-center border-b-[3px] transition-colors",
@@ -482,8 +549,21 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               ? "border-[#1a1a1a] text-[#1a1a1a]"
               : "border-transparent text-[#9e9e9e]",
           )}
+          title="Insights & Weight Progress"
         >
           <BarChart2 className="w-6 h-6" />
+        </button>
+        <button
+          onClick={() => setProfileTab("meals")}
+          className={cn(
+            "flex-1 py-3 flex justify-center border-b-[3px] transition-colors",
+            profileTab === "meals"
+              ? "border-[#1a1a1a] text-[#1a1a1a]"
+              : "border-transparent text-[#9e9e9e]",
+          )}
+          title="Food Library"
+        >
+          <BookOpen className="w-6 h-6" />
         </button>
         <button
           onClick={() => setProfileTab("agent-brain")}
@@ -493,6 +573,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               ? "border-[#1a1a1a] text-[#1a1a1a]"
               : "border-transparent text-[#9e9e9e]",
           )}
+          title="Agent Brain"
         >
           <Database className="w-6 h-6" />
         </button>
@@ -500,230 +581,237 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
 
       <div className="min-h-[300px] mt-4 relative z-10 w-full mb-20 font-sans">
         {profileTab === "meals" && (
-          <div className="px-6 py-2 space-y-6">
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5">
-                <div className="flex-1 relative flex items-center bg-stone-100 hover:bg-stone-200/60 focus-within:bg-stone-50 border border-black/5 rounded-2xl px-2.5 py-1.5 shadow-sm focus-within:ring-1 focus-within:ring-orange-500/10 transition-all font-sans">
-                  <Search className="w-3.5 h-3.5 text-stone-400 mr-2 shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Search recipes..."
-                    value={recipeSearch}
-                    onChange={(e) => setRecipeSearch(e.target.value)}
-                    className="w-full bg-transparent border-none outline-none text-xs font-bold text-stone-900 placeholder:text-stone-400 font-sans"
-                  />
-                  {recipeSearch && (
-                    <button
-                      onClick={() => setRecipeSearch("")}
-                      className="text-stone-400 hover:text-black shrink-0 text-xs font-black font-sans ml-1"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div className="relative">
-                  <button
-                    onClick={() => setShowLabelsDropdown(!showLabelsDropdown)}
-                    type="button"
-                    className={cn(
-                      "p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center relative active:scale-95",
-                      selectedTags.length > 0
-                        ? "bg-orange-50 border-orange-200 text-orange-600 shadow-sm"
-                        : "bg-stone-100 border-black/5 text-stone-600 hover:bg-stone-200"
-                    )}
-                    title="Filter by Labels"
+          <div className="px-6 py-2 space-y-4 font-sans">
+            {/* Morphing 1-Line Control Bar */}
+            <div className="flex items-center justify-between gap-1.5 font-sans min-h-[38px]">
+              <AnimatePresence mode="wait">
+                {isSearchExpanded ? (
+                  <motion.div
+                    key="expanded-search"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center gap-2 font-sans w-full"
                   >
-                    <Filter className="w-4 h-4" />
-                    {selectedTags.length > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-orange-500 text-white border border-white rounded-full flex items-center justify-center text-[8px] font-black font-sans px-1 leading-none shadow-sm">
-                        {selectedTags.length}
-                      </span>
-                    )}
-                  </button>
-                  <AnimatePresence>
-                    {showLabelsDropdown && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40"
-                          onClick={() => setShowLabelsDropdown(false)}
-                        />
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                          transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                          className="absolute right-0 mt-3 w-56 bg-white/95 backdrop-blur-md border border-neutral-100 rounded-[28px] p-4 shadow-2xl shadow-orange-950/10 z-50 flex flex-col gap-1.5 font-sans"
+                    <div className="flex-1 relative flex items-center bg-stone-100 focus-within:bg-white border border-stone-300/80 rounded-2xl px-3 py-2 shadow-xs focus-within:ring-2 focus-within:ring-orange-500/20 transition-all min-w-0">
+                      <Search className="w-4 h-4 text-orange-500 mr-2 shrink-0" />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder="Search recipes, logs, or ingredients..."
+                        value={recipeSearch}
+                        onChange={(e) => setRecipeSearch(e.target.value)}
+                        className="w-full bg-transparent border-none outline-none text-xs font-bold text-stone-900 placeholder:text-stone-400 font-sans min-w-0"
+                      />
+                      {recipeSearch && (
+                        <button
+                          onClick={() => setRecipeSearch("")}
+                          className="text-stone-400 hover:text-stone-700 shrink-0 text-xs font-black font-sans ml-1 cursor-pointer"
                         >
-                          <div className="flex justify-between items-center px-2 pb-1.5 border-b border-stone-100">
-                            <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
-                              Dietary Labels
-                            </span>
-                            {selectedTags.length > 0 && (
-                              <button
-                                onClick={() => setSelectedTags([])}
-                                className="text-[9px] font-black uppercase text-orange-600 tracking-wider hover:opacity-80 active:scale-95 transition-all cursor-pointer"
-                              >
-                                Clear ({selectedTags.length})
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="flex flex-col gap-1 max-h-[220px] overflow-y-auto pr-0.5 mt-1 no-scrollbar-all">
-                            {(profileData.preferences && profileData.preferences.length > 0
-                              ? profileData.preferences
-                              : ["Gluten Free", "Dairy Free", "Keto", "Vegan", "Vegetarian", "High Protein", "Low Carb"]
-                            ).map((tag: string) => {
-                              const isSelected = selectedTags.includes(tag);
-                              return (
-                                <button
-                                  key={tag}
-                                  onClick={() => {
-                                    if (isSelected) {
-                                      setSelectedTags(selectedTags.filter((t) => t !== tag));
-                                    } else {
-                                      setSelectedTags([...selectedTags, tag]);
-                                    }
-                                  }}
-                                  className={cn(
-                                    "w-full text-left px-3 py-2 rounded-xl text-[11px] font-bold tracking-wide transition-all flex items-center justify-between gap-2 select-none cursor-pointer",
-                                    isSelected
-                                      ? "bg-orange-500 text-white font-extrabold shadow-md animate-none"
-                                      : "text-stone-600 hover:bg-stone-50 hover:text-stone-955"
-                                  )}
-                                >
-                                  <span className="truncate">{tag}</span>
-                                  {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* Add from Logs button */}
-                <button
-                  type="button"
-                  onClick={() => setShowLogsToRecipeModal(true)}
-                  className="p-2 bg-stone-100 hover:bg-stone-200 border border-black/5 text-stone-600 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-sm active:scale-95"
-                  title="Add from Logs"
-                >
-                  <Sparkles className="w-4 h-4 pointer-events-none text-stone-500" />
-                </button>
-
-                {/* Add Custom Recipe Button (+) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const blankRecipe: Recipe = {
-                      id: "new",
-                      name: "",
-                      time: "15 mins",
-                      calories: 0,
-                      protein: 0,
-                      carbs: 0,
-                      fats: 0,
-                      tags: [],
-                      image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80",
-                      ingredients: [],
-                      instructions: "",
-                      micros: [],
-                    };
-                    openRecipeDetails(blankRecipe);
-                  }}
-                  className="p-2 bg-orange-50 hover:bg-orange-100 border border-orange-200/55 text-orange-600 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-sm active:scale-95"
-                  title="Add Custom Recipe"
-                >
-                  <Plus className="w-4 h-4 pointer-events-none" />
-                </button>
-              </div>
-
-              {selectedTags.length > 0 && (
-                <motion.div
-                  id="active-filters-row"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="flex flex-wrap items-center gap-2 mt-2 font-sans px-1 overflow-hidden"
-                >
-                  <AnimatePresence>
-                    {selectedTags.map((tag) => (
-                      <motion.span
-                        key={tag}
-                        id={`active-tag-badge-${tag.toLowerCase().replace(/\s+/g, '-')}`}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setSelectedTags(selectedTags.filter((t) => t !== tag))}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-orange-100/70 hover:bg-orange-200/60 border border-orange-200 text-orange-800 rounded-full text-[10px] font-black tracking-wider uppercase shadow-sm cursor-pointer transition-all"
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRecipeSearch("");
+                        setIsSearchExpanded(false);
+                      }}
+                      className="px-3 py-2 bg-stone-100 hover:bg-stone-200 border border-stone-200/80 text-stone-700 font-black text-xs rounded-xl transition-all cursor-pointer shrink-0 active:scale-95"
+                    >
+                      Cancel
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="collapsed-bar"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center justify-between gap-1.5 font-sans w-full"
+                  >
+                    {/* Left: 2 Multi-Toggle Pills (Recipes & Logs) */}
+                    <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar-all py-0.5">
+                      <button
+                        onClick={() => setShowRecipesFilter(!showRecipesFilter)}
+                        className={cn(
+                          "px-3.5 py-1.5 rounded-full text-xs transition-all cursor-pointer select-none shrink-0 flex items-center gap-1.5",
+                          showRecipesFilter
+                            ? "bg-[#1a1a1a] text-white font-extrabold shadow-sm"
+                            : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 font-bold border border-stone-200/40 opacity-70"
+                        )}
                       >
-                        {tag}
-                        <span className="opacity-80 font-sans font-light text-[12px] leading-none ml-0.5">×</span>
-                      </motion.span>
-                    ))}
-                  </AnimatePresence>
-                </motion.div>
-              )}
+                        <span>Recipes</span>
+                        {showRecipesFilter && <Check className="w-3 h-3 text-orange-400 shrink-0" />}
+                      </button>
+
+                      <button
+                        onClick={() => setShowLogsFilter(!showLogsFilter)}
+                        className={cn(
+                          "px-3.5 py-1.5 rounded-full text-xs transition-all cursor-pointer select-none shrink-0 flex items-center gap-1.5",
+                          showLogsFilter
+                            ? "bg-[#1a1a1a] text-white font-extrabold shadow-sm"
+                            : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 font-bold border border-stone-200/40 opacity-70"
+                        )}
+                      >
+                        <span>Past Foods</span>
+                        {showLogsFilter && <Check className="w-3 h-3 text-orange-400 shrink-0" />}
+                      </button>
+                    </div>
+
+                    {/* Right: Search Icon + Dietary Tags Dropdown + Add Dropdown */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Search Icon Trigger */}
+                      <button
+                        onClick={() => setIsSearchExpanded(true)}
+                        type="button"
+                        className="p-2 bg-stone-100 hover:bg-stone-200 border border-black/5 text-stone-600 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 shadow-xs"
+                        title="Search Recipes & Logs"
+                      >
+                        <Search className="w-4 h-4 text-stone-600" />
+                      </button>
+
+                      {/* Dietary Tags Dropdown */}
+                      <div className="relative shrink-0">
+                        <button
+                          onClick={() => {
+                            setShowLabelsDropdown(!showLabelsDropdown);
+                            setShowAddDropdown(false);
+                          }}
+                          type="button"
+                          className={cn(
+                            "p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center relative active:scale-95 shrink-0 shadow-xs",
+                            selectedTags.length > 0
+                              ? "bg-orange-50 border-orange-200 text-orange-600 shadow-xs"
+                              : "bg-stone-100 border-black/5 text-stone-600 hover:bg-stone-200"
+                          )}
+                          title="Filter by Dietary Tags"
+                        >
+                          <Filter className="w-4 h-4" />
+                          {selectedTags.length > 0 && (
+                            <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 bg-orange-500 text-white rounded-full flex items-center justify-center text-[7.5px] font-black font-sans px-1 leading-none shadow-sm">
+                              {selectedTags.length}
+                            </span>
+                          )}
+                        </button>
+                        <AnimatePresence>
+                          {showLabelsDropdown && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setShowLabelsDropdown(false)} />
+                              <motion.div
+                                initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                                className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-md border border-neutral-100 rounded-[24px] p-3.5 shadow-2xl z-50 flex flex-col gap-1 font-sans"
+                              >
+                                <div className="flex justify-between items-center px-2 pb-2 border-b border-stone-100">
+                                  <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
+                                    Dietary Tags
+                                  </span>
+                                  {selectedTags.length > 0 && (
+                                    <button
+                                      onClick={() => setSelectedTags([])}
+                                      className="text-[9px] font-black uppercase text-orange-600 tracking-wider hover:opacity-80 transition-all cursor-pointer"
+                                    >
+                                      Clear ({selectedTags.length})
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="flex flex-col gap-1 max-h-[220px] overflow-y-auto pr-0.5 mt-1 no-scrollbar-all">
+                                  {availableDietaryTags.map((tag: string) => {
+                                    const isSelected = selectedTags.includes(tag);
+                                    return (
+                                      <button
+                                        key={tag}
+                                        onClick={() => {
+                                          if (isSelected) {
+                                            setSelectedTags(selectedTags.filter((t) => t !== tag));
+                                          } else {
+                                            setSelectedTags([...selectedTags, tag]);
+                                          }
+                                        }}
+                                        className={cn(
+                                          "w-full text-left px-3 py-2 rounded-xl text-[11px] font-bold tracking-wide transition-all flex items-center justify-between gap-2 select-none cursor-pointer",
+                                          isSelected
+                                            ? "bg-orange-500 text-white font-extrabold shadow-sm"
+                                            : "text-stone-600 hover:bg-stone-50"
+                                        )}
+                                      >
+                                        <span className="truncate">{tag}</span>
+                                        {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </motion.div>
+                            </>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      {/* Individual Convert Log (AI) Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowLogsToRecipeModal(true)}
+                        className="p-2 bg-stone-100 hover:bg-stone-200 border border-black/5 text-stone-600 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-xs active:scale-95"
+                        title="Convert Log to Recipe (AI)"
+                      >
+                        <Wand2 className="w-4 h-4 text-stone-600" />
+                      </button>
+
+                      {/* Individual Add Custom Recipe Button (+) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const blankRecipe: Recipe = {
+                            id: "new",
+                            name: "",
+                            time: "15 mins",
+                            calories: 0,
+                            protein: 0,
+                            carbs: 0,
+                            fats: 0,
+                            tags: [],
+                            image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80",
+                            ingredients: [],
+                            instructions: "",
+                            micros: [],
+                          };
+                          openRecipeDetails(blankRecipe);
+                        }}
+                        className="p-2 bg-stone-100 hover:bg-stone-200 border border-black/5 text-stone-600 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-xs active:scale-95"
+                        title="Add Custom Recipe"
+                      >
+                        <Plus className="w-4 h-4 text-stone-600" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Instagram Style Square Recipe Feed */}
-            <div className="grid grid-cols-3 gap-[1.5px] -mx-6 pb-6">
-              {recipes.length === 0 ? (
-                <div className="col-span-3 text-center py-10 px-6 mx-6 bg-gradient-to-br from-orange-50/20 to-orange-50/5 border border-dashed border-orange-200 rounded-[32px] font-sans flex flex-col items-center">
-                  <div className="w-16 h-16 rounded-3xl bg-orange-100/50 flex items-center justify-center text-3xl shadow-sm mb-4">
-                    🍲
-                  </div>
-                  <h4 className="font-black text-sm text-[#1a1a1a]">Build Your Recipe Book</h4>
-                  <p className="text-[10px] text-stone-500 font-semibold max-w-[240px] mt-1.5 leading-relaxed text-center">
-                    Save your favourite meals, convert past logs into detailed recipes with AI, or design custom recipes.
-                  </p>
+            {/* Active Tag Badges Row */}
+            {selectedTags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 font-sans px-1">
+                {selectedTags.map((tag) => (
+                  <span
+                    key={tag}
+                    onClick={() => setSelectedTags(selectedTags.filter((t) => t !== tag))}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-orange-100/70 hover:bg-orange-200/60 border border-orange-200 text-orange-800 rounded-full text-[9px] font-black tracking-wider uppercase cursor-pointer transition-all"
+                  >
+                    {tag}
+                    <span className="opacity-80 font-light text-[11px] leading-none ml-0.5">×</span>
+                  </span>
+                ))}
+              </div>
+            )}
 
-                  <div className="flex gap-2.5 mt-5 w-full max-w-[280px]">
-                    <button
-                      onClick={() => {
-                        const blankRecipe: Recipe = {
-                          id: "new",
-                          name: "",
-                          time: "15 mins",
-                          calories: 0,
-                          protein: 0,
-                          carbs: 0,
-                          fats: 0,
-                          tags: [],
-                          image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80",
-                          ingredients: [],
-                          instructions: "",
-                          micros: [],
-                        };
-                        openRecipeDetails(blankRecipe);
-                      }}
-                      className="flex-1 bg-stone-950 hover:bg-stone-900 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 text-center"
-                    >
-                      Custom Recipe
-                    </button>
-                    <button
-                      onClick={() => setShowLogsToRecipeModal(true)}
-                      className="flex-1 border border-orange-500 text-orange-600 hover:bg-orange-50/50 text-[10px] font-black uppercase tracking-wider py-3 rounded-xl transition-all cursor-pointer active:scale-95 text-center"
-                    >
-                      Add from Logs
-                    </button>
-                  </div>
-                </div>
-              ) : filteredRecipes.length === 0 ? (
-                <div className="col-span-3 text-center py-12 bg-white/55 border border-dashed border-orange-100 rounded-[28px] p-6 mx-6 font-sans">
-                  <span className="text-3xl inline-block">🍲</span>
-                  <h5 className="font-bold text-xs text-orange-950 mt-2 font-sans font-extrabold text-center">
-                    No recipes match current tags
-                  </h5>
-                  <p className="text-[10px] text-orange-950/40 font-sans font-medium text-center">
-                    Try adjusting your search query, choosing another tag above, or configuring your dietary profile.
-                  </p>
-                </div>
-              ) : (
+            {/* Grid Display */}
+            <div className="grid grid-cols-3 gap-[1.5px] -mx-6 pb-6">
+              {showRecipesFilter &&
                 filteredRecipes.map((recipe) => (
                   <motion.div
                     key={recipe.id}
@@ -745,6 +833,12 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
 
                     <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none z-10" />
 
+                    {/* Top Left: Recipe Badge */}
+                    <div className="absolute top-1.5 left-1.5 bg-orange-500/90 backdrop-blur-[4px] border border-white/10 px-1.5 py-0.5 rounded-md text-[7.5px] font-black text-white uppercase tracking-wider z-20 shadow-sm flex items-center gap-0.5">
+                      <span>📖</span> Recipe
+                    </div>
+
+                    {/* Top Right: Calories Badge */}
                     <div className="absolute top-1.5 right-1.5 bg-black/40 backdrop-blur-[4px] border border-white/5 px-1.5 py-0.5 rounded-md text-[8px] font-black text-white font-mono tracking-wider z-20 shadow-sm">
                       {recipe.calories} <span className="text-[7px] text-orange-300 font-sans font-bold">kcal</span>
                     </div>
@@ -754,11 +848,71 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                         {recipe.name}
                       </span>
                       <span className="text-[7px] text-orange-200/90 font-black uppercase tracking-wider mt-0.5">
-                        ⏱️ {recipe.time}
+                        ⏱️ {recipe.time} {recipe.log_count ? `• Logged ${recipe.log_count}x` : ""}
                       </span>
                     </div>
                   </motion.div>
-                ))
+                ))}
+
+              {showLogsFilter &&
+                filteredPastLogs.map((meal) => {
+                  const count = mealFrequencyMap[meal.name.trim().toLowerCase()] || 1;
+                  return (
+                    <motion.div
+                      key={`past-log-${meal.id}`}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSelectedMealPopup(meal)}
+                      className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150 border border-white/5"
+                    >
+                      {meal.image && !hasNoGeneratedImage(meal.image) ? (
+                        <img src={meal.image} className="w-full h-full object-cover" alt={meal.name} />
+                      ) : (
+                        <div className="absolute inset-0 bg-[#F4F3EF]/90 flex items-center justify-center pointer-events-none select-none">
+                          <span className="text-4xl filter drop-shadow-xs opacity-[0.85]">{getMealEmoji(meal.name, meal.type)}</span>
+                        </div>
+                      )}
+
+                      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none z-10" />
+
+                      {/* Top Left: Past Food Badge */}
+                      <div className="absolute top-1.5 left-1.5 bg-stone-900/80 backdrop-blur-[4px] border border-white/10 px-1.5 py-0.5 rounded-md text-[7.5px] font-black text-white uppercase tracking-wider z-20 shadow-sm flex items-center gap-0.5">
+                        <span>🍲</span> Past Food
+                      </div>
+
+                      <div className="absolute top-1.5 right-1.5 bg-black/40 backdrop-blur-[4px] border border-white/5 px-1.5 py-0.5 rounded-md text-[8px] font-black text-white font-mono tracking-wider z-20 shadow-sm">
+                        {meal.calories} <span className="text-[7px] text-orange-300 font-sans font-bold">kcal</span>
+                      </div>
+
+                      <div className="absolute bottom-1.5 left-2 right-2 text-left z-20 flex flex-col pointer-events-none">
+                        <span className="text-[9.5px] font-black text-white/95 leading-tight tracking-tight line-clamp-1">
+                          {meal.name}
+                        </span>
+                        <span className="text-[7px] text-orange-200/90 font-black uppercase tracking-wider mt-0.5">
+                          Logged {count}x
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+
+              {/* Empty State */}
+              {((!showRecipesFilter || filteredRecipes.length === 0) &&
+                (!showLogsFilter || filteredPastLogs.length === 0)) && (
+                <div className="col-span-3 text-center py-12 bg-white/55 border border-dashed border-orange-100 rounded-[28px] p-6 mx-6 font-sans">
+                  <span className="text-3xl inline-block">
+                    {!showRecipesFilter && !showLogsFilter ? "🔍" : "🍲"}
+                  </span>
+                  <h5 className="font-bold text-xs text-orange-950 mt-2 font-sans font-extrabold text-center">
+                    {!showRecipesFilter && !showLogsFilter
+                      ? "No Categories Active"
+                      : "No Matching Items Found"}
+                  </h5>
+                  <p className="text-[10px] text-orange-950/40 font-sans font-medium text-center mt-1">
+                    {!showRecipesFilter && !showLogsFilter
+                      ? "Tap 'Recipes' or 'Past Foods' above to view items."
+                      : "Try adjusting your search query or enabling toggles above."}
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -773,6 +927,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               weightLogs={weightLogs}
               onLogWeight={onLogWeight}
               onDeleteWeight={onDeleteWeight}
+              triggerToast={triggerToast}
             />
           </div>
         )}
@@ -841,139 +996,313 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
         )}
       </div>
 
-      {/* Log to Recipe Modal */}
-      <AnimatePresence>
-        {showLogsToRecipeModal && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center font-sans">
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.5 }}
-              exit={{ opacity: 0 }}
-              onClick={() => !isGeneratingRecipe && setShowLogsToRecipeModal(false)}
-              className="absolute inset-0 bg-black/60"
-            />
-            {/* Sheet */}
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="relative w-full max-w-md bg-white rounded-t-[32px] shadow-2xl p-6 pb-8 z-10 flex flex-col max-h-[85vh]"
-            >
-              {/* Drag Handle */}
-              <div className="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-4" />
+      {/* Log to Recipe Modal (Portaled to document.body to escape stacking context) */}
+      {createPortal(
+        <AnimatePresence>
+          {showLogsToRecipeModal && (
+            <div className="fixed inset-0 z-[9999] flex items-end justify-center font-sans">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.5 }}
+                exit={{ opacity: 0 }}
+                onClick={() => !isGeneratingRecipe && setShowLogsToRecipeModal(false)}
+                className="absolute inset-0 bg-black/60 cursor-pointer"
+              />
+              {/* Sheet */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                className="relative w-full max-w-md bg-white rounded-t-[32px] shadow-2xl p-6 pb-8 z-10 flex flex-col max-h-[85vh]"
+              >
+                {/* Drag Handle */}
+                <div className="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-4" />
 
-              {/* Title & Close */}
-              <div className="flex justify-between items-center mb-3 text-left">
-                <div>
-                  <h3 className="text-base font-black text-[#1a1a1a]">Convert Log to Recipe</h3>
-                  <p className="text-[10px] text-stone-400 font-semibold mt-0.5">Select any past logged meal to convert into an AI recipe</p>
-                </div>
-                {!isGeneratingRecipe && (
-                  <button
-                    onClick={() => setShowLogsToRecipeModal(false)}
-                    className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-500 cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Search bar */}
-              {!isGeneratingRecipe && (
-                <div className="relative mb-3">
-                  <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Search past logs by name or type..."
-                    value={logSearchQuery}
-                    onChange={(e) => setLogSearchQuery(e.target.value)}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-9 pr-9 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-400"
-                  />
-                  {logSearchQuery && (
+                {/* Title & Close */}
+                <div className="flex justify-between items-center mb-3 text-left">
+                  <div>
+                    <h3 className="text-base font-black text-[#1a1a1a]">Convert Log to Recipe</h3>
+                    <p className="text-[10px] text-stone-400 font-semibold mt-0.5">Select any past logged meal to convert into an AI recipe</p>
+                  </div>
+                  {!isGeneratingRecipe && (
                     <button
-                      onClick={() => setLogSearchQuery("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
+                      onClick={() => setShowLogsToRecipeModal(false)}
+                      className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-500 cursor-pointer"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
-              )}
 
-              {/* Content Area */}
-              <div className="flex-1 overflow-y-auto pr-0.5 space-y-3 min-h-[250px]">
-                {isGeneratingRecipe ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-3xl shadow-sm relative">
-                      <div className="absolute inset-0 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-                      🍳
-                    </div>
-                    <div>
-                      <h4 className="font-extrabold text-sm text-[#1a1a1a]">Drafting Gourmet Recipe...</h4>
-                      <p className="text-[10px] text-stone-400 font-semibold mt-1 max-w-[280px] leading-relaxed mx-auto">
-                        Gemini Chef is structuring ingredients, detailing step-by-step steps, and predicting micronutrient content.
-                      </p>
-                    </div>
-                  </div>
-                ) : filteredLogsForRecipe.length === 0 ? (
-                  <div className="text-center py-16 space-y-3">
-                    <div className="text-3xl">🗓️</div>
-                    <h5 className="font-extrabold text-xs text-stone-700">
-                      {logSearchQuery ? "No Matches Found" : "No Meals Logged Yet"}
-                    </h5>
-                    <p className="text-[10px] text-stone-400 font-medium max-w-[200px] mx-auto">
-                      {logSearchQuery
-                        ? "Try a different search term."
-                        : "Go back to your home timeline to log some food before converting them to recipes."}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredLogsForRecipe.map((meal) => (
-                      <div
-                        key={meal.id}
-                        onClick={() => handleGenerateRecipeFromMeal(meal)}
-                        className="bg-stone-50/55 hover:bg-orange-50/30 border border-stone-200/50 hover:border-orange-200/50 rounded-2xl p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all active:scale-99"
+                {/* Search bar */}
+                {!isGeneratingRecipe && (
+                  <div className="relative mb-3">
+                    <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search past logs by name or type..."
+                      value={logSearchQuery}
+                      onChange={(e) => setLogSearchQuery(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-9 pr-9 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-400"
+                    />
+                    {logSearchQuery && (
+                      <button
+                        onClick={() => setLogSearchQuery("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
                       >
-                        <div className="flex items-center gap-3 min-w-0 text-left">
-                          <div className="w-11 h-11 rounded-xl overflow-hidden bg-stone-100 shrink-0 border border-stone-200/50">
-                            {meal.image && !hasNoGeneratedImage(meal.image) ? (
-                              <img src={meal.image} className="w-full h-full object-cover" alt={meal.name} />
-                            ) : (
-                              <div className="w-full h-full bg-orange-50/55 flex items-center justify-center text-lg select-none">
-                                {getMealEmoji(meal.name, meal.type)}
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <h5 className="text-[11px] font-black text-stone-900 truncate leading-snug">{meal.name}</h5>
-                            {meal.meal_description && (
-                              <p className="text-[9px] text-stone-400 font-medium truncate leading-tight mt-0.5" title={meal.meal_description}>
-                                {meal.meal_description}
-                              </p>
-                            )}
-                            <div className="text-[8px] text-stone-405 font-bold mt-1">
-                              {meal.type} • {new Date(meal.date + "T00:00:00").toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                            </div>
-                            <div className="text-[8px] font-mono text-orange-600 font-black tracking-wider mt-1">
-                              {meal.calories} KCAL • P: {meal.protein}g C: {meal.carbs}g F: {meal.fats}g Fiber: {meal.fiber || 0}g
-                            </div>
-                          </div>
-                        </div>
-                        <span className="bg-orange-50 text-orange-600 border border-orange-100 hover:bg-orange-100 rounded-lg text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 shrink-0 transition-colors">
-                          ✨ Convert
-                        </span>
-                      </div>
-                    ))}
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+
+                {/* Content Area */}
+                <div className="flex-1 overflow-y-auto pr-0.5 space-y-3 min-h-[250px]">
+                  {isGeneratingRecipe ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
+                      <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-3xl shadow-sm relative">
+                        <div className="absolute inset-0 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+                        🍳
+                      </div>
+                      <div>
+                        <h4 className="font-extrabold text-sm text-[#1a1a1a]">Drafting Gourmet Recipe...</h4>
+                        <p className="text-[10px] text-stone-400 font-semibold mt-1 max-w-[280px] leading-relaxed mx-auto">
+                          Gemini Chef is structuring ingredients, detailing step-by-step steps, and predicting micronutrient content.
+                        </p>
+                      </div>
+                    </div>
+                  ) : filteredLogsForRecipe.length === 0 ? (
+                    <div className="text-center py-16 space-y-3">
+                      <div className="text-3xl">🗓️</div>
+                      <h5 className="font-extrabold text-xs text-stone-700">
+                        {logSearchQuery ? "No Matches Found" : "No Meals Logged Yet"}
+                      </h5>
+                      <p className="text-[10px] text-stone-400 font-medium max-w-[200px] mx-auto">
+                        {logSearchQuery
+                          ? "Try a different search term."
+                          : "Go back to your home timeline to log some food before converting them to recipes."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredLogsForRecipe.map((meal) => (
+                        <div
+                          key={meal.id}
+                          onClick={() => handleGenerateRecipeFromMeal(meal)}
+                          className="bg-stone-50/55 hover:bg-orange-50/30 border border-stone-200/50 hover:border-orange-200/50 rounded-2xl p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all active:scale-99"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 text-left">
+                            <div className="w-11 h-11 rounded-xl overflow-hidden bg-stone-100 shrink-0 border border-stone-200/50">
+                              {meal.image && !hasNoGeneratedImage(meal.image) ? (
+                                <img src={meal.image} className="w-full h-full object-cover" alt={meal.name} />
+                              ) : (
+                                <div className="w-full h-full bg-orange-50/55 flex items-center justify-center text-lg select-none">
+                                  {getMealEmoji(meal.name, meal.type)}
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h5 className="text-[11px] font-black text-stone-900 truncate leading-snug">{meal.name}</h5>
+                              {meal.meal_description && (
+                                <p className="text-[9px] text-stone-400 font-medium truncate leading-tight mt-0.5" title={meal.meal_description}>
+                                  {meal.meal_description}
+                                </p>
+                              )}
+                              <div className="text-[8px] text-stone-405 font-bold mt-1">
+                                {meal.type} • {new Date(meal.date + "T00:00:00").toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                              </div>
+                              <div className="text-[8px] font-mono text-orange-600 font-black tracking-wider mt-1">
+                                {meal.calories} KCAL • P: {meal.protein}g C: {meal.carbs}g F: {meal.fats}g Fiber: {meal.fiber || 0}g
+                              </div>
+                            </div>
+                          </div>
+                          <span className="bg-orange-50 text-orange-600 border border-orange-100 hover:bg-orange-100 rounded-lg text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 shrink-0 transition-colors">
+                            ✨ Convert
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* Selected Meal Details Modal Sheet (Portaled to document.body) */}
+      {createPortal(
+        <AnimatePresence>
+          {selectedMealPopup && (
+            <div className="fixed inset-0 z-[9999] flex items-end justify-center font-sans">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.6 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSelectedMealPopup(null)}
+                className="absolute inset-0 bg-black/60 cursor-pointer backdrop-blur-xs"
+              />
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 26, stiffness: 240 }}
+                className="relative w-full max-w-[448px] bg-stone-50 rounded-t-[36px] overflow-hidden flex flex-col max-h-[85vh] shadow-2xl z-10 border-t border-white/20 text-left font-sans"
+              >
+                {/* Hero Image / Emoji Banner */}
+                <div className="h-44 w-full relative shrink-0 bg-stone-900">
+                  {selectedMealPopup.image && !hasNoGeneratedImage(selectedMealPopup.image) ? (
+                    <img
+                      src={selectedMealPopup.image}
+                      className="w-full h-full object-cover"
+                      alt={selectedMealPopup.name}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-stone-850 via-stone-900 to-stone-950 flex items-center justify-center">
+                      <span className="text-6xl filter drop-shadow-md opacity-90 select-none">
+                        {getMealEmoji(selectedMealPopup.name, selectedMealPopup.type)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/40 to-black/20 pointer-events-none" />
+
+                  {/* Header Top Controls */}
+                  <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-20">
+                    <span className="px-3 py-1 bg-black/55 backdrop-blur-md rounded-full text-[9px] font-black text-white/90 tracking-wide font-sans">
+                      Logged {mealFrequencyMap[selectedMealPopup.name.trim().toLowerCase()] || 1}x in history
+                    </span>
+                    <button
+                      onClick={() => setSelectedMealPopup(null)}
+                      className="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-md transition-all cursor-pointer active:scale-95"
+                    >
+                      <X className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+
+                  {/* Overlaid Title, Tags & Date */}
+                  <div className="absolute bottom-4 left-4 right-4 text-left z-20">
+                    {selectedMealPopup.tags && selectedMealPopup.tags.length > 0 && (
+                      <div className="flex gap-1.5 mb-1.5 flex-wrap">
+                        {selectedMealPopup.tags.map((t, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-0.5 bg-orange-500 text-white rounded-md text-[7.5px] font-black uppercase tracking-widest font-sans shadow-xs"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <h3 className="text-white text-lg font-black leading-tight tracking-tight drop-shadow-sm font-sans">
+                      {selectedMealPopup.name}
+                    </h3>
+                    <p className="text-[10px] text-orange-200/90 font-bold font-sans mt-0.5 flex items-center gap-1.5">
+                      <span>🗓️ {selectedMealPopup.date ? new Date(selectedMealPopup.date + "T00:00:00").toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : 'Past Log'}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Scrollable Details Content */}
+                <div className="flex-1 overflow-y-auto no-scrollbar p-5 space-y-4">
+                  {/* Calories & Macro Progress Bars */}
+                  <div className="bg-white rounded-3xl p-4 border border-stone-200/60 shadow-xs space-y-3">
+                    <div className="flex justify-between items-center pb-2 border-b border-stone-100">
+                      <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
+                        Macronutrient Density
+                      </span>
+                      <span className="text-xs font-black text-orange-600 font-mono">
+                        🔥 {selectedMealPopup.calories} kcal
+                      </span>
+                    </div>
+
+                    {/* Dynamic Tracked Nutrients Progress Bars (Per Dynamic Nutrients Rule) */}
+                    <div className={cn(
+                      "grid gap-2 text-center",
+                      activeTrackedNutrients.length <= 4 ? "grid-cols-4" : "grid-cols-3 sm:grid-cols-4"
+                    )}>
+                      {activeTrackedNutrients.map((n) => {
+                        const val = Number(selectedMealPopup.nutrients?.[n.id] ?? (selectedMealPopup as any)[n.id] ?? 0);
+                        const targetVal = n.target || 100;
+                        const pct = Math.min(100, Math.max(0, (val / targetVal) * 100));
+                        return (
+                          <div
+                            key={n.id}
+                            className="bg-stone-50/70 rounded-2xl p-2.5 border border-stone-200/50 flex flex-col justify-center min-w-0"
+                          >
+                            <span
+                              className="text-[7.5px] font-black uppercase tracking-wider truncate"
+                              style={{ color: n.color }}
+                            >
+                              {n.name}
+                            </span>
+                            <span className="text-xs font-black text-stone-900 mt-0.5">
+                              {val}{n.unit}
+                            </span>
+                            <div className="w-full bg-stone-200/60 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${pct}%`,
+                                  backgroundColor: n.color
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Meal Description / Notes Callout */}
+                  {selectedMealPopup.meal_description && (
+                    <div className="bg-white rounded-3xl p-4 border border-stone-200/60 shadow-xs text-left">
+                      <div className="text-[9px] font-black uppercase tracking-wider text-orange-600 mb-1">
+                        Meal Notes & Insights
+                      </div>
+                      <p className="text-xs text-stone-700 leading-relaxed italic">
+                        "{selectedMealPopup.meal_description}"
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2.5 pt-1 pb-2">
+                    {!existingRecipeNames.has(selectedMealPopup.name.trim().toLowerCase()) && (
+                      <button
+                        onClick={() => {
+                          const targetMeal = selectedMealPopup;
+                          setSelectedMealPopup(null);
+                          handleGenerateRecipeFromMeal(targetMeal);
+                        }}
+                        className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs py-3 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <Wand2 className="w-4 h-4" />
+                        <span>Convert to Recipe (AI)</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        onAddMeal(selectedMealPopup);
+                        triggerToast(`Logged "${selectedMealPopup.name}" for today! 🍽️`);
+                        setSelectedMealPopup(null);
+                      }}
+                      className="flex-1 bg-stone-950 hover:bg-stone-900 text-white font-extrabold text-xs py-3 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Log Again Today</span>
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </motion.div>
   );
 };

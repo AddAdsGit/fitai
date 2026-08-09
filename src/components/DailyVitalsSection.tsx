@@ -1,0 +1,1339 @@
+import React, { useEffect, useState } from "react";
+import {
+  Scale,
+  Droplet,
+  Zap,
+  Clock,
+  Minus,
+  Plus,
+  Check,
+  X,
+  List,
+} from "lucide-react";
+import { cn } from "../lib/utils";
+import { BristolStoolIcon, GutIcon } from "./BristolStoolIcons";
+import { Profile, DailyWellness, WeightLog } from "../types";
+
+export interface DailyVitalsSectionProps {
+  profileData: Profile;
+  selectedDate: string;
+  todayStr: string;
+  dailyNotes: DailyWellness[];
+  weightLogs: WeightLog[];
+  isVitalsLogOpen: boolean;
+  setIsVitalsLogOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+  activeVitalsTab: "weight" | "water" | "digestion" | "energy" | null;
+  setActiveVitalsTab: (
+    tab:
+      | "weight"
+      | "water"
+      | "digestion"
+      | "energy"
+      | null
+      | ((
+          prev: "weight" | "water" | "digestion" | "energy" | null
+        ) => "weight" | "water" | "digestion" | "energy" | null)
+  ) => void;
+  draftWeight: number | null;
+  setDraftWeight: (w: number | null) => void;
+  draftWeightTime: string;
+  setDraftWeightTime: (t: string) => void;
+  draftWater: number | null;
+  setDraftWater: (w: number | null) => void;
+  draftWaterTime: string;
+  setDraftWaterTime: (t: string) => void;
+  draftStoolType: number | null;
+  setDraftStoolType: (t: number | null) => void;
+  draftStoolTime: string;
+  setDraftStoolTime: (t: string) => void;
+  draftEnergy: number | null;
+  setDraftEnergy: (l: number | null) => void;
+  draftEnergyTime: string;
+  setDraftEnergyTime: (t: string) => void;
+  isWeightStepping: boolean;
+  isWaterStepping: boolean;
+  isStoolSliding: boolean;
+  setIsStoolSliding: (s: boolean) => void;
+  isEnergySliding: boolean;
+  setIsEnergySliding: (s: boolean) => void;
+  triggerWeightStepping: () => void;
+  triggerWaterStepping: () => void;
+  setTimePickerTarget: (
+    target: "weight" | "water" | "digestion" | "energy"
+  ) => void;
+  setTimePickerInitialTime: (time: string) => void;
+  setIsTimePickerOpen: (open: boolean) => void;
+  handleLogWeight: (
+    weight: number,
+    date: string,
+    time?: string
+  ) => Promise<void>;
+  handleDeleteWeight: (id: string) => Promise<void>;
+  handleLogWater: (
+    amount: number,
+    date: string,
+    time?: string
+  ) => Promise<void>;
+  handleDeleteWaterLogItem: (itemId: string, date: string) => Promise<void>;
+  handleLogDigestion: (
+    type: number | null,
+    notes: string | null,
+    date: string,
+    time?: string
+  ) => Promise<void>;
+  handleDeleteStoolLogItem: (itemId: string, date: string) => Promise<void>;
+  handleLogEnergy: (
+    level: number | null,
+    date: string,
+    time?: string
+  ) => Promise<void>;
+  handleDeleteEnergyLogItem: (itemId: string, date: string) => Promise<void>;
+  DAILY_WATER_GOAL_ML: number;
+}
+
+export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
+  profileData,
+  selectedDate,
+  todayStr,
+  dailyNotes,
+  weightLogs,
+  isVitalsLogOpen,
+  setIsVitalsLogOpen,
+  activeVitalsTab,
+  setActiveVitalsTab,
+  draftWeight,
+  setDraftWeight,
+  draftWeightTime,
+  setDraftWeightTime,
+  draftWater,
+  setDraftWater,
+  draftWaterTime,
+  setDraftWaterTime,
+  draftStoolType,
+  setDraftStoolType,
+  draftStoolTime,
+  setDraftStoolTime,
+  draftEnergy,
+  setDraftEnergy,
+  draftEnergyTime,
+  setDraftEnergyTime,
+  isWeightStepping,
+  isWaterStepping,
+  isStoolSliding,
+  setIsStoolSliding,
+  isEnergySliding,
+  setIsEnergySliding,
+  triggerWeightStepping,
+  triggerWaterStepping,
+  setTimePickerTarget,
+  setTimePickerInitialTime,
+  setIsTimePickerOpen,
+  handleLogWeight,
+  handleDeleteWeight,
+  handleLogWater,
+  handleDeleteWaterLogItem,
+  handleLogDigestion,
+  handleDeleteStoolLogItem,
+  handleLogEnergy,
+  handleDeleteEnergyLogItem,
+  DAILY_WATER_GOAL_ML,
+}) => {
+  if (
+    !profileData.agent_config?.trackWeight &&
+    !profileData.agent_config?.trackWater &&
+    !profileData.agent_config?.trackDigestion &&
+    !profileData.agent_config?.trackEnergy
+  ) {
+    return null;
+  }
+
+  const wellnessToday = dailyNotes.find((n) => n.date === selectedDate);
+  const weightTodayLog = weightLogs.find((l) => l.date === selectedDate);
+  const waterIntake = wellnessToday?.water_intake || 0;
+  const stoolType = wellnessToday?.stool_type ?? null;
+  const energyLevel = wellnessToday?.energy_level ?? null;
+
+  const isWeightActive = profileData.agent_config?.trackWeight ?? true;
+  const isWaterActive = profileData.agent_config?.trackWater ?? true;
+  const isDigestionActive = profileData.agent_config?.trackDigestion ?? true;
+  const isEnergyActive = profileData.agent_config?.trackEnergy ?? true;
+
+  // Sync/reset local draft states whenever dailyNotes, weightLogs, or selectedDate updates
+  useEffect(() => {
+    setDraftWeight(null);
+    setDraftWater(null);
+    setDraftStoolType(null);
+    setDraftEnergy(null);
+  }, [dailyNotes, weightLogs, selectedDate]);
+
+  const getNowTimeStr = () => new Date().toTimeString().slice(0, 5);
+
+  const waterLogsList =
+    wellnessToday?.water_logs && wellnessToday.water_logs.length > 0
+      ? wellnessToday.water_logs
+      : waterIntake > 0
+      ? [
+          {
+            id: "legacy-water",
+            amount: waterIntake,
+            time: wellnessToday?.water_log_time || getNowTimeStr(),
+          },
+        ]
+      : [];
+
+  const stoolLogsList =
+    wellnessToday?.stool_logs && wellnessToday.stool_logs.length > 0
+      ? wellnessToday.stool_logs
+      : stoolType !== null
+      ? [
+          {
+            id: "legacy-stool",
+            type: stoolType,
+            time: wellnessToday?.stool_log_time || getNowTimeStr(),
+          },
+        ]
+      : [];
+
+  const energyLogsList =
+    wellnessToday?.energy_logs && wellnessToday.energy_logs.length > 0
+      ? wellnessToday.energy_logs
+      : energyLevel !== null
+      ? [
+          {
+            id: "legacy-energy",
+            level: energyLevel,
+            time: wellnessToday?.energy_log_time || getNowTimeStr(),
+          },
+        ]
+      : [];
+
+  const totalLoggedVitals =
+    (isWeightActive && weightTodayLog ? 1 : 0) +
+    (isWaterActive ? waterLogsList.length : 0) +
+    (isDigestionActive ? stoolLogsList.length : 0) +
+    (isEnergyActive ? energyLogsList.length : 0);
+
+  const activeWeightTime =
+    draftWeightTime || weightTodayLog?.log_time || getNowTimeStr();
+  const currentWater = draftWater ?? waterIntake;
+  const activeType = draftStoolType ?? stoolType ?? 4;
+  const currentEnergy = draftEnergy ?? energyLevel ?? 3;
+
+  const activeWaterTime =
+    draftWaterTime || wellnessToday?.water_log_time || getNowTimeStr();
+  const activeStoolTime =
+    draftStoolTime || wellnessToday?.stool_log_time || getNowTimeStr();
+  const activeEnergyTime =
+    draftEnergyTime || wellnessToday?.energy_log_time || getNowTimeStr();
+
+  const formatInterestingTime = (timeStr?: string | null) => {
+    if (!timeStr) return null;
+    const [hStr, mStr] = timeStr.split(":");
+    const h = parseInt(hStr, 10);
+    if (isNaN(h)) return timeStr;
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return `${h12}:${mStr} ${ampm}`;
+  };
+
+  // True activity-based 30s auto-collapse timer
+  const [lastActivity, setLastActivity] = useState<number>(Date.now());
+  const resetActivity = () => setLastActivity(Date.now());
+
+  useEffect(() => {
+    if (!isVitalsLogOpen && !activeVitalsTab) return;
+
+    const timer = setTimeout(() => {
+      if (isVitalsLogOpen) setIsVitalsLogOpen(false);
+      if (activeVitalsTab) setActiveVitalsTab(null);
+    }, 30000);
+
+    return () => clearTimeout(timer);
+  }, [isVitalsLogOpen, activeVitalsTab, lastActivity, setIsVitalsLogOpen, setActiveVitalsTab]);
+
+  return (
+    <section
+      onPointerDownCapture={resetActivity}
+      onClickCapture={resetActivity}
+      onKeyDownCapture={resetActivity}
+      className="px-6 mt-6 relative z-10 text-left space-y-4 animate-fade-in"
+    >
+
+      {/* DYNAMIC ADAPTIVE VITALS BUTTON CARDS (HANDLES 1, 2, 3, or 4 ACTIVE VITALS) */}
+      {(() => {
+        const activeVitalsList = [
+          isWeightActive && {
+            id: "weight" as const,
+            label: "Weight",
+            icon: Scale,
+            isLogged: !!weightTodayLog,
+            valText: weightTodayLog ? `${weightTodayLog.weight} kg` : "Weight",
+          },
+          isWaterActive && {
+            id: "water" as const,
+            label: "Water",
+            icon: Droplet,
+            isLogged: waterIntake > 0,
+            valText: waterIntake > 0 ? `${(waterIntake / 1000).toFixed(1)}L` : "Water",
+          },
+          isDigestionActive && {
+            id: "digestion" as const,
+            label: "Digestion",
+            icon: GutIcon,
+            isLogged: stoolType !== null,
+            valText: stoolType !== null ? `Type ${stoolType}` : "Digestion",
+          },
+          isEnergyActive && {
+            id: "energy" as const,
+            label: "Energy",
+            icon: Zap,
+            isLogged: energyLevel !== null,
+            valText: energyLevel !== null ? `Lvl ${energyLevel}` : "Energy",
+          },
+        ].filter(Boolean) as Array<{
+          id: "weight" | "water" | "digestion" | "energy";
+          label: string;
+          icon: any;
+          isLogged: boolean;
+          valText: string;
+        }>;
+
+        if (activeVitalsList.length === 0) return null;
+
+        const gridClass =
+          activeVitalsList.length === 1
+            ? "grid-cols-1 max-w-xs mx-auto"
+            : activeVitalsList.length === 2
+            ? "grid-cols-2"
+            : activeVitalsList.length === 3
+            ? "grid-cols-3"
+            : "grid-cols-4";
+
+        return (
+          <div className={cn("grid gap-2 select-none mt-1", gridClass)}>
+            {activeVitalsList.map((item) => {
+              const IconComp = item.icon;
+              const isActive = activeVitalsTab === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() =>
+                    setActiveVitalsTab((prev) =>
+                      prev === item.id ? null : item.id
+                    )
+                  }
+                  className={cn(
+                    "py-2.5 px-2 rounded-2xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border active:scale-95",
+                    isActive
+                      ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/15 font-black"
+                      : item.isLogged
+                      ? "bg-white text-stone-900 border-stone-200/90 hover:bg-stone-50 shadow-2xs font-bold"
+                      : "bg-white/70 text-stone-500 border-stone-200/60 hover:bg-white hover:text-stone-800 shadow-3xs"
+                  )}
+                  title={`Toggle ${item.label} Card`}
+                >
+                  <IconComp
+                    className={cn(
+                      "w-3.5 h-3.5 shrink-0 transition-colors",
+                      isActive
+                        ? "text-white"
+                        : item.isLogged
+                        ? "text-stone-700"
+                        : "text-stone-400"
+                    )}
+                  />
+                  <span className="truncate">{item.valText}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* MINIMALIST ALL VITALS LOGS TOGGLE & LIST (ONLY SHOWN IF LOGS EXIST & NO TAB IS ACTIVE) */}
+      {totalLoggedVitals > 0 && !activeVitalsTab && (
+        <div className="w-full mt-1">
+          {!isVitalsLogOpen ? (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setIsVitalsLogOpen(true)}
+                className="text-[10px] font-medium text-stone-400 hover:text-stone-700 transition-colors flex items-center gap-1 cursor-pointer border-none bg-transparent px-2 py-0.5"
+              >
+                <List className="w-2.5 h-2.5 text-stone-400" />
+                <span>view all vitals logs ({totalLoggedVitals})</span>
+              </button>
+            </div>
+          ) : (
+            <div className="w-full flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
+              <div className="flex items-center justify-between px-0.5 mb-0.5">
+                <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
+                  Today's Logged Vitals ({totalLoggedVitals})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsVitalsLogOpen(false)}
+                  className="text-[10px] font-bold text-stone-400 hover:text-stone-700 transition-colors flex items-center gap-1 cursor-pointer border-none bg-transparent"
+                >
+                  <span>hide logs</span>
+                  <span className="text-[8px]">▲</span>
+                </button>
+              </div>
+              {weightTodayLog && (
+                <div className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {weightTodayLog.log_time ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
+                        <Clock className="w-2.5 h-2.5 text-stone-400" />
+                        {formatInterestingTime(weightTodayLog.log_time)}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
+                        Today
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Scale className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                      <strong className="text-stone-900 font-extrabold">
+                        {weightTodayLog.weight} kg
+                      </strong>
+                    </div>
+                  </div>
+                  {selectedDate === todayStr && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (weightTodayLog.id) {
+                          await handleDeleteWeight(weightTodayLog.id);
+                        }
+                      }}
+                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
+                      title="Remove weight log"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {waterLogsList.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {item.time ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
+                        <Clock className="w-2.5 h-2.5 text-stone-400" />
+                        {formatInterestingTime(item.time)}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
+                        Today
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Droplet className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                      <strong className="text-stone-900 font-extrabold">
+                        {item.amount} ml
+                      </strong>
+                    </div>
+                  </div>
+                  {selectedDate === todayStr && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (item.id === "legacy-water") {
+                          await handleLogWater(0, selectedDate);
+                        } else {
+                          await handleDeleteWaterLogItem(item.id, selectedDate);
+                        }
+                      }}
+                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
+                      title="Remove water entry"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {stoolLogsList.map((item) => {
+                const itemConstipated = item.type === 1 || item.type === 2;
+                const itemHealthy = item.type === 3 || item.type === 4;
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {item.time ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
+                          <Clock className="w-2.5 h-2.5 text-stone-400" />
+                          {formatInterestingTime(item.time)}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
+                          Today
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1.5 truncate">
+                        <BristolStoolIcon
+                          type={item.type}
+                          className="w-4 h-4 shrink-0"
+                        />
+                        <strong
+                          className={cn(
+                            "font-extrabold",
+                            itemConstipated
+                              ? "text-amber-600"
+                              : itemHealthy
+                              ? "text-emerald-600"
+                              : "text-sky-600"
+                          )}
+                        >
+                          {itemConstipated
+                            ? "Constipated"
+                            : itemHealthy
+                            ? "Healthy"
+                            : "Loose"}
+                        </strong>
+                        <span className="text-[10px] text-stone-400 font-semibold">
+                          (Type {item.type})
+                        </span>
+                      </div>
+                    </div>
+                    {selectedDate === todayStr && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (item.id === "legacy-stool") {
+                            await handleLogDigestion(null, null, selectedDate);
+                          } else {
+                            await handleDeleteStoolLogItem(
+                              item.id,
+                              selectedDate
+                            );
+                          }
+                        }}
+                        className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
+                        title="Remove digestion entry"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {energyLogsList.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {item.time ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
+                        <Clock className="w-2.5 h-2.5 text-stone-400" />
+                        {formatInterestingTime(item.time)}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
+                        Today
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Zap className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                      <strong className="text-stone-900 font-extrabold">
+                        {(() => {
+                          if (item.level === 1) return "😴 Exhausted";
+                          if (item.level === 2) return "🥱 Sluggish";
+                          if (item.level === 3) return "⚡ Steady";
+                          if (item.level === 4) return "🔥 High Energy";
+                          return "🚀 Peak Vitality";
+                        })()}
+                      </strong>
+                      <span className="text-[10px] text-stone-400 font-semibold">
+                        (Level {item.level})
+                      </span>
+                    </div>
+                  </div>
+                  {selectedDate === todayStr && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (item.id === "legacy-energy") {
+                          await handleLogEnergy(null, selectedDate);
+                        } else {
+                          await handleDeleteEnergyLogItem(
+                            item.id,
+                            selectedDate
+                          );
+                        }
+                      }}
+                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
+                      title="Remove energy entry"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 1. WEIGHT LOG (POPS OUT WHEN TOGGLED) */}
+      {isWeightActive && activeVitalsTab === "weight" && (
+        <div className="flex flex-col gap-2">
+
+          {weightTodayLog ? (
+            <div className="flex flex-col gap-1.5 animate-fade-in">
+              <div className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3.5 py-3 text-xs transition-all shadow-3xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {weightTodayLog.log_time ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-stone-100 border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
+                      <Clock className="w-2.5 h-2.5 text-stone-400" />
+                      {formatInterestingTime(weightTodayLog.log_time)}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-stone-100/50 px-2 py-0.5 rounded-md shrink-0">
+                      Today
+                    </span>
+                  )}
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Scale className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                    <span className="text-stone-500 font-bold">Weight:</span>
+                    <strong className="text-stone-900 font-black">
+                      {weightTodayLog.weight} kg
+                    </strong>
+                  </div>
+                </div>
+                {selectedDate === todayStr && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (weightTodayLog.id) {
+                        await handleDeleteWeight(weightTodayLog.id);
+                      }
+                    }}
+                    className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
+                    title="Remove weight log"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : selectedDate === todayStr ? (
+            (() => {
+              const baseWeight = (() => {
+                const pastLogs = weightLogs.filter((l) => l.date < todayStr);
+                if (pastLogs.length > 0) {
+                  const sortedPast = [...pastLogs].sort((a, b) =>
+                    b.date.localeCompare(a.date)
+                  );
+                  return sortedPast[0].weight;
+                }
+                return profileData.weight || 70;
+              })();
+
+              const currentWeight = draftWeight ?? baseWeight;
+
+              return (
+                <div className="flex flex-col gap-2 w-full animate-fade-in">
+                  <div className="flex items-center gap-2.5 w-full">
+                    {/* Left: Time Pill */}
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTimePickerTarget("weight");
+                          setTimePickerInitialTime(activeWeightTime);
+                          setIsTimePickerOpen(true);
+                        }}
+                        className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-stone-400" />
+                        <span>
+                          {formatInterestingTime(activeWeightTime) ||
+                            activeWeightTime}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Middle: Stepper */}
+                    <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraftWeight(
+                            Math.max(
+                              30,
+                              Number((currentWeight - 0.1).toFixed(1))
+                            )
+                          );
+                          triggerWeightStepping();
+                        }}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all shrink-0"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750">
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="30"
+                          max="300"
+                          value={
+                            draftWeight !== null ? draftWeight : currentWeight
+                          }
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val)) setDraftWeight(val);
+                            else if (e.target.value === "") setDraftWeight(0);
+                          }}
+                          className="w-14 text-center text-sm font-black text-stone-850 bg-transparent border-none focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-stone-400">kg</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraftWeight(
+                            Math.min(
+                              300,
+                              Number((currentWeight + 0.1).toFixed(1))
+                            )
+                          );
+                          triggerWeightStepping();
+                        }}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Right: Log Button */}
+                    <button
+                      onClick={async () => {
+                        await handleLogWeight(
+                          currentWeight,
+                          todayStr,
+                          activeWeightTime
+                        );
+                        setDraftWeight(null);
+                        setDraftWeightTime("");
+                      }}
+                      className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                      title="Log Weight"
+                    >
+                      <Check className="w-5 h-5 text-white" />
+                    </button>
+                  </div>
+
+                  {/* Transient Micro-Feedback (only while stepping) */}
+                  {isWeightStepping && (
+                    <div className="px-1 text-left animate-fade-in">
+                      <span className="text-[11px] font-medium text-stone-500">
+                        {(() => {
+                          const pastLogs = weightLogs.filter(
+                            (l) => l.date < selectedDate
+                          );
+                          if (pastLogs.length > 0) {
+                            const sortedPast = [...pastLogs].sort((a, b) =>
+                              b.date.localeCompare(a.date)
+                            );
+                            const prev = sortedPast[0];
+                            const diff = Number(
+                              (currentWeight - prev.weight).toFixed(1)
+                            );
+
+                            const prevDateObj = new Date(
+                              prev.date + "T00:00:00"
+                            );
+                            const monthStr = prevDateObj.toLocaleString(
+                              "en-US",
+                              { month: "short" }
+                            );
+                            const dayNum = prevDateObj.getDate();
+                            const dayName = prevDateObj.toLocaleString(
+                              "en-US",
+                              { weekday: "short" }
+                            );
+                            const dateFormatted = `${monthStr} ${dayNum} (${dayName})`;
+
+                            if (diff < 0)
+                              return `📉 ${diff} kg from last log on ${dateFormatted}`;
+                            if (diff > 0)
+                              return `📈 +${diff} kg from last log on ${dateFormatted}`;
+                            return `⚖️ Same as last log on ${dateFormatted}`;
+                          }
+                          return `⚖️ Baseline weight recorded (${currentWeight} kg)`;
+                        })()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : (
+            <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
+              No weight logged for this date
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 2. WATER LOG (POPS OUT WHEN TOGGLED) */}
+      {isWaterActive && activeVitalsTab === "water" && (
+        <div className="flex flex-col gap-2">
+
+          {selectedDate === todayStr &&
+            (() => {
+              const currentWaterIncrement =
+                draftWater !== null ? draftWater : 250;
+              return (
+                <div className="flex flex-col gap-2 w-full animate-fade-in">
+                  <div className="flex items-center gap-2.5 w-full">
+                    {/* Left: Time Pill */}
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTimePickerTarget("water");
+                          setTimePickerInitialTime(activeWaterTime);
+                          setIsTimePickerOpen(true);
+                        }}
+                        className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-stone-400" />
+                        <span>
+                          {formatInterestingTime(activeWaterTime) ||
+                            activeWaterTime}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Stepper with Typeable Input */}
+                    <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraftWater(
+                            Math.max(50, currentWaterIncrement - 50)
+                          );
+                          triggerWaterStepping();
+                        }}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all shrink-0"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750">
+                        <input
+                          type="number"
+                          step="50"
+                          min="0"
+                          max="5000"
+                          value={currentWaterIncrement}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val)) setDraftWater(val);
+                            else if (e.target.value === "") setDraftWater(0);
+                          }}
+                          className="w-14 text-center text-sm font-black text-stone-850 bg-transparent border-none focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-stone-400">ml</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraftWater(
+                            Math.min(5000, currentWaterIncrement + 50)
+                          );
+                          triggerWaterStepping();
+                        }}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Right: Solid Orange Checkmark Button */}
+                    <button
+                      onClick={async () => {
+                        await handleLogWater(
+                          currentWaterIncrement,
+                          selectedDate,
+                          activeWaterTime
+                        );
+                        setDraftWater(null);
+                        setDraftWaterTime("");
+                      }}
+                      className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                      title="Log Water"
+                    >
+                      <Check className="w-5 h-5 text-white" />
+                    </button>
+                  </div>
+
+                  {/* Dynamic Motivational Description below (only while stepping) */}
+                  {isWaterStepping && (
+                    <div className="px-1 text-left animate-fade-in">
+                      <span className="text-[11px] font-medium text-stone-500">
+                        {(() => {
+                          if (waterIntake === 0)
+                            return `Goal: ${DAILY_WATER_GOAL_ML}ml — tap + or type to log hydration 💧`;
+                          const remaining = DAILY_WATER_GOAL_ML - waterIntake;
+                          if (remaining > 0)
+                            return `${waterIntake}ml logged (${Math.round(
+                              (waterIntake / DAILY_WATER_GOAL_ML) * 100
+                            )}%) — ${remaining}ml remaining 🌊`;
+                          if (remaining === 0)
+                            return `Daily goal achieved (${DAILY_WATER_GOAL_ML}ml)! Amazing job 🎉`;
+                          return `${waterIntake}ml logged — daily goal exceeded! 🚀`;
+                        })()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+          {/* Logged Water Entries List for selectedDate */}
+          {waterLogsList.length > 0 ? (
+            <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-stone-400">
+                  Water Logs ({waterLogsList.length})
+                </span>
+                <span className="text-[10px] font-bold text-stone-500">
+                  {waterIntake} ml total
+                </span>
+              </div>
+              {waterLogsList.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {item.time ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
+                        <Clock className="w-2.5 h-2.5 text-stone-400" />
+                        {formatInterestingTime(item.time)}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
+                        Today
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Droplet className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                      <strong className="text-stone-900 font-extrabold">
+                        {item.amount} ml
+                      </strong>
+                    </div>
+                  </div>
+                  {selectedDate === todayStr && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (item.id === "legacy-water") {
+                          await handleLogWater(0, selectedDate);
+                        } else {
+                          await handleDeleteWaterLogItem(item.id, selectedDate);
+                        }
+                      }}
+                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
+                      title="Remove water entry"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            selectedDate !== todayStr && (
+              <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
+                No water logged for this date
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      {/* 3. DIGESTION TRACKER (POPS OUT WHEN TOGGLED) */}
+      {isDigestionActive && activeVitalsTab === "digestion" && (
+        <div className="flex flex-col gap-2">
+
+          {selectedDate === todayStr && (
+            <div className="flex flex-col gap-2 w-full animate-fade-in">
+              <div className="flex items-center gap-2.5 w-full">
+                {/* Left: Time Pill */}
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTimePickerTarget("digestion");
+                      setTimePickerInitialTime(activeStoolTime);
+                      setIsTimePickerOpen(true);
+                    }}
+                    className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-stone-400" />
+                    <span>
+                      {formatInterestingTime(activeStoolTime) ||
+                        activeStoolTime}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Middle: Clean Slider */}
+                <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
+                  <input
+                    type="range"
+                    min="1"
+                    max="7"
+                    value={activeType}
+                    onChange={(e) =>
+                      setDraftStoolType(parseInt(e.target.value))
+                    }
+                    onMouseDown={() => setIsStoolSliding(true)}
+                    onTouchStart={() => setIsStoolSliding(true)}
+                    onMouseUp={() =>
+                      setTimeout(() => setIsStoolSliding(false), 200)
+                    }
+                    onTouchEnd={() =>
+                      setTimeout(() => setIsStoolSliding(false), 200)
+                    }
+                    className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                  />
+                </div>
+
+                {/* Right: Action Box */}
+                <div className="w-12 h-12 [perspective:1000px] shrink-0">
+                  <div
+                    className={cn(
+                      "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
+                      isStoolSliding ? "[transform:rotateY(180deg)]" : ""
+                    )}
+                  >
+                    {/* FRONT: Log Button */}
+                    <button
+                      onClick={async () => {
+                        await handleLogDigestion(
+                          activeType,
+                          null,
+                          selectedDate,
+                          activeStoolTime
+                        );
+                        setDraftStoolType(null);
+                        setDraftStoolTime("");
+                      }}
+                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                      title="Log Digestion"
+                    >
+                      <Check className="w-5 h-5 text-white" />
+                    </button>
+
+                    {/* BACK: Brown Bristol Stool SVG */}
+                    <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs">
+                      <BristolStoolIcon type={activeType} className="w-7 h-7" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic description below the section (only while sliding) */}
+              {isStoolSliding && (
+                <div className="px-1 text-left animate-fade-in">
+                  <span className="text-[11px] font-medium text-stone-500">
+                    {(() => {
+                      if (activeType === 1)
+                        return "Bristol Stool Type 1: Separate hard lumps, like nuts (hard to pass)";
+                      if (activeType === 2)
+                        return "Bristol Stool Type 2: Sausage-shaped, but lumpy";
+                      if (activeType === 3)
+                        return "Bristol Stool Type 3: Like a sausage, with cracks on surface";
+                      if (activeType === 4)
+                        return "Bristol Stool Type 4: Like a sausage or snake, smooth & soft (Optimal)";
+                      if (activeType === 5)
+                        return "Bristol Stool Type 5: Soft blobs with clear-cut edges";
+                      if (activeType === 6)
+                        return "Bristol Stool Type 6: Fluffy pieces with ragged edges, mushy stool";
+                      return "Bristol Stool Type 7: Watery, no solid pieces (entirely liquid)";
+                    })()}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Logged Digestion Entries List for selectedDate */}
+          {stoolLogsList.length > 0 ? (
+            <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
+              <span className="text-[10px] font-black uppercase text-stone-400">
+                Digestion Logs ({stoolLogsList.length})
+              </span>
+              {stoolLogsList.map((item) => {
+                const itemConstipated = item.type === 1 || item.type === 2;
+                const itemHealthy = item.type === 3 || item.type === 4;
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {item.time ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
+                          <Clock className="w-2.5 h-2.5 text-stone-400" />
+                          {formatInterestingTime(item.time)}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
+                          Today
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1.5 truncate">
+                        <BristolStoolIcon
+                          type={item.type}
+                          className="w-4 h-4 shrink-0"
+                        />
+                        <strong
+                          className={cn(
+                            "font-extrabold",
+                            itemConstipated
+                              ? "text-amber-600"
+                              : itemHealthy
+                              ? "text-emerald-600"
+                              : "text-sky-600"
+                          )}
+                        >
+                          {itemConstipated
+                            ? "Constipated"
+                            : itemHealthy
+                            ? "Healthy"
+                            : "Loose"}
+                        </strong>
+                        <span className="text-[10px] text-stone-400 font-semibold">
+                          (Type {item.type})
+                        </span>
+                      </div>
+                    </div>
+                    {selectedDate === todayStr && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (item.id === "legacy-stool") {
+                            await handleLogDigestion(null, null, selectedDate);
+                          } else {
+                            await handleDeleteStoolLogItem(
+                              item.id,
+                              selectedDate
+                            );
+                          }
+                        }}
+                        className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
+                        title="Remove digestion entry"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            selectedDate !== todayStr && (
+              <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
+                No digestion logged for this date
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      {/* 4. ENERGY TRACKER (POPS OUT WHEN TOGGLED) */}
+      {isEnergyActive && activeVitalsTab === "energy" && (
+        <div className="flex flex-col gap-2">
+
+          {selectedDate === todayStr && (
+            <div className="flex flex-col gap-2 w-full animate-fade-in">
+              <div className="flex items-center gap-2.5 w-full">
+                {/* Left: Time Pill */}
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTimePickerTarget("energy");
+                      setTimePickerInitialTime(activeEnergyTime);
+                      setIsTimePickerOpen(true);
+                    }}
+                    className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-stone-400" />
+                    <span>
+                      {formatInterestingTime(activeEnergyTime) ||
+                        activeEnergyTime}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Middle: Clean 1-5 Slider */}
+                <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    value={currentEnergy}
+                    onChange={(e) =>
+                      setDraftEnergy(parseInt(e.target.value))
+                    }
+                    onMouseDown={() => setIsEnergySliding(true)}
+                    onTouchStart={() => setIsEnergySliding(true)}
+                    onMouseUp={() =>
+                      setTimeout(() => setIsEnergySliding(false), 200)
+                    }
+                    onTouchEnd={() =>
+                      setTimeout(() => setIsEnergySliding(false), 200)
+                    }
+                    className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                  />
+                </div>
+
+                {/* Right: Action Box */}
+                <div className="w-12 h-12 [perspective:1000px] shrink-0">
+                  <div
+                    className={cn(
+                      "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
+                      isEnergySliding ? "[transform:rotateY(180deg)]" : ""
+                    )}
+                  >
+                    {/* FRONT: Log Button */}
+                    <button
+                      onClick={async () => {
+                        await handleLogEnergy(
+                          currentEnergy,
+                          selectedDate,
+                          activeEnergyTime
+                        );
+                        setDraftEnergy(null);
+                        setDraftEnergyTime("");
+                      }}
+                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                      title="Log Energy"
+                    >
+                      <Check className="w-5 h-5 text-white" />
+                    </button>
+
+                    {/* BACK: Energy Emoji Badge */}
+                    <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs text-lg select-none">
+                      {(() => {
+                        if (currentEnergy === 1) return "😴";
+                        if (currentEnergy === 2) return "🥱";
+                        if (currentEnergy === 3) return "⚡";
+                        if (currentEnergy === 4) return "🔥";
+                        return "🚀";
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic description below the section (only while sliding) */}
+              {isEnergySliding && (
+                <div className="px-1 text-left animate-fade-in">
+                  <span className="text-[11px] font-medium text-stone-500">
+                    {(() => {
+                      if (currentEnergy === 1)
+                        return "Energy Level 1: Extremely tired, struggling to focus";
+                      if (currentEnergy === 2)
+                        return "Energy Level 2: Low vitality, feeling sluggish";
+                      if (currentEnergy === 3)
+                        return "Energy Level 3: Moderate, stable & balanced energy";
+                      if (currentEnergy === 4)
+                        return "Energy Level 4: High vitality, feeling active & clear";
+                      return "Energy Level 5: Maximum peak performance & focus";
+                    })()}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Logged Energy Entries List for selectedDate */}
+          {energyLogsList.length > 0 ? (
+            <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
+              <span className="text-[10px] font-black uppercase text-stone-400">
+                Energy Logs ({energyLogsList.length})
+              </span>
+              {energyLogsList.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {item.time ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
+                        <Clock className="w-2.5 h-2.5 text-stone-400" />
+                        {formatInterestingTime(item.time)}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
+                        Today
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Zap className="w-3.5 h-3.5 text-stone-600 shrink-0" />
+                      <strong className="text-stone-900 font-extrabold">
+                        {(() => {
+                          if (item.level === 1) return "😴 Exhausted";
+                          if (item.level === 2) return "🥱 Sluggish";
+                          if (item.level === 3) return "⚡ Steady";
+                          if (item.level === 4) return "🔥 High Energy";
+                          return "🚀 Peak Vitality";
+                        })()}
+                      </strong>
+                      <span className="text-[10px] text-stone-400 font-semibold">
+                        (Level {item.level})
+                      </span>
+                    </div>
+                  </div>
+                  {selectedDate === todayStr && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (item.id === "legacy-energy") {
+                          await handleLogEnergy(null, selectedDate);
+                        } else {
+                          await handleDeleteEnergyLogItem(
+                            item.id,
+                            selectedDate
+                          );
+                        }
+                      }}
+                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
+                      title="Remove energy entry"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            selectedDate !== todayStr && (
+              <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
+                No energy logged for this date
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </section>
+  );
+};

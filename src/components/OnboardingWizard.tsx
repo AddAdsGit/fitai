@@ -397,28 +397,29 @@ export const OnboardingWizard = ({
     reader.readAsDataURL(file);
   };
 
-  // Generate Gemini AI Bio silently in the background
+  // Generate Gemini AI Self Note silently in the background
   const generateAiBioSilently = async (p: number, c: number, f: number, cal: number, fib: number): Promise<string> => {
     const age = metrics.age;
     const goalText = metrics.goal === "Lose Weight" ? `lose weight (target: ${metrics.targetWeight}kg)` : metrics.goal === "Build Muscle" ? `build muscle (target: ${metrics.targetWeight}kg)` : "maintain weight";
     const dietPrefs = metrics.preferences.length > 0 ? metrics.preferences.join(", ") : "no specific food restrictions";
     
-    const fallbackBio = `Hey, I'm ${metrics.name}! I'm tracking my nutrition to ${goalText}. Currently focusing on keeping ${metrics.activityLevel.toLowerCase()} and maintaining a target of ${cal} kcal daily.`;
+    const fallbackBio = `Focusing on ${goalText} with a target of ${cal} kcal & ${p}g protein daily! 💪`;
 
     try {
-      const prompt = `Write a brief, engaging, friendly first-person profile bio (maximum 2 sentences) for a user on a fitness app.
-Details:
+      const prompt = `Write a brief, motivating first-person personal self-note / reminder (maximum 1-2 short sentences) for a user's fitness profile.
+Examples:
+- "Focusing on ${p}g protein daily & staying active 💪"
+- "Building muscle and eating clean 🥗"
+- "Staying consistent with my ${cal} kcal daily goal 🚀"
+
+User Details:
 - Name: ${metrics.name}
-- Age: ${age}
-- Biology: ${metrics.gender}
-- Height: ${metrics.height}cm
-- Weight: ${metrics.weight}kg
 - Goal: ${goalText}
 - Activity Level: ${metrics.activityLevel}
 - Dietary Preferences/Restrictions: ${dietPrefs}
-- Target Intake: ${cal} calories, ${p}g protein, ${c}g carbs, ${f}g fats, ${fib}g fiber
+- Target Daily Intake: ${cal} kcal, ${p}g protein, ${c}g carbs, ${f}g fats
 
-Make it sound casual, optimistic, and clean. Do not include quotes or meta-commentary. Just output the bio.`;
+Make it punchy, personal, and clean. Do not include surrounding quotes or meta-commentary. Output only the self-note.`;
 
       const { data, error } = await supabase.functions.invoke("gemini", {
         body: { prompt }
@@ -428,7 +429,7 @@ Make it sound casual, optimistic, and clean. Do not include quotes or meta-comme
       const generated = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       return generated || fallbackBio;
     } catch (err) {
-      console.error("AI Bio Generation Error:", err);
+      console.error("AI Self-Note Generation Error:", err);
       return fallbackBio;
     }
   };
