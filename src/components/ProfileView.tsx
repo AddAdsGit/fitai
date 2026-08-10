@@ -808,7 +808,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
             )}
 
             {/* Instagram-Style Seamless Grid Display */}
-            <div className="grid grid-cols-3 gap-[1px] bg-orange-100/50 -mx-6 pb-6 mt-4">
+            <div className="grid grid-cols-3 gap-[1px] -mx-6 pb-6 mt-4">
               {showRecipesFilter &&
                 filteredRecipes.map((recipe) => (
                   <motion.div
