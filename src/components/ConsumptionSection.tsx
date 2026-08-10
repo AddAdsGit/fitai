@@ -456,19 +456,20 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                       </p>
                     )}
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       {[
                         { l: "Protein", v: meal.protein },
                         { l: "Carbs", v: meal.carbs },
                         { l: "Fats", v: meal.fats },
+                        { l: "Fiber", v: meal.fiber || 0 },
                       ].map((m) => (
                         <div key={m.l} className="flex items-center gap-1.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-white/70 shadow-sm" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-white/70 shadow-xs" />
                           <div className="flex items-baseline gap-1">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-white/50">
+                            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-white/60">
                               {m.l}
                             </span>
-                            <span className="text-sm font-bold text-white">
+                            <span className="text-xs sm:text-sm font-bold text-white">
                               {m.v}g
                             </span>
                           </div>

@@ -105,7 +105,7 @@ export function DailyProgressSection({
                       setActiveMacroPage(newPage);
                     }
                   }}
-                  className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 gap-6"
+                  className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-2 px-2 gap-4"
                 >
                   {pages.map((pageItems, pageIdx) => (
                     <div
