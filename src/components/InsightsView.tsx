@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { TrendingUp, Minus, Plus, Scale, X, Share2, Droplets, Zap, Activity, Utensils, Home, Sparkles } from "lucide-react";
+import { TrendingUp, Minus, Plus, Scale, X, Share2, Droplets, Zap, Activity, Utensils, Home, Sparkles, ChevronDown, Calendar } from "lucide-react";
 import { motion } from "motion/react";
 import {
   BarChart,
@@ -23,6 +23,8 @@ import {
 import { cn } from "../lib/utils";
 import type { Meal, WeightLog } from "../types";
 import { normalizeTrackedNutrients } from "../constants/nutrition";
+
+type TimeRangeOption = "7D" | "14D" | "30D" | "60D" | "90D" | "CUSTOM";
 
 const ProgressBar = ({
   value,
@@ -149,6 +151,18 @@ export const InsightsView = ({
     return `${y}-${m}-${d}`;
   };
 
+  const getTimeRangeLabel = (range: TimeRangeOption) => {
+    switch (range) {
+      case "7D": return "7 Days";
+      case "14D": return "14 Days";
+      case "30D": return "30 Days";
+      case "60D": return "60 Days";
+      case "90D": return "90 Days";
+      case "CUSTOM": return "Custom Range";
+      default: return "7 Days";
+    }
+  };
+
   const dateRangeBounds = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -157,8 +171,14 @@ export const InsightsView = ({
 
     if (timeRange === "7D") {
       start.setDate(today.getDate() - 6);
+    } else if (timeRange === "14D") {
+      start.setDate(today.getDate() - 13);
     } else if (timeRange === "30D") {
       start.setDate(today.getDate() - 29);
+    } else if (timeRange === "60D") {
+      start.setDate(today.getDate() - 59);
+    } else if (timeRange === "90D") {
+      start.setDate(today.getDate() - 89);
     } else if (timeRange === "CUSTOM") {
       start = new Date(customStartDate + "T00:00:00");
       end = new Date(customEndDate + "T23:59:59");
@@ -444,95 +464,22 @@ export const InsightsView = ({
       transition={{ duration: 0.3 }}
       className="px-6 mt-8 relative z-10 space-y-6 pb-12 font-sans"
     >
-      {/* Page Title & Filter Bar */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight text-orange-950">
-              Your Progress
-            </h2>
-            <p className="text-[11px] font-medium text-orange-950/50 mt-0.5">
-              Analytics & Insights Digest
-            </p>
-          </div>
-          <div className="flex bg-orange-100/50 rounded-full p-1 border border-orange-200/30 shrink-0 self-start sm:self-auto">
-            {(
-              [
-                { id: "7D", label: "7D" },
-                { id: "30D", label: "30D" },
-                { id: "CUSTOM", label: "Custom" },
-              ] as const
-            ).map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setTimeRange(item.id);
-                  if (item.id === "CUSTOM") {
-                    setShowCustomPicker(true);
-                  } else {
-                    setShowCustomPicker(false);
-                  }
-                }}
-                className={cn(
-                  "text-[10px] font-black uppercase tracking-[0.1em] px-3.5 py-1.5 rounded-full transition-all cursor-pointer",
-                  timeRange === item.id
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : "text-orange-900/60 hover:text-orange-900",
-                )}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Page Title & Range Selector Badge */}
+      <div className="flex justify-between items-center min-w-0 gap-2">
+        <h2 className="text-2xl font-black tracking-tight text-orange-950 truncate">
+          Your Progress
+        </h2>
 
-        {/* Collapsible Custom Date Picker Panel */}
-        {(timeRange === "CUSTOM" || showCustomPicker) && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-white/60 backdrop-blur-md rounded-[24px] p-4 border border-white/80 shadow-sm space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-orange-950 uppercase tracking-wider">
-                Select Custom Dates
-              </span>
-              <button
-                onClick={() => setShowCustomPicker(false)}
-                className="w-6 h-6 rounded-full bg-orange-100/50 text-orange-950 flex items-center justify-center text-xs font-bold cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[9px] font-black text-orange-950/50 uppercase tracking-wider mb-1">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-full bg-white/80 border border-orange-200/60 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 focus:outline-none focus:border-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[9px] font-black text-orange-950/50 uppercase tracking-wider mb-1">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-full bg-white/80 border border-orange-200/60 rounded-xl px-3 py-2 text-xs font-bold text-orange-950 focus:outline-none focus:border-orange-500"
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
+        {/* Compact Dropdown Trigger Badge */}
+        <button
+          onClick={() => setShowCustomPicker(true)}
+          className="bg-orange-100/70 hover:bg-orange-200/80 text-orange-950 px-3.5 py-1.5 rounded-full text-xs font-black tracking-tight border border-orange-200/60 flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer select-none shrink-0"
+          title="Change time range"
+        >
+          <Calendar className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+          <span>{getTimeRangeLabel(timeRange)}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+        </button>
       </div>
 
       {/* Metrics Row (Streak Cards with Minimal Icon-Only Share) */}
@@ -1200,6 +1147,106 @@ export const InsightsView = ({
           ))}
         </div>
       </div>
+
+      {/* TIME RANGE PICKER BOTTOM SHEET MODAL */}
+      {showCustomPicker && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
+          <div
+            className="fixed inset-0"
+            onClick={() => setShowCustomPicker(false)}
+          />
+          <div className="w-full max-w-md bg-white rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl border border-stone-200 space-y-6 font-sans relative z-10 animate-slide-up">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-black text-orange-950">Select Time Range</h3>
+                <p className="text-xs text-stone-400 font-semibold mt-0.5">
+                  Choose a quick preset or set custom dates
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCustomPicker(false)}
+                className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:text-stone-800 transition-colors cursor-pointer border-none"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick Presets Grid */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
+                Quick Presets
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "7D", label: "7 Days" },
+                  { id: "14D", label: "14 Days" },
+                  { id: "30D", label: "30 Days" },
+                  { id: "60D", label: "60 Days" },
+                  { id: "90D", label: "90 Days" },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setTimeRange(item.id as TimeRangeOption);
+                      setShowCustomPicker(false);
+                    }}
+                    className={cn(
+                      "py-2.5 px-3 rounded-2xl text-xs font-black transition-all cursor-pointer border text-center active:scale-95",
+                      timeRange === item.id
+                        ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
+                        : "bg-stone-50 text-stone-700 border-stone-200/80 hover:bg-stone-100"
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Date Pickers */}
+            <div className="space-y-3 pt-2 border-t border-stone-100">
+              <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
+                Custom Dates
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-[10px] font-bold text-stone-500 block mb-1">
+                    Start Date
+                  </span>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200/80 rounded-xl p-2.5 text-xs font-bold text-stone-800 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-stone-500 block mb-1">
+                    End Date
+                  </span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200/80 rounded-xl p-2.5 text-xs font-bold text-stone-800 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Apply Custom Range Button */}
+            <button
+              onClick={() => {
+                setTimeRange("CUSTOM");
+                setShowCustomPicker(false);
+              }}
+              className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-black rounded-2xl shadow-lg shadow-orange-500/25 active:scale-95 transition-all cursor-pointer border-none"
+            >
+              Apply Custom Range
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
