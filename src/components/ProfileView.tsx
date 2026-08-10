@@ -808,14 +808,14 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
             )}
 
             {/* Instagram-Style Seamless Grid Display */}
-            <div className="grid grid-cols-3 gap-[1px] bg-stone-200/80 -mx-6 pb-6">
+            <div className="grid grid-cols-3 gap-[1px] bg-orange-100/50 -mx-6 pb-6 mt-4">
               {showRecipesFilter &&
                 filteredRecipes.map((recipe) => (
                   <motion.div
                     key={recipe.id}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => openRecipeDetails(recipe)}
-                    className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150"
+                    className="aspect-square bg-orange-50/40 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150"
                   >
                     {!hasNoGeneratedImage(recipe.image) ? (
                       <RecipeImage
@@ -860,7 +860,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                       key={`past-log-${meal.id}`}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setSelectedMealPopup(meal)}
-                      className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150"
+                      className="aspect-square bg-orange-50/40 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150"
                     >
                       {meal.image && !hasNoGeneratedImage(meal.image) ? (
                         <img src={meal.image} className="w-full h-full object-cover" alt={meal.name} />
@@ -893,19 +893,19 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                   );
                 })}
 
-              {/* Empty State */}
+              {/* Warm Cream Empty State */}
               {((!showRecipesFilter || filteredRecipes.length === 0) &&
                 (!showLogsFilter || filteredPastLogs.length === 0)) && (
-                <div className="col-span-3 text-center py-12 bg-white/55 border border-dashed border-orange-100 rounded-[28px] p-6 mx-6 font-sans">
+                <div className="col-span-3 text-center py-10 bg-white/90 backdrop-blur-md border border-dashed border-orange-200/80 rounded-[28px] p-6 my-4 mx-6 shadow-sm font-sans">
                   <span className="text-3xl inline-block">
                     {!showRecipesFilter && !showLogsFilter ? "🔍" : "🍲"}
                   </span>
-                  <h5 className="font-bold text-xs text-orange-950 mt-2 font-sans font-extrabold text-center">
+                  <h5 className="font-extrabold text-xs text-orange-950 mt-2 text-center">
                     {!showRecipesFilter && !showLogsFilter
                       ? "No Categories Active"
                       : "No Matching Items Found"}
                   </h5>
-                  <p className="text-[10px] text-orange-950/40 font-sans font-medium text-center mt-1">
+                  <p className="text-[10px] text-orange-950/50 font-medium text-center mt-1">
                     {!showRecipesFilter && !showLogsFilter
                       ? "Tap 'Recipes' or 'Past Foods' above to view items."
                       : "Try adjusting your search query or enabling toggles above."}
