@@ -457,41 +457,41 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               <DefaultAvatar />
             )}
           </div>
-          <div className="flex-1 flex justify-around">
+          <div className="flex-1 grid grid-cols-3 gap-1 min-w-0 text-center items-center">
             <div
               onClick={() => openGoalConfig("dailyCalories")}
-              className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 p-1 px-2 rounded-xl transition-all select-none"
+              className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 py-1 px-0.5 rounded-xl transition-all select-none min-w-0"
               title="Tap to edit daily calorie goal"
             >
-              <div className="text-xl font-black text-[#1a1a1a]">
+              <div className="text-lg sm:text-xl font-black text-[#1a1a1a] truncate font-mono">
                 {profileData.goals?.dailyCalories || profileData.daily_calories_goal || 2000}
               </div>
-              <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
-                Goal(kcal)
+              <div className="text-[9px] font-extrabold text-[#9e9e9e] uppercase tracking-tight truncate w-full">
+                KCAL GOAL
               </div>
             </div>
             <div
               onClick={() => setProfileTab("insights")}
-              className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 p-1 px-2 rounded-xl transition-all select-none"
+              className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 py-1 px-0.5 rounded-xl transition-all select-none min-w-0"
               title="Tap to view weight progress & log weight"
             >
-              <div className="text-xl font-black text-[#1a1a1a]">
+              <div className="text-lg sm:text-xl font-black text-[#1a1a1a] truncate font-mono">
                 {profileData.weight || 0}
               </div>
-              <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
-                Weight(kg)
+              <div className="text-[9px] font-extrabold text-[#9e9e9e] uppercase tracking-tight truncate w-full">
+                WEIGHT (KG)
               </div>
             </div>
             <div
               onClick={() => openGoalConfig("weightGoal")}
-              className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 p-1 px-2 rounded-xl transition-all select-none"
+              className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 py-1 px-0.5 rounded-xl transition-all select-none min-w-0"
               title="Tap to edit weight goal"
             >
-              <div className="text-xl font-black text-[#1a1a1a]">
+              <div className="text-lg sm:text-xl font-black text-[#1a1a1a] truncate font-mono">
                 {profileData.goals?.weightGoal || profileData.weight_goal || profileData.weight || 0}
               </div>
-              <div className="text-[10px] font-bold text-[#9e9e9e] uppercase tracking-wider">
-                Target(kg)
+              <div className="text-[9px] font-extrabold text-[#9e9e9e] uppercase tracking-tight truncate w-full">
+                TARGET (KG)
               </div>
             </div>
           </div>

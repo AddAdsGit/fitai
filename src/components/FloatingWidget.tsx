@@ -60,7 +60,7 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
       whileTap={{ scale: 0.95 }}
       onClick={() => onExecuteAction(actionType)}
       className={cn(
-        "fixed bottom-24 right-5 w-12 h-12 rounded-full flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-stone-900/15 z-40 border-none cursor-pointer transition-all active:scale-95 select-none"
+        "fixed bottom-28 right-5 sm:right-[calc(50%-210px)] w-12 h-12 rounded-full flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 z-40 border-none cursor-pointer transition-all active:scale-95 select-none"
       )}
       title={getLabel()}
     >

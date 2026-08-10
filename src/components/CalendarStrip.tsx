@@ -33,8 +33,8 @@ export function CalendarStrip({
   return (
     <div id="calendar-strip" className="px-6 mt-8 relative z-10 space-y-4">
       {/* Date Selector & Snap-to-Today Header */}
-      <div className="flex justify-between items-center px-1">
-        <span className="text-xs font-black uppercase tracking-widest text-stone-500">
+      <div className="flex justify-between items-center px-1 gap-2 min-w-0">
+        <span className="text-xs font-black uppercase tracking-widest text-stone-500 truncate min-w-0">
           {getFormattedSelectedDate()}
         </span>
         <div className="flex items-center gap-2">
