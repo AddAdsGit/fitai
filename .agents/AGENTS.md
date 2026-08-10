@@ -19,3 +19,10 @@ This file defines critical rules that all AI developers and code-generation suba
 * **Weight Tracker:** In weight analytics, do NOT display redundant Start/Current/Goal stats. Display ONLY `Average Weight (kg)` with `avg from X logged days`.
 * **Chart Zero Drops:** Do NOT plot dots or drop lines to 0 for unlogged days on charts.
 
+## 3. Modal Stacking Context & Portal Rule (No BottomNav Overlap)
+* **React Portals (`createPortal`):** ALL popup modals, bottom sheets, date range pickers, vitals modals, and dialog overlays MUST be rendered using React's `createPortal(..., document.body)` with `z-[9999]`.
+* **Reasoning:** Sub-page components sit inside lower `z-10` container layers. If a popup is rendered inside a sub-component, it gets trapped in `z-10`, allowing `BottomNav` (`z-50`) to render on top of the popup. Rendering popups directly on `document.body` guarantees they float **100% above everything**.
+
+## 4. Mobile Header Congestion & Stat Grid Rule
+* **Header Title + Filter Row:** NEVER squeeze multi-pill filter bars on the same horizontal flex row as a large page heading (e.g., `Your Progress`) on mobile. ALWAYS use a single compact dropdown trigger badge (`[ 7 Days ▾ ]`) or stack them cleanly.
+* **Multi-Stat Headers:** Header columns displaying 3 or more stat metrics (e.g. `KCAL GOAL`, `WEIGHT`, `TARGET`) MUST use a locked CSS grid (`grid grid-cols-3 gap-1 min-w-0 truncate`) so text never clips off-screen on 360px phones.

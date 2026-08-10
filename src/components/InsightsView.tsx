@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { TrendingUp, Minus, Plus, Scale, X, Share2, Droplets, Zap, Activity, Utensils, Home, Sparkles, ChevronDown, Calendar } from "lucide-react";
 import { motion } from "motion/react";
 import {
@@ -1148,105 +1149,107 @@ export const InsightsView = ({
         </div>
       </div>
 
-      {/* TIME RANGE PICKER BOTTOM SHEET MODAL */}
-      {showCustomPicker && (
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
-          <div
-            className="fixed inset-0"
-            onClick={() => setShowCustomPicker(false)}
-          />
-          <div className="w-full max-w-md bg-white rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl border border-stone-200 space-y-6 font-sans relative z-10 animate-slide-up">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-lg font-black text-orange-950">Select Time Range</h3>
-                <p className="text-xs text-stone-400 font-semibold mt-0.5">
-                  Choose a quick preset or set custom dates
-                </p>
+      {/* TIME RANGE PICKER BOTTOM SHEET MODAL (PORTAL TO BODY) */}
+      {showCustomPicker &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
+            <div
+              className="fixed inset-0"
+              onClick={() => setShowCustomPicker(false)}
+            />
+            <div className="w-full max-w-md bg-white rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl border border-stone-200 space-y-6 font-sans relative z-10 animate-slide-up">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-black text-orange-950">Select Time Range</h3>
+                  <p className="text-xs text-stone-400 font-semibold mt-0.5">
+                    Choose a quick preset or set custom dates
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCustomPicker(false)}
+                  className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:text-stone-800 transition-colors cursor-pointer border-none"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
+
+              {/* Quick Presets Grid */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
+                  Quick Presets
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "7D", label: "7 Days" },
+                    { id: "14D", label: "14 Days" },
+                    { id: "30D", label: "30 Days" },
+                    { id: "60D", label: "60 Days" },
+                    { id: "90D", label: "90 Days" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setTimeRange(item.id as TimeRangeOption);
+                        setShowCustomPicker(false);
+                      }}
+                      className={cn(
+                        "py-2.5 px-3 rounded-2xl text-xs font-black transition-all cursor-pointer border text-center active:scale-95",
+                        timeRange === item.id
+                          ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
+                          : "bg-stone-50 text-stone-700 border-stone-200/80 hover:bg-stone-100"
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Date Pickers */}
+              <div className="space-y-3 pt-2 border-t border-stone-100">
+                <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
+                  Custom Dates
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-stone-500 block mb-1">
+                      Start Date
+                    </span>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200/80 rounded-xl p-2.5 text-xs font-bold text-stone-800 focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-stone-500 block mb-1">
+                      End Date
+                    </span>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="w-full bg-stone-50 border border-stone-200/80 rounded-xl p-2.5 text-xs font-bold text-stone-800 focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Apply Custom Range Button */}
               <button
-                onClick={() => setShowCustomPicker(false)}
-                className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:text-stone-800 transition-colors cursor-pointer border-none"
+                onClick={() => {
+                  setTimeRange("CUSTOM");
+                  setShowCustomPicker(false);
+                }}
+                className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-black rounded-2xl shadow-lg shadow-orange-500/25 active:scale-95 transition-all cursor-pointer border-none"
               >
-                <X className="w-4 h-4" />
+                Apply Custom Range
               </button>
             </div>
-
-            {/* Quick Presets Grid */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
-                Quick Presets
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: "7D", label: "7 Days" },
-                  { id: "14D", label: "14 Days" },
-                  { id: "30D", label: "30 Days" },
-                  { id: "60D", label: "60 Days" },
-                  { id: "90D", label: "90 Days" },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setTimeRange(item.id as TimeRangeOption);
-                      setShowCustomPicker(false);
-                    }}
-                    className={cn(
-                      "py-2.5 px-3 rounded-2xl text-xs font-black transition-all cursor-pointer border text-center active:scale-95",
-                      timeRange === item.id
-                        ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
-                        : "bg-stone-50 text-stone-700 border-stone-200/80 hover:bg-stone-100"
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Date Pickers */}
-            <div className="space-y-3 pt-2 border-t border-stone-100">
-              <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
-                Custom Dates
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-[10px] font-bold text-stone-500 block mb-1">
-                    Start Date
-                  </span>
-                  <input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full bg-stone-50 border border-stone-200/80 rounded-xl p-2.5 text-xs font-bold text-stone-800 focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-stone-500 block mb-1">
-                    End Date
-                  </span>
-                  <input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full bg-stone-50 border border-stone-200/80 rounded-xl p-2.5 text-xs font-bold text-stone-800 focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Apply Custom Range Button */}
-            <button
-              onClick={() => {
-                setTimeRange("CUSTOM");
-                setShowCustomPicker(false);
-              }}
-              className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-black rounded-2xl shadow-lg shadow-orange-500/25 active:scale-95 transition-all cursor-pointer border-none"
-            >
-              Apply Custom Range
-            </button>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </motion.div>
   );
 };
