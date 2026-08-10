@@ -704,39 +704,37 @@ export const EditProfileView = ({
                 </button>
               </div>
             </div>
+          </div>
 
-              {/* Unified Nutrient Tracker (Master Switch Removed, Up to 8 Slots Total) */}
-              <div className="pt-3 border-t border-stone-100 space-y-3 text-left">
-                <div className="flex justify-between items-center px-1">
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-black text-stone-800 uppercase tracking-wider">
-                        Nutrient Tracker
-                      </span>
-                      {(() => {
-                        const trackedList = profileData.tracked_nutrients || [];
-                        const activeCount = trackedList.filter((n: any) => n.enabled ?? true).length;
-                        return (
-                          <span
-                            className={cn(
-                              "text-[8px] font-black font-mono px-1.5 py-0.2 rounded-md border",
-                              activeCount >= 8
-                                ? "bg-amber-50 text-amber-700 border-amber-200"
-                                : "bg-stone-100 text-stone-500 border-stone-200/80"
-                            )}
-                          >
-                            {activeCount}/8 Active Slots
-                          </span>
-                        );
-                      })()}
-                    </div>
-                    <span className="text-[9px] font-medium text-stone-400">
-                      Track Calories only, or add up to 8 macro & micro nutrient targets
-                    </span>
-                  </div>
+          {/* Card: Nutrient Tracking (Dedicated Section) */}
+          <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
+            <div className="flex items-center justify-between pb-2 border-b border-stone-50">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
+                  <Activity className="w-4 h-4 text-orange-500" />
                 </div>
-
-                <div className="space-y-3 pt-1 relative">
+                <h3 className="text-sm font-extrabold text-[#1a1a1a]">
+                  Nutrient Tracking
+                </h3>
+              </div>
+              {(() => {
+                const trackedList = profileData.tracked_nutrients || [];
+                const activeCount = trackedList.filter((n: any) => n.enabled ?? true).length;
+                return (
+                  <span
+                    className={cn(
+                      "text-[9px] font-black font-mono px-2 py-0.5 rounded-full border",
+                      activeCount >= 8
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : "bg-orange-50 text-orange-600 border-orange-200/80"
+                    )}
+                  >
+                    {activeCount}/8 Active Slots
+                  </span>
+                );
+              })()}
+            </div>
+            <div className="space-y-3 pt-1 relative">
                   {/* Search Bar Input */}
                   <div ref={dropdownRef} className="relative">
                     <div className="flex items-center gap-2 bg-stone-50 border border-stone-200/90 rounded-2xl px-3 py-2 shadow-2xs focus-within:ring-2 focus-within:ring-orange-500/20 focus-within:border-orange-500/50 transition-all">
@@ -1051,7 +1049,6 @@ export const EditProfileView = ({
                   })()}
                 </div>
               </div>
-            </div>
 
         {/* Card 5: Tracking Tags */}
           <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">

@@ -634,31 +634,29 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                     className="flex items-center justify-between gap-1.5 font-sans w-full"
                   >
                     {/* Left: 2 Multi-Toggle Pills (Recipes & Logs) */}
-                    <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar-all py-0.5">
+                    <div className="flex items-center gap-1.5 shrink-0 py-0.5">
                       <button
                         onClick={() => setShowRecipesFilter(!showRecipesFilter)}
                         className={cn(
-                          "px-3.5 py-1.5 rounded-full text-xs transition-all cursor-pointer select-none shrink-0 flex items-center gap-1.5",
+                          "px-3 py-1.5 rounded-full text-xs transition-all cursor-pointer select-none shrink-0 flex items-center justify-center font-black active:scale-95",
                           showRecipesFilter
-                            ? "bg-[#1a1a1a] text-white font-extrabold shadow-sm"
-                            : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 font-bold border border-stone-200/40 opacity-70"
+                            ? "bg-orange-500 text-white shadow-md shadow-orange-500/20 border border-orange-500"
+                            : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 border border-stone-200/40 opacity-70"
                         )}
                       >
                         <span>Recipes</span>
-                        {showRecipesFilter && <Check className="w-3 h-3 text-orange-400 shrink-0" />}
                       </button>
 
                       <button
                         onClick={() => setShowLogsFilter(!showLogsFilter)}
                         className={cn(
-                          "px-3.5 py-1.5 rounded-full text-xs transition-all cursor-pointer select-none shrink-0 flex items-center gap-1.5",
+                          "px-3 py-1.5 rounded-full text-xs transition-all cursor-pointer select-none shrink-0 flex items-center justify-center font-black active:scale-95",
                           showLogsFilter
-                            ? "bg-[#1a1a1a] text-white font-extrabold shadow-sm"
-                            : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 font-bold border border-stone-200/40 opacity-70"
+                            ? "bg-orange-500 text-white shadow-md shadow-orange-500/20 border border-orange-500"
+                            : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 border border-stone-200/40 opacity-70"
                         )}
                       >
                         <span>Past Foods</span>
-                        {showLogsFilter && <Check className="w-3 h-3 text-orange-400 shrink-0" />}
                       </button>
                     </div>
 
@@ -809,15 +807,15 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               </div>
             )}
 
-            {/* Grid Display */}
-            <div className="grid grid-cols-3 gap-[1.5px] -mx-6 pb-6">
+            {/* Instagram-Style Seamless Grid Display */}
+            <div className="grid grid-cols-3 gap-[1px] bg-stone-200/80 -mx-6 pb-6">
               {showRecipesFilter &&
                 filteredRecipes.map((recipe) => (
                   <motion.div
                     key={recipe.id}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => openRecipeDetails(recipe)}
-                    className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150 border border-white/5"
+                    className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150"
                   >
                     {!hasNoGeneratedImage(recipe.image) ? (
                       <RecipeImage
@@ -862,7 +860,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                       key={`past-log-${meal.id}`}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => setSelectedMealPopup(meal)}
-                      className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150 border border-white/5"
+                      className="aspect-square bg-stone-100 overflow-hidden relative cursor-pointer select-none active:brightness-90 transition-all duration-150"
                     >
                       {meal.image && !hasNoGeneratedImage(meal.image) ? (
                         <img src={meal.image} className="w-full h-full object-cover" alt={meal.name} />
