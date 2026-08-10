@@ -463,7 +463,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 py-1 px-0.5 rounded-xl transition-all select-none min-w-0"
               title="Tap to edit daily calorie goal"
             >
-              <div className="text-lg sm:text-xl font-black text-[#1a1a1a] truncate font-mono">
+              <div className="text-lg sm:text-xl font-black text-[#1a1a1a] truncate font-sans">
                 {profileData.goals?.dailyCalories || profileData.daily_calories_goal || 2000}
               </div>
               <div className="text-[9px] font-extrabold text-[#9e9e9e] uppercase tracking-tight truncate w-full">
@@ -475,7 +475,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 py-1 px-0.5 rounded-xl transition-all select-none min-w-0"
               title="Tap to view weight progress & log weight"
             >
-              <div className="text-lg sm:text-xl font-black text-[#1a1a1a] truncate font-mono">
+              <div className="text-lg sm:text-xl font-black text-[#1a1a1a] truncate font-sans">
                 {profileData.weight || 0}
               </div>
               <div className="text-[9px] font-extrabold text-[#9e9e9e] uppercase tracking-tight truncate w-full">
@@ -487,7 +487,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               className="flex flex-col items-center cursor-pointer hover:bg-stone-100/50 py-1 px-0.5 rounded-xl transition-all select-none min-w-0"
               title="Tap to edit weight goal"
             >
-              <div className="text-lg sm:text-xl font-black text-[#1a1a1a] truncate font-mono">
+              <div className="text-lg sm:text-xl font-black text-[#1a1a1a] truncate font-sans">
                 {profileData.goals?.weightGoal || profileData.weight_goal || profileData.weight || 0}
               </div>
               <div className="text-[9px] font-extrabold text-[#9e9e9e] uppercase tracking-tight truncate w-full">
