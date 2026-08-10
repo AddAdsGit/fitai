@@ -74,8 +74,6 @@ const ProgressBar = ({
 
 export { ProgressBar };
 
-type TimeRangeOption = "7D" | "30D" | "CUSTOM";
-
 const CustomScatterTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
