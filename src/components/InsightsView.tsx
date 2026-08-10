@@ -446,11 +446,16 @@ export const InsightsView = ({
     >
       {/* Page Title & Filter Bar */}
       <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-black tracking-tight text-orange-950">
-            Your Progress
-          </h2>
-          <div className="flex bg-orange-100/50 rounded-full p-1 border border-orange-200/30">
+        <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-orange-950">
+              Your Progress
+            </h2>
+            <p className="text-[11px] font-medium text-orange-950/50 mt-0.5">
+              Analytics & Insights Digest
+            </p>
+          </div>
+          <div className="flex bg-orange-100/50 rounded-full p-1 border border-orange-200/30 shrink-0 self-start sm:self-auto">
             {(
               [
                 { id: "7D", label: "7D" },
@@ -469,7 +474,7 @@ export const InsightsView = ({
                   }
                 }}
                 className={cn(
-                  "text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1.5 rounded-full transition-all cursor-pointer",
+                  "text-[10px] font-black uppercase tracking-[0.1em] px-3.5 py-1.5 rounded-full transition-all cursor-pointer",
                   timeRange === item.id
                     ? "bg-orange-500 text-white shadow-sm"
                     : "text-orange-900/60 hover:text-orange-900",
