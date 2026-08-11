@@ -26,3 +26,10 @@ This file defines critical rules that all AI developers and code-generation suba
 ## 4. Mobile Header Congestion & Stat Grid Rule
 * **Header Title + Filter Row:** NEVER squeeze multi-pill filter bars on the same horizontal flex row as a large page heading (e.g., `Your Progress`) on mobile. ALWAYS use a single compact dropdown trigger badge (`[ 7 Days ▾ ]`) or stack them cleanly.
 * **Multi-Stat Headers:** Header columns displaying 3 or more stat metrics (e.g. `KCAL GOAL`, `WEIGHT`, `TARGET`) MUST use a locked CSS grid (`grid grid-cols-3 gap-1 min-w-0 truncate`) so text never clips off-screen on 360px phones.
+
+## 5. Unbreakable Minimalist UI/UX & Micro-copy Rules
+* **Reference Skill**: Read `.agents/skills/fitai-design-system/SKILL.md` before making UI design edits.
+* **The Dashboard is the Truth-Teller**: All new screens, settings pages, and modals MUST match the exact Warm Cream (`#FAF7F2`) background, soft pure-white cards (`rounded-[32px] shadow-xl shadow-orange-100/20`), uppercase micro-typography (`text-[10px] font-black tracking-widest text-orange-950`), and zero-clutter layout demonstrated in the main Dashboard screen.
+* **No Verbose / Complicated Copy**: Keep titles & labels direct, ultra-short, and functional (e.g. `Your Name`, `Today's Progress`). Never add conversational explanatory subtext under basic labels.
+* **No Unnecessary Section Headers**: Do not add section headers above inputs when the UI context/placeholder is already clear.
+* **No Emoji Soup or Rainbow Icons**: Never use multi-colored emoji soup in section titles. Use clean typography or single-tint monochrome Lucide SVG icons matching the espresso or orange brand palette.
