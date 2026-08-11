@@ -641,29 +641,33 @@ export const OnboardingWizard = ({
               </h2>
             </div>
 
-            {/* Activity Level Selector */}
+            {/* Primary Goal Selector (Pure Typography) */}
             <div className="space-y-1">
               <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Activity Level
+                Primary Goal
               </label>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: "Sedentary", label: "Sedentary" },
-                  { id: "Lightly Active", label: "Light" },
-                  { id: "Moderately Active", label: "Moderate" },
-                  { id: "Very Active", label: "Active" },
-                ].map((act) => (
+                  { id: "Lose Weight", label: "Fat Loss" },
+                  { id: "Maintain Weight", label: "Maintain" },
+                  { id: "Build Muscle", label: "Muscle Gain" },
+                ].map((g) => (
                   <button
-                    key={act.id}
+                    key={g.id}
                     type="button"
-                    onClick={() => handleActivityLevelChange(act.id as any)}
-                    className={`py-2 px-1 rounded-xl border text-center text-[10px] font-black uppercase tracking-tight cursor-pointer ${
-                      metrics.activityLevel === act.id
-                        ? "bg-orange-500 border-orange-500 text-white shadow-sm"
-                        : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
+                    onClick={() => {
+                      const updatedMetrics = { ...metrics, goal: g.id as any };
+                      setMetrics(updatedMetrics);
+                      const rec = calculateRecommendedTargets(updatedMetrics);
+                      setTargets(rec);
+                    }}
+                    className={`py-2.5 px-2 rounded-2xl border text-center text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                      metrics.goal === g.id
+                        ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-100"
+                        : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
                     }`}
                   >
-                    {act.label}
+                    {g.label}
                   </button>
                 ))}
               </div>
