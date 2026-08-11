@@ -9,10 +9,11 @@ import {
   Check,
   Zap,
   Activity,
-  Heart,
+  Scale,
   Droplet,
   Flame,
-  Scale
+  ShieldCheck,
+  Utensils
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -98,7 +99,7 @@ export const OnboardingWizard = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
-  // Targets state (configured on Step 3)
+  // Targets state (configured on Step 3 & 4)
   const [targets, setTargets] = useState({
     calories: 2000,
     protein: 150,
@@ -107,10 +108,9 @@ export const OnboardingWizard = ({
     fiber: 30,
   });
 
-  const [showAdvancedMacros, setShowAdvancedMacros] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<"free" | "pro">("pro");
 
-  // Vitals Selection State (Step 4)
+  // Vitals Selection State (Step 5)
   const [selectedVitals, setSelectedVitals] = useState({
     weight: true,
     water: false,
@@ -124,15 +124,15 @@ export const OnboardingWizard = ({
   ]);
   const [selectedMicros, setSelectedMicros] = useState<string[]>([]);
 
-  // Step 5 AI Generation Loading animation
+  // Step 6 AI Generation Loading animation
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState("Calculating metabolic baseline...");
 
-  const totalSteps = 6;
+  const totalSteps = 7;
 
-  // Handle Step 5 auto-progress animation
+  // Handle Step 6 auto-progress animation
   useEffect(() => {
-    if (step === 5) {
+    if (step === 6) {
       setGenerationProgress(0);
       setGenerationStatus("Calculating metabolic baseline...");
 
@@ -152,7 +152,7 @@ export const OnboardingWizard = ({
       }, 1800);
 
       const t4 = setTimeout(() => {
-        setStep(6);
+        setStep(7);
       }, 2300);
 
       return () => {
@@ -181,7 +181,11 @@ export const OnboardingWizard = ({
   };
 
   const handleBack = () => {
-    if (step === 5) return; // cannot go back during generating step
+    if (step === 6) return; // cannot go back during generating step
+    if (step === 7) {
+      setStep(5); // skip generating step when going back from pricing screen
+      return;
+    }
     setStep(prev => Math.max(1, prev - 1));
   };
 
@@ -315,8 +319,6 @@ export const OnboardingWizard = ({
 
   const generateAiBioSilently = async (p: number, c: number, f: number, cal: number, fib: number): Promise<string> => {
     const goalText = metrics.goal === "Lose Weight" ? `lose weight (target: ${metrics.targetWeight}kg)` : metrics.goal === "Build Muscle" ? `build muscle (target: ${metrics.targetWeight}kg)` : "maintain weight";
-    const dietPrefs = metrics.preferences.length > 0 ? metrics.preferences.join(", ") : "no specific food restrictions";
-    
     const fallbackBio = `Focusing on ${goalText} with a target of ${cal} kcal & ${p}g protein daily! 💪`;
 
     try {
@@ -462,11 +464,11 @@ export const OnboardingWizard = ({
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-6 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
       
-      {/* Header Progress */}
+      {/* Sleek Header Progress Bar (No Step Text) */}
       <div className="w-full flex items-center justify-between gap-4 py-2 border-b border-stone-200/50">
         <button
           onClick={handleBack}
-          disabled={step === 1 || step === 5}
+          disabled={step === 1 || step === 6}
           className="w-8 h-8 rounded-full flex items-center justify-center bg-stone-100 hover:bg-stone-200 text-stone-600 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-none"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -478,10 +480,6 @@ export const OnboardingWizard = ({
             className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all duration-300"
           />
         </div>
-        
-        <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest shrink-0">
-          Step {step} of {totalSteps}
-        </span>
       </div>
 
       {/* Steps Content */}
@@ -675,18 +673,18 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 3: DAILY TARGETS */}
+        {/* STEP 3: DAILY GOALS (SPACIOUS & UNCLUTTERED) */}
         {step === 3 && (
-          <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
+          <div className="space-y-5 animate-fadeIn">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Daily Targets
+                Daily Goals
               </h2>
             </div>
 
-            {/* Primary Goal Selector (Pure Typography) */}
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
+            {/* Primary Goal Selector */}
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
                 Primary Goal
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -704,7 +702,7 @@ export const OnboardingWizard = ({
                       const rec = calculateRecommendedTargets(updatedMetrics);
                       setTargets(rec);
                     }}
-                    className={`py-2.5 px-2 rounded-2xl border text-center text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                    className={`py-3 px-2 rounded-2xl border text-center text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
                       metrics.goal === g.id
                         ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-100"
                         : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
@@ -779,19 +777,24 @@ export const OnboardingWizard = ({
                 </button>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Collapsible advanced macro panel toggle */}
-            <button
-              type="button"
-              onClick={() => setShowAdvancedMacros(!showAdvancedMacros)}
-              className="w-full flex items-center justify-between py-3 px-4 bg-stone-100 hover:bg-stone-200/85 rounded-2xl text-stone-700 text-[10px] font-black uppercase tracking-wider border-none cursor-pointer transition-colors shadow-2xs select-none mt-2 active:scale-[0.99]"
-            >
-              <span>{showAdvancedMacros ? "Hide Macro Splits" : "Adjust Macro Split"}</span>
-              <span className="text-[10px] font-black">{showAdvancedMacros ? "▲" : "▼"}</span>
-            </button>
+        {/* STEP 4: NUTRIENTS & MACRO PROTOCOL (MATCHING EDIT PROFILE STYLING) */}
+        {step === 4 && (
+          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
+            <div className="text-center space-y-0.5">
+              <h2 className="text-xl font-black tracking-tight text-stone-900">
+                Nutrients & Macro Protocol
+              </h2>
+            </div>
 
-            {showAdvancedMacros && (
-              <div className="grid grid-cols-2 gap-3 animate-fadeIn mt-2">
+            {/* Core Macro Split Grid */}
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Core Macro Gram Targets
+              </label>
+              <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-600 bg-orange-50/15" },
                   { label: "Carbs (g)", key: "carbs", color: "border-[#90E0EF] text-[#0077B6] bg-[#CAF0F8]/10" },
@@ -825,96 +828,12 @@ export const OnboardingWizard = ({
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* STEP 4: TRACKING PREFERENCES (VITALS & NUTRIENTS) */}
-        {step === 4 && (
-          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
-            <div className="text-center space-y-0.5">
-              <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Tracking Preferences
-              </h2>
-              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
-                Select the vitals & nutrients you want on your dashboard.
-              </p>
-            </div>
-
-            {/* Daily Vitals Card Toggles */}
-            <div className="space-y-2">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Daily Vitals Cards
-              </label>
-              <div className="grid grid-cols-2 gap-2.5">
-                {[
-                  { id: "weight", label: "Weight Tracker", desc: "Log daily body weight" },
-                  { id: "water", label: "Water Intake", desc: "Track daily hydration" },
-                  { id: "digestion", label: "Gut & Digestion", desc: "Comfort score & notes" },
-                  { id: "energy", label: "Daily Energy", desc: "Track energy levels" },
-                ].map((v) => {
-                  const active = selectedVitals[v.id as keyof typeof selectedVitals];
-                  return (
-                    <div
-                      key={v.id}
-                      onClick={() => setSelectedVitals(prev => ({ ...prev, [v.id]: !active }))}
-                      className={`p-3 rounded-2xl border cursor-pointer transition-all ${
-                        active
-                          ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-100"
-                          : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black uppercase tracking-wider">{v.label}</span>
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${active ? "border-white bg-white text-orange-500" : "border-stone-300"}`}>
-                          {active && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                        </div>
-                      </div>
-                      <p className={`text-[9px] font-medium mt-1 ${active ? "text-white/80" : "text-stone-400"}`}>{v.desc}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Core Macros & Nutrients to Track */}
-            <div className="space-y-2">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Core Macros to Track
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: "protein", label: "Protein", color: "text-orange-500" },
-                  { id: "carbs", label: "Carbs", color: "text-sky-500" },
-                  { id: "fats", label: "Fats", color: "text-amber-500" },
-                  { id: "fiber", label: "Fiber", color: "text-emerald-500" },
-                ].map((n) => {
-                  const active = selectedNutrients.includes(n.id);
-                  return (
-                    <button
-                      key={n.id}
-                      type="button"
-                      onClick={() => toggleNutrient(n.id)}
-                      className={`py-2.5 px-3 rounded-2xl border text-left text-xs font-black uppercase tracking-wider transition-all flex items-center justify-between cursor-pointer ${
-                        active
-                          ? "bg-white border-stone-850 text-stone-900 shadow-sm"
-                          : "bg-stone-50 border-stone-200 text-stone-400 hover:bg-stone-100"
-                      }`}
-                    >
-                      <span className={active ? n.color : ""}>{n.label}</span>
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${active ? "bg-stone-900 border-stone-900 text-white" : "border-stone-300"}`}>
-                        {active && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
 
             {/* Optional Specific Micronutrients */}
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Specific Micronutrients (Optional)
+                Track Specific Micronutrients (Optional)
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {EXTRA_MICRONUTRIENTS.map((m) => {
@@ -924,7 +843,7 @@ export const OnboardingWizard = ({
                       key={m.id}
                       type="button"
                       onClick={() => toggleMicro(m.id)}
-                      className={`py-1.5 px-3 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      className={`py-2 px-3 rounded-2xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
                         active
                           ? "bg-orange-500 border-orange-500 text-white shadow-xs"
                           : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
@@ -940,8 +859,57 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 5: AI PLAN GENERATION ANIMATION */}
+        {/* STEP 5: DAILY VITALS TRACKERS (MATCHING EDIT PROFILE CARD ROWS) */}
         {step === 5 && (
+          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
+            <div className="text-center space-y-0.5">
+              <h2 className="text-xl font-black tracking-tight text-stone-900">
+                Daily Vitals Trackers
+              </h2>
+            </div>
+
+            {/* Daily Vitals Card Toggles */}
+            <div className="space-y-3">
+              {[
+                { id: "weight", label: "Weight Tracker", desc: "Log daily body weight & trendlines", icon: Scale },
+                { id: "water", label: "Water Intake", desc: "Quick-log daily hydration volume", icon: Droplet },
+                { id: "digestion", label: "Gut & Digestion", desc: "Bristol stool spectrum & comfort", icon: Activity },
+                { id: "energy", label: "Daily Energy", desc: "1 to 5 vitality & mood spectrum", icon: Zap },
+              ].map((v) => {
+                const active = selectedVitals[v.id as keyof typeof selectedVitals];
+                const IconComponent = v.icon;
+                return (
+                  <div
+                    key={v.id}
+                    onClick={() => setSelectedVitals(prev => ({ ...prev, [v.id]: !active }))}
+                    className={`p-4 rounded-[24px] border cursor-pointer transition-all flex items-center justify-between ${
+                      active
+                        ? "bg-white border-orange-500 shadow-md shadow-orange-100/50"
+                        : "bg-white border-stone-200 hover:border-stone-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${active ? "bg-orange-500 text-white" : "bg-stone-100 text-stone-400"}`}>
+                        <IconComponent className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">{v.label}</h4>
+                        <p className="text-[10px] font-bold text-stone-400 mt-0.5">{v.desc}</p>
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${active ? "border-orange-500 bg-orange-500 text-white" : "border-stone-300"}`}>
+                      {active && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+          </div>
+        )}
+
+        {/* STEP 6: AI PLAN GENERATION ANIMATION */}
+        {step === 6 && (
           <div className="space-y-6 animate-fadeIn flex flex-col items-center justify-center text-center py-8">
             <div className="w-20 h-20 rounded-full bg-orange-500 shadow-2xl shadow-orange-300 flex items-center justify-center animate-pulse">
               <Sparkles className="w-10 h-10 text-white fill-white" />
@@ -965,8 +933,8 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 6: PRICING & PLAN REVEAL */}
-        {step === 6 && (
+        {/* STEP 7: PRICING & PLAN REVEAL */}
+        {step === 7 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-wider">
@@ -1053,7 +1021,7 @@ export const OnboardingWizard = ({
       </div>
 
       {/* Navigation Footer */}
-      {step !== 5 && (
+      {step !== 6 && (
         <div className="w-full pt-4 border-t border-stone-200/50 flex gap-4">
           <button
             type="button"
