@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   Sparkles, 
   Camera, 
@@ -11,14 +11,24 @@ import {
   Activity,
   Scale,
   Droplet,
-  Flame,
-  ShieldCheck,
-  Utensils
+  Search,
+  X,
+  Info
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
 import { TERMS_AND_CONDITIONS } from "../constants/terms";
 import { DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
+
+const AVAILABLE_NUTRIENT_CATALOG = [
+  { id: "iron", name: "Iron", defaultTarget: 18, unit: "mg", color: "#EF4444", type: "micro" },
+  { id: "b12", name: "Vitamin B12", defaultTarget: 2.4, unit: "mcg", color: "#8B5CF6", type: "micro" },
+  { id: "vit_d", name: "Vitamin D", defaultTarget: 600, unit: "IU", color: "#F59E0B", type: "micro" },
+  { id: "sodium", name: "Sodium", defaultTarget: 2300, unit: "mg", color: "#64748B", type: "micro" },
+  { id: "sugar", name: "Added Sugar", defaultTarget: 25, unit: "g", color: "#EC4899", type: "micro" },
+  { id: "potassium", name: "Potassium", defaultTarget: 3400, unit: "mg", color: "#10B981", type: "micro" },
+  { id: "calcium", name: "Calcium", defaultTarget: 1000, unit: "mg", color: "#3B82F6", type: "micro" },
+];
 
 interface BodyMetrics {
   name: string;
@@ -45,16 +55,6 @@ const DEFAULT_METRICS: BodyMetrics = {
   activityLevel: "Moderately Active",
   preferences: [],
 };
-
-const EXTRA_MICRONUTRIENTS = [
-  { id: "iron", name: "Iron", target: 18, unit: "mg" },
-  { id: "b12", name: "Vitamin B12", target: 2.4, unit: "mcg" },
-  { id: "vit_d", name: "Vitamin D", target: 600, unit: "IU" },
-  { id: "sodium", name: "Sodium", target: 2300, unit: "mg" },
-  { id: "sugar", name: "Added Sugar", target: 25, unit: "g" },
-  { id: "potassium", name: "Potassium", target: 3400, unit: "mg" },
-  { id: "calcium", name: "Calcium", target: 1000, unit: "mg" },
-];
 
 export const OnboardingWizard = ({
   activeProfileId,
@@ -118,11 +118,14 @@ export const OnboardingWizard = ({
     energy: false,
   });
 
-  // Nutrients Selection State (Step 4)
-  const [selectedNutrients, setSelectedNutrients] = useState<string[]>([
-    "protein", "carbs", "fats", "fiber"
-  ]);
-  const [selectedMicros, setSelectedMicros] = useState<string[]>([]);
+  // Tracked Nutrients List (Step 4 - Edit Profile Model)
+  const [trackedNutrientList, setTrackedNutrientList] = useState<any[]>(() => {
+    return DEFAULT_TRACKED_NUTRIENTS.map(n => ({ ...n, enabled: true }));
+  });
+
+  const [nutrientSearchQuery, setNutrientSearchQuery] = useState("");
+  const [isNutrientDropdownOpen, setIsNutrientDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Step 6 AI Generation Loading animation
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -168,7 +171,7 @@ export const OnboardingWizard = ({
     if (step === 1) return metrics.name.trim() !== "";
     if (step === 2) return metrics.height > 0 && metrics.weight > 0 && metrics.age > 0;
     if (step === 3) return metrics.targetWeight > 0 && targets.calories > 0;
-    if (step === 4) return selectedNutrients.length > 0;
+    if (step === 4) return trackedNutrientList.some(n => n.enabled);
     return true;
   };
 
@@ -189,16 +192,32 @@ export const OnboardingWizard = ({
     setStep(prev => Math.max(1, prev - 1));
   };
 
-  const toggleNutrient = (id: string) => {
-    setSelectedNutrients(prev => 
-      prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]
+  const toggleNutrientEnabled = (id: string) => {
+    setTrackedNutrientList(prev => 
+      prev.map(n => n.id === id ? { ...n, enabled: !n.enabled } : n)
     );
   };
 
-  const toggleMicro = (id: string) => {
-    setSelectedMicros(prev => 
-      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
-    );
+  const addNutrientFromCatalog = (item: any) => {
+    const exists = trackedNutrientList.some(n => n.id === item.id);
+    if (exists) {
+      setTrackedNutrientList(prev => prev.map(n => n.id === item.id ? { ...n, enabled: true } : n));
+    } else {
+      setTrackedNutrientList(prev => [
+        ...prev,
+        {
+          id: item.id,
+          name: item.name,
+          unit: item.unit,
+          target: item.defaultTarget || 10,
+          color: item.color || "#F97316",
+          enabled: true,
+          type: item.type || "micro"
+        }
+      ]);
+    }
+    setNutrientSearchQuery("");
+    setIsNutrientDropdownOpen(false);
   };
 
   // Sync initials from Google/supabase profile
@@ -280,6 +299,7 @@ export const OnboardingWizard = ({
 
   const handleMacroChange = (key: "protein" | "carbs" | "fats" | "fiber", val: number) => {
     setTargets(prev => ({ ...prev, [key]: val }));
+    setTrackedNutrientList(prev => prev.map(n => n.id === key ? { ...n, target: val } : n));
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -377,16 +397,12 @@ export const OnboardingWizard = ({
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     };
 
-    // Filter tracked nutrients according to Step 4 choices
-    const filteredTrackedNutrients = DEFAULT_TRACKED_NUTRIENTS.filter((n) => 
-      selectedNutrients.includes(n.id)
-    ).map((n) => ({
+    const finalTrackedNutrients = trackedNutrientList.map((n) => ({
       ...n,
-      target: { protein: targets.protein, carbs: targets.carbs, fats: targets.fats, fiber: targets.fiber }[n.id] ?? n.target
+      target: n.id === "protein" ? targets.protein : n.id === "carbs" ? targets.carbs : n.id === "fats" ? targets.fats : n.id === "fiber" ? targets.fiber : n.target
     }));
 
-    // Build custom micros array from Step 4 choices
-    const activeMicros = EXTRA_MICRONUTRIENTS.filter((m) => selectedMicros.includes(m.id));
+    const activeMicros = finalTrackedNutrients.filter(n => n.enabled && n.type === "micro");
 
     const { error } = await supabase
       .from('profiles')
@@ -409,7 +425,7 @@ export const OnboardingWizard = ({
         daily_calories_goal: targets.calories,
         weight_goal: metrics.targetWeight,
         protein_goal: targets.protein,
-        tracked_nutrients: filteredTrackedNutrients,
+        tracked_nutrients: finalTrackedNutrients,
         track_micros: activeMicros.length > 0,
         micros: activeMicros
       })
@@ -439,7 +455,7 @@ export const OnboardingWizard = ({
         fats: targets.fats,
         fiber: targets.fiber
       },
-      tracked_nutrients: filteredTrackedNutrients,
+      tracked_nutrients: finalTrackedNutrients,
       trackMicros: activeMicros.length > 0,
       micros: activeMicros
     };
@@ -460,6 +476,11 @@ export const OnboardingWizard = ({
   };
 
   const progressPercent = (step / totalSteps) * 100;
+
+  const filteredCatalog = AVAILABLE_NUTRIENT_CATALOG.filter(item => 
+    !trackedNutrientList.some(tn => tn.id === item.id && tn.enabled) &&
+    (item.name.toLowerCase().includes(nutrientSearchQuery.toLowerCase()) || item.id.toLowerCase().includes(nutrientSearchQuery.toLowerCase()))
+  );
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-6 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
@@ -780,80 +801,167 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 4: NUTRIENTS & MACRO PROTOCOL (MATCHING EDIT PROFILE STYLING) */}
+        {/* STEP 4: NUTRIENTS & MACROS (SIMPLE DROPDOWN & REMOVABLE DEFAULTS MATCHING EDIT PROFILE) */}
         {step === 4 && (
-          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
+          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Nutrients & Macro Protocol
+                Nutrient Tracking
               </h2>
+              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
+                Protein, Carbs, Fats & Fiber are default. Toggle or remove as you wish.
+              </p>
             </div>
 
-            {/* Core Macro Split Grid */}
-            <div className="space-y-2">
+            {/* Search Dropdown Input (Same as Edit Profile) */}
+            <div className="relative">
+              <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-orange-500 transition-all">
+                <Search className="w-4 h-4 text-stone-400 shrink-0" />
+                <input
+                  type="text"
+                  value={nutrientSearchQuery}
+                  onChange={(e) => {
+                    setNutrientSearchQuery(e.target.value);
+                    setIsNutrientDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsNutrientDropdownOpen(true)}
+                  placeholder="+ Add Nutrient (Sodium, B12, Iron, Vitamin D, Sugar...)"
+                  className="flex-1 bg-transparent border-none text-xs font-bold text-stone-850 placeholder:text-stone-400 focus:outline-none"
+                />
+                {nutrientSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setNutrientSearchQuery("")}
+                    className="text-stone-400 hover:text-stone-600 border-none bg-transparent cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown Options List */}
+              {isNutrientDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-2xl shadow-xl z-30 max-h-48 overflow-y-auto p-1.5 space-y-1">
+                  {filteredCatalog.length > 0 ? (
+                    filteredCatalog.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => addNutrientFromCatalog(item)}
+                        className="flex items-center justify-between p-2.5 hover:bg-stone-50 rounded-xl cursor-pointer transition-colors"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-stone-800">{item.name}</span>
+                          <span className="text-[9px] font-medium text-stone-400">Default target: {item.defaultTarget || 10} {item.unit}</span>
+                        </div>
+                        <Plus className="w-4 h-4 text-orange-500" />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-3 text-center text-xs text-stone-400 font-bold">
+                      No matching nutrients found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Active Nutrients List Cards */}
+            <div className="space-y-2.5">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Core Macro Gram Targets
+                Active Tracked Nutrients
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-600 bg-orange-50/15" },
-                  { label: "Carbs (g)", key: "carbs", color: "border-[#90E0EF] text-[#0077B6] bg-[#CAF0F8]/10" },
-                  { label: "Fats (g)", key: "fats", color: "border-yellow-200 text-yellow-600 bg-yellow-50/15" },
-                  { label: "Fiber (g)", key: "fiber", color: "border-emerald-200 text-emerald-700 bg-emerald-50/10" },
-                ].map((m) => (
-                  <div key={m.label} className={`border rounded-2xl p-3 flex flex-col justify-between shadow-2xs ${m.color}`}>
-                    <span className="text-[9px] font-black uppercase tracking-wider opacity-90">{m.label}</span>
-                    <div className="flex items-center justify-between mt-2.5 gap-1 bg-white/95 border border-black/[0.04] rounded-xl px-1.5 py-0.5">
+              {trackedNutrientList.map((n) => (
+                <div
+                  key={n.id}
+                  className={`p-3.5 rounded-2xl border transition-all ${
+                    n.enabled
+                      ? "bg-white border-stone-200 shadow-2xs"
+                      : "bg-stone-50 border-stone-150 opacity-60"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: n.color || "#F97316" }} />
+                      <span className="text-xs font-black text-stone-900 uppercase tracking-wide">{n.name}</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {/* Toggle Switch */}
                       <button
                         type="button"
-                        onClick={() => handleMacroChange(m.key as any, Math.max(0, targets[m.key as keyof typeof targets] - 5))}
-                        className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
+                        onClick={() => toggleNutrientEnabled(n.id)}
+                        className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0 ${
+                          n.enabled ? "bg-orange-500" : "bg-stone-300"
+                        }`}
                       >
-                        <Minus className="w-3 h-3" />
+                        <div
+                          className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${
+                            n.enabled ? "translate-x-4" : "translate-x-0"
+                          }`}
+                        />
                       </button>
-                      <input
-                        type="number"
-                        value={targets[m.key as keyof typeof targets]}
-                        onChange={(e) => handleMacroChange(m.key as any, parseInt(e.target.value) || 0)}
-                        className="flex-1 bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
+
+                      {/* Remove Button */}
                       <button
                         type="button"
-                        onClick={() => handleMacroChange(m.key as any, Math.min(500, targets[m.key as keyof typeof targets] + 5))}
-                        className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
+                        onClick={() => setTrackedNutrientList(prev => prev.filter(item => item.id !== n.id))}
+                        className="text-stone-300 hover:text-red-500 border-none bg-transparent cursor-pointer transition-colors p-1"
+                        title="Remove nutrient"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Optional Specific Micronutrients */}
-            <div className="space-y-2 pt-2">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Track Specific Micronutrients (Optional)
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {EXTRA_MICRONUTRIENTS.map((m) => {
-                  const active = selectedMicros.includes(m.id);
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => toggleMicro(m.id)}
-                      className={`py-2 px-3 rounded-2xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                        active
-                          ? "bg-orange-500 border-orange-500 text-white shadow-xs"
-                          : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
-                      }`}
-                    >
-                      {active ? `✓ ${m.name}` : `+ ${m.name}`}
-                    </button>
-                  );
-                })}
-              </div>
+                  {/* Target Stepper Input */}
+                  {n.enabled && (
+                    <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between">
+                      <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">Daily Target</span>
+                      <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 rounded-xl px-2 py-0.5 shadow-3xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = Math.max(0, (n.target || 10) - 5);
+                            setTrackedNutrientList(prev => prev.map(item => item.id === n.id ? { ...item, target: val } : item));
+                            if (["protein", "carbs", "fats", "fiber"].includes(n.id)) {
+                              handleMacroChange(n.id as any, val);
+                            }
+                          }}
+                          className="w-5 h-5 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <input
+                          type="number"
+                          value={n.target || 0}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 0;
+                            setTrackedNutrientList(prev => prev.map(item => item.id === n.id ? { ...item, target: val } : item));
+                            if (["protein", "carbs", "fats", "fiber"].includes(n.id)) {
+                              handleMacroChange(n.id as any, val);
+                            }
+                          }}
+                          className="bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-[9px] font-bold text-stone-400">{n.unit}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = (n.target || 0) + 5;
+                            setTrackedNutrientList(prev => prev.map(item => item.id === n.id ? { ...item, target: val } : item));
+                            if (["protein", "carbs", "fats", "fiber"].includes(n.id)) {
+                              handleMacroChange(n.id as any, val);
+                            }
+                          }}
+                          className="w-5 h-5 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
           </div>
