@@ -14,7 +14,10 @@ import {
   Search,
   X,
   Flame,
-  Crown
+  Crown,
+  Tag,
+  BookOpen,
+  Utensils
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -60,6 +63,57 @@ const FULL_NUTRIENT_CATALOG = [
   { id: "vit_c", name: "Vitamin C", defaultTarget: 90, unit: "mg", color: "#F97316", type: "micro" },
 ];
 
+const STARTER_RECIPES = [
+  {
+    id: "rec_oats",
+    name: "High Protein Berry Oats",
+    calories: 380,
+    protein: 32,
+    carbs: 45,
+    fats: 8,
+    fiber: 9,
+    category: "Breakfast",
+    tag: "High Protein",
+    ingredients: ["Rolled Oats (60g)", "Whey Protein (30g)", "Mixed Berries (50g)", "Almond Milk (200ml)"]
+  },
+  {
+    id: "rec_chicken",
+    name: "Chicken & Quinoa Bowl",
+    calories: 520,
+    protein: 45,
+    carbs: 48,
+    fats: 14,
+    fiber: 7,
+    category: "Lunch",
+    tag: "High Protein",
+    ingredients: ["Grilled Chicken Breast (180g)", "Cooked Quinoa (120g)", "Steamed Broccoli (100g)", "Olive Oil (10ml)"]
+  },
+  {
+    id: "rec_beef",
+    name: "Beef & Broccoli Stir-Fry",
+    calories: 460,
+    protein: 40,
+    carbs: 35,
+    fats: 16,
+    fiber: 6,
+    category: "Dinner",
+    tag: "High Protein",
+    ingredients: ["Lean Flank Steak (160g)", "Fresh Broccoli (150g)", "Brown Rice (100g)", "Soy Sauce (15ml)"]
+  },
+  {
+    id: "rec_smoothie",
+    name: "Avocado Protein Smoothie",
+    calories: 310,
+    protein: 28,
+    carbs: 22,
+    fats: 12,
+    fiber: 8,
+    category: "Snack",
+    tag: "Gluten Free",
+    ingredients: ["Whey Protein (30g)", "Ripe Avocado (50g)", "Baby Spinach (30g)", "Unsweetened Almond Milk (250ml)"]
+  }
+];
+
 export const OnboardingWizard = ({
   activeProfileId,
   supabase,
@@ -103,7 +157,7 @@ export const OnboardingWizard = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
-  // Targets state (configured on Step 3 & 4)
+  // Targets state (configured on Step 3)
   const [targets, setTargets] = useState({
     calories: 2000,
     protein: 150,
@@ -114,7 +168,19 @@ export const OnboardingWizard = ({
 
   const [selectedPlan, setSelectedPlan] = useState<"free" | "plus" | "pro">("pro");
 
-  // Vitals Selection State (Step 5 - Simple Question Toggles)
+  // AI Meal Tracking Tags State (Step 4 - Edit Profile Model)
+  const [aiTrackingTags, setAiTrackingTags] = useState([
+    { id: "tag_hp", name: "High Protein", description: "Apply when meal has >= 30g protein", enabled: true },
+    { id: "tag_gf", name: "Gluten Free", description: "Apply when meal contains no gluten ingredients", enabled: false },
+    { id: "tag_keto", name: "Keto", description: "Apply when meal has <= 10g net carbs", enabled: false },
+    { id: "tag_if", name: "Intermittent Fasting", description: "Apply during daily eating window", enabled: false },
+    { id: "tag_home", name: "Homemade", description: "Apply for home-cooked meals", enabled: true }
+  ]);
+
+  // Selected Starter Recipes State (Step 4)
+  const [importedRecipeIds, setImportedRecipeIds] = useState<string[]>(["rec_oats", "rec_chicken"]);
+
+  // Vitals Selection State (Step 6)
   const [selectedVitals, setSelectedVitals] = useState({
     weight: true,
     water: false,
@@ -122,7 +188,7 @@ export const OnboardingWizard = ({
     energy: false,
   });
 
-  // Tracked Nutrients List (Step 4 - Edit Profile Model)
+  // Tracked Nutrients List (Step 5 - Edit Profile Model)
   const [trackedNutrientList, setTrackedNutrientList] = useState<any[]>(() => {
     return DEFAULT_TRACKED_NUTRIENTS.map(n => ({ ...n, enabled: true }));
   });
@@ -142,15 +208,15 @@ export const OnboardingWizard = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Step 6 AI Generation Loading animation
+  // Step 7 AI Generation Loading animation
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState("Calculating metabolic baseline...");
 
-  const totalSteps = 7;
+  const totalSteps = 8;
 
-  // Handle Step 6 auto-progress animation
+  // Handle Step 7 auto-progress animation
   useEffect(() => {
-    if (step === 6) {
+    if (step === 7) {
       setGenerationProgress(0);
       setGenerationStatus("Calculating metabolic baseline...");
 
@@ -170,7 +236,7 @@ export const OnboardingWizard = ({
       }, 1800);
 
       const t4 = setTimeout(() => {
-        setStep(7);
+        setStep(8);
       }, 2300);
 
       return () => {
@@ -186,7 +252,7 @@ export const OnboardingWizard = ({
     if (step === 1) return metrics.name.trim() !== "";
     if (step === 2) return metrics.height > 0 && metrics.weight > 0 && metrics.age > 0;
     if (step === 3) return metrics.targetWeight > 0 && targets.calories > 0;
-    if (step === 4) return trackedNutrientList.some(n => n.enabled);
+    if (step === 5) return trackedNutrientList.some(n => n.enabled);
     return true;
   };
 
@@ -199,22 +265,22 @@ export const OnboardingWizard = ({
   };
 
   const handleBack = () => {
-    if (step === 6) return; // cannot go back during generating step
-    if (step === 7) {
-      setStep(5); // skip generating step when going back from pricing screen
+    if (step === 7) return; // cannot go back during generating step
+    if (step === 8) {
+      setStep(6); // skip generating step when going back from pricing screen
       return;
     }
     setStep(prev => Math.max(1, prev - 1));
   };
 
-  const togglePreference = (prefId: string) => {
-    setMetrics(prev => {
-      const isSelected = prev.preferences.includes(prefId);
-      const updated = isSelected
-        ? prev.preferences.filter(p => p !== prefId)
-        : [...prev.preferences, prefId];
-      return { ...prev, preferences: updated };
-    });
+  const toggleAiTag = (id: string) => {
+    setAiTrackingTags(prev => prev.map(t => t.id === id ? { ...t, enabled: !t.enabled } : t));
+  };
+
+  const toggleImportRecipe = (id: string) => {
+    setImportedRecipeIds(prev =>
+      prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
+    );
   };
 
   const toggleNutrientEnabled = (id: string) => {
@@ -430,6 +496,7 @@ export const OnboardingWizard = ({
     }));
 
     const activeMicros = finalTrackedNutrients.filter(n => n.enabled && n.type === "micro");
+    const activeTags = aiTrackingTags.filter(t => t.enabled);
 
     const { error } = await supabase
       .from('profiles')
@@ -443,6 +510,7 @@ export const OnboardingWizard = ({
         gender: metrics.gender,
         description: silentBio,
         preferences: updatedPrefs,
+        tracking_tags: activeTags,
         knowledge_preferences: metrics.preferences || [],
         knowledge_health: [],
         knowledge_notes: [],
@@ -462,6 +530,23 @@ export const OnboardingWizard = ({
       throw error;
     }
 
+    // Insert imported starter recipes into user's recipes table if enabled
+    const importedRecipes = STARTER_RECIPES.filter(r => importedRecipeIds.includes(r.id));
+    for (const rec of importedRecipes) {
+      await supabase.from('user_recipes').insert({
+        user_id: activeProfileId,
+        name: rec.name,
+        calories: rec.calories,
+        protein: rec.protein,
+        carbs: rec.carbs,
+        fats: rec.fats,
+        fiber: rec.fiber,
+        ingredients: rec.ingredients,
+        category: rec.category,
+        is_preset: true
+      }).catch(() => {});
+    }
+
     return {
       name: metrics.name.trim(),
       imageUrl: metrics.avatar || null,
@@ -471,6 +556,7 @@ export const OnboardingWizard = ({
       gender: metrics.gender,
       description: silentBio,
       preferences: updatedPrefs,
+      tracking_tags: activeTags,
       agent_config: initialAgentConfig,
       goals: {
         dailyCalories: targets.calories,
@@ -516,7 +602,7 @@ export const OnboardingWizard = ({
       <div className="w-full flex items-center justify-between gap-4 py-2 border-b border-stone-200/50">
         <button
           onClick={handleBack}
-          disabled={step === 1 || step === 6}
+          disabled={step === 1 || step === 7}
           className="w-8 h-8 rounded-full flex items-center justify-center bg-stone-100 hover:bg-stone-200 text-stone-600 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-none"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -718,9 +804,9 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 3: DAILY GOALS & OPTIONAL DIETARY CHIPS */}
+        {/* STEP 3: DAILY GOALS (100% CLEAN & MINIMALIST) */}
         {step === 3 && (
-          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
+          <div className="space-y-5 animate-fadeIn">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
                 Daily Goals
@@ -822,30 +908,97 @@ export const OnboardingWizard = ({
                 </button>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Optional Dietary Habits & Preferences Chips */}
-            <div className="space-y-1.5 pt-1">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Dietary Habits & Preferences (Optional)
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  "Gluten Free", "Dairy Free", "Keto", "Vegan", "Intermittent Fasting", "High Protein", "Low Carb"
-                ].map((pref) => {
-                  const active = metrics.preferences.includes(pref);
-                  return (
+        {/* STEP 4: AI TRACKING TAGS & STARTER RECIPES (EDIT PROFILE MODEL) */}
+        {step === 4 && (
+          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
+            <div className="text-center space-y-0.5">
+              <h2 className="text-xl font-black tracking-tight text-stone-900">
+                AI Tags & Recipes
+              </h2>
+            </div>
+
+            {/* AI Meal Tracking Tags Section */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <Tag className="w-3.5 h-3.5 text-orange-500" />
+                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
+                  AI Meal Tracking Tags
+                </label>
+              </div>
+              <div className="space-y-2">
+                {aiTrackingTags.map((t) => (
+                  <div
+                    key={t.id}
+                    className={`p-3 rounded-2xl border transition-all flex items-center justify-between shadow-2xs ${
+                      t.enabled ? "bg-white border-stone-200" : "bg-stone-50 border-stone-150 opacity-60"
+                    }`}
+                  >
+                    <div>
+                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">{t.name}</h4>
+                      <p className="text-[10px] font-bold text-stone-400 mt-0.5">{t.description}</p>
+                    </div>
                     <button
-                      key={pref}
                       type="button"
-                      onClick={() => togglePreference(pref)}
-                      className={`py-1.5 px-3 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                        active
-                          ? "bg-orange-500 border-orange-500 text-white shadow-xs"
-                          : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                      onClick={() => toggleAiTag(t.id)}
+                      className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0 ${
+                        t.enabled ? "bg-orange-500" : "bg-stone-300"
                       }`}
                     >
-                      {active ? `✓ ${pref}` : `+ ${pref}`}
+                      <div
+                        className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${
+                          t.enabled ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
                     </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Starter Recipes Section (1-Tap Import) */}
+            <div className="space-y-2.5 pt-2">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-3.5 h-3.5 text-orange-500" />
+                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
+                  Starter Recipes (1-Tap Import)
+                </label>
+              </div>
+              <div className="space-y-2">
+                {STARTER_RECIPES.map((rec) => {
+                  const imported = importedRecipeIds.includes(rec.id);
+                  return (
+                    <div
+                      key={rec.id}
+                      className={`p-3.5 rounded-[22px] border transition-all flex items-center justify-between shadow-2xs ${
+                        imported ? "bg-white border-orange-500 shadow-orange-100/40" : "bg-white border-stone-200"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-black text-stone-900 tracking-tight">{rec.name}</h4>
+                          <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-stone-100 text-stone-500">
+                            {rec.category}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-bold text-stone-400 mt-1">
+                          {rec.calories} kcal · {rec.protein}g P · {rec.carbs}g C · {rec.fats}g F
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleImportRecipe(rec.id)}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border-none ${
+                          imported
+                            ? "bg-orange-500 text-white shadow-xs"
+                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                        }`}
+                      >
+                        {imported ? "✓ Added" : "+ Import"}
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -854,8 +1007,8 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 4: NUTRIENTS & MACROS (MINIMALIST SPACIOUS CARDS) */}
-        {step === 4 && (
+        {/* STEP 5: NUTRIENTS & MACROS (MINIMALIST SPACIOUS CARDS) */}
+        {step === 5 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
@@ -915,7 +1068,7 @@ export const OnboardingWizard = ({
               )}
             </div>
 
-            {/* Active Nutrients List Cards (Spacious Breathing Room) */}
+            {/* Active Nutrients List Cards */}
             <div className="space-y-2.5">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
                 Active Tracked Nutrients
@@ -1012,8 +1165,8 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 5: DAILY VITALS (SIMPLE QUESTION TOGGLES) */}
-        {step === 5 && (
+        {/* STEP 6: DAILY VITALS (SIMPLE QUESTION TOGGLES) */}
+        {step === 6 && (
           <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
@@ -1067,8 +1220,8 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 6: AI PLAN GENERATION ANIMATION */}
-        {step === 6 && (
+        {/* STEP 7: AI PLAN GENERATION ANIMATION */}
+        {step === 7 && (
           <div className="space-y-6 animate-fadeIn flex flex-col items-center justify-center text-center py-8">
             <div className="w-20 h-20 rounded-full bg-orange-500 shadow-2xl shadow-orange-300 flex items-center justify-center animate-pulse">
               <Sparkles className="w-10 h-10 text-white fill-white" />
@@ -1092,8 +1245,8 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 7: PRICING & PLAN REVEAL (3 TIERS: FREE, PLUS, PRO) */}
-        {step === 7 && (
+        {/* STEP 8: PRICING & PLAN REVEAL (3 TIERS: FREE, PLUS, PRO) */}
+        {step === 8 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-wider">
@@ -1211,7 +1364,7 @@ export const OnboardingWizard = ({
       </div>
 
       {/* Navigation Footer */}
-      {step !== 6 && (
+      {step !== 7 && (
         <div className="w-full pt-4 border-t border-stone-200/50 flex gap-4">
           <button
             type="button"
