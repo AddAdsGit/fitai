@@ -515,7 +515,7 @@ export default function App() {
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isVitalsLogOpen, setIsVitalsLogOpen] = useState(false);
   const [activeVitalsTab, setActiveVitalsTab] = useState<"weight" | "water" | "digestion" | "energy" | null>(null);
-  const [expandedCardLogs, setExpandedCardLogs] = useState<{ [key: string]: boolean }>({});
+  const [expandedCardLogs, setExpandedCardLogs] = useState<{ [key: string]: boolean }>({ weight: true });
 
   // Password Recovery States
   const [newPassword, setNewPassword] = useState("");
