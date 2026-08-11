@@ -622,7 +622,7 @@ export default function App() {
 
   const handleGoogleLogin = async () => {
     try {
-      const returnUrl = window.location.href;
+      const returnUrl = window.location.origin + window.location.pathname;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -631,11 +631,11 @@ export default function App() {
       });
       if (error) {
         console.error("Google login error:", error);
-        showToast("❌ Google login failed");
+        showToast(`❌ Google login failed: ${error.message}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      showToast("❌ Google login error");
+      showToast(`❌ Google login error: ${err?.message || "Unknown error"}`);
     }
   };
 

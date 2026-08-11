@@ -74,13 +74,31 @@ const ProgressBar = ({
 
 export { ProgressBar };
 
+const formatFullDateLabel = (dateStr: string) => {
+  if (!dateStr) return "";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monthName = months[m - 1] || "";
+      return `${monthName} ${d}, ${y}`;
+    }
+    return dateStr;
+  } catch (_) {
+    return dateStr;
+  }
+};
+
 const CustomScatterTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
       <div className="bg-white/95 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-orange-100/80 shadow-xl text-orange-950 font-sans text-xs space-y-0.5 z-50">
         <div className="font-mono text-[10px] text-orange-900/50 font-bold tracking-wider">
-          {data.date} at {data.time}
+          {formatFullDateLabel(data.date)} at {data.time}
         </div>
         <div className="font-black flex items-center gap-1.5" style={{ color: data.fill }}>
           <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: data.fill }} />
@@ -214,6 +232,10 @@ export const InsightsView = ({
     return { start, current, goal, change, avgWeight };
   }, [filteredWeightData, profileData?.weight, profileData?.goals?.weightGoal]);
 
+  const activeTrackedNutrients = useMemo(() => {
+    return normalizeTrackedNutrients(profileData?.tracked_nutrients, profileData?.goals?.dailyProtein);
+  }, [profileData?.tracked_nutrients, profileData?.goals?.dailyProtein]);
+
   const chartData = useMemo(() => {
     const data = [];
     const start = new Date(dateRangeBounds.start);
@@ -225,10 +247,6 @@ export const InsightsView = ({
 
       const daysMeals = (mealsState || []).filter((m) => m.date === dateStr);
       const calories = daysMeals.reduce((sum, m) => sum + m.calories, 0);
-      const protein = daysMeals.reduce((sum, m) => sum + m.protein, 0);
-      const carbs = daysMeals.reduce((sum, m) => sum + m.carbs, 0);
-      const fats = daysMeals.reduce((sum, m) => sum + m.fats, 0);
-      const fiber = daysMeals.reduce((sum, m) => sum + (m.fiber || 0), 0);
 
       let dayLabel = "";
       const totalDaysInRange = Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
@@ -241,21 +259,27 @@ export const InsightsView = ({
 
       const hasLogs = daysMeals.length > 0 && calories > 0;
 
+      const nutrientValues: Record<string, number | null> = {};
+      activeTrackedNutrients.forEach((n) => {
+        const daySum = daysMeals.reduce((mSum, m) => {
+          const val = m.nutrients?.[n.id] ?? (m as any)[n.id] ?? 0;
+          return mSum + (Number(val) || 0);
+        }, 0);
+        nutrientValues[n.id] = hasLogs ? daySum : null;
+      });
+
       data.push({
         day: dayLabel,
         calories: hasLogs ? calories : null,
         goal: profileData?.goals?.dailyCalories || 2000,
-        protein: hasLogs ? protein : null,
-        carbs: hasLogs ? carbs : null,
-        fats: hasLogs ? fats : null,
-        fiber: hasLogs ? fiber : null,
+        ...nutrientValues,
         date: dateStr,
       });
 
       current.setDate(current.getDate() + 1);
     }
     return data;
-  }, [dateRangeBounds, mealsState, profileData]);
+  }, [dateRangeBounds, mealsState, profileData, activeTrackedNutrients]);
 
   const loggedDaysCount = useMemo(() => {
     return chartData.filter((item) => item.calories !== null && item.calories > 0).length;
@@ -264,10 +288,6 @@ export const InsightsView = ({
   const activeLoggedChartData = useMemo(() => {
     return chartData.filter((item) => item.calories !== null && item.calories > 0);
   }, [chartData]);
-
-  const activeTrackedNutrients = useMemo(() => {
-    return normalizeTrackedNutrients(profileData?.tracked_nutrients, profileData?.goals?.dailyProtein);
-  }, [profileData?.tracked_nutrients, profileData?.goals?.dailyProtein]);
 
   const periodNutrientStats = useMemo(() => {
     const dayCount = loggedDaysCount || 1;
@@ -886,10 +906,18 @@ export const InsightsView = ({
                     fontSize: 11,
                   }}
                 />
-                <Line type="monotone" dataKey="protein" connectNulls={true} stroke="#F97316" strokeWidth={2.5} dot={false} name="Protein (g)" />
-                <Line type="monotone" dataKey="carbs" connectNulls={true} stroke="#38BDF8" strokeWidth={2.5} dot={false} name="Carbs (g)" />
-                <Line type="monotone" dataKey="fats" connectNulls={true} stroke="#FBBF24" strokeWidth={2.5} dot={false} name="Fats (g)" />
-                <Line type="monotone" dataKey="fiber" connectNulls={true} stroke="#34D399" strokeWidth={2.5} dot={false} name="Fiber (g)" />
+                {periodNutrientStats.map((n) => (
+                  <Line
+                    key={n.id}
+                    type="monotone"
+                    dataKey={n.id}
+                    connectNulls={true}
+                    stroke={n.color}
+                    strokeWidth={2.5}
+                    dot={false}
+                    name={`${n.name} (${n.unit})`}
+                  />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </motion.div>
@@ -913,183 +941,209 @@ export const InsightsView = ({
         </div>
       </motion.div>
 
-      {/* 1. Dedicated Water Hydration Card (Dynamic Date Range) */}
-      <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-1">
-              Water Hydration
+      {/* 1. Dedicated Water Hydration Card (Respects trackWater config) */}
+      {profileData?.agent_config?.trackWater !== false && (
+        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-sky-100/70 text-sky-600 flex items-center justify-center border border-sky-200/50 shadow-2xs">
+                <Droplets className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
+                  Water Hydration
+                </div>
+                <div className="text-2xl font-black text-orange-950">
+                  2.6{" "}
+                  <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                    L avg/d <span className="font-medium text-sky-600 font-bold">(3.0L daily goal)</span>
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="text-3xl font-black text-orange-950">
-              2.6{" "}
-              <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
-                L avg/d <span className="font-medium text-orange-900/40">(3.0L daily goal)</span>
-              </span>
-            </div>
-          </div>
 
-          <button
-            onClick={() => {
-              if (triggerToast) triggerToast("💧 Water report copied!");
-            }}
-            title="Share Water Intake"
-            className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Dynamic Water Intake Bar Chart */}
-        <div className="h-40 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={dynamicVitalsChartData}
-              margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
+            <button
+              onClick={() => {
+                if (triggerToast) triggerToast("💧 Water report copied!");
+              }}
+              title="Share Water Intake"
+              className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
             >
-              <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-              <YAxis domain={[0, 4]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
-              <RechartsTooltip
-                contentStyle={{
-                  borderRadius: "16px",
-                  border: "none",
-                  background: "rgba(255,255,255,0.9)",
-                  backdropFilter: "blur(10px)",
-                  boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                  fontSize: 11,
-                  fontWeight: 900,
-                  color: "#431407",
-                }}
-              />
-              <Bar dataKey="water" fill="#38BDF8" radius={[6, 6, 6, 6]} name="Water (L)" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* 2. Dedicated Energy Levels Card (Dynamic Date Range) */}
-      <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-1">
-              Energy Levels
-            </div>
-            <div className="text-3xl font-black text-orange-950">
-              4.2{" "}
-              <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
-                / 5.0 <span className="font-medium text-amber-600 font-bold">(High Energy Average)</span>
-              </span>
-            </div>
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <button
-            onClick={() => {
-              if (triggerToast) triggerToast("⚡ Energy report copied!");
-            }}
-            title="Share Energy Level"
-            className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-          </button>
+          {/* Dynamic Water Intake Bar Chart */}
+          <div className="h-40 w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={dynamicVitalsChartData}
+                margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
+              >
+                <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
+                <YAxis domain={[0, 4]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
+                <RechartsTooltip
+                  contentStyle={{
+                    borderRadius: "16px",
+                    border: "none",
+                    background: "rgba(255,255,255,0.9)",
+                    backdropFilter: "blur(10px)",
+                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                    fontSize: 11,
+                    fontWeight: 900,
+                    color: "#431407",
+                  }}
+                />
+                <Bar dataKey="water" fill="#38BDF8" radius={[6, 6, 6, 6]} name="Water (L)" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
+      )}
 
-        {/* Dynamic Energy Level Line Chart */}
-        <div className="h-40 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={dynamicVitalsChartData}
-              margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+      {/* 2. Dedicated Energy Levels Card (Respects trackEnergy config) */}
+      {profileData?.agent_config?.trackEnergy !== false && (
+        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100/70 text-amber-600 flex items-center justify-center border border-amber-200/50 shadow-2xs">
+                <Zap className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
+                  Energy Levels
+                </div>
+                <div className="text-2xl font-black text-orange-950">
+                  4.2{" "}
+                  <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                    / 5.0 <span className="font-medium text-amber-600 font-bold">(High Energy Average)</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                if (triggerToast) triggerToast("⚡ Energy report copied!");
+              }}
+              title="Share Energy Level"
+              className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
             >
-              <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-              <YAxis domain={[1, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
-              <RechartsTooltip
-                contentStyle={{
-                  borderRadius: "16px",
-                  border: "none",
-                  background: "rgba(255,255,255,0.9)",
-                  backdropFilter: "blur(10px)",
-                  boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                  fontSize: 11,
-                  fontWeight: 900,
-                  color: "#431407",
-                }}
-              />
-              <Line type="monotone" dataKey="energy" stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} name="Energy (1-5)" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* 3. Dedicated Digestion Card (Multi-Dot Scatter Chart Across Date Range) */}
-      <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-1">
-              Digestion (Bristol Scatter)
-            </div>
-            <div className="text-3xl font-black text-orange-950 flex flex-wrap items-baseline gap-2">
-              <span>Type 3.8</span>
-              <span className="text-xs font-bold text-emerald-600 tracking-normal font-sans">
-                Ideal Zone 🟢
-              </span>
-            </div>
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <button
-            onClick={() => {
-              if (triggerToast) triggerToast("💩 Digestion report copied!");
-            }}
-            title="Share Digestion Report"
-            className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-          </button>
+          {/* Dynamic Energy Level Line Chart */}
+          <div className="h-40 w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={dynamicVitalsChartData}
+                margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+              >
+                <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
+                <YAxis domain={[1, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
+                <RechartsTooltip
+                  contentStyle={{
+                    borderRadius: "16px",
+                    border: "none",
+                    background: "rgba(255,255,255,0.9)",
+                    backdropFilter: "blur(10px)",
+                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                    fontSize: 11,
+                    fontWeight: 900,
+                    color: "#431407",
+                  }}
+                />
+                <Line type="monotone" dataKey="energy" stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} name="Energy (1-5)" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
+      )}
 
-        {/* Dynamic Multi-Dot Scatter Chart */}
-        <div className="h-44 w-full pt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <ReferenceLine y={3} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
-              <ReferenceLine y={4} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
-              <XAxis dataKey="date" name="Date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-              <YAxis domain={[1, 7]} ticks={[1, 2, 3, 4, 5, 6, 7]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} tickFormatter={(val) => `Type ${val}`} />
-              <ZAxis range={[60, 60]} />
-              <RechartsTooltip content={<CustomScatterTooltip />} />
-              <Scatter data={dynamicDigestionScatterData} dataKey="type">
-                {dynamicDigestionScatterData.map((entry, index) => (
-                  <Cell key={`scatter-cell-${index}`} fill={entry.fill} />
-                ))}
-              </Scatter>
-            </ScatterChart>
-          </ResponsiveContainer>
-        </div>
+      {/* 3. Dedicated Digestion Card (Respects trackDigestion config) */}
+      {profileData?.agent_config?.trackDigestion !== false && (
+        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-100/70 text-emerald-600 flex items-center justify-center border border-emerald-200/50 shadow-2xs">
+                <Activity className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
+                  Digestion (Bristol Scatter)
+                </div>
+                <div className="text-2xl font-black text-orange-950 flex flex-wrap items-baseline gap-2">
+                  <span>Type 3.8</span>
+                  <span className="text-xs font-bold text-emerald-600 tracking-normal font-sans">
+                    Ideal Zone 🟢
+                  </span>
+                </div>
+              </div>
+            </div>
 
-        {/* Legend */}
-        <div className="flex justify-between items-center text-[10px] font-black text-orange-950/60 pt-1 px-1">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            Optimal (Type 3–4)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-500" />
-            Constipated (Type 1–2)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-rose-500" />
-            Loose (Type 5–7)
-          </span>
+            <button
+              onClick={() => {
+                if (triggerToast) triggerToast("💩 Digestion report copied!");
+              }}
+              title="Share Digestion Report"
+              className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Dynamic Multi-Dot Scatter Chart */}
+          <div className="h-44 w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <ReferenceLine y={3} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
+                <ReferenceLine y={4} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
+                <XAxis dataKey="date" name="Date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
+                <YAxis domain={[1, 7]} ticks={[1, 2, 3, 4, 5, 6, 7]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} tickFormatter={(val) => `Type ${val}`} />
+                <ZAxis range={[60, 60]} />
+                <RechartsTooltip content={<CustomScatterTooltip />} />
+                <Scatter data={dynamicDigestionScatterData} dataKey="type">
+                  {dynamicDigestionScatterData.map((entry, index) => (
+                    <Cell key={`scatter-cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Legend */}
+          <div className="flex justify-between items-center text-[10px] font-black text-orange-950/60 pt-1 px-1">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              Optimal (Type 3–4)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              Constipated (Type 1–2)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              Loose (Type 5–7)
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 4. Dedicated Eating Habits & Meal Tags Card */}
       <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-5 font-sans">
         <div className="flex justify-between items-start">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-1">
-              Eating Habits & Tags
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-orange-100/70 text-orange-600 flex items-center justify-center border border-orange-200/50 shadow-2xs">
+              <Utensils className="w-5 h-5" />
             </div>
-            <div className="text-xs font-bold text-orange-900/60 font-sans">
-              based on 18 logged meals
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
+                Eating Habits & Tags
+              </div>
+              <div className="text-xs font-bold text-orange-900/60 font-sans">
+                based on 18 logged meals
+              </div>
             </div>
           </div>
 

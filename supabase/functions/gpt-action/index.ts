@@ -730,8 +730,47 @@ serve(async (req) => {
     // --- DAILY WELLNESS ENDPOINTS ---
     if (path.endsWith("/daily-wellness")) {
       if (method === "GET") {
-        const queryDate = url.searchParams.get("date") || getLocalTimeAndDate().dateStr;
-        
+        const queryDate = url.searchParams.get("date");
+        const startDate = url.searchParams.get("start_date");
+        const endDate = url.searchParams.get("end_date");
+        const limitParam = url.searchParams.get("limit") || url.searchParams.get("days");
+
+        // Multi-day or date-range query
+        if (startDate || endDate || limitParam || !queryDate) {
+          let dbQuery = supabase
+            .from("daily_wellness")
+            .select("*")
+            .eq("profile_id", profile.id);
+
+          if (startDate) dbQuery = dbQuery.gte("date", startDate);
+          if (endDate) dbQuery = dbQuery.lte("date", endDate);
+
+          const maxLimit = Math.min(parseInt(limitParam || "90"), 365);
+          if (!startDate && !endDate && limitParam) {
+            dbQuery = dbQuery.order("date", { ascending: false }).limit(maxLimit);
+          } else {
+            dbQuery = dbQuery.order("date", { ascending: true }).limit(maxLimit);
+          }
+
+          const { data: records, error: fetchError } = await dbQuery;
+
+          if (fetchError) {
+            return new Response(JSON.stringify({ error: "Failed to retrieve daily wellness logs", details: fetchError }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          return new Response(JSON.stringify({
+            wellness_logs: records || [],
+            count: records ? records.length : 0,
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Single date query fallback
         const { data: record, error: fetchError } = await supabase
           .from("daily_wellness")
           .select("*")

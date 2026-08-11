@@ -460,16 +460,34 @@ paths:
           description: Meal not found
   /daily-wellness:
     get:
-      summary: Get daily wellness notes
-      description: Retrieve wellness and health notes for a specific date.
+      summary: Get daily wellness and digestion logs
+      description: Retrieve wellness, digestion, stool, water, and health logs for a specific date, custom date range (e.g. start_date & end_date), or recent limit.
       operationId: getDailyWellness
       parameters:
         - name: date
           in: query
-          description: The target date in YYYY-MM-DD format. Defaults to today's date.
+          description: Target single date in YYYY-MM-DD format.
           required: false
           schema:
             type: string
+        - name: start_date
+          in: query
+          description: Start date filter in YYYY-MM-DD format (e.g., "2026-01-01"). Use with end_date for custom range history.
+          required: false
+          schema:
+            type: string
+        - name: end_date
+          in: query
+          description: End date filter in YYYY-MM-DD format (e.g., "2026-03-31").
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Number of recent daily wellness logs to retrieve across past dates (e.g., 90).
+          required: false
+          schema:
+            type: integer
       responses:
         '200':
           description: Wellness notes retrieved successfully
@@ -503,6 +521,14 @@ paths:
                   energy_log_time:
                     type: string
                     description: Time energy level was logged (HH:MM format)
+                  wellness_logs:
+                    type: array
+                    description: Array of daily wellness records when querying date ranges or limit
+                    items:
+                      type: object
+                  count:
+                    type: integer
+                    description: Number of records returned in wellness_logs
     post:
       summary: Save daily wellness data
       description: Create or update the wellness log for a specific date. Only provided fields are changed; omitted fields keep their existing values.
