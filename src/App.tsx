@@ -48,6 +48,7 @@ import { EditProfileView } from "./components/EditProfileView";
 import { SettingsView, DEFAULT_TRACKING_TAGS } from "./components/SettingsView";
 import { OAuthConsentView } from "./components/OAuthConsentView";
 import { OnboardingWizard } from "./components/OnboardingWizard";
+import { DashboardWalkthrough } from "./components/DashboardWalkthrough";
 import { CalendarPickerModal } from "./components/CalendarPickerModal";
 import { TimePickerModal } from "./components/TimePickerModal";
 import { DefaultAvatar } from "./components/DefaultAvatar";
@@ -511,6 +512,7 @@ export default function App() {
   
   // Router States & Navigation
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isVitalsLogOpen, setIsVitalsLogOpen] = useState(false);
   const [activeVitalsTab, setActiveVitalsTab] = useState<"weight" | "water" | "digestion" | "energy" | null>(null);
   const [expandedCardLogs, setExpandedCardLogs] = useState<{ [key: string]: boolean }>({ water: true, digestion: true, energy: true, weight: true });
@@ -3251,6 +3253,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               console.warn("localStorage is blocked or disabled:", e);
             }
           }
+          setShowWalkthrough(true);
           setProfileDataState((prev: any) => ({
             ...prev,
             ...completedData,
@@ -4463,6 +4466,10 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             : "Energy"
         } Log Time`}
       />
+
+      {showWalkthrough && (
+        <DashboardWalkthrough onDismiss={() => setShowWalkthrough(false)} />
+      )}
     </div>
   );
 }

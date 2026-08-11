@@ -8,14 +8,12 @@ import {
   Minus, 
   ArrowRight, 
   Check,
-  Target,
   Flame,
   ShieldCheck,
   Scale,
   Ruler,
   User,
-  Heart,
-  Activity
+  Heart
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -25,7 +23,6 @@ import { cn } from "../lib/utils";
 
 interface BodyMetrics {
   name: string;
-  username: string;
   avatar: string;
   gender: "Male" | "Female";
   age: number;
@@ -39,7 +36,6 @@ interface BodyMetrics {
 
 const DEFAULT_METRICS: BodyMetrics = {
   name: "",
-  username: "",
   avatar: "",
   gender: "Male",
   age: 28,
@@ -93,12 +89,9 @@ export const OnboardingWizard = ({
       }
     }
 
-    const defaultUsername = profileData?.username || (profileData?.email ? profileData.email.split('@')[0] : "");
-
     return {
       ...DEFAULT_METRICS,
       name: profileData?.name || profileData?.display_name || "",
-      username: defaultUsername,
       avatar: profileData?.imageUrl || profileData?.image_url || "",
       age: initialAge,
       height: profileData?.height || 175,
@@ -109,7 +102,6 @@ export const OnboardingWizard = ({
 
   const [avatarPreview, setAvatarPreview] = useState(profileData?.imageUrl || profileData?.image_url || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [disclaimerAgreed, setDisclaimerAgreed] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
   // Targets state (configured on Step 3)
@@ -121,51 +113,6 @@ export const OnboardingWizard = ({
     fiber: 30,
   });
 
-  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
-  const [usernameError, setUsernameError] = useState("");
-
-  // Auto-set username availability check
-  useEffect(() => {
-    const cleanUsername = metrics.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
-    if (!cleanUsername) {
-      setUsernameStatus("idle");
-      setUsernameError("");
-      return;
-    }
-
-    setUsernameStatus("checking");
-    setUsernameError("");
-
-    const delayDebounce = setTimeout(async () => {
-      try {
-        const { data: duplicate, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('username', cleanUsername)
-          .neq('id', activeProfileId)
-          .maybeSingle();
-
-        if (error) {
-          console.error(error);
-          setUsernameStatus("available");
-          return;
-        }
-
-        if (duplicate) {
-          setUsernameStatus("taken");
-          setUsernameError("Username is taken");
-        } else {
-          setUsernameStatus("available");
-        }
-      } catch (err) {
-        console.error(err);
-        setUsernameStatus("available");
-      }
-    }, 350);
-
-    return () => clearTimeout(delayDebounce);
-  }, [metrics.username, activeProfileId]);
-
   // Sync initials from Google/supabase profile
   useEffect(() => {
     if (profileData?.imageUrl || profileData?.image_url) {
@@ -176,12 +123,9 @@ export const OnboardingWizard = ({
     if (profileData?.name || profileData?.display_name) {
       setMetrics(prev => ({ ...prev, name: profileData.name || profileData.display_name }));
     }
-    if (profileData?.username && !metrics.username) {
-      setMetrics(prev => ({ ...prev, username: profileData.username }));
-    }
   }, [profileData]);
 
-  // Mifflin-St Jeor recommendation engine
+  // Mifflin-St Jeor recommendation engine (Static & Predictable)
   const calculateRecommendedTargets = (currentMetrics: BodyMetrics) => {
     if (currentMetrics.height <= 0 || currentMetrics.weight <= 0) {
       return { calories: 2000, protein: 150, carbs: 150, fats: 60, fiber: 30 };
@@ -236,7 +180,7 @@ export const OnboardingWizard = ({
     };
   };
 
-  // Recalculate targets when biometric parameters change
+  // Recalculate targets ONLY when goal or biological metrics change initially
   useEffect(() => {
     const recommended = calculateRecommendedTargets(metrics);
     setTargets(recommended);
@@ -246,14 +190,6 @@ export const OnboardingWizard = ({
     if (step === 1) {
       if (!metrics.name.trim()) {
         triggerToast("⚠️ Please enter your name!");
-        return;
-      }
-      if (!metrics.username.trim()) {
-        triggerToast("⚠️ Please enter a username!");
-        return;
-      }
-      if (usernameStatus === "taken") {
-        triggerToast("⚠️ This username is already taken!");
         return;
       }
     }
@@ -274,18 +210,6 @@ export const OnboardingWizard = ({
         : [...prev.preferences, prefId];
       return { ...prev, preferences: updated };
     });
-  };
-
-  const handleTargetWeightChange = (newTargetWeight: number) => {
-    let goal: "Lose Weight" | "Maintain Weight" | "Build Muscle" = "Maintain Weight";
-    if (newTargetWeight < metrics.weight) {
-      goal = "Lose Weight";
-    } else if (newTargetWeight > metrics.weight) {
-      goal = "Build Muscle";
-    }
-
-    const updatedMetrics = { ...metrics, goal, targetWeight: newTargetWeight };
-    setMetrics(updatedMetrics);
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,7 +249,6 @@ export const OnboardingWizard = ({
 
   const generateAiBioSilently = async (p: number, c: number, f: number, cal: number): Promise<string> => {
     const goalText = metrics.goal === "Lose Weight" ? `lose weight (target: ${metrics.targetWeight}kg)` : metrics.goal === "Build Muscle" ? `build muscle (target: ${metrics.targetWeight}kg)` : "maintain weight";
-    const dietPrefs = metrics.preferences.length > 0 ? metrics.preferences.join(", ") : "clean eating";
     const fallbackBio = `Focusing on ${goalText} with a target of ${cal} kcal & ${p}g protein daily! 💪`;
 
     try {
@@ -339,10 +262,8 @@ export const OnboardingWizard = ({
   };
 
   const saveProfileData = async () => {
-    const cleanUsername = metrics.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
-    if (!cleanUsername) {
-      throw new Error("Please enter a valid username!");
-    }
+    // Generate clean username fallback behind the scenes
+    const cleanUsername = (metrics.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "") || "user") + "_" + Math.random().toString(36).substring(7);
 
     const silentBio = await generateAiBioSilently(
       targets.protein,
@@ -437,7 +358,7 @@ export const OnboardingWizard = ({
     try {
       const completedState = await saveProfileData();
       onComplete(completedState);
-      triggerToast("✨ Welcome to FitAI! Your plan is live.");
+      triggerToast("✨ Welcome to FitAI! Setup complete.");
     } catch (err: any) {
       console.error(err);
       triggerToast(err.message || "❌ Failed to save onboarding targets");
@@ -448,7 +369,7 @@ export const OnboardingWizard = ({
 
   const isStepValid = () => {
     if (step === 1) {
-      return metrics.name.trim() !== "" && metrics.username.trim() !== "" && usernameStatus !== "taken";
+      return metrics.name.trim() !== "";
     }
     if (step === 2) {
       return metrics.height > 0 && metrics.weight > 0 && metrics.age > 0;
@@ -456,13 +377,10 @@ export const OnboardingWizard = ({
     if (step === 3) {
       return metrics.targetWeight > 0 && targets.calories > 0;
     }
-    if (step === 4) {
-      return disclaimerAgreed;
-    }
     return true;
   };
 
-  const totalSteps = 4;
+  const totalSteps = 3;
   const progressPercent = (step / totalSteps) * 100;
 
   const slideVariants = {
@@ -502,11 +420,11 @@ export const OnboardingWizard = ({
         </div>
         
         <span className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest shrink-0 font-mono">
-          {step}/{totalSteps}
+          Step {step} of {totalSteps}
         </span>
       </div>
 
-      {/* Steps Content Area with Smooth Slide Transitions */}
+      {/* Steps Content Area with Smooth Transitions */}
       <div className="flex-1 flex flex-col justify-center py-4 relative min-h-[480px]">
         <AnimatePresence custom={direction} mode="wait">
           <motion.div
@@ -559,53 +477,21 @@ export const OnboardingWizard = ({
                   </span>
                 </div>
 
-                {/* Name & Username Inputs */}
-                <div className="space-y-3.5 bg-white/70 backdrop-blur-md rounded-[28px] p-4.5 border border-white/80 shadow-xl shadow-orange-100/20">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest block px-1">
-                      Full Name
-                    </label>
-                    <div className="relative flex items-center">
-                      <User className="absolute left-3.5 w-4 h-4 text-orange-400" />
-                      <input
-                        type="text"
-                        placeholder="Alex Morgan"
-                        value={metrics.name}
-                        onChange={(e) => setMetrics(prev => ({ ...prev, name: e.target.value }))}
-                        className="w-full bg-orange-50/30 border border-orange-200/60 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-orange-950 placeholder-orange-900/30 focus:outline-none focus:border-orange-500 focus:bg-white shadow-2xs transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest block px-1">
-                      Username
-                    </label>
-                    <div className="relative flex items-center">
-                      <span className="absolute left-3.5 text-xs font-black text-orange-400">@</span>
-                      <input
-                        type="text"
-                        placeholder="alex_fit"
-                        value={metrics.username}
-                        onChange={(e) => {
-                          const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "");
-                          setMetrics(prev => ({ ...prev, username: cleaned }));
-                        }}
-                        className="w-full bg-orange-50/30 border border-orange-200/60 rounded-2xl pl-8 pr-10 py-3 text-xs font-bold text-orange-950 placeholder-orange-900/30 focus:outline-none focus:border-orange-500 focus:bg-white shadow-2xs transition-all"
-                      />
-                      {usernameStatus === "checking" && (
-                        <div className="absolute right-3.5 w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                      )}
-                      {usernameStatus === "available" && (
-                        <Check className="absolute right-3.5 w-4 h-4 text-emerald-600 font-bold" />
-                      )}
-                    </div>
-                    {usernameStatus === "available" && (
-                      <p className="text-[9px] text-emerald-600 font-extrabold uppercase tracking-wider px-1 pt-0.5">✨ Username available!</p>
-                    )}
-                    {usernameStatus === "taken" && (
-                      <p className="text-[9px] text-rose-500 font-extrabold uppercase tracking-wider px-1 pt-0.5">⚠️ This username is already taken.</p>
-                    )}
+                {/* Name Input Only */}
+                <div className="bg-white/70 backdrop-blur-md rounded-[28px] p-5 border border-white/80 shadow-xl shadow-orange-100/20 space-y-1">
+                  <label className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest block px-1">
+                    What should we call you?
+                  </label>
+                  <div className="relative flex items-center">
+                    <User className="absolute left-3.5 w-4 h-4 text-orange-400" />
+                    <input
+                      type="text"
+                      placeholder="Your Name (e.g. Alex Morgan)"
+                      value={metrics.name}
+                      onChange={(e) => setMetrics(prev => ({ ...prev, name: e.target.value }))}
+                      autoFocus
+                      className="w-full bg-orange-50/30 border border-orange-200/60 rounded-2xl pl-10 pr-4 py-3.5 text-xs font-bold text-orange-950 placeholder-orange-900/30 focus:outline-none focus:border-orange-500 focus:bg-white shadow-2xs transition-all"
+                    />
                   </div>
                 </div>
 
@@ -635,6 +521,14 @@ export const OnboardingWizard = ({
                     })}
                   </div>
                 </div>
+
+                {/* Minimalist Terms Footer Reference */}
+                <p className="text-[9px] font-medium text-orange-950/40 text-center pt-2">
+                  By continuing, you agree to FitAI's{" "}
+                  <button type="button" onClick={() => setShowTermsModal(true)} className="font-bold underline text-orange-600 cursor-pointer border-none bg-transparent">
+                    Terms & Privacy Policy
+                  </button>
+                </p>
               </div>
             )}
 
@@ -646,7 +540,7 @@ export const OnboardingWizard = ({
                     Your Biological Baseline
                   </h2>
                   <p className="text-xs font-bold text-orange-900/60 font-sans">
-                    Used to calculate your precise baseline TDEE
+                    Directly type or adjust your metrics
                   </p>
                 </div>
 
@@ -674,9 +568,9 @@ export const OnboardingWizard = ({
                   </div>
                 </div>
 
-                {/* Height, Weight & Age Card */}
+                {/* Height, Weight & Age Card (Directly Typable + Steppers + Sliders) */}
                 <div className="bg-white/70 backdrop-blur-md rounded-[28px] p-5 border border-white/80 shadow-xl shadow-orange-100/20 space-y-4">
-                  {/* Age Stepper */}
+                  {/* Age Input & Stepper */}
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-black text-orange-950 flex items-center gap-1.5">
                       <Heart className="w-4 h-4 text-orange-500" />
@@ -690,7 +584,12 @@ export const OnboardingWizard = ({
                       >
                         <Minus className="w-3 h-3" />
                       </button>
-                      <span className="text-xs font-black text-orange-950 font-mono w-10 text-center">{metrics.age} yrs</span>
+                      <input
+                        type="number"
+                        value={metrics.age}
+                        onChange={(e) => setMetrics(prev => ({ ...prev, age: parseInt(e.target.value) || 28 }))}
+                        className="w-12 bg-transparent text-center text-xs font-black text-orange-950 font-mono focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
                       <button
                         type="button"
                         onClick={() => setMetrics(prev => ({ ...prev, age: Math.min(100, prev.age + 1) }))}
@@ -701,16 +600,22 @@ export const OnboardingWizard = ({
                     </div>
                   </div>
 
-                  {/* Height Slider */}
+                  {/* Height Slider & Direct Typable Box */}
                   <div className="space-y-1.5 pt-1">
                     <div className="flex justify-between items-center text-xs font-black text-orange-950">
                       <span className="flex items-center gap-1.5">
                         <Ruler className="w-4 h-4 text-sky-500" />
                         Height
                       </span>
-                      <span className="font-mono text-sky-600 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200/50">
-                        {metrics.height} cm
-                      </span>
+                      <div className="flex items-center gap-1 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200/50">
+                        <input
+                          type="number"
+                          value={metrics.height}
+                          onChange={(e) => setMetrics(prev => ({ ...prev, height: parseInt(e.target.value) || 175 }))}
+                          className="w-10 bg-transparent text-center font-mono font-black text-sky-600 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-xs"
+                        />
+                        <span className="text-[10px] font-bold text-sky-600">cm</span>
+                      </div>
                     </div>
                     <input
                       type="range"
@@ -720,33 +625,27 @@ export const OnboardingWizard = ({
                       onChange={(e) => setMetrics(prev => ({ ...prev, height: parseInt(e.target.value) || 175 }))}
                       className="w-full accent-orange-500 cursor-pointer"
                     />
-                    <div className="flex justify-between gap-1 pt-0.5">
-                      {[160, 170, 175, 180, 185].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setMetrics(prev => ({ ...prev, height: val }))}
-                          className={cn(
-                            "px-2 py-0.5 rounded-md text-[10px] font-bold font-mono transition-all border cursor-pointer",
-                            metrics.height === val ? "bg-sky-500 text-white border-sky-500" : "bg-white text-orange-900/60 border-orange-100 hover:bg-orange-50"
-                          )}
-                        >
-                          {val}cm
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
-                  {/* Weight Slider */}
+                  {/* Weight Slider & Direct Typable Box */}
                   <div className="space-y-1.5 pt-1">
                     <div className="flex justify-between items-center text-xs font-black text-orange-950">
                       <span className="flex items-center gap-1.5">
                         <Scale className="w-4 h-4 text-orange-500" />
                         Current Weight
                       </span>
-                      <span className="font-mono text-orange-600 bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-200/50">
-                        {metrics.weight} kg
-                      </span>
+                      <div className="flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-200/50">
+                        <input
+                          type="number"
+                          value={metrics.weight}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 70;
+                            setMetrics(prev => ({ ...prev, weight: val, targetWeight: prev.targetWeight === prev.weight ? val : prev.targetWeight }));
+                          }}
+                          className="w-12 bg-transparent text-center font-mono font-black text-orange-600 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-xs"
+                        />
+                        <span className="text-[10px] font-bold text-orange-600">kg</span>
+                      </div>
                     </div>
                     <input
                       type="range"
@@ -759,21 +658,6 @@ export const OnboardingWizard = ({
                       }}
                       className="w-full accent-orange-500 cursor-pointer"
                     />
-                    <div className="flex justify-between gap-1 pt-0.5">
-                      {[60, 70, 75, 80, 90].map((val) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setMetrics(prev => ({ ...prev, weight: val }))}
-                          className={cn(
-                            "px-2 py-0.5 rounded-md text-[10px] font-bold font-mono transition-all border cursor-pointer",
-                            metrics.weight === val ? "bg-orange-500 text-white border-orange-500" : "bg-white text-orange-900/60 border-orange-100 hover:bg-orange-50"
-                          )}
-                        >
-                          {val}kg
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
 
@@ -809,15 +693,15 @@ export const OnboardingWizard = ({
               </div>
             )}
 
-            {/* STEP 3: GOALS & DYNAMIC MACRO ENGINE */}
+            {/* STEP 3: GOALS, MACRO ENGINE & LAUNCH */}
             {step === 3 && (
               <div className="space-y-4">
                 <div className="text-center space-y-1">
                   <h2 className="text-2xl font-black tracking-tight text-orange-950">
-                    Your Goal & Targets
+                    Goals & Dynamic Targets
                   </h2>
                   <p className="text-xs font-bold text-orange-900/60 font-sans">
-                    Calculated using Mifflin-St Jeor metabolic model
+                    Customizable daily calorie & nutrient targets
                   </p>
                 </div>
 
@@ -849,7 +733,7 @@ export const OnboardingWizard = ({
                   ))}
                 </div>
 
-                {/* Target Weight Card */}
+                {/* Target Weight Card (Direct Typable Box) */}
                 <div className="bg-white/70 backdrop-blur-md rounded-[28px] p-4 border border-white/80 shadow-xl shadow-orange-100/20 flex justify-between items-center">
                   <div>
                     <div className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest">
@@ -863,15 +747,20 @@ export const OnboardingWizard = ({
                   <div className="flex items-center gap-2 bg-orange-50/50 rounded-xl p-1 border border-orange-200/40">
                     <button
                       type="button"
-                      onClick={() => handleTargetWeightChange(Math.max(35, metrics.targetWeight - 1))}
+                      onClick={() => setMetrics(prev => ({ ...prev, targetWeight: Math.max(35, prev.targetWeight - 1) }))}
                       className="w-8 h-8 rounded-lg bg-white text-orange-950 flex items-center justify-center shadow-2xs hover:bg-orange-100 active:scale-90 transition-all border-none cursor-pointer"
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="text-xs font-black text-orange-950 font-mono w-12 text-center">{metrics.targetWeight} kg</span>
+                    <input
+                      type="number"
+                      value={metrics.targetWeight}
+                      onChange={(e) => setMetrics(prev => ({ ...prev, targetWeight: parseFloat(e.target.value) || 70 }))}
+                      className="w-12 bg-transparent text-center font-mono font-black text-orange-950 focus:outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
                     <button
                       type="button"
-                      onClick={() => handleTargetWeightChange(Math.min(200, metrics.targetWeight + 1))}
+                      onClick={() => setMetrics(prev => ({ ...prev, targetWeight: Math.min(200, prev.targetWeight + 1) }))}
                       className="w-8 h-8 rounded-lg bg-white text-orange-950 flex items-center justify-center shadow-2xs hover:bg-orange-100 active:scale-90 transition-all border-none cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -914,10 +803,10 @@ export const OnboardingWizard = ({
                   {/* 4 Macro Cards */}
                   <div className="grid grid-cols-2 gap-2.5">
                     {[
-                      { label: "Protein", key: "protein", color: "#F97316", unit: "g" },
-                      { label: "Carbs", key: "carbs", color: "#38BDF8", unit: "g" },
-                      { label: "Fats", key: "fats", color: "#FBBF24", unit: "g" },
-                      { label: "Fiber", key: "fiber", color: "#34D399", unit: "g" },
+                      { label: "Protein", key: "protein", color: "#F97316" },
+                      { label: "Carbs", key: "carbs", color: "#38BDF8" },
+                      { label: "Fats", key: "fats", color: "#FBBF24" },
+                      { label: "Fiber", key: "fiber", color: "#34D399" },
                     ].map((m) => (
                       <div key={m.key} className="bg-white/90 rounded-2xl p-3 border border-orange-100/60 shadow-2xs space-y-1.5">
                         <div className="flex items-center justify-between">
@@ -938,9 +827,12 @@ export const OnboardingWizard = ({
                           >
                             <Minus className="w-3 h-3" />
                           </button>
-                          <span className="text-[10px] font-bold text-orange-950/60 font-mono">
-                            {targets[m.key as keyof typeof targets]}g
-                          </span>
+                          <input
+                            type="number"
+                            value={targets[m.key as keyof typeof targets]}
+                            onChange={(e) => setTargets(prev => ({ ...prev, [m.key]: parseInt(e.target.value) || 0 }))}
+                            className="w-10 bg-transparent text-center text-[10px] font-bold text-orange-950 font-mono focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
                           <button
                             type="button"
                             onClick={() => setTargets(prev => ({ ...prev, [m.key]: Math.min(400, prev[m.key as keyof typeof targets] + 5) }))}
@@ -952,82 +844,6 @@ export const OnboardingWizard = ({
                       </div>
                     ))}
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 4: PLAN SUMMARY & INSTANT LAUNCH */}
-            {step === 4 && (
-              <div className="space-y-4">
-                <div className="text-center space-y-1">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500 shadow-lg shadow-emerald-200 flex items-center justify-center mx-auto mb-1">
-                    <ShieldCheck className="text-white w-6 h-6" />
-                  </div>
-                  <h2 className="text-2xl font-black tracking-tight text-orange-950">
-                    Your Plan is Ready! 🎉
-                  </h2>
-                  <p className="text-xs font-bold text-orange-900/60 font-sans">
-                    Review your personalized setup before launching FitAI
-                  </p>
-                </div>
-
-                {/* Plan Summary Hero Card */}
-                <div className="bg-white/80 backdrop-blur-md rounded-[28px] p-5 border border-white/80 shadow-xl shadow-orange-100/20 space-y-4">
-                  <div className="flex items-center gap-3 border-b border-orange-100 pb-3">
-                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-orange-300 shrink-0">
-                      {avatarPreview ? (
-                        <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                      ) : (
-                        <DefaultAvatar />
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-sm font-black text-orange-950">{metrics.name}</div>
-                      <div className="text-xs font-bold text-orange-600 font-mono">@{metrics.username}</div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100/60">
-                      <div className="text-[10px] font-black uppercase text-orange-950/50">Daily Calories</div>
-                      <div className="text-base font-black text-orange-950 font-mono mt-0.5">{targets.calories} kcal</div>
-                    </div>
-                    <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100/60">
-                      <div className="text-[10px] font-black uppercase text-orange-950/50">Protein Goal</div>
-                      <div className="text-base font-black text-orange-600 font-mono mt-0.5">{targets.protein}g / day</div>
-                    </div>
-                    <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100/60">
-                      <div className="text-[10px] font-black uppercase text-orange-950/50">Target Weight</div>
-                      <div className="text-base font-black text-orange-950 font-mono mt-0.5">{metrics.targetWeight} kg</div>
-                    </div>
-                    <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100/60">
-                      <div className="text-[10px] font-black uppercase text-orange-950/50">Primary Goal</div>
-                      <div className="text-xs font-black text-emerald-600 mt-1">{metrics.goal}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Minimalist Agreement Checkbox */}
-                <div className="bg-white/60 rounded-2xl p-4 border border-orange-100/80 shadow-2xs space-y-2">
-                  <label className="flex items-start gap-3 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={disclaimerAgreed}
-                      onChange={(e) => setDisclaimerAgreed(e.target.checked)}
-                      className="w-4 h-4 rounded text-orange-500 focus:ring-orange-200 cursor-pointer border-orange-300 mt-0.5 accent-orange-500"
-                    />
-                    <span className="text-xs text-orange-950 font-bold leading-relaxed">
-                      I agree to the FitAI Terms of Service and Privacy Policy.
-                    </span>
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowTermsModal(true)}
-                    className="text-[10px] font-black text-orange-600 hover:underline uppercase tracking-wider pl-7 cursor-pointer border-none bg-transparent"
-                  >
-                    View Terms & Conditions ↗
-                  </button>
                 </div>
               </div>
             )}
@@ -1056,7 +872,7 @@ export const OnboardingWizard = ({
             </div>
           ) : (
             <>
-              <span>{step === totalSteps ? "🚀 Start My Fitness Journey" : "Continue"}</span>
+              <span>{step === totalSteps ? "🚀 Launch FitAI" : "Continue"}</span>
               {step < totalSteps && <ArrowRight className="w-4 h-4" />}
             </>
           )}
@@ -1087,13 +903,10 @@ export const OnboardingWizard = ({
             </div>
             <button
               type="button"
-              onClick={() => {
-                setDisclaimerAgreed(true);
-                setShowTermsModal(false);
-              }}
+              onClick={() => setShowTermsModal(false)}
               className="w-full bg-orange-500 text-white font-black py-3 rounded-2xl cursor-pointer border-none"
             >
-              I Agree & Close
+              Close
             </button>
           </div>
         </div>
