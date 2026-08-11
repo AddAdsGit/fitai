@@ -2329,9 +2329,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
   }
 
   // --- ROUTING HANDLERS ---
-  const localOnboardedKey = activeProfileId ? `fitai_onboarded_${activeProfileId}` : null;
-  const localOnboarded = localOnboardedKey ? localStorage.getItem(localOnboardedKey) === "true" : false;
-  const isOnboarded = localOnboarded || profileData.preferences?.includes("onboarded");
+  const isOnboarded = !!profileData.preferences?.includes("onboarded");
 
   // "/" is the main app — no more Redirecting... screen needed
 

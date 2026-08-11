@@ -767,8 +767,8 @@ export const InsightsView = ({
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                <Scale className="w-8 h-8 text-stone-300 animate-bounce" />
-                <span className="text-xs font-bold text-stone-400 mt-2">No weight logs recorded in this range</span>
+                <Scale className="w-8 h-8 text-orange-950/20" />
+                <span className="text-xs font-bold text-orange-900/40 mt-2">No weight logs recorded in this range</span>
               </div>
             )}
           </div>

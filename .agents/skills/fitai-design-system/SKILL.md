@@ -96,3 +96,10 @@ This is the exact gold standard established by the main Dashboard screen:
    * Values: Current numeric value highlighted in nutrient color (`78` orange, `125` cyan, `90` yellow, `6` green) + Target in muted taupe (`/ 140G`).
    * Progress Bar: Sleek 6px progress track with rounded pill indicator in exact nutrient color (`bg-orange-500`, `bg-sky-500`, `bg-amber-500`, `bg-emerald-500`).
    * Pure minimalism: No superfluous icons beside nutrient names. The bold typography and clean color bars create instant visual hierarchy without clutter.
+
+---
+
+## 🧘 6. Calm Empty States & Anti-Jitter Rule
+
+* **No Bouncing / Shaking Icons**: Never apply continuous keyframe animations like `animate-bounce` or `animate-pulse` to empty state icons or empty charts (e.g. empty weight chart, empty meal list).
+* **Calm Aesthetics**: Empty states must be still, steady, and calm (`text-orange-950/20` monochrome icon with `text-xs font-bold text-orange-900/40` caption). Never draw attention with distracting looped motion.

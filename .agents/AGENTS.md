@@ -33,3 +33,4 @@ This file defines critical rules that all AI developers and code-generation suba
 * **No Verbose / Complicated Copy**: Keep titles & labels direct, ultra-short, and functional (e.g. `Your Name`, `Today's Progress`). Never add conversational explanatory subtext under basic labels.
 * **No Unnecessary Section Headers**: Do not add section headers above inputs when the UI context/placeholder is already clear.
 * **No Emoji Soup or Rainbow Icons**: Never use multi-colored emoji soup in section titles. Use clean typography or single-tint monochrome Lucide SVG icons matching the espresso or orange brand palette.
+* **No Shaking / Jittering Animations**: NEVER use continuous keyframe bounce or pulse animations (`animate-bounce`, `animate-pulse`) on empty state icons or empty charts. Keep empty states calm, still, and steady.
