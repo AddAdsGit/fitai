@@ -544,8 +544,11 @@ export default function App() {
   const isAuthenticatingRef = useRef(false);
 
   const handleUserAuthenticated = async (user: any) => {
-    if (isAuthenticatingRef.current) return;
-    isAuthenticatingRef.current = true;
+    if (!user || !user.id) return;
+
+    setActiveProfileId(user.id);
+    localStorage.setItem("fitai_active_profile_id", user.id);
+
     try {
       const { data: existing, error } = await supabase
         .from('profiles')
@@ -558,17 +561,10 @@ export default function App() {
         return;
       }
 
-      if (existing) {
-        setActiveProfileId(existing.id);
-        localStorage.setItem("fitai_active_profile_id", existing.id);
-        if (!existing.email && user.email) {
-          supabase.from('profiles').update({ email: user.email }).eq('id', existing.id).then();
-        }
-      } else {
+      if (!existing) {
         const newKey = "fit_" + crypto.randomUUID().replace(/-/g, "");
         const baseUsername = user.email ? user.email.split('@')[0] : "user_" + Math.random().toString(36).substring(7);
         
-        // Ensure username uniqueness
         let resolvedUsername = baseUsername;
         const { data: dupCheck } = await supabase
           .from('profiles')
@@ -588,7 +584,6 @@ export default function App() {
           username: resolvedUsername,
           display_name: googleName,
           image_url: googleAvatar,
-          email: user.email,
           height: 175,
           weight: 70,
           dob: "1998-05-15",
@@ -608,15 +603,11 @@ export default function App() {
         if (createErr) {
           console.error("Error creating authenticated profile:", createErr);
         } else {
-          setActiveProfileId(user.id);
-          localStorage.setItem("fitai_active_profile_id", user.id);
           showToast(`✨ Profile created for @${resolvedUsername}!`);
         }
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      isAuthenticatingRef.current = false;
     }
   };
 
@@ -965,10 +956,16 @@ export default function App() {
         setIsSessionLoading(false);
       } else if (event === "PASSWORD_RECOVERY") {
         navigateTo("/reset-password");
-      } else if (event === "SIGNED_IN" && !isSessionLoading) {
-        // Handle post-startup sign ins
-        setIsDataLoading(true);
-        await handleUserAuthenticated(session?.user);
+      } else if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+        if (session?.user) {
+          setIsDataLoading(true);
+          await handleUserAuthenticated(session.user);
+          if (window.location.hash.includes("access_token") || window.location.pathname === "/login") {
+            window.history.replaceState(null, "", "/");
+            setCurrentPath("/");
+          }
+        }
+        setIsSessionLoading(false);
       }
     });
 
