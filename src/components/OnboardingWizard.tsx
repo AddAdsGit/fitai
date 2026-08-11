@@ -5,15 +5,14 @@ import {
   ChevronLeft, 
   Plus, 
   Minus, 
-  Bot, 
-  ArrowRight, 
-  HelpCircle,
-  ExternalLink,
-  BookOpen
+  ArrowRight,
+  Flame,
+  Scale,
+  Ruler,
+  Heart
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
-import { ChatGPTIcon } from "./ChatGPTIcon";
 import { TERMS_AND_CONDITIONS } from "../constants/terms";
 import { DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
 
@@ -35,10 +34,10 @@ const DEFAULT_METRICS: BodyMetrics = {
   avatar: "",
   gender: "Male",
   age: 28,
-  height: 0,
-  weight: 0,
+  height: 175,
+  weight: 70,
   goal: "Maintain Weight",
-  targetWeight: 0,
+  targetWeight: 70,
   activityLevel: "Moderately Active",
   preferences: [],
 };
@@ -52,7 +51,6 @@ const DIET_ALLERGY_OPTIONS = [
   { id: "Balanced", label: "🍎 Balanced" },
   { id: "Nut Allergy", label: "🥜 Nut Allergy" },
   { id: "Dairy Free", label: "🥛 Dairy Free" },
-  { id: "Shellfish Allergy", label: "🦐 Shellfish Allergy" },
 ];
 
 export const OnboardingWizard = ({
@@ -90,27 +88,23 @@ export const OnboardingWizard = ({
       age: initialAge,
       height: profileData?.height || 175,
       weight: profileData?.weight || 70,
-      targetWeight: profileData?.weight_goal || 65,
+      targetWeight: profileData?.weight_goal || profileData?.weight || 70,
     };
   });
   const [avatarPreview, setAvatarPreview] = useState(profileData?.imageUrl || profileData?.image_url || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Custom GPT page preference toggles
-  const [enableGptWidget, setEnableGptWidget] = useState(true);
-  const [requireGptConfirmation, setRequireGptConfirmation] = useState(true);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   // Targets state (configured on Step 3)
   const [targets, setTargets] = useState({
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fats: 0,
-    fiber: 0,
+    calories: 2000,
+    protein: 150,
+    carbs: 150,
+    fats: 60,
+    fiber: 30,
   });
 
   const [showAdvancedMacros, setShowAdvancedMacros] = useState(false);
-  const [disclaimerAgreed, setDisclaimerAgreed] = useState(false);
 
   const isStepValid = () => {
     if (step === 1) {
@@ -128,9 +122,6 @@ export const OnboardingWizard = ({
         metrics.targetWeight > 0 &&
         targets.calories > 0
       );
-    }
-    if (step === 4) {
-      return disclaimerAgreed;
     }
     return true;
   };
@@ -171,16 +162,10 @@ export const OnboardingWizard = ({
     }
   }, [profileData]);
 
-  // Perform Mifflin-St Jeor calculation (used for default recommendations)
+  // Perform Mifflin-St Jeor calculation (used ONCE for default baseline recommendations)
   const calculateRecommendedTargets = (currentMetrics: BodyMetrics) => {
     if (currentMetrics.height <= 0 || currentMetrics.weight <= 0) {
-      return {
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fats: 0,
-        fiber: 0,
-      };
+      return { calories: 2000, protein: 150, carbs: 150, fats: 60, fiber: 30 };
     }
 
     const age = currentMetrics.age;
@@ -199,12 +184,12 @@ export const OnboardingWizard = ({
       "Very Active": 1.725,
     };
 
-    const multiplier = activityMultipliers[currentMetrics.activityLevel] || 1.2;
+    const multiplier = activityMultipliers[currentMetrics.activityLevel] || 1.55;
     const tdee = bmr * multiplier;
 
     let targetCalories = Math.round(tdee);
     if (currentMetrics.goal === "Lose Weight") {
-      targetCalories = Math.round(tdee - 500);
+      targetCalories = Math.round(tdee - 450);
       if (targetCalories < 1200) targetCalories = 1200;
     } else if (currentMetrics.goal === "Build Muscle") {
       targetCalories = Math.round(tdee + 300);
@@ -215,8 +200,6 @@ export const OnboardingWizard = ({
       proteinMultiplier = 2.0;
     } else if (currentMetrics.goal === "Build Muscle") {
       proteinMultiplier = 2.2;
-    } else {
-      proteinMultiplier = 1.8;
     }
 
     const proteinGrams = Math.round(currentMetrics.weight * proteinMultiplier);
@@ -240,48 +223,17 @@ export const OnboardingWizard = ({
     setTargets(recommended);
   }, [metrics.gender, metrics.age, metrics.height, metrics.weight]);
 
+  // NO dynamic recalculation when editing weight/height/target weight — static & user controllable
   const handleCurrentWeightChange = (newWeight: number) => {
-    let goal: "Lose Weight" | "Maintain Weight" | "Build Muscle" = "Maintain Weight";
-    let newTargetWeight = metrics.targetWeight;
-    
-    if (metrics.targetWeight === metrics.weight) {
-      newTargetWeight = newWeight;
-    }
-
-    if (newTargetWeight < newWeight) {
-      goal = "Lose Weight";
-    } else if (newTargetWeight > newWeight) {
-      goal = "Build Muscle";
-    }
-
-    const updatedMetrics = { ...metrics, weight: newWeight, targetWeight: newTargetWeight, goal };
-    setMetrics(updatedMetrics);
-
-    const recommended = calculateRecommendedTargets(updatedMetrics);
-    setTargets(recommended);
+    setMetrics(prev => ({ ...prev, weight: newWeight }));
   };
 
   const handleTargetWeightChange = (newTargetWeight: number) => {
-    let goal: "Lose Weight" | "Maintain Weight" | "Build Muscle" = "Maintain Weight";
-    if (newTargetWeight < metrics.weight) {
-      goal = "Lose Weight";
-    } else if (newTargetWeight > metrics.weight) {
-      goal = "Build Muscle";
-    }
-
-    const updatedMetrics = { ...metrics, goal, targetWeight: newTargetWeight };
-    setMetrics(updatedMetrics);
-
-    const recommended = calculateRecommendedTargets(updatedMetrics);
-    setTargets(recommended);
+    setMetrics(prev => ({ ...prev, targetWeight: newTargetWeight }));
   };
 
   const handleActivityLevelChange = (activityLevel: "Sedentary" | "Lightly Active" | "Moderately Active" | "Very Active") => {
-    const updatedMetrics = { ...metrics, activityLevel };
-    setMetrics(updatedMetrics);
-
-    const recommended = calculateRecommendedTargets(updatedMetrics);
-    setTargets(recommended);
+    setMetrics(prev => ({ ...prev, activityLevel }));
   };
 
   const handleCaloriesChange = (newCalories: number) => {
@@ -340,15 +292,7 @@ export const OnboardingWizard = ({
     const fallbackBio = `Focusing on ${goalText} with a target of ${cal} kcal & ${p}g protein daily! 💪`;
 
     try {
-      const prompt = `Write a brief, motivating first-person personal self-note / reminder (maximum 1-2 short sentences) for a user's fitness profile.
-User Details:
-- Name: ${metrics.name}
-- Goal: ${goalText}
-- Activity Level: ${metrics.activityLevel}
-- Dietary Preferences/Restrictions: ${dietPrefs}
-- Target Daily Intake: ${cal} kcal, ${p}g protein, ${c}g carbs, ${f}g fats
-
-Make it punchy, personal, and clean. Output only the self-note without surrounding quotes.`;
+      const prompt = `Write a 1-sentence personal self-note for ${metrics.name} focusing on ${goalText} with ${cal} kcal & ${p}g protein. Output only the self-note without quotes.`;
 
       const { data, error } = await supabase.functions.invoke("gemini", {
         body: { prompt }
@@ -358,7 +302,6 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
       const generated = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       return generated || fallbackBio;
     } catch (err) {
-      console.error("AI Self-Note Generation Error:", err);
       return fallbackBio;
     }
   };
@@ -380,12 +323,12 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
     ];
 
     const initialAgentConfig = {
-      showGptWidget: enableGptWidget,
+      showGptWidget: true,
       generateImages: true,
       refinePhotos: false,
       artStyle: "gourmet",
       customArtStyle: "",
-      requireConfirmation: requireGptConfirmation,
+      requireConfirmation: true,
       trackWeight: true,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     };
@@ -470,7 +413,7 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
     }
   };
 
-  const totalSteps = 4;
+  const totalSteps = 3;
   const progressPercent = (step / totalSteps) * 100;
 
   return (
@@ -501,7 +444,7 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
       {/* Steps Content */}
       <div className="flex-1 flex flex-col justify-center py-4">
         
-        {/* STEP 1: BASICS */}
+        {/* STEP 1: YOUR PROFILE */}
         {step === 1 && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col items-center gap-2 text-center">
@@ -553,10 +496,18 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
                 className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
               />
             </div>
+
+            {/* Clean Terms Reference Link */}
+            <p className="text-[9px] font-medium text-stone-400 text-center pt-2">
+              By continuing, you agree to FitAI's{" "}
+              <button type="button" onClick={() => setShowTermsModal(true)} className="font-bold text-orange-500 hover:underline cursor-pointer border-none bg-transparent">
+                Terms of Service & Privacy Policy
+              </button>
+            </p>
           </div>
         )}
 
-        {/* STEP 2: BIOLOGY */}
+        {/* STEP 2: BODY MEASUREMENTS */}
         {step === 2 && (
           <div className="space-y-5 animate-fadeIn">
             <div className="text-center space-y-0.5">
@@ -588,7 +539,7 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
               </div>
             </div>
 
-            {/* Age stepper */}
+            {/* Age stepper + Typable numeric input */}
             <div className="space-y-1.5 animate-fadeIn">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
                 Age (years)
@@ -606,7 +557,7 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
                     type="number"
                     value={metrics.age}
                     onChange={(e) => setMetrics(prev => ({ ...prev, age: parseInt(e.target.value) || 28 }))}
-                    className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="text-[10px] font-bold text-stone-400">Yrs Old</span>
                 </div>
@@ -620,7 +571,7 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
               </div>
             </div>
 
-            {/* Height/Weight steppers */}
+            {/* Height/Weight steppers + Typable inputs */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
@@ -681,7 +632,7 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
           </div>
         )}
 
-        {/* STEP 3: TRAJECTORY, GOALS & PROTOCOLS (MERGED CONFIGURATOR) */}
+        {/* STEP 3: DAILY TARGETS */}
         {step === 3 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-0.5">
@@ -718,7 +669,7 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
               </div>
             </div>
 
-            {/* Target Weight Stepper */}
+            {/* Target Weight Stepper + Typable Box */}
             <div className="space-y-1">
               <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
                 Target Weight
@@ -733,7 +684,13 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
-                  <span className="text-xs font-black text-stone-850 w-16 text-center">{metrics.targetWeight} kg</span>
+                  <input
+                    type="number"
+                    value={metrics.targetWeight}
+                    onChange={(e) => handleTargetWeightChange(parseFloat(e.target.value) || 70)}
+                    className="w-12 bg-transparent text-center font-bold text-stone-850 focus:outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-xs font-bold text-stone-400">kg</span>
                   <button
                     type="button"
                     onClick={() => handleTargetWeightChange(Math.min(250, metrics.targetWeight + 1))}
@@ -748,14 +705,13 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
             {/* Calorie & Macro Target Editor */}
             <div className="space-y-3.5">
               <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Nutrition protocol goals
+                Nutrition Protocol Goals
               </label>
 
-              {/* Calories Target Stepper card */}
+              {/* Calories Target Stepper card + Typable Input */}
               <div className="flex items-center justify-between bg-stone-50 border border-stone-200 rounded-2xl p-4 shadow-2xs">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black text-stone-500 uppercase tracking-widest">Daily Calories Target</span>
-                  <span className="text-[8px] text-stone-400 font-bold uppercase mt-0.5">Adjustable target</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -788,14 +744,14 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
                 onClick={() => setShowAdvancedMacros(!showAdvancedMacros)}
                 className="w-full flex items-center justify-between py-3 px-4 bg-stone-100 hover:bg-stone-200/85 rounded-2xl text-stone-700 text-[10px] font-black uppercase tracking-wider border-none cursor-pointer transition-colors shadow-2xs select-none mt-2 active:scale-[0.99]"
               >
-                <span>{showAdvancedMacros ? "Hide Advanced Macro Splits" : "Adjust Macro Split (Advanced)"}</span>
+                <span>{showAdvancedMacros ? "Hide Macro Splits" : "Adjust Macro Split"}</span>
                 <span className="text-[10px] font-black">{showAdvancedMacros ? "▲" : "▼"}</span>
               </button>
 
               {showAdvancedMacros && (
                 <div className="grid grid-cols-2 gap-3 animate-fadeIn mt-2">
                   {[
-                    { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-655 bg-orange-50/15" },
+                    { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-600 bg-orange-50/15" },
                     { label: "Carbs (g)", key: "carbs", color: "border-[#90E0EF] text-[#0077B6] bg-[#CAF0F8]/10" },
                     { label: "Fats (g)", key: "fats", color: "border-yellow-200 text-yellow-600 bg-yellow-50/15" },
                     { label: "Fiber (g)", key: "fiber", color: "border-emerald-200 text-emerald-700 bg-emerald-50/10" },
@@ -832,47 +788,6 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
           </div>
         )}
 
-        {/* STEP 4: MEDICAL DISCLAIMER & TERMS */}
-        {step === 4 && (
-          <div className="space-y-4 animate-fadeIn">
-            <div className="text-center space-y-0.5">
-              <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Terms of Service
-              </h2>
-            </div>
-
-            {/* Scrollable Terms box */}
-            <div className="bg-white rounded-2xl p-4.5 border border-stone-200/50 shadow-2xs max-h-[42vh] overflow-y-auto space-y-3.5 scrollbar-thin text-left">
-              <h4 className="text-[10px] font-black text-stone-850 uppercase tracking-wide">
-                FitAI Terms of Service & Privacy Policy
-              </h4>
-              <div className="space-y-3 text-[8px] text-stone-450 font-bold leading-normal">
-                {TERMS_AND_CONDITIONS.map((section, idx) => (
-                  <div key={idx} className="space-y-1">
-                    <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">
-                      {section.title}
-                    </p>
-                    <p>{section.content}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Checkbox agreement */}
-            <label className="flex items-start gap-3 bg-stone-50 border border-stone-200/80 rounded-2xl p-4 cursor-pointer select-none active:scale-[0.99] transition-transform">
-              <input
-                type="checkbox"
-                checked={disclaimerAgreed}
-                onChange={(e) => setDisclaimerAgreed(e.target.checked)}
-                className="w-4.5 h-4.5 rounded text-orange-500 focus:ring-orange-200 cursor-pointer border-stone-300 mt-0.5"
-              />
-              <span className="text-[10px] text-stone-600 font-bold leading-relaxed text-left">
-                I read, understand, and agree to the FitAI Terms of Service and Privacy Policy.
-              </span>
-            </label>
-          </div>
-        )}
-
       </div>
 
       {/* Navigation Footer */}
@@ -886,11 +801,45 @@ Make it punchy, personal, and clean. Output only the self-note without surroundi
               (!isStepValid() || isSubmitting) ? "opacity-50 cursor-not-allowed shadow-none" : "shadow-lg shadow-orange-100 active:scale-[0.98]"
             }`}
           >
-            <span>{step === totalSteps ? "Start Tracking" : "Continue"}</span>
+            <span>{step === totalSteps ? "🚀 Launch FitAI" : "Continue"}</span>
             {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
           </button>
         </div>
       )}
+
+      {/* TERMS MODAL POPUP */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-[32px] p-6 max-w-md w-full shadow-2xl border border-stone-200 space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-base font-black text-stone-900">FitAI Terms & Conditions</h3>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="w-8 h-8 rounded-full bg-stone-100 text-stone-700 flex items-center justify-center font-bold border-none cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3 text-xs text-stone-600 font-medium">
+              {TERMS_AND_CONDITIONS.map((section, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="font-black text-stone-900 uppercase text-[10px] tracking-wider">{section.title}</div>
+                  <p>{section.content}</p>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowTermsModal(false)}
+              className="w-full bg-orange-500 text-white font-black py-3 rounded-2xl cursor-pointer border-none"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
