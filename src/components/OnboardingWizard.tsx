@@ -13,22 +13,13 @@ import {
   Droplet,
   Search,
   X,
-  Info
+  Flame,
+  Crown
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
 import { TERMS_AND_CONDITIONS } from "../constants/terms";
 import { DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
-
-const AVAILABLE_NUTRIENT_CATALOG = [
-  { id: "iron", name: "Iron", defaultTarget: 18, unit: "mg", color: "#EF4444", type: "micro" },
-  { id: "b12", name: "Vitamin B12", defaultTarget: 2.4, unit: "mcg", color: "#8B5CF6", type: "micro" },
-  { id: "vit_d", name: "Vitamin D", defaultTarget: 600, unit: "IU", color: "#F59E0B", type: "micro" },
-  { id: "sodium", name: "Sodium", defaultTarget: 2300, unit: "mg", color: "#64748B", type: "micro" },
-  { id: "sugar", name: "Added Sugar", defaultTarget: 25, unit: "g", color: "#EC4899", type: "micro" },
-  { id: "potassium", name: "Potassium", defaultTarget: 3400, unit: "mg", color: "#10B981", type: "micro" },
-  { id: "calcium", name: "Calcium", defaultTarget: 1000, unit: "mg", color: "#3B82F6", type: "micro" },
-];
 
 interface BodyMetrics {
   name: string;
@@ -55,6 +46,19 @@ const DEFAULT_METRICS: BodyMetrics = {
   activityLevel: "Moderately Active",
   preferences: [],
 };
+
+const FULL_NUTRIENT_CATALOG = [
+  { id: "iron", name: "Iron", defaultTarget: 18, unit: "mg", color: "#EF4444", type: "micro" },
+  { id: "b12", name: "Vitamin B12", defaultTarget: 2.4, unit: "mcg", color: "#8B5CF6", type: "micro" },
+  { id: "vit_d", name: "Vitamin D", defaultTarget: 600, unit: "IU", color: "#F59E0B", type: "micro" },
+  { id: "sodium", name: "Sodium", defaultTarget: 2300, unit: "mg", color: "#64748B", type: "micro" },
+  { id: "sugar", name: "Added Sugar", defaultTarget: 25, unit: "g", color: "#EC4899", type: "micro" },
+  { id: "potassium", name: "Potassium", defaultTarget: 3400, unit: "mg", color: "#10B981", type: "micro" },
+  { id: "calcium", name: "Calcium", defaultTarget: 1000, unit: "mg", color: "#3B82F6", type: "micro" },
+  { id: "magnesium", name: "Magnesium", defaultTarget: 400, unit: "mg", color: "#6366F1", type: "micro" },
+  { id: "zinc", name: "Zinc", defaultTarget: 11, unit: "mg", color: "#14B8A6", type: "micro" },
+  { id: "vit_c", name: "Vitamin C", defaultTarget: 90, unit: "mg", color: "#F97316", type: "micro" },
+];
 
 export const OnboardingWizard = ({
   activeProfileId,
@@ -108,9 +112,9 @@ export const OnboardingWizard = ({
     fiber: 30,
   });
 
-  const [selectedPlan, setSelectedPlan] = useState<"free" | "pro">("pro");
+  const [selectedPlan, setSelectedPlan] = useState<"free" | "plus" | "pro">("pro");
 
-  // Vitals Selection State (Step 5)
+  // Vitals Selection State (Step 5 - Simple Question Toggles)
   const [selectedVitals, setSelectedVitals] = useState({
     weight: true,
     water: false,
@@ -126,6 +130,17 @@ export const OnboardingWizard = ({
   const [nutrientSearchQuery, setNutrientSearchQuery] = useState("");
   const [isNutrientDropdownOpen, setIsNutrientDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Auto-close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsNutrientDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Step 6 AI Generation Loading animation
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -381,6 +396,8 @@ export const OnboardingWizard = ({
 
     if (selectedPlan === "pro") {
       updatedPrefs.push("plan_pro");
+    } else if (selectedPlan === "plus") {
+      updatedPrefs.push("plan_plus");
     }
 
     const initialAgentConfig = {
@@ -477,7 +494,7 @@ export const OnboardingWizard = ({
 
   const progressPercent = (step / totalSteps) * 100;
 
-  const filteredCatalog = AVAILABLE_NUTRIENT_CATALOG.filter(item => 
+  const filteredCatalog = FULL_NUTRIENT_CATALOG.filter(item => 
     !trackedNutrientList.some(tn => tn.id === item.id && tn.enabled) &&
     (item.name.toLowerCase().includes(nutrientSearchQuery.toLowerCase()) || item.id.toLowerCase().includes(nutrientSearchQuery.toLowerCase()))
   );
@@ -506,20 +523,20 @@ export const OnboardingWizard = ({
       {/* Steps Content */}
       <div className="flex-1 flex flex-col justify-center py-4">
         
-        {/* STEP 1: YOUR PROFILE */}
+        {/* STEP 1: YOUR PROFILE (SLEEK BRANDING) */}
         {step === 1 && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="flex flex-col items-center gap-2 text-center">
+            <div className="flex flex-col items-center gap-1.5 text-center">
               <div className="w-12 h-12 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center">
-                <Sparkles className="text-white w-6 h-6 fill-white" />
+                <Flame className="text-white w-6 h-6 fill-white" />
               </div>
               <h2 className="text-xl font-black tracking-tight text-stone-900 mt-1">
-                Your Profile
+                Welcome to FitAI
               </h2>
             </div>
 
             {/* Avatar picker */}
-            <div className="flex flex-col items-center gap-2 py-2">
+            <div className="flex flex-col items-center gap-2 py-1">
               <div className="relative">
                 <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-stone-200 shadow-inner flex items-center justify-center bg-stone-100">
                   {avatarPreview ? (
@@ -538,9 +555,6 @@ export const OnboardingWizard = ({
                   />
                 </label>
               </div>
-              <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">
-                Choose profile photo
-              </span>
             </div>
 
             {/* Name input */}
@@ -694,7 +708,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 3: DAILY GOALS (SPACIOUS & UNCLUTTERED) */}
+        {/* STEP 3: DAILY GOALS */}
         {step === 3 && (
           <div className="space-y-5 animate-fadeIn">
             <div className="text-center space-y-0.5">
@@ -801,20 +815,17 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 4: NUTRIENTS & MACROS (SIMPLE DROPDOWN & REMOVABLE DEFAULTS MATCHING EDIT PROFILE) */}
+        {/* STEP 4: NUTRIENTS & MACROS (COMPACT 1-LINE ROWS + AUTO-CLOSING SEARCH) */}
         {step === 4 && (
-          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
+          <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
                 Nutrient Tracking
               </h2>
-              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
-                Protein, Carbs, Fats & Fiber are default. Toggle or remove as you wish.
-              </p>
             </div>
 
-            {/* Search Dropdown Input (Same as Edit Profile) */}
-            <div className="relative">
+            {/* Search Dropdown Input */}
+            <div ref={dropdownRef} className="relative">
               <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-orange-500 transition-all">
                 <Search className="w-4 h-4 text-stone-400 shrink-0" />
                 <input
@@ -825,7 +836,7 @@ export const OnboardingWizard = ({
                     setIsNutrientDropdownOpen(true);
                   }}
                   onFocus={() => setIsNutrientDropdownOpen(true)}
-                  placeholder="+ Add Nutrient (Sodium, B12, Iron, Vitamin D, Sugar...)"
+                  placeholder="+ Add Nutrient (B12, Iron, Sodium, Vit D, Sugar...)"
                   className="flex-1 bg-transparent border-none text-xs font-bold text-stone-850 placeholder:text-stone-400 focus:outline-none"
                 />
                 {nutrientSearchQuery && (
@@ -851,7 +862,7 @@ export const OnboardingWizard = ({
                       >
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-stone-800">{item.name}</span>
-                          <span className="text-[9px] font-medium text-stone-400">Default target: {item.defaultTarget || 10} {item.unit}</span>
+                          <span className="text-[9px] font-medium text-stone-400">Default target: {item.defaultTarget} {item.unit}</span>
                         </div>
                         <Plus className="w-4 h-4 text-orange-500" />
                       </div>
@@ -865,59 +876,29 @@ export const OnboardingWizard = ({
               )}
             </div>
 
-            {/* Active Nutrients List Cards */}
-            <div className="space-y-2.5">
+            {/* Active Nutrients List Cards (Compact 1-Line Format) */}
+            <div className="space-y-2">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
                 Active Tracked Nutrients
               </label>
               {trackedNutrientList.map((n) => (
                 <div
                   key={n.id}
-                  className={`p-3.5 rounded-2xl border transition-all ${
+                  className={`p-3 rounded-2xl border transition-all flex items-center justify-between ${
                     n.enabled
                       ? "bg-white border-stone-200 shadow-2xs"
                       : "bg-stone-50 border-stone-150 opacity-60"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: n.color || "#F97316" }} />
-                      <span className="text-xs font-black text-stone-900 uppercase tracking-wide">{n.name}</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {/* Toggle Switch */}
-                      <button
-                        type="button"
-                        onClick={() => toggleNutrientEnabled(n.id)}
-                        className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0 ${
-                          n.enabled ? "bg-orange-500" : "bg-stone-300"
-                        }`}
-                      >
-                        <div
-                          className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${
-                            n.enabled ? "translate-x-4" : "translate-x-0"
-                          }`}
-                        />
-                      </button>
-
-                      {/* Remove Button */}
-                      <button
-                        type="button"
-                        onClick={() => setTrackedNutrientList(prev => prev.filter(item => item.id !== n.id))}
-                        className="text-stone-300 hover:text-red-500 border-none bg-transparent cursor-pointer transition-colors p-1"
-                        title="Remove nutrient"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: n.color || "#F97316" }} />
+                    <span className="text-xs font-black text-stone-900 uppercase tracking-wide">{n.name}</span>
                   </div>
 
-                  {/* Target Stepper Input */}
-                  {n.enabled && (
-                    <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between">
-                      <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">Daily Target</span>
-                      <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 rounded-xl px-2 py-0.5 shadow-3xs">
+                  <div className="flex items-center gap-2">
+                    {/* Stepper Target Input */}
+                    {n.enabled && (
+                      <div className="flex items-center gap-0.5 bg-stone-50 border border-stone-200 rounded-xl px-1.5 py-0.5 shadow-3xs">
                         <button
                           type="button"
                           onClick={() => {
@@ -927,9 +908,9 @@ export const OnboardingWizard = ({
                               handleMacroChange(n.id as any, val);
                             }
                           }}
-                          className="w-5 h-5 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                          className="w-4 h-4 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
                         >
-                          <Minus className="w-3 h-3" />
+                          <Minus className="w-2.5 h-2.5" />
                         </button>
                         <input
                           type="number"
@@ -941,7 +922,7 @@ export const OnboardingWizard = ({
                               handleMacroChange(n.id as any, val);
                             }
                           }}
-                          className="bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         <span className="text-[9px] font-bold text-stone-400">{n.unit}</span>
                         <button
@@ -953,13 +934,38 @@ export const OnboardingWizard = ({
                               handleMacroChange(n.id as any, val);
                             }
                           }}
-                          className="w-5 h-5 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                          className="w-4 h-4 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-2.5 h-2.5" />
                         </button>
                       </div>
-                    </div>
-                  )}
+                    )}
+
+                    {/* Toggle Switch */}
+                    <button
+                      type="button"
+                      onClick={() => toggleNutrientEnabled(n.id)}
+                      className={`w-8 h-4.5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0 ${
+                        n.enabled ? "bg-orange-500" : "bg-stone-300"
+                      }`}
+                    >
+                      <div
+                        className={`bg-white w-3.5 h-3.5 rounded-full shadow-sm transform transition-transform ${
+                          n.enabled ? "translate-x-3.5" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+
+                    {/* Remove Button */}
+                    <button
+                      type="button"
+                      onClick={() => setTrackedNutrientList(prev => prev.filter(item => item.id !== n.id))}
+                      className="text-stone-300 hover:text-red-500 border-none bg-transparent cursor-pointer transition-colors p-0.5"
+                      title="Remove nutrient"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -967,22 +973,22 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 5: DAILY VITALS TRACKERS (MATCHING EDIT PROFILE CARD ROWS) */}
+        {/* STEP 5: DAILY VITALS (SIMPLE QUESTION TOGGLES) */}
         {step === 5 && (
           <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Daily Vitals Trackers
+                Daily Vitals
               </h2>
             </div>
 
-            {/* Daily Vitals Card Toggles */}
+            {/* Simple Question Toggles */}
             <div className="space-y-3">
               {[
-                { id: "weight", label: "Weight Tracker", desc: "Log daily body weight & trendlines", icon: Scale },
-                { id: "water", label: "Water Intake", desc: "Quick-log daily hydration volume", icon: Droplet },
-                { id: "digestion", label: "Gut & Digestion", desc: "Bristol stool spectrum & comfort", icon: Activity },
-                { id: "energy", label: "Daily Energy", desc: "1 to 5 vitality & mood spectrum", icon: Zap },
+                { id: "weight", question: "Track Daily Weight?", desc: "Body weight logs & trendlines", icon: Scale, defaultOn: true },
+                { id: "water", question: "Track Water Intake?", desc: "Daily hydration volume counter", icon: Droplet, defaultOn: false },
+                { id: "digestion", question: "Track Gut & Digestion?", desc: "Bristol stool spectrum & comfort", icon: Activity, defaultOn: false },
+                { id: "energy", question: "Track Daily Energy?", desc: "1 to 5 vitality & mood scale", icon: Zap, defaultOn: false },
               ].map((v) => {
                 const active = selectedVitals[v.id as keyof typeof selectedVitals];
                 const IconComponent = v.icon;
@@ -1001,12 +1007,18 @@ export const OnboardingWizard = ({
                         <IconComponent className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">{v.label}</h4>
+                        <h4 className="text-xs font-black text-stone-900 tracking-tight">{v.question}</h4>
                         <p className="text-[10px] font-bold text-stone-400 mt-0.5">{v.desc}</p>
                       </div>
                     </div>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${active ? "border-orange-500 bg-orange-500 text-white" : "border-stone-300"}`}>
-                      {active && <Check className="w-3 h-3 stroke-[3]" />}
+                    
+                    {/* Clean YES / NO Toggle Pill */}
+                    <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
+                      active
+                        ? "bg-orange-500 text-white shadow-sm"
+                        : "bg-stone-100 text-stone-400"
+                    }`}>
+                      {active ? "YES" : "NO"}
                     </div>
                   </div>
                 );
@@ -1041,7 +1053,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 7: PRICING & PLAN REVEAL */}
+        {/* STEP 7: PRICING & PLAN REVEAL (3 TIERS: FREE, PLUS, PRO) */}
         {step === 7 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-1">
@@ -1054,9 +1066,10 @@ export const OnboardingWizard = ({
               </h2>
             </div>
 
-            {/* Plan selection grid */}
+            {/* 3 Tier Plan Cards */}
             <div className="space-y-3">
-              {/* FitAI Pro Option */}
+              
+              {/* 1. FitAI Pro Option */}
               <div
                 onClick={() => setSelectedPlan("pro")}
                 className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all relative ${
@@ -1066,7 +1079,7 @@ export const OnboardingWizard = ({
                 }`}
               >
                 <div className="absolute -top-3 right-4 bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest px-3 py-0.5 rounded-full shadow-sm">
-                  Recommended
+                  Popular
                 </div>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -1074,8 +1087,11 @@ export const OnboardingWizard = ({
                       {selectedPlan === "pro" && <Check className="w-3 h-3 stroke-[3]" />}
                     </div>
                     <div>
-                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Pro</h4>
-                      <p className="text-[10px] font-bold text-stone-400">Full AI Features & Unlimited Sync</p>
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Pro</h4>
+                        <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      </div>
+                      <p className="text-[10px] font-bold text-stone-400">Advanced AI & Gut Analytics</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1087,7 +1103,7 @@ export const OnboardingWizard = ({
                   {[
                     "Unlimited AI Photo & Text Meal Logging",
                     "ChatGPT Auto-Sync & Custom Memories",
-                    "Advanced Gut & Micro Nutrient Analytics",
+                    "Gut Health & Micro Nutrient Analytics",
                   ].map((feat, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-[10px] font-bold text-stone-600">
                       <Zap className="w-3 h-3 text-orange-500 fill-orange-500 shrink-0" />
@@ -1097,7 +1113,33 @@ export const OnboardingWizard = ({
                 </div>
               </div>
 
-              {/* Free Baseline Option */}
+              {/* 2. FitAI Plus Option */}
+              <div
+                onClick={() => setSelectedPlan("plus")}
+                className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all ${
+                  selectedPlan === "plus"
+                    ? "bg-white border-orange-500 shadow-xl shadow-orange-100"
+                    : "bg-white/60 border-stone-200 hover:border-stone-300"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === "plus" ? "border-orange-500 bg-orange-500 text-white" : "border-stone-300"}`}>
+                      {selectedPlan === "plus" && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Plus</h4>
+                      <p className="text-[10px] font-bold text-stone-400">AI Photo Logging & Macro Tracker</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-black text-stone-900">$4.99</span>
+                    <span className="text-[9px] text-stone-400 block font-bold">/month</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Free Baseline Option */}
               <div
                 onClick={() => setSelectedPlan("free")}
                 className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all ${
@@ -1113,7 +1155,7 @@ export const OnboardingWizard = ({
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">Free Baseline</h4>
-                      <p className="text-[10px] font-bold text-stone-400">Basic Manual Macro Tracking</p>
+                      <p className="text-[10px] font-bold text-stone-400">Basic Manual Tracking</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1122,6 +1164,7 @@ export const OnboardingWizard = ({
                   </div>
                 </div>
               </div>
+
             </div>
           </div>
         )}
@@ -1141,9 +1184,9 @@ export const OnboardingWizard = ({
           >
             <span>
               {step === totalSteps
-                ? selectedPlan === "pro"
-                  ? "🚀 Start 7-Day Free Trial"
-                  : "🚀 Launch Free FitAI"
+                ? selectedPlan === "free"
+                  ? "🚀 Launch Free FitAI"
+                  : "🚀 Start 7-Day Free Trial"
                 : "Continue"}
             </span>
             {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
