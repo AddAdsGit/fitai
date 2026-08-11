@@ -1,21 +1,27 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, 
   Camera, 
   ChevronLeft, 
   Plus, 
   Minus, 
-  Bot, 
   ArrowRight, 
-  HelpCircle,
-  ExternalLink,
-  BookOpen
+  Check,
+  Target,
+  Flame,
+  ShieldCheck,
+  Scale,
+  Ruler,
+  User,
+  Heart,
+  Activity
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
-import { ChatGPTIcon } from "./ChatGPTIcon";
 import { TERMS_AND_CONDITIONS } from "../constants/terms";
 import { DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
+import { cn } from "../lib/utils";
 
 interface BodyMetrics {
   name: string;
@@ -37,24 +43,23 @@ const DEFAULT_METRICS: BodyMetrics = {
   avatar: "",
   gender: "Male",
   age: 28,
-  height: 0,
-  weight: 0,
+  height: 175,
+  weight: 70,
   goal: "Maintain Weight",
-  targetWeight: 0,
+  targetWeight: 70,
   activityLevel: "Moderately Active",
   preferences: [],
 };
 
 const DIET_ALLERGY_OPTIONS = [
+  { id: "High Protein", label: "🥩 High Protein" },
   { id: "Keto", label: "🥑 Keto" },
   { id: "Vegan", label: "🌱 Vegan" },
   { id: "Vegetarian", label: "🥦 Vegetarian" },
   { id: "Gluten Free", label: "🌾 Gluten Free" },
-  { id: "Low Carb", label: "🥩 Low Carb" },
-  { id: "Balanced", label: "🍎 Balanced" },
+  { id: "Low Carb", label: "🍳 Low Carb" },
   { id: "Nut Allergy", label: "🥜 Nut Allergy" },
   { id: "Dairy Free", label: "🥛 Dairy Free" },
-  { id: "Shellfish Allergy", label: "🦐 Shellfish Allergy" },
 ];
 
 export const OnboardingWizard = ({
@@ -71,6 +76,8 @@ export const OnboardingWizard = ({
   triggerToast: (msg: string) => void;
 }) => {
   const [step, setStep] = useState(1);
+  const [direction, setDirection] = useState<number>(1);
+
   const [metrics, setMetrics] = useState<BodyMetrics>(() => {
     let initialAge = 28;
     if (profileData?.dob) {
@@ -85,39 +92,39 @@ export const OnboardingWizard = ({
         initialAge = ageVal || 28;
       }
     }
+
+    const defaultUsername = profileData?.username || (profileData?.email ? profileData.email.split('@')[0] : "");
+
     return {
       ...DEFAULT_METRICS,
-      name: profileData?.name || "",
-      avatar: profileData?.imageUrl || "",
+      name: profileData?.name || profileData?.display_name || "",
+      username: defaultUsername,
+      avatar: profileData?.imageUrl || profileData?.image_url || "",
       age: initialAge,
       height: profileData?.height || 175,
       weight: profileData?.weight || 70,
-      targetWeight: profileData?.weight_goal || 65,
+      targetWeight: profileData?.weight_goal || profileData?.weight || 70,
     };
   });
-  const [avatarPreview, setAvatarPreview] = useState(profileData?.imageUrl || "");
+
+  const [avatarPreview, setAvatarPreview] = useState(profileData?.imageUrl || profileData?.image_url || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Custom GPT page preference toggles
-  const [enableGptWidget, setEnableGptWidget] = useState(true);
-  const [requireGptConfirmation, setRequireGptConfirmation] = useState(true);
+  const [disclaimerAgreed, setDisclaimerAgreed] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   // Targets state (configured on Step 3)
   const [targets, setTargets] = useState({
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fats: 0,
-    fiber: 0,
+    calories: 2000,
+    protein: 150,
+    carbs: 150,
+    fats: 60,
+    fiber: 30,
   });
-
-  const [showAdvancedMacros, setShowAdvancedMacros] = useState(false);
-  const [disclaimerAgreed, setDisclaimerAgreed] = useState(false);
 
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [usernameError, setUsernameError] = useState("");
 
-  // Debounced Supabase validation check for username availability
+  // Auto-set username availability check
   useEffect(() => {
     const cleanUsername = metrics.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
     if (!cleanUsername) {
@@ -140,104 +147,44 @@ export const OnboardingWizard = ({
 
         if (error) {
           console.error(error);
-          setUsernameStatus("idle");
+          setUsernameStatus("available");
           return;
         }
 
         if (duplicate) {
           setUsernameStatus("taken");
-          setUsernameError("This username is already taken!");
+          setUsernameError("Username is taken");
         } else {
           setUsernameStatus("available");
         }
       } catch (err) {
         console.error(err);
-        setUsernameStatus("idle");
+        setUsernameStatus("available");
       }
-    }, 400); // 400ms debounce
+    }, 350);
 
     return () => clearTimeout(delayDebounce);
   }, [metrics.username, activeProfileId]);
 
-  const isStepValid = () => {
-    if (step === 1) {
-      return (
-        metrics.name.trim() !== "" &&
-        metrics.username.trim() !== "" &&
-        usernameStatus === "available"
-      );
-    }
-    if (step === 2) {
-      return (
-        metrics.height > 0 &&
-        metrics.weight > 0 &&
-        metrics.age > 0
-      );
-    }
-    if (step === 3) {
-      return (
-        metrics.targetWeight > 0 &&
-        targets.calories > 0
-      );
-    }
-    if (step === 4) {
-      return disclaimerAgreed;
-    }
-    return true;
-  };
-
-  const handleNext = () => {
-    if (step === 1) {
-      if (!metrics.name.trim()) {
-        triggerToast("⚠️ Please enter your name to continue!");
-        return;
-      }
-      if (!metrics.username.trim()) {
-        triggerToast("⚠️ Please choose a username to continue!");
-        return;
-      }
-    }
-    setStep(prev => Math.min(totalSteps, prev + 1));
-  };
-
-  const handleBack = () => {
-    setStep(prev => Math.max(1, prev - 1));
-  };
-
-  const togglePreference = (prefId: string) => {
-    setMetrics(prev => {
-      const isSelected = prev.preferences.includes(prefId);
-      const updated = isSelected
-        ? prev.preferences.filter(p => p !== prefId)
-        : [...prev.preferences, prefId];
-      return { ...prev, preferences: updated };
-    });
-  };
-
   // Sync initials from Google/supabase profile
   useEffect(() => {
-    if (profileData?.imageUrl) {
-      setAvatarPreview(profileData.imageUrl);
-      setMetrics(prev => ({ ...prev, avatar: profileData.imageUrl }));
+    if (profileData?.imageUrl || profileData?.image_url) {
+      const url = profileData.imageUrl || profileData.image_url;
+      setAvatarPreview(url);
+      setMetrics(prev => ({ ...prev, avatar: url }));
     }
-    if (profileData?.name) {
-      setMetrics(prev => ({ ...prev, name: profileData.name }));
+    if (profileData?.name || profileData?.display_name) {
+      setMetrics(prev => ({ ...prev, name: profileData.name || profileData.display_name }));
     }
-    if (profileData?.username) {
+    if (profileData?.username && !metrics.username) {
       setMetrics(prev => ({ ...prev, username: profileData.username }));
     }
   }, [profileData]);
 
-  // Perform Mifflin-St Jeor calculation (used for default recommendations)
+  // Mifflin-St Jeor recommendation engine
   const calculateRecommendedTargets = (currentMetrics: BodyMetrics) => {
     if (currentMetrics.height <= 0 || currentMetrics.weight <= 0) {
-      return {
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fats: 0,
-        fiber: 0,
-      };
+      return { calories: 2000, protein: 150, carbs: 150, fats: 60, fiber: 30 };
     }
 
     const age = currentMetrics.age;
@@ -256,12 +203,12 @@ export const OnboardingWizard = ({
       "Very Active": 1.725,
     };
 
-    const multiplier = activityMultipliers[currentMetrics.activityLevel] || 1.2;
+    const multiplier = activityMultipliers[currentMetrics.activityLevel] || 1.55;
     const tdee = bmr * multiplier;
 
     let targetCalories = Math.round(tdee);
     if (currentMetrics.goal === "Lose Weight") {
-      targetCalories = Math.round(tdee - 500);
+      targetCalories = Math.round(tdee - 450);
       if (targetCalories < 1200) targetCalories = 1200;
     } else if (currentMetrics.goal === "Build Muscle") {
       targetCalories = Math.round(tdee + 300);
@@ -269,11 +216,9 @@ export const OnboardingWizard = ({
 
     let proteinMultiplier = 1.8;
     if (currentMetrics.goal === "Lose Weight") {
-      proteinMultiplier = 2.0; // Higher protein to preserve lean muscle in deficit
+      proteinMultiplier = 2.0;
     } else if (currentMetrics.goal === "Build Muscle") {
-      proteinMultiplier = 2.2; // Extra protein to support muscle synthesis
-    } else {
-      proteinMultiplier = 1.8; // Maintenance protein
+      proteinMultiplier = 2.2;
     }
 
     const proteinGrams = Math.round(currentMetrics.weight * proteinMultiplier);
@@ -291,37 +236,46 @@ export const OnboardingWizard = ({
     };
   };
 
-  // Initialize targets once when biological metrics are completed
+  // Recalculate targets when biometric parameters change
   useEffect(() => {
     const recommended = calculateRecommendedTargets(metrics);
     setTargets(recommended);
-  }, [metrics.gender, metrics.age, metrics.height, metrics.weight]);
+  }, [metrics.gender, metrics.age, metrics.height, metrics.weight, metrics.activityLevel, metrics.goal]);
 
-  // HIERARCHICAL REACTION HANDLERS:
-
-  // 1. Current weight change handler (synchronizes targetWeight & goal if they match)
-  const handleCurrentWeightChange = (newWeight: number) => {
-    let goal: "Lose Weight" | "Maintain Weight" | "Build Muscle" = "Maintain Weight";
-    let newTargetWeight = metrics.targetWeight;
-    
-    if (metrics.targetWeight === metrics.weight) {
-      newTargetWeight = newWeight;
+  const handleNext = () => {
+    if (step === 1) {
+      if (!metrics.name.trim()) {
+        triggerToast("⚠️ Please enter your name!");
+        return;
+      }
+      if (!metrics.username.trim()) {
+        triggerToast("⚠️ Please enter a username!");
+        return;
+      }
+      if (usernameStatus === "taken") {
+        triggerToast("⚠️ This username is already taken!");
+        return;
+      }
     }
-
-    if (newTargetWeight < newWeight) {
-      goal = "Lose Weight";
-    } else if (newTargetWeight > newWeight) {
-      goal = "Build Muscle";
-    }
-
-    const updatedMetrics = { ...metrics, weight: newWeight, targetWeight: newTargetWeight, goal };
-    setMetrics(updatedMetrics);
-
-    const recommended = calculateRecommendedTargets(updatedMetrics);
-    setTargets(recommended);
+    setDirection(1);
+    setStep(prev => Math.min(totalSteps, prev + 1));
   };
 
-  // 2. Target weight change: Automatically determines goal under-the-hood and recalculates baseline targets
+  const handleBack = () => {
+    setDirection(-1);
+    setStep(prev => Math.max(1, prev - 1));
+  };
+
+  const togglePreference = (prefId: string) => {
+    setMetrics(prev => {
+      const isSelected = prev.preferences.includes(prefId);
+      const updated = isSelected
+        ? prev.preferences.filter(p => p !== prefId)
+        : [...prev.preferences, prefId];
+      return { ...prev, preferences: updated };
+    });
+  };
+
   const handleTargetWeightChange = (newTargetWeight: number) => {
     let goal: "Lose Weight" | "Maintain Weight" | "Build Muscle" = "Maintain Weight";
     if (newTargetWeight < metrics.weight) {
@@ -332,34 +286,6 @@ export const OnboardingWizard = ({
 
     const updatedMetrics = { ...metrics, goal, targetWeight: newTargetWeight };
     setMetrics(updatedMetrics);
-
-    const recommended = calculateRecommendedTargets(updatedMetrics);
-    setTargets(recommended);
-  };
-
-  // 3. Activity Level change: Updates baseline calories and balances macros
-  const handleActivityLevelChange = (activityLevel: "Sedentary" | "Lightly Active" | "Moderately Active" | "Very Active") => {
-    const updatedMetrics = { ...metrics, activityLevel };
-    setMetrics(updatedMetrics);
-
-    const recommended = calculateRecommendedTargets(updatedMetrics);
-    setTargets(recommended);
-  };
-
-  // 4. Calorie Target change: ONLY updates calories, no dynamic macro shifts
-  const handleCaloriesChange = (newCalories: number) => {
-    setTargets(prev => ({
-      ...prev,
-      calories: newCalories
-    }));
-  };
-
-  // 5. Macro (Protein, Carbs, Fats) change: ONLY updates that macro, no confusing calorie recalculations
-  const handleMacroChange = (key: "protein" | "carbs" | "fats" | "fiber", val: number) => {
-    setTargets(prev => ({
-      ...prev,
-      [key]: val
-    }));
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -372,7 +298,7 @@ export const OnboardingWizard = ({
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-        const max = 200;
+        const max = 250;
         if (width > max || height > max) {
           if (width > height) {
             height = Math.round((height * max) / width);
@@ -387,7 +313,7 @@ export const OnboardingWizard = ({
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
           setAvatarPreview(dataUrl);
           setMetrics(prev => ({ ...prev, avatar: dataUrl }));
         }
@@ -397,39 +323,17 @@ export const OnboardingWizard = ({
     reader.readAsDataURL(file);
   };
 
-  // Generate Gemini AI Self Note silently in the background
-  const generateAiBioSilently = async (p: number, c: number, f: number, cal: number, fib: number): Promise<string> => {
-    const age = metrics.age;
+  const generateAiBioSilently = async (p: number, c: number, f: number, cal: number): Promise<string> => {
     const goalText = metrics.goal === "Lose Weight" ? `lose weight (target: ${metrics.targetWeight}kg)` : metrics.goal === "Build Muscle" ? `build muscle (target: ${metrics.targetWeight}kg)` : "maintain weight";
-    const dietPrefs = metrics.preferences.length > 0 ? metrics.preferences.join(", ") : "no specific food restrictions";
-    
+    const dietPrefs = metrics.preferences.length > 0 ? metrics.preferences.join(", ") : "clean eating";
     const fallbackBio = `Focusing on ${goalText} with a target of ${cal} kcal & ${p}g protein daily! 💪`;
 
     try {
-      const prompt = `Write a brief, motivating first-person personal self-note / reminder (maximum 1-2 short sentences) for a user's fitness profile.
-Examples:
-- "Focusing on ${p}g protein daily & staying active 💪"
-- "Building muscle and eating clean 🥗"
-- "Staying consistent with my ${cal} kcal daily goal 🚀"
-
-User Details:
-- Name: ${metrics.name}
-- Goal: ${goalText}
-- Activity Level: ${metrics.activityLevel}
-- Dietary Preferences/Restrictions: ${dietPrefs}
-- Target Daily Intake: ${cal} kcal, ${p}g protein, ${c}g carbs, ${f}g fats
-
-Make it punchy, personal, and clean. Do not include surrounding quotes or meta-commentary. Output only the self-note.`;
-
-      const { data, error } = await supabase.functions.invoke("gemini", {
-        body: { prompt }
-      });
-      if (error) return fallbackBio;
-
+      const prompt = `Write a 1-sentence punchy personal self-note for a fitness user named ${metrics.name} whose goal is ${goalText} with ${cal} kcal & ${p}g protein. Output only the self-note without quotes.`;
+      const { data } = await supabase.functions.invoke("gemini", { body: { prompt } });
       const generated = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       return generated || fallbackBio;
-    } catch (err) {
-      console.error("AI Self-Note Generation Error:", err);
+    } catch (_) {
       return fallbackBio;
     }
   };
@@ -440,23 +344,11 @@ Make it punchy, personal, and clean. Do not include surrounding quotes or meta-c
       throw new Error("Please enter a valid username!");
     }
 
-    const { data: duplicate } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('username', cleanUsername)
-      .neq('id', activeProfileId)
-      .maybeSingle();
-
-    if (duplicate) {
-      throw new Error("This username is already taken. Please choose another one!");
-    }
-
     const silentBio = await generateAiBioSilently(
       targets.protein,
       targets.carbs,
       targets.fats,
-      targets.calories,
-      targets.fiber
+      targets.calories
     );
 
     const updatedPrefs = [
@@ -465,13 +357,16 @@ Make it punchy, personal, and clean. Do not include surrounding quotes or meta-c
     ];
 
     const initialAgentConfig = {
-      showGptWidget: enableGptWidget,
+      showGptWidget: true,
       generateImages: true,
       refinePhotos: false,
       artStyle: "gourmet",
       customArtStyle: "",
-      requireConfirmation: requireGptConfirmation,
+      requireConfirmation: true,
       trackWeight: true,
+      trackWater: true,
+      trackDigestion: true,
+      trackEnergy: true,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     };
 
@@ -488,10 +383,6 @@ Make it punchy, personal, and clean. Do not include surrounding quotes or meta-c
         description: silentBio,
         preferences: updatedPrefs,
         knowledge_preferences: metrics.preferences || [],
-        knowledge_health: [],
-        knowledge_notes: [],
-        knowledge_patterns: [],
-        agent_memory: [],
         agent_config: initialAgentConfig,
         daily_calories_goal: targets.calories,
         weight_goal: metrics.targetWeight,
@@ -546,7 +437,7 @@ Make it punchy, personal, and clean. Do not include surrounding quotes or meta-c
     try {
       const completedState = await saveProfileData();
       onComplete(completedState);
-      triggerToast("✨ Welcome to FitAI! Setup complete.");
+      triggerToast("✨ Welcome to FitAI! Your plan is live.");
     } catch (err: any) {
       console.error(err);
       triggerToast(err.message || "❌ Failed to save onboarding targets");
@@ -555,476 +446,659 @@ Make it punchy, personal, and clean. Do not include surrounding quotes or meta-c
     }
   };
 
+  const isStepValid = () => {
+    if (step === 1) {
+      return metrics.name.trim() !== "" && metrics.username.trim() !== "" && usernameStatus !== "taken";
+    }
+    if (step === 2) {
+      return metrics.height > 0 && metrics.weight > 0 && metrics.age > 0;
+    }
+    if (step === 3) {
+      return metrics.targetWeight > 0 && targets.calories > 0;
+    }
+    if (step === 4) {
+      return disclaimerAgreed;
+    }
+    return true;
+  };
+
   const totalSteps = 4;
   const progressPercent = (step / totalSteps) * 100;
 
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? 50 : -50,
+      opacity: 0,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+    },
+    exit: (dir: number) => ({
+      x: dir < 0 ? 50 : -50,
+      opacity: 0,
+    }),
+  };
+
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-6 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
+    <div className="min-h-screen bg-[#FAF7F2] text-orange-950 font-sans selection:bg-orange-100 p-4 sm:p-6 max-w-md mx-auto relative shadow-2xl flex flex-col justify-between">
       
-      {/* Header Progress */}
-      <div className="w-full flex items-center justify-between gap-4 py-2 border-b border-stone-200/50">
+      {/* Brand Progress Header */}
+      <div className="w-full flex items-center justify-between gap-4 py-3 border-b border-orange-200/40">
         <button
           onClick={handleBack}
           disabled={step === 1}
-          className="w-8 h-8 rounded-full flex items-center justify-center bg-stone-100 hover:bg-stone-200 text-stone-600 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-none"
+          className="w-9 h-9 rounded-full flex items-center justify-center bg-white/80 hover:bg-white text-orange-900 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer border border-orange-100 shadow-2xs active:scale-95"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
         
-        <div className="flex-1 h-2 bg-stone-200/80 rounded-full overflow-hidden relative">
-          <div
-            style={{ width: `${progressPercent}%` }}
-            className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all duration-300"
+        <div className="flex-1 h-2.5 bg-orange-100/60 rounded-full overflow-hidden relative border border-orange-200/30">
+          <motion.div
+            animate={{ width: `${progressPercent}%` }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full"
           />
         </div>
         
-        <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest shrink-0">
-          Step {step} of {totalSteps}
+        <span className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest shrink-0 font-mono">
+          {step}/{totalSteps}
         </span>
       </div>
 
-      {/* Steps Content */}
-      <div className="flex-1 flex flex-col justify-center py-4">
-        
-        {/* STEP 1: BASICS */}
-        {step === 1 && (
-          <div className="space-y-6 animate-fadeIn">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center">
-                <Sparkles className="text-white w-7 h-7 fill-white" />
-              </div>
-              <h2 className="text-2xl font-black tracking-tight text-stone-900 mt-2">
-                Let's get started
-              </h2>
-              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
-                Welcome to FitAI. Tell us your name.
-              </p>
-            </div>
-
-            {/* Avatar picker */}
-            <div className="flex flex-col items-center gap-2 py-2">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-stone-200 shadow-inner flex items-center justify-center bg-stone-100">
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <DefaultAvatar />
-                  )}
+      {/* Steps Content Area with Smooth Slide Transitions */}
+      <div className="flex-1 flex flex-col justify-center py-4 relative min-h-[480px]">
+        <AnimatePresence custom={direction} mode="wait">
+          <motion.div
+            key={step}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="w-full"
+          >
+            {/* STEP 1: IDENTITY & PREFERENCES */}
+            {step === 1 && (
+              <div className="space-y-5">
+                <div className="flex flex-col items-center text-center space-y-1">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-500 shadow-lg shadow-orange-200 flex items-center justify-center mb-1">
+                    <Sparkles className="text-white w-6 h-6 fill-white" />
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight text-orange-950">
+                    Welcome to FitAI
+                  </h2>
+                  <p className="text-xs font-bold text-orange-900/60 font-sans">
+                    Let's personalize your intelligent nutrition assistant
+                  </p>
                 </div>
-                <label className="absolute bottom-0 right-0 w-8 h-8 bg-stone-900 text-white rounded-full border-2 border-white flex items-center justify-center cursor-pointer shadow-md hover:bg-stone-800 active:scale-95 transition-all">
-                  <Camera className="w-4 h-4" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                  />
-                </label>
-              </div>
-              <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">
-                Choose profile photo
-              </span>
-            </div>
 
-            {/* Name input */}
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Your Name
-              </label>
-              <input
-                type="text"
-                placeholder="Full Name (e.g. Alex Doe)"
-                value={metrics.name}
-                onChange={(e) => setMetrics(prev => ({ ...prev, name: e.target.value }))}
-                autoFocus
-                required
-                className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
-              />
-            </div>
-
-            {/* Username input */}
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Username
-              </label>
-              <div className="relative flex items-center">
-                <span className="absolute left-4 text-xs font-bold text-stone-400">@</span>
-                <input
-                  type="text"
-                  placeholder="username"
-                  value={metrics.username}
-                  onChange={(e) => {
-                    const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "");
-                    setMetrics(prev => ({ ...prev, username: cleaned }));
-                  }}
-                  required
-                  className="w-full bg-white border border-stone-200 rounded-2xl pl-8 pr-10 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
-                />
-                {usernameStatus === "checking" && (
-                  <div className="absolute right-4 w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                )}
-                {usernameStatus === "available" && (
-                  <span className="absolute right-4 text-xs text-emerald-500 font-bold">✓</span>
-                )}
-                {usernameStatus === "taken" && (
-                  <span className="absolute right-4 text-xs text-red-500 font-bold">✗</span>
-                )}
-              </div>
-              {usernameStatus === "available" && (
-                <p className="text-[8px] text-emerald-600 font-extrabold uppercase tracking-wider px-1">✨ Username available!</p>
-              )}
-              {usernameStatus === "taken" && (
-                <p className="text-[8px] text-red-500 font-extrabold uppercase tracking-wider px-1">⚠️ This username is already taken.</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: BIOLOGY */}
-        {step === 2 && (
-          <div className="space-y-5 animate-fadeIn">
-            <div className="text-center space-y-1">
-              <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Tell us about your body
-              </h2>
-              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
-                Biological sex and measurements calculate baseline TDEE.
-              </p>
-            </div>
-
-            {/* Sex selection */}
-            <div className="space-y-1.5">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Biological Sex
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                {(["Male", "Female"] as const).map((gender) => (
-                  <button
-                    key={gender}
-                    type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, gender }))}
-                    className={`py-3 px-4 rounded-2xl border text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center ${
-                      metrics.gender === gender
-                        ? "bg-orange-500 border-orange-500 text-white shadow-lg shadow-orange-100"
-                        : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
-                    }`}
-                  >
-                    {gender === "Male" ? "🙋‍♂️ Male" : "🙋‍♀️ Female"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Age stepper */}
-            <div className="space-y-1.5 animate-fadeIn">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Age (years)
-              </label>
-              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setMetrics(prev => ({ ...prev, age: Math.max(10, prev.age - 1) }))}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <div className="flex-1 flex items-center justify-center gap-0.5">
-                  <input
-                    type="number"
-                    value={metrics.age}
-                    onChange={(e) => setMetrics(prev => ({ ...prev, age: parseInt(e.target.value) || 28 }))}
-                    className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <span className="text-[10px] font-bold text-stone-400">Yrs Old</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMetrics(prev => ({ ...prev, age: Math.min(120, prev.age + 1) }))}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Height/Weight steppers */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                  Height (cm)
-                </label>
-                <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, height: Math.max(100, prev.height - 1) }))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <input
-                    type="number"
-                    value={metrics.height}
-                    onChange={(e) => setMetrics(prev => ({ ...prev, height: parseInt(e.target.value) || 170 }))}
-                    className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, height: Math.min(250, prev.height + 1) }))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                  Weight (kg)
-                </label>
-                <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => handleCurrentWeightChange(Math.max(30, metrics.weight - 1))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <input
-                    type="number"
-                    value={metrics.weight}
-                    onChange={(e) => handleCurrentWeightChange(parseFloat(e.target.value) || 70)}
-                    className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleCurrentWeightChange(Math.min(300, metrics.weight + 1))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: TRAJECTORY, GOALS & PROTOCOLS (MERGED CONFIGURATOR) */}
-        {step === 3 && (
-          <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
-            <div className="text-center space-y-0.5">
-              <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Goals & Protocols
-              </h2>
-              <p className="text-[9px] text-stone-400 font-bold uppercase tracking-wider">
-                Refine targets directly. Calculations auto-sync with presets.
-              </p>
-            </div>
-
-            {/* Activity Level Selector */}
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Activity Level
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {[
-                  { id: "Sedentary", label: "🟢 Sedentary" },
-                  { id: "Lightly Active", label: "🟡 Light" },
-                  { id: "Moderately Active", label: "🟠 Moderate" },
-                  { id: "Very Active", label: "🔴 Active" },
-                ].map((act) => (
-                  <button
-                    key={act.id}
-                    type="button"
-                    onClick={() => handleActivityLevelChange(act.id as any)}
-                    className={`py-2 px-1 rounded-xl border text-center text-[10px] font-black uppercase tracking-tight cursor-pointer ${
-                      metrics.activityLevel === act.id
-                        ? "bg-orange-500 border-orange-500 text-white shadow-sm"
-                        : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
-                    }`}
-                  >
-                    {act.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Target Weight Stepper (Precise, 35-250kg range) */}
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Target Weight
-              </label>
-              <div className="flex items-center justify-between bg-white border border-stone-200 rounded-2xl px-4 py-2 shadow-sm">
-                <span className="text-xs font-bold text-stone-400">Target Weight</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleTargetWeightChange(Math.max(35, metrics.targetWeight - 1))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-xs font-black text-stone-850 w-16 text-center">{metrics.targetWeight} kg</span>
-                  <button
-                    type="button"
-                    onClick={() => handleTargetWeightChange(Math.min(250, metrics.targetWeight + 1))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Premium Calorie & Macro Target Editor */}
-            <div className="space-y-3.5">
-              <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Nutrition protocol goals
-              </label>
-
-              {/* Calories Target Stepper card */}
-              <div className="flex items-center justify-between bg-stone-50 border border-stone-200 rounded-2xl p-4 shadow-2xs">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-stone-500 uppercase tracking-widest">Daily Calories Target</span>
-                  <span className="text-[8px] text-stone-400 font-bold uppercase mt-0.5">Adjustable target</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleCaloriesChange(Math.max(800, targets.calories - 50))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 cursor-pointer border-none shadow-2xs active:scale-90 transition-transform"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <input
-                    type="number"
-                    value={targets.calories}
-                    onChange={(e) => handleCaloriesChange(parseInt(e.target.value) || 0)}
-                    className="w-16 bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleCaloriesChange(Math.min(10000, targets.calories + 50))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 cursor-pointer border-none shadow-2xs active:scale-90 transition-transform"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-[9px] font-black text-stone-450 uppercase">kcal</span>
-                </div>
-              </div>
-
-              {/* Collapsible advanced macro panel toggle */}
-              <button
-                type="button"
-                onClick={() => setShowAdvancedMacros(!showAdvancedMacros)}
-                className="w-full flex items-center justify-between py-3 px-4 bg-stone-100 hover:bg-stone-200/85 rounded-2xl text-stone-700 text-[10px] font-black uppercase tracking-wider border-none cursor-pointer transition-colors shadow-2xs select-none mt-2 active:scale-[0.99]"
-              >
-                <span>{showAdvancedMacros ? "Hide Advanced Macro Splits" : "🔧 Adjust Macro Split (Advanced)"}</span>
-                <span className="text-[10px] font-black">{showAdvancedMacros ? "▲" : "▼"}</span>
-              </button>
-
-              {showAdvancedMacros && (
-                <div className="grid grid-cols-2 gap-3 animate-fadeIn mt-2">
-                  {[
-                    { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-655 bg-orange-50/15" },
-                    { label: "Carbs (g)", key: "carbs", color: "border-[#90E0EF] text-[#0077B6] bg-[#CAF0F8]/10" },
-                    { label: "Fats (g)", key: "fats", color: "border-yellow-200 text-yellow-600 bg-yellow-50/15" },
-                    { label: "Fiber (g)", key: "fiber", color: "border-emerald-200 text-emerald-700 bg-emerald-50/10" },
-                  ].map((m) => (
-                    <div key={m.label} className={`border rounded-2xl p-3 flex flex-col justify-between shadow-2xs ${m.color}`}>
-                      <span className="text-[9px] font-black uppercase tracking-wider opacity-90">{m.label}</span>
-                      <div className="flex items-center justify-between mt-2.5 gap-1 bg-white/95 border border-black/[0.04] rounded-xl px-1.5 py-0.5">
-                        <button
-                          type="button"
-                          onClick={() => handleMacroChange(m.key as any, Math.max(0, targets[m.key as keyof typeof targets] - 5))}
-                          className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <input
-                          type="number"
-                          value={targets[m.key as keyof typeof targets]}
-                          onChange={(e) => handleMacroChange(m.key as any, parseInt(e.target.value) || 0)}
-                          className="flex-1 bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleMacroChange(m.key as any, Math.min(500, targets[m.key as keyof typeof targets] + 5))}
-                          className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                {/* Glassmorphic Photo Selector */}
+                <div className="flex flex-col items-center gap-2 py-1">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-xl shadow-orange-100/50 flex items-center justify-center bg-orange-100/50">
+                      {avatarPreview ? (
+                        <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <DefaultAvatar />
+                      )}
                     </div>
+                    <label className="absolute bottom-0 right-0 w-8 h-8 bg-orange-500 hover:bg-orange-600 text-white rounded-full border-2 border-white flex items-center justify-center cursor-pointer shadow-md active:scale-95 transition-all">
+                      <Camera className="w-4 h-4" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarChange}
+                      />
+                    </label>
+                  </div>
+                  <span className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest">
+                    Choose Profile Photo
+                  </span>
+                </div>
+
+                {/* Name & Username Inputs */}
+                <div className="space-y-3.5 bg-white/70 backdrop-blur-md rounded-[28px] p-4.5 border border-white/80 shadow-xl shadow-orange-100/20">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest block px-1">
+                      Full Name
+                    </label>
+                    <div className="relative flex items-center">
+                      <User className="absolute left-3.5 w-4 h-4 text-orange-400" />
+                      <input
+                        type="text"
+                        placeholder="Alex Morgan"
+                        value={metrics.name}
+                        onChange={(e) => setMetrics(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full bg-orange-50/30 border border-orange-200/60 rounded-2xl pl-10 pr-4 py-3 text-xs font-bold text-orange-950 placeholder-orange-900/30 focus:outline-none focus:border-orange-500 focus:bg-white shadow-2xs transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest block px-1">
+                      Username
+                    </label>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-3.5 text-xs font-black text-orange-400">@</span>
+                      <input
+                        type="text"
+                        placeholder="alex_fit"
+                        value={metrics.username}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "");
+                          setMetrics(prev => ({ ...prev, username: cleaned }));
+                        }}
+                        className="w-full bg-orange-50/30 border border-orange-200/60 rounded-2xl pl-8 pr-10 py-3 text-xs font-bold text-orange-950 placeholder-orange-900/30 focus:outline-none focus:border-orange-500 focus:bg-white shadow-2xs transition-all"
+                      />
+                      {usernameStatus === "checking" && (
+                        <div className="absolute right-3.5 w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                      )}
+                      {usernameStatus === "available" && (
+                        <Check className="absolute right-3.5 w-4 h-4 text-emerald-600 font-bold" />
+                      )}
+                    </div>
+                    {usernameStatus === "available" && (
+                      <p className="text-[9px] text-emerald-600 font-extrabold uppercase tracking-wider px-1 pt-0.5">✨ Username available!</p>
+                    )}
+                    {usernameStatus === "taken" && (
+                      <p className="text-[9px] text-rose-500 font-extrabold uppercase tracking-wider px-1 pt-0.5">⚠️ This username is already taken.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dietary Tags */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest block px-1">
+                    Dietary Preferences & Allergies
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {DIET_ALLERGY_OPTIONS.map((opt) => {
+                      const isSelected = metrics.preferences.includes(opt.id);
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => togglePreference(opt.id)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer active:scale-95",
+                            isSelected
+                              ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-200"
+                              : "bg-white/80 text-orange-950 border-orange-200/60 hover:bg-orange-50"
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: BODY METRICS & ACTIVITY */}
+            {step === 2 && (
+              <div className="space-y-5">
+                <div className="text-center space-y-1">
+                  <h2 className="text-2xl font-black tracking-tight text-orange-950">
+                    Your Biological Baseline
+                  </h2>
+                  <p className="text-xs font-bold text-orange-900/60 font-sans">
+                    Used to calculate your precise baseline TDEE
+                  </p>
+                </div>
+
+                {/* Sex Segmented Control */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest block px-1">
+                    Biological Sex
+                  </label>
+                  <div className="grid grid-cols-2 gap-3 p-1.5 bg-white/70 backdrop-blur-md rounded-2xl border border-white/80 shadow-sm">
+                    {(["Male", "Female"] as const).map((gender) => (
+                      <button
+                        key={gender}
+                        type="button"
+                        onClick={() => setMetrics(prev => ({ ...prev, gender }))}
+                        className={cn(
+                          "py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer text-center",
+                          metrics.gender === gender
+                            ? "bg-orange-500 text-white shadow-md shadow-orange-200"
+                            : "text-orange-950/60 hover:text-orange-950"
+                        )}
+                      >
+                        {gender === "Male" ? "🙋‍♂️ Male" : "🙋‍♀️ Female"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Height, Weight & Age Card */}
+                <div className="bg-white/70 backdrop-blur-md rounded-[28px] p-5 border border-white/80 shadow-xl shadow-orange-100/20 space-y-4">
+                  {/* Age Stepper */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black text-orange-950 flex items-center gap-1.5">
+                      <Heart className="w-4 h-4 text-orange-500" />
+                      Age
+                    </span>
+                    <div className="flex items-center gap-2 bg-orange-50/50 rounded-xl p-1 border border-orange-200/40">
+                      <button
+                        type="button"
+                        onClick={() => setMetrics(prev => ({ ...prev, age: Math.max(12, prev.age - 1) }))}
+                        className="w-7 h-7 rounded-lg bg-white text-orange-950 flex items-center justify-center shadow-2xs hover:bg-orange-100 active:scale-90 transition-all border-none cursor-pointer"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-xs font-black text-orange-950 font-mono w-10 text-center">{metrics.age} yrs</span>
+                      <button
+                        type="button"
+                        onClick={() => setMetrics(prev => ({ ...prev, age: Math.min(100, prev.age + 1) }))}
+                        className="w-7 h-7 rounded-lg bg-white text-orange-950 flex items-center justify-center shadow-2xs hover:bg-orange-100 active:scale-90 transition-all border-none cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Height Slider */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex justify-between items-center text-xs font-black text-orange-950">
+                      <span className="flex items-center gap-1.5">
+                        <Ruler className="w-4 h-4 text-sky-500" />
+                        Height
+                      </span>
+                      <span className="font-mono text-sky-600 bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-200/50">
+                        {metrics.height} cm
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={120}
+                      max={220}
+                      value={metrics.height}
+                      onChange={(e) => setMetrics(prev => ({ ...prev, height: parseInt(e.target.value) || 175 }))}
+                      className="w-full accent-orange-500 cursor-pointer"
+                    />
+                    <div className="flex justify-between gap-1 pt-0.5">
+                      {[160, 170, 175, 180, 185].map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setMetrics(prev => ({ ...prev, height: val }))}
+                          className={cn(
+                            "px-2 py-0.5 rounded-md text-[10px] font-bold font-mono transition-all border cursor-pointer",
+                            metrics.height === val ? "bg-sky-500 text-white border-sky-500" : "bg-white text-orange-900/60 border-orange-100 hover:bg-orange-50"
+                          )}
+                        >
+                          {val}cm
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Weight Slider */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex justify-between items-center text-xs font-black text-orange-950">
+                      <span className="flex items-center gap-1.5">
+                        <Scale className="w-4 h-4 text-orange-500" />
+                        Current Weight
+                      </span>
+                      <span className="font-mono text-orange-600 bg-orange-50 px-2 py-0.5 rounded-lg border border-orange-200/50">
+                        {metrics.weight} kg
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={40}
+                      max={180}
+                      value={metrics.weight}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 70;
+                        setMetrics(prev => ({ ...prev, weight: val, targetWeight: prev.targetWeight === prev.weight ? val : prev.targetWeight }));
+                      }}
+                      className="w-full accent-orange-500 cursor-pointer"
+                    />
+                    <div className="flex justify-between gap-1 pt-0.5">
+                      {[60, 70, 75, 80, 90].map((val) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setMetrics(prev => ({ ...prev, weight: val }))}
+                          className={cn(
+                            "px-2 py-0.5 rounded-md text-[10px] font-bold font-mono transition-all border cursor-pointer",
+                            metrics.weight === val ? "bg-orange-500 text-white border-orange-500" : "bg-white text-orange-900/60 border-orange-100 hover:bg-orange-50"
+                          )}
+                        >
+                          {val}kg
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Activity Level Grid */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest block px-1">
+                    Daily Activity Level
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {[
+                      { id: "Sedentary", label: "🟢 Sedentary", desc: "Desk job, low movement" },
+                      { id: "Lightly Active", label: "🟡 Lightly Active", desc: "Light exercise 1-3 days" },
+                      { id: "Moderately Active", label: "🟠 Moderately Active", desc: "Moderate workout 3-5 days" },
+                      { id: "Very Active", label: "🔴 Very Active", desc: "Heavy exercise 6-7 days" },
+                    ].map((act) => (
+                      <button
+                        key={act.id}
+                        type="button"
+                        onClick={() => setMetrics(prev => ({ ...prev, activityLevel: act.id as any }))}
+                        className={cn(
+                          "p-3 rounded-2xl border text-left transition-all cursor-pointer active:scale-95 flex flex-col justify-between space-y-1",
+                          metrics.activityLevel === act.id
+                            ? "bg-white border-orange-500 shadow-md shadow-orange-100 ring-2 ring-orange-500/20"
+                            : "bg-white/60 border-orange-100 hover:bg-white"
+                        )}
+                      >
+                        <div className="text-xs font-black text-orange-950">{act.label}</div>
+                        <div className="text-[9px] font-bold text-orange-900/50">{act.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: GOALS & DYNAMIC MACRO ENGINE */}
+            {step === 3 && (
+              <div className="space-y-4">
+                <div className="text-center space-y-1">
+                  <h2 className="text-2xl font-black tracking-tight text-orange-950">
+                    Your Goal & Targets
+                  </h2>
+                  <p className="text-xs font-bold text-orange-900/60 font-sans">
+                    Calculated using Mifflin-St Jeor metabolic model
+                  </p>
+                </div>
+
+                {/* Primary Goal Selection Cards */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "Lose Weight", label: "📉 Fat Loss", icon: "🔥" },
+                    { id: "Maintain Weight", label: "⚖️ Maintain", icon: "✨" },
+                    { id: "Build Muscle", label: "💪 Muscle Gain", icon: "⚡" },
+                  ].map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => {
+                        const updated = { ...metrics, goal: g.id as any };
+                        setMetrics(updated);
+                        setTargets(calculateRecommendedTargets(updated));
+                      }}
+                      className={cn(
+                        "p-3 rounded-2xl border text-center transition-all cursor-pointer active:scale-95 space-y-1",
+                        metrics.goal === g.id
+                          ? "bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-200"
+                          : "bg-white/80 text-orange-950 border-orange-100 hover:bg-white"
+                      )}
+                    >
+                      <div className="text-lg">{g.icon}</div>
+                      <div className="text-[10px] font-black uppercase tracking-tight">{g.label}</div>
+                    </button>
                   ))}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
-        {/* STEP 4: MEDICAL DISCLAIMER & TERMS */}
-        {step === 4 && (
-          <div className="space-y-4 animate-fadeIn">
-            <div className="text-center space-y-1">
-              <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Terms & Agreement
-              </h2>
-              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
-                Please accept the terms to initialize tracking.
-              </p>
-            </div>
 
-            {/* Scrollable Terms box */}
-            <div className="bg-white rounded-2xl p-4.5 border border-stone-200/50 shadow-2xs max-h-[42vh] overflow-y-auto space-y-3.5 scrollbar-thin text-left">
-              <h4 className="text-[10px] font-black text-stone-850 uppercase tracking-wide">
-                FitAI Terms of Service & Privacy Policy
-              </h4>
-              <div className="space-y-3 text-[8px] text-stone-450 font-bold leading-normal">
-                {TERMS_AND_CONDITIONS.map((section, idx) => (
-                  <div key={idx} className="space-y-1">
-                    <p className="uppercase tracking-widest text-[7px] text-stone-500 font-black">
-                      {section.title}
-                    </p>
-                    <p>{section.content}</p>
+                {/* Target Weight Card */}
+                <div className="bg-white/70 backdrop-blur-md rounded-[28px] p-4 border border-white/80 shadow-xl shadow-orange-100/20 flex justify-between items-center">
+                  <div>
+                    <div className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest">
+                      Goal Target Weight
+                    </div>
+                    <div className="text-xl font-black text-orange-950">
+                      {metrics.targetWeight} <span className="text-xs font-bold text-orange-900/40">kg</span>
+                    </div>
                   </div>
-                ))}
+
+                  <div className="flex items-center gap-2 bg-orange-50/50 rounded-xl p-1 border border-orange-200/40">
+                    <button
+                      type="button"
+                      onClick={() => handleTargetWeightChange(Math.max(35, metrics.targetWeight - 1))}
+                      className="w-8 h-8 rounded-lg bg-white text-orange-950 flex items-center justify-center shadow-2xs hover:bg-orange-100 active:scale-90 transition-all border-none cursor-pointer"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs font-black text-orange-950 font-mono w-12 text-center">{metrics.targetWeight} kg</span>
+                    <button
+                      type="button"
+                      onClick={() => handleTargetWeightChange(Math.min(200, metrics.targetWeight + 1))}
+                      className="w-8 h-8 rounded-lg bg-white text-orange-950 flex items-center justify-center shadow-2xs hover:bg-orange-100 active:scale-90 transition-all border-none cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Calorie & Macro Target Grid */}
+                <div className="bg-white/70 backdrop-blur-md rounded-[28px] p-5 border border-white/80 shadow-xl shadow-orange-100/20 space-y-4">
+                  {/* Calorie Banner */}
+                  <div className="flex justify-between items-center bg-orange-50/80 p-3.5 rounded-2xl border border-orange-200/50">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-xs">
+                        <Flame className="w-4 h-4 fill-white" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-wider text-orange-950/60">Daily Target</div>
+                        <div className="text-lg font-black text-orange-950 font-mono">{targets.calories} kcal</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setTargets(prev => ({ ...prev, calories: Math.max(1000, prev.calories - 50) }))}
+                        className="w-7 h-7 rounded-lg bg-white text-orange-950 flex items-center justify-center shadow-2xs hover:bg-orange-100 border-none cursor-pointer"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTargets(prev => ({ ...prev, calories: Math.min(8000, prev.calories + 50) }))}
+                        className="w-7 h-7 rounded-lg bg-white text-orange-950 flex items-center justify-center shadow-2xs hover:bg-orange-100 border-none cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 4 Macro Cards */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {[
+                      { label: "Protein", key: "protein", color: "#F97316", unit: "g" },
+                      { label: "Carbs", key: "carbs", color: "#38BDF8", unit: "g" },
+                      { label: "Fats", key: "fats", color: "#FBBF24", unit: "g" },
+                      { label: "Fiber", key: "fiber", color: "#34D399", unit: "g" },
+                    ].map((m) => (
+                      <div key={m.key} className="bg-white/90 rounded-2xl p-3 border border-orange-100/60 shadow-2xs space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 text-orange-950">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: m.color }} />
+                            {m.label}
+                          </span>
+                          <span className="text-xs font-black font-mono" style={{ color: m.color }}>
+                            {targets[m.key as keyof typeof targets]}g
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-orange-50/30 rounded-xl px-1 py-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setTargets(prev => ({ ...prev, [m.key]: Math.max(5, prev[m.key as keyof typeof targets] - 5) }))}
+                            className="w-6 h-6 rounded-md bg-white text-orange-950 flex items-center justify-center shadow-2xs border-none cursor-pointer"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-[10px] font-bold text-orange-950/60 font-mono">
+                            {targets[m.key as keyof typeof targets]}g
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setTargets(prev => ({ ...prev, [m.key]: Math.min(400, prev[m.key as keyof typeof targets] + 5) }))}
+                            className="w-6 h-6 rounded-md bg-white text-orange-950 flex items-center justify-center shadow-2xs border-none cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Checkbox agreement */}
-            <label className="flex items-start gap-3 bg-stone-50 border border-stone-200/80 rounded-2xl p-4 cursor-pointer select-none active:scale-[0.99] transition-transform">
-              <input
-                type="checkbox"
-                checked={disclaimerAgreed}
-                onChange={(e) => setDisclaimerAgreed(e.target.checked)}
-                className="w-4.5 h-4.5 rounded text-orange-500 focus:ring-orange-200 cursor-pointer border-stone-300 mt-0.5"
-              />
-              <span className="text-[10px] text-stone-600 font-bold leading-relaxed text-left">
-                I read, understand, and agree to the FitAI Terms of Service and Privacy Policy.
-              </span>
-            </label>
-          </div>
-        )}
+            {/* STEP 4: PLAN SUMMARY & INSTANT LAUNCH */}
+            {step === 4 && (
+              <div className="space-y-4">
+                <div className="text-center space-y-1">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500 shadow-lg shadow-emerald-200 flex items-center justify-center mx-auto mb-1">
+                    <ShieldCheck className="text-white w-6 h-6" />
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight text-orange-950">
+                    Your Plan is Ready! 🎉
+                  </h2>
+                  <p className="text-xs font-bold text-orange-900/60 font-sans">
+                    Review your personalized setup before launching FitAI
+                  </p>
+                </div>
 
+                {/* Plan Summary Hero Card */}
+                <div className="bg-white/80 backdrop-blur-md rounded-[28px] p-5 border border-white/80 shadow-xl shadow-orange-100/20 space-y-4">
+                  <div className="flex items-center gap-3 border-b border-orange-100 pb-3">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-orange-300 shrink-0">
+                      {avatarPreview ? (
+                        <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <DefaultAvatar />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm font-black text-orange-950">{metrics.name}</div>
+                      <div className="text-xs font-bold text-orange-600 font-mono">@{metrics.username}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100/60">
+                      <div className="text-[10px] font-black uppercase text-orange-950/50">Daily Calories</div>
+                      <div className="text-base font-black text-orange-950 font-mono mt-0.5">{targets.calories} kcal</div>
+                    </div>
+                    <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100/60">
+                      <div className="text-[10px] font-black uppercase text-orange-950/50">Protein Goal</div>
+                      <div className="text-base font-black text-orange-600 font-mono mt-0.5">{targets.protein}g / day</div>
+                    </div>
+                    <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100/60">
+                      <div className="text-[10px] font-black uppercase text-orange-950/50">Target Weight</div>
+                      <div className="text-base font-black text-orange-950 font-mono mt-0.5">{metrics.targetWeight} kg</div>
+                    </div>
+                    <div className="bg-orange-50/50 rounded-xl p-3 border border-orange-100/60">
+                      <div className="text-[10px] font-black uppercase text-orange-950/50">Primary Goal</div>
+                      <div className="text-xs font-black text-emerald-600 mt-1">{metrics.goal}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Minimalist Agreement Checkbox */}
+                <div className="bg-white/60 rounded-2xl p-4 border border-orange-100/80 shadow-2xs space-y-2">
+                  <label className="flex items-start gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={disclaimerAgreed}
+                      onChange={(e) => setDisclaimerAgreed(e.target.checked)}
+                      className="w-4 h-4 rounded text-orange-500 focus:ring-orange-200 cursor-pointer border-orange-300 mt-0.5 accent-orange-500"
+                    />
+                    <span className="text-xs text-orange-950 font-bold leading-relaxed">
+                      I agree to the FitAI Terms of Service and Privacy Policy.
+                    </span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowTermsModal(true)}
+                    className="text-[10px] font-black text-orange-600 hover:underline uppercase tracking-wider pl-7 cursor-pointer border-none bg-transparent"
+                  >
+                    View Terms & Conditions ↗
+                  </button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
-      {/* Navigation Footer (active for all steps) */}
-      {step <= totalSteps && (
-        <div className="w-full pt-4 border-t border-stone-200/50 flex gap-4">
-          <button
-            type="button"
-            onClick={step === totalSteps ? handleFinish : handleNext}
-            disabled={!isStepValid() || isSubmitting}
-            className={`w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border-none ${
-              (!isStepValid() || isSubmitting) ? "opacity-50 cursor-not-allowed shadow-none" : "shadow-lg shadow-orange-100 active:scale-[0.98]"
-            }`}
-          >
-            <span>{step === totalSteps ? "Start Tracking" : "Continue"}</span>
-            {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
-          </button>
+      {/* Navigation Footer */}
+      <div className="w-full pt-4 border-t border-orange-200/40">
+        <button
+          type="button"
+          onClick={step === totalSteps ? handleFinish : handleNext}
+          disabled={!isStepValid() || isSubmitting}
+          className={cn(
+            "w-full text-xs font-black uppercase tracking-widest py-4 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border-none shadow-xl",
+            step === totalSteps
+              ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-200 active:scale-[0.98]"
+              : "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-200 active:scale-[0.98]",
+            (!isStepValid() || isSubmitting) && "opacity-50 cursor-not-allowed shadow-none"
+          )}
+        >
+          {isSubmitting ? (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span>Launching...</span>
+            </div>
+          ) : (
+            <>
+              <span>{step === totalSteps ? "🚀 Start My Fitness Journey" : "Continue"}</span>
+              {step < totalSteps && <ArrowRight className="w-4 h-4" />}
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* TERMS MODAL POPUP */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-[32px] p-6 max-w-md w-full shadow-2xl border border-stone-200 space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-base font-black text-orange-950">FitAI Terms & Conditions</h3>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="w-8 h-8 rounded-full bg-orange-50 text-orange-900 flex items-center justify-center font-bold border-none cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-3 text-xs text-orange-900/80 font-medium">
+              {TERMS_AND_CONDITIONS.map((section, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="font-black text-orange-950 uppercase text-[10px] tracking-wider">{section.title}</div>
+                  <p>{section.content}</p>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDisclaimerAgreed(true);
+                setShowTermsModal(false);
+              }}
+              className="w-full bg-orange-500 text-white font-black py-3 rounded-2xl cursor-pointer border-none"
+            >
+              I Agree & Close
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Date of Birth Picker removed - replaced by age stepper */}
     </div>
   );
 };
