@@ -6,10 +6,10 @@ import {
   Plus, 
   Minus, 
   ArrowRight,
-  Flame,
-  Scale,
-  Ruler,
-  Heart
+  Check,
+  Zap,
+  ShieldCheck,
+  Bot
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -41,17 +41,6 @@ const DEFAULT_METRICS: BodyMetrics = {
   activityLevel: "Moderately Active",
   preferences: [],
 };
-
-const DIET_ALLERGY_OPTIONS = [
-  { id: "Keto", label: "🥑 Keto" },
-  { id: "Vegan", label: "🌱 Vegan" },
-  { id: "Vegetarian", label: "🥦 Vegetarian" },
-  { id: "Gluten Free", label: "🌾 Gluten Free" },
-  { id: "Low Carb", label: "🥩 Low Carb" },
-  { id: "Balanced", label: "🍎 Balanced" },
-  { id: "Nut Allergy", label: "🥜 Nut Allergy" },
-  { id: "Dairy Free", label: "🥛 Dairy Free" },
-];
 
 export const OnboardingWizard = ({
   activeProfileId,
@@ -91,6 +80,7 @@ export const OnboardingWizard = ({
       targetWeight: profileData?.weight_goal || profileData?.weight || 70,
     };
   });
+
   const [avatarPreview, setAvatarPreview] = useState(profileData?.imageUrl || profileData?.image_url || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -105,49 +95,66 @@ export const OnboardingWizard = ({
   });
 
   const [showAdvancedMacros, setShowAdvancedMacros] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<"free" | "pro">("pro");
+
+  // Step 4 AI Generation Loading animation
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStatus, setGenerationStatus] = useState("Calculating metabolic baseline...");
+
+  const totalSteps = 5;
+
+  // Handle Step 4 auto-progress animation
+  useEffect(() => {
+    if (step === 4) {
+      setGenerationProgress(0);
+      setGenerationStatus("Calculating metabolic baseline...");
+
+      const t1 = setTimeout(() => {
+        setGenerationProgress(35);
+        setGenerationStatus("Configuring AI meal logger & ChatGPT assistant...");
+      }, 600);
+
+      const t2 = setTimeout(() => {
+        setGenerationProgress(75);
+        setGenerationStatus("Customizing daily macro & nutrition protocol...");
+      }, 1200);
+
+      const t3 = setTimeout(() => {
+        setGenerationProgress(100);
+        setGenerationStatus("✨ 98% Personalization Match Ready!");
+      }, 1800);
+
+      const t4 = setTimeout(() => {
+        setStep(5);
+      }, 2300);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        clearTimeout(t4);
+      };
+    }
+  }, [step]);
 
   const isStepValid = () => {
-    if (step === 1) {
-      return metrics.name.trim() !== "";
-    }
-    if (step === 2) {
-      return (
-        metrics.height > 0 &&
-        metrics.weight > 0 &&
-        metrics.age > 0
-      );
-    }
-    if (step === 3) {
-      return (
-        metrics.targetWeight > 0 &&
-        targets.calories > 0
-      );
-    }
+    if (step === 1) return metrics.name.trim() !== "";
+    if (step === 2) return metrics.height > 0 && metrics.weight > 0 && metrics.age > 0;
+    if (step === 3) return metrics.targetWeight > 0 && targets.calories > 0;
     return true;
   };
 
   const handleNext = () => {
-    if (step === 1) {
-      if (!metrics.name.trim()) {
-        triggerToast("⚠️ Please enter your name to continue!");
-        return;
-      }
+    if (step === 1 && !metrics.name.trim()) {
+      triggerToast("⚠️ Please enter your name to continue!");
+      return;
     }
     setStep(prev => Math.min(totalSteps, prev + 1));
   };
 
   const handleBack = () => {
+    if (step === 4) return; // cannot go back during generating step
     setStep(prev => Math.max(1, prev - 1));
-  };
-
-  const togglePreference = (prefId: string) => {
-    setMetrics(prev => {
-      const isSelected = prev.preferences.includes(prefId);
-      const updated = isSelected
-        ? prev.preferences.filter(p => p !== prefId)
-        : [...prev.preferences, prefId];
-      return { ...prev, preferences: updated };
-    });
   };
 
   // Sync initials from Google/supabase profile
@@ -177,14 +184,7 @@ export const OnboardingWizard = ({
       bmr = 10 * currentMetrics.weight + 6.25 * currentMetrics.height - 5 * age - 161;
     }
 
-    const activityMultipliers = {
-      "Sedentary": 1.2,
-      "Lightly Active": 1.375,
-      "Moderately Active": 1.55,
-      "Very Active": 1.725,
-    };
-
-    const multiplier = activityMultipliers[currentMetrics.activityLevel] || 1.55;
+    const multiplier = 1.55;
     const tdee = bmr * multiplier;
 
     let targetCalories = Math.round(tdee);
@@ -217,13 +217,11 @@ export const OnboardingWizard = ({
     };
   };
 
-  // Initialize targets once when biological metrics are completed
   useEffect(() => {
     const recommended = calculateRecommendedTargets(metrics);
     setTargets(recommended);
   }, [metrics.gender, metrics.age, metrics.height, metrics.weight]);
 
-  // NO dynamic recalculation when editing weight/height/target weight — static & user controllable
   const handleCurrentWeightChange = (newWeight: number) => {
     setMetrics(prev => ({ ...prev, weight: newWeight }));
   };
@@ -232,22 +230,12 @@ export const OnboardingWizard = ({
     setMetrics(prev => ({ ...prev, targetWeight: newTargetWeight }));
   };
 
-  const handleActivityLevelChange = (activityLevel: "Sedentary" | "Lightly Active" | "Moderately Active" | "Very Active") => {
-    setMetrics(prev => ({ ...prev, activityLevel }));
-  };
-
   const handleCaloriesChange = (newCalories: number) => {
-    setTargets(prev => ({
-      ...prev,
-      calories: newCalories
-    }));
+    setTargets(prev => ({ ...prev, calories: newCalories }));
   };
 
   const handleMacroChange = (key: "protein" | "carbs" | "fats" | "fiber", val: number) => {
-    setTargets(prev => ({
-      ...prev,
-      [key]: val
-    }));
+    setTargets(prev => ({ ...prev, [key]: val }));
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,6 +317,10 @@ export const OnboardingWizard = ({
       ...(metrics.preferences || []),
       "onboarded"
     ];
+
+    if (selectedPlan === "pro") {
+      updatedPrefs.push("plan_pro");
+    }
 
     const initialAgentConfig = {
       showGptWidget: true,
@@ -421,7 +413,6 @@ export const OnboardingWizard = ({
     }
   };
 
-  const totalSteps = 3;
   const progressPercent = (step / totalSteps) * 100;
 
   return (
@@ -431,7 +422,7 @@ export const OnboardingWizard = ({
       <div className="w-full flex items-center justify-between gap-4 py-2 border-b border-stone-200/50">
         <button
           onClick={handleBack}
-          disabled={step === 1}
+          disabled={step === 1 || step === 4}
           className="w-8 h-8 rounded-full flex items-center justify-center bg-stone-100 hover:bg-stone-200 text-stone-600 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-none"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -745,59 +736,169 @@ export const OnboardingWizard = ({
               </div>
             </div>
 
-              {/* Collapsible advanced macro panel toggle */}
-              <button
-                type="button"
-                onClick={() => setShowAdvancedMacros(!showAdvancedMacros)}
-                className="w-full flex items-center justify-between py-3 px-4 bg-stone-100 hover:bg-stone-200/85 rounded-2xl text-stone-700 text-[10px] font-black uppercase tracking-wider border-none cursor-pointer transition-colors shadow-2xs select-none mt-2 active:scale-[0.99]"
-              >
-                <span>{showAdvancedMacros ? "Hide Macro Splits" : "Adjust Macro Split"}</span>
-                <span className="text-[10px] font-black">{showAdvancedMacros ? "▲" : "▼"}</span>
-              </button>
+            {/* Collapsible advanced macro panel toggle */}
+            <button
+              type="button"
+              onClick={() => setShowAdvancedMacros(!showAdvancedMacros)}
+              className="w-full flex items-center justify-between py-3 px-4 bg-stone-100 hover:bg-stone-200/85 rounded-2xl text-stone-700 text-[10px] font-black uppercase tracking-wider border-none cursor-pointer transition-colors shadow-2xs select-none mt-2 active:scale-[0.99]"
+            >
+              <span>{showAdvancedMacros ? "Hide Macro Splits" : "Adjust Macro Split"}</span>
+              <span className="text-[10px] font-black">{showAdvancedMacros ? "▲" : "▼"}</span>
+            </button>
 
-              {showAdvancedMacros && (
-                <div className="grid grid-cols-2 gap-3 animate-fadeIn mt-2">
+            {showAdvancedMacros && (
+              <div className="grid grid-cols-2 gap-3 animate-fadeIn mt-2">
+                {[
+                  { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-600 bg-orange-50/15" },
+                  { label: "Carbs (g)", key: "carbs", color: "border-[#90E0EF] text-[#0077B6] bg-[#CAF0F8]/10" },
+                  { label: "Fats (g)", key: "fats", color: "border-yellow-200 text-yellow-600 bg-yellow-50/15" },
+                  { label: "Fiber (g)", key: "fiber", color: "border-emerald-200 text-emerald-700 bg-emerald-50/10" },
+                ].map((m) => (
+                  <div key={m.label} className={`border rounded-2xl p-3 flex flex-col justify-between shadow-2xs ${m.color}`}>
+                    <span className="text-[9px] font-black uppercase tracking-wider opacity-90">{m.label}</span>
+                    <div className="flex items-center justify-between mt-2.5 gap-1 bg-white/95 border border-black/[0.04] rounded-xl px-1.5 py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleMacroChange(m.key as any, Math.max(0, targets[m.key as keyof typeof targets] - 5))}
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <input
+                        type="number"
+                        value={targets[m.key as keyof typeof targets]}
+                        onChange={(e) => handleMacroChange(m.key as any, parseInt(e.target.value) || 0)}
+                        className="flex-1 bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleMacroChange(m.key as any, Math.min(500, targets[m.key as keyof typeof targets] + 5))}
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* STEP 4: AI PLAN GENERATION ANIMATION */}
+        {step === 4 && (
+          <div className="space-y-6 animate-fadeIn flex flex-col items-center justify-center text-center py-8">
+            <div className="w-20 h-20 rounded-full bg-orange-500 shadow-2xl shadow-orange-300 flex items-center justify-center animate-pulse">
+              <Sparkles className="w-10 h-10 text-white fill-white" />
+            </div>
+            
+            <div className="space-y-2 max-w-xs">
+              <h2 className="text-xl font-black text-stone-900 tracking-tight">
+                Building Your Assistant...
+              </h2>
+              <p className="text-xs font-bold text-stone-500 uppercase tracking-wider h-8 flex items-center justify-center">
+                {generationStatus}
+              </p>
+            </div>
+
+            <div className="w-full bg-stone-200 h-2.5 rounded-full overflow-hidden max-w-xs shadow-inner">
+              <div
+                className="bg-orange-500 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${generationProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* STEP 5: PRICING & PLAN REVEAL */}
+        {step === 5 && (
+          <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
+            <div className="text-center space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-wider">
+                <Sparkles className="w-3 h-3 fill-orange-500" />
+                Custom Protocol Ready
+              </div>
+              <h2 className="text-xl font-black tracking-tight text-stone-900">
+                Choose Your Plan
+              </h2>
+            </div>
+
+            {/* Plan selection grid */}
+            <div className="space-y-3">
+              {/* FitAI Pro Option */}
+              <div
+                onClick={() => setSelectedPlan("pro")}
+                className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all relative ${
+                  selectedPlan === "pro"
+                    ? "bg-white border-orange-500 shadow-xl shadow-orange-100"
+                    : "bg-white/60 border-stone-200 hover:border-stone-300"
+                }`}
+              >
+                <div className="absolute -top-3 right-4 bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest px-3 py-0.5 rounded-full shadow-sm">
+                  Recommended
+                </div>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === "pro" ? "border-orange-500 bg-orange-500 text-white" : "border-stone-300"}`}>
+                      {selectedPlan === "pro" && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Pro</h4>
+                      <p className="text-[10px] font-bold text-stone-400">Full AI Features & Unlimited Sync</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-black text-stone-900">$9.99</span>
+                    <span className="text-[9px] text-stone-400 block font-bold">/month</span>
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-stone-100 space-y-1.5">
                   {[
-                    { label: "Protein (g)", key: "protein", color: "border-orange-200 text-orange-600 bg-orange-50/15" },
-                    { label: "Carbs (g)", key: "carbs", color: "border-[#90E0EF] text-[#0077B6] bg-[#CAF0F8]/10" },
-                    { label: "Fats (g)", key: "fats", color: "border-yellow-200 text-yellow-600 bg-yellow-50/15" },
-                    { label: "Fiber (g)", key: "fiber", color: "border-emerald-200 text-emerald-700 bg-emerald-50/10" },
-                  ].map((m) => (
-                    <div key={m.label} className={`border rounded-2xl p-3 flex flex-col justify-between shadow-2xs ${m.color}`}>
-                      <span className="text-[9px] font-black uppercase tracking-wider opacity-90">{m.label}</span>
-                      <div className="flex items-center justify-between mt-2.5 gap-1 bg-white/95 border border-black/[0.04] rounded-xl px-1.5 py-0.5">
-                        <button
-                          type="button"
-                          onClick={() => handleMacroChange(m.key as any, Math.max(0, targets[m.key as keyof typeof targets] - 5))}
-                          className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <input
-                          type="number"
-                          value={targets[m.key as keyof typeof targets]}
-                          onChange={(e) => handleMacroChange(m.key as any, parseInt(e.target.value) || 0)}
-                          className="flex-1 bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleMacroChange(m.key as any, Math.min(500, targets[m.key as keyof typeof targets] + 5))}
-                          className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90 transition-transform"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                    "Unlimited AI Photo & Text Meal Logging",
+                    "ChatGPT Auto-Sync & Custom Memories",
+                    "Advanced Gut & Micro Nutrient Analytics",
+                  ].map((feat, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-[10px] font-bold text-stone-600">
+                      <Zap className="w-3 h-3 text-orange-500 fill-orange-500 shrink-0" />
+                      <span>{feat}</span>
                     </div>
                   ))}
                 </div>
-              )}
+              </div>
+
+              {/* Free Baseline Option */}
+              <div
+                onClick={() => setSelectedPlan("free")}
+                className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all ${
+                  selectedPlan === "free"
+                    ? "bg-white border-orange-500 shadow-xl shadow-orange-100"
+                    : "bg-white/60 border-stone-200 hover:border-stone-300"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === "free" ? "border-orange-500 bg-orange-500 text-white" : "border-stone-300"}`}>
+                      {selectedPlan === "free" && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">Free Baseline</h4>
+                      <p className="text-[10px] font-bold text-stone-400">Basic Manual Macro Tracking</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-black text-stone-900">$0</span>
+                    <span className="text-[9px] text-stone-400 block font-bold">Forever Free</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
       </div>
 
       {/* Navigation Footer */}
-      {step <= totalSteps && (
+      {step !== 4 && (
         <div className="w-full pt-4 border-t border-stone-200/50 flex gap-4">
           <button
             type="button"
@@ -807,7 +908,13 @@ export const OnboardingWizard = ({
               (!isStepValid() || isSubmitting) ? "opacity-50 cursor-not-allowed shadow-none" : "shadow-lg shadow-orange-100 active:scale-[0.98]"
             }`}
           >
-            <span>{step === totalSteps ? "🚀 Launch FitAI" : "Continue"}</span>
+            <span>
+              {step === totalSteps
+                ? selectedPlan === "pro"
+                  ? "🚀 Start 7-Day Free Trial"
+                  : "🚀 Launch Free FitAI"
+                : "Continue"}
+            </span>
             {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
           </button>
         </div>
