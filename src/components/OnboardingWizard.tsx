@@ -309,13 +309,21 @@ export const OnboardingWizard = ({
   const saveProfileData = async () => {
     const cleanUsername = (metrics.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "") || "user") + "_" + Math.random().toString(36).substring(7);
 
-    const silentBio = await generateAiBioSilently(
+    const goalText = metrics.goal === "Lose Weight" ? `lose weight (target: ${metrics.targetWeight}kg)` : metrics.goal === "Build Muscle" ? `build muscle (target: ${metrics.targetWeight}kg)` : "maintain weight";
+    const silentBio = `Focusing on ${goalText} with a target of ${targets.calories} kcal & ${targets.protein}g protein daily! 💪`;
+
+    // Fire AI bio enhancement in background asynchronously
+    generateAiBioSilently(
       targets.protein,
       targets.carbs,
       targets.fats,
       targets.calories,
       targets.fiber
-    );
+    ).then((aiBio) => {
+      if (aiBio && aiBio !== silentBio) {
+        supabase.from('profiles').update({ description: aiBio }).eq('id', activeProfileId).then();
+      }
+    }).catch(() => {});
 
     const updatedPrefs = [
       ...(metrics.preferences || []),
@@ -673,74 +681,69 @@ export const OnboardingWizard = ({
               </div>
             </div>
 
-            {/* Target Weight Stepper + Typable Box */}
-            <div className="space-y-1">
-              <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Target Weight
+            {/* Target Weight (kg) */}
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Target Weight (kg)
               </label>
-              <div className="flex items-center justify-between bg-white border border-stone-200 rounded-2xl px-4 py-2 shadow-sm">
-                <span className="text-xs font-bold text-stone-400">Target Weight</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleTargetWeightChange(Math.max(35, metrics.targetWeight - 1))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
+              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => handleTargetWeightChange(Math.max(35, metrics.targetWeight - 1))}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
                     value={metrics.targetWeight}
                     onChange={(e) => handleTargetWeightChange(parseFloat(e.target.value) || 70)}
-                    className="w-12 bg-transparent text-center font-bold text-stone-850 focus:outline-none text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <span className="text-xs font-bold text-stone-400">kg</span>
-                  <button
-                    type="button"
-                    onClick={() => handleTargetWeightChange(Math.min(250, metrics.targetWeight + 1))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
+                  <span className="text-[10px] font-bold text-stone-400">kg</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleTargetWeightChange(Math.min(250, metrics.targetWeight + 1))}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
-            {/* Calorie & Macro Target Editor */}
-            <div className="space-y-3.5">
-              <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-0.5">
-                Nutrition Protocol Goals
+            {/* Daily Calories Target (kcal) */}
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Daily Calories Target (kcal)
               </label>
-
-              {/* Calories Target Stepper card + Typable Input */}
-              <div className="flex items-center justify-between bg-stone-50 border border-stone-200 rounded-2xl p-4 shadow-2xs">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-stone-500 uppercase tracking-widest">Daily Calories Target</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleCaloriesChange(Math.max(800, targets.calories - 50))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 cursor-pointer border-none shadow-2xs active:scale-90 transition-transform"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
+              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => handleCaloriesChange(Math.max(800, targets.calories - 50))}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
                     value={targets.calories}
                     onChange={(e) => handleCaloriesChange(parseInt(e.target.value) || 0)}
-                    className="w-16 bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <button
-                    type="button"
-                    onClick={() => handleCaloriesChange(Math.min(10000, targets.calories + 50))}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 cursor-pointer border-none shadow-2xs active:scale-90 transition-transform"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-[9px] font-black text-stone-450 uppercase">kcal</span>
+                  <span className="text-[10px] font-bold text-stone-400">kcal</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleCaloriesChange(Math.min(10000, targets.calories + 50))}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
               </div>
+            </div>
 
               {/* Collapsible advanced macro panel toggle */}
               <button
@@ -788,7 +791,6 @@ export const OnboardingWizard = ({
                   ))}
                 </div>
               )}
-            </div>
           </div>
         )}
 

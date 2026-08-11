@@ -103,3 +103,11 @@ This is the exact gold standard established by the main Dashboard screen:
 
 * **No Bouncing / Shaking Icons**: Never apply continuous keyframe animations like `animate-bounce` or `animate-pulse` to empty state icons or empty charts (e.g. empty weight chart, empty meal list).
 * **Calm Aesthetics**: Empty states must be still, steady, and calm (`text-orange-950/20` monochrome icon with `text-xs font-bold text-orange-900/40` caption). Never draw attention with distracting looped motion.
+
+---
+
+## 🎛️ 7. Unified Stepper Pill Anatomy Rule
+
+* **Consistent Label Placement**: The parameter label MUST ALWAYS sit ABOVE the control pill container (`text-[9px] font-black tracking-widest text-stone-400 uppercase block px-1`).
+* **Clean Pill Interior**: The inside of the pill container (`bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm`) is dedicated strictly to the control inputs (`[-]`, numeric typable input, unit string, `[+]`).
+* **No Duplicate Inner Titles**: NEVER repeat the parameter title inside the pill container! (e.g. Do NOT put `[ Target Weight | [-] 70 kg [+] ]`). Keep every stepper pill across all steps 100% identical in structure.
