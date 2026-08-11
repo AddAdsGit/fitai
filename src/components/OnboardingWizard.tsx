@@ -207,6 +207,16 @@ export const OnboardingWizard = ({
     setStep(prev => Math.max(1, prev - 1));
   };
 
+  const togglePreference = (prefId: string) => {
+    setMetrics(prev => {
+      const isSelected = prev.preferences.includes(prefId);
+      const updated = isSelected
+        ? prev.preferences.filter(p => p !== prefId)
+        : [...prev.preferences, prefId];
+      return { ...prev, preferences: updated };
+    });
+  };
+
   const toggleNutrientEnabled = (id: string) => {
     setTrackedNutrientList(prev => 
       prev.map(n => n.id === id ? { ...n, enabled: !n.enabled } : n)
@@ -708,9 +718,9 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 3: DAILY GOALS */}
+        {/* STEP 3: DAILY GOALS & OPTIONAL DIETARY CHIPS */}
         {step === 3 && (
-          <div className="space-y-5 animate-fadeIn">
+          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
                 Daily Goals
@@ -812,10 +822,39 @@ export const OnboardingWizard = ({
                 </button>
               </div>
             </div>
+
+            {/* Optional Dietary Habits & Preferences Chips */}
+            <div className="space-y-1.5 pt-1">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Dietary Habits & Preferences (Optional)
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  "Gluten Free", "Dairy Free", "Keto", "Vegan", "Intermittent Fasting", "High Protein", "Low Carb"
+                ].map((pref) => {
+                  const active = metrics.preferences.includes(pref);
+                  return (
+                    <button
+                      key={pref}
+                      type="button"
+                      onClick={() => togglePreference(pref)}
+                      className={`py-1.5 px-3 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        active
+                          ? "bg-orange-500 border-orange-500 text-white shadow-xs"
+                          : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                      }`}
+                    >
+                      {active ? `✓ ${pref}` : `+ ${pref}`}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
         )}
 
-        {/* STEP 4: NUTRIENTS & MACROS (COMPACT 1-LINE ROWS + AUTO-CLOSING SEARCH) */}
+        {/* STEP 4: NUTRIENTS & MACROS (MINIMALIST SPACIOUS CARDS) */}
         {step === 4 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-0.5">
@@ -826,7 +865,7 @@ export const OnboardingWizard = ({
 
             {/* Search Dropdown Input */}
             <div ref={dropdownRef} className="relative">
-              <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3 py-2.5 shadow-sm focus-within:border-orange-500 transition-all">
+              <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3.5 py-3 shadow-sm focus-within:border-orange-500 transition-all">
                 <Search className="w-4 h-4 text-stone-400 shrink-0" />
                 <input
                   type="text"
@@ -876,29 +915,29 @@ export const OnboardingWizard = ({
               )}
             </div>
 
-            {/* Active Nutrients List Cards (Compact 1-Line Format) */}
-            <div className="space-y-2">
+            {/* Active Nutrients List Cards (Spacious Breathing Room) */}
+            <div className="space-y-2.5">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
                 Active Tracked Nutrients
               </label>
               {trackedNutrientList.map((n) => (
                 <div
                   key={n.id}
-                  className={`p-3 rounded-2xl border transition-all flex items-center justify-between ${
+                  className={`p-4 rounded-[22px] border transition-all flex items-center justify-between shadow-2xs ${
                     n.enabled
-                      ? "bg-white border-stone-200 shadow-2xs"
+                      ? "bg-white border-stone-200"
                       : "bg-stone-50 border-stone-150 opacity-60"
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: n.color || "#F97316" }} />
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: n.color || "#F97316" }} />
                     <span className="text-xs font-black text-stone-900 uppercase tracking-wide">{n.name}</span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     {/* Stepper Target Input */}
                     {n.enabled && (
-                      <div className="flex items-center gap-0.5 bg-stone-50 border border-stone-200 rounded-xl px-1.5 py-0.5 shadow-3xs">
+                      <div className="flex items-center gap-1 bg-stone-50 border border-stone-200/90 rounded-xl px-2 py-1 shadow-3xs">
                         <button
                           type="button"
                           onClick={() => {
@@ -908,9 +947,9 @@ export const OnboardingWizard = ({
                               handleMacroChange(n.id as any, val);
                             }
                           }}
-                          className="w-4 h-4 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                          className="w-5 h-5 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
                         >
-                          <Minus className="w-2.5 h-2.5" />
+                          <Minus className="w-3 h-3" />
                         </button>
                         <input
                           type="number"
@@ -922,7 +961,7 @@ export const OnboardingWizard = ({
                               handleMacroChange(n.id as any, val);
                             }
                           }}
-                          className="bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-9 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         <span className="text-[9px] font-bold text-stone-400">{n.unit}</span>
                         <button
@@ -934,9 +973,9 @@ export const OnboardingWizard = ({
                               handleMacroChange(n.id as any, val);
                             }
                           }}
-                          className="w-4 h-4 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                          className="w-5 h-5 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
                         >
-                          <Plus className="w-2.5 h-2.5" />
+                          <Plus className="w-3 h-3" />
                         </button>
                       </div>
                     )}
@@ -945,13 +984,13 @@ export const OnboardingWizard = ({
                     <button
                       type="button"
                       onClick={() => toggleNutrientEnabled(n.id)}
-                      className={`w-8 h-4.5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0 ${
+                      className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0 ${
                         n.enabled ? "bg-orange-500" : "bg-stone-300"
                       }`}
                     >
                       <div
-                        className={`bg-white w-3.5 h-3.5 rounded-full shadow-sm transform transition-transform ${
-                          n.enabled ? "translate-x-3.5" : "translate-x-0"
+                        className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${
+                          n.enabled ? "translate-x-4" : "translate-x-0"
                         }`}
                       />
                     </button>
@@ -960,7 +999,7 @@ export const OnboardingWizard = ({
                     <button
                       type="button"
                       onClick={() => setTrackedNutrientList(prev => prev.filter(item => item.id !== n.id))}
-                      className="text-stone-300 hover:text-red-500 border-none bg-transparent cursor-pointer transition-colors p-0.5"
+                      className="text-stone-300 hover:text-red-500 border-none bg-transparent cursor-pointer transition-colors p-1"
                       title="Remove nutrient"
                     >
                       <X className="w-3.5 h-3.5" />
