@@ -8,8 +8,11 @@ import {
   ArrowRight,
   Check,
   Zap,
-  ShieldCheck,
-  Bot
+  Activity,
+  Heart,
+  Droplet,
+  Flame,
+  Scale
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -41,6 +44,16 @@ const DEFAULT_METRICS: BodyMetrics = {
   activityLevel: "Moderately Active",
   preferences: [],
 };
+
+const EXTRA_MICRONUTRIENTS = [
+  { id: "iron", name: "Iron", target: 18, unit: "mg" },
+  { id: "b12", name: "Vitamin B12", target: 2.4, unit: "mcg" },
+  { id: "vit_d", name: "Vitamin D", target: 600, unit: "IU" },
+  { id: "sodium", name: "Sodium", target: 2300, unit: "mg" },
+  { id: "sugar", name: "Added Sugar", target: 25, unit: "g" },
+  { id: "potassium", name: "Potassium", target: 3400, unit: "mg" },
+  { id: "calcium", name: "Calcium", target: 1000, unit: "mg" },
+];
 
 export const OnboardingWizard = ({
   activeProfileId,
@@ -97,15 +110,29 @@ export const OnboardingWizard = ({
   const [showAdvancedMacros, setShowAdvancedMacros] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<"free" | "pro">("pro");
 
-  // Step 4 AI Generation Loading animation
+  // Vitals Selection State (Step 4)
+  const [selectedVitals, setSelectedVitals] = useState({
+    weight: true,
+    water: false,
+    digestion: false,
+    energy: false,
+  });
+
+  // Nutrients Selection State (Step 4)
+  const [selectedNutrients, setSelectedNutrients] = useState<string[]>([
+    "protein", "carbs", "fats", "fiber"
+  ]);
+  const [selectedMicros, setSelectedMicros] = useState<string[]>([]);
+
+  // Step 5 AI Generation Loading animation
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState("Calculating metabolic baseline...");
 
-  const totalSteps = 5;
+  const totalSteps = 6;
 
-  // Handle Step 4 auto-progress animation
+  // Handle Step 5 auto-progress animation
   useEffect(() => {
-    if (step === 4) {
+    if (step === 5) {
       setGenerationProgress(0);
       setGenerationStatus("Calculating metabolic baseline...");
 
@@ -125,7 +152,7 @@ export const OnboardingWizard = ({
       }, 1800);
 
       const t4 = setTimeout(() => {
-        setStep(5);
+        setStep(6);
       }, 2300);
 
       return () => {
@@ -141,6 +168,7 @@ export const OnboardingWizard = ({
     if (step === 1) return metrics.name.trim() !== "";
     if (step === 2) return metrics.height > 0 && metrics.weight > 0 && metrics.age > 0;
     if (step === 3) return metrics.targetWeight > 0 && targets.calories > 0;
+    if (step === 4) return selectedNutrients.length > 0;
     return true;
   };
 
@@ -153,8 +181,20 @@ export const OnboardingWizard = ({
   };
 
   const handleBack = () => {
-    if (step === 4) return; // cannot go back during generating step
+    if (step === 5) return; // cannot go back during generating step
     setStep(prev => Math.max(1, prev - 1));
+  };
+
+  const toggleNutrient = (id: string) => {
+    setSelectedNutrients(prev => 
+      prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]
+    );
+  };
+
+  const toggleMicro = (id: string) => {
+    setSelectedMicros(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
   };
 
   // Sync initials from Google/supabase profile
@@ -300,7 +340,6 @@ export const OnboardingWizard = ({
     const goalText = metrics.goal === "Lose Weight" ? `lose weight (target: ${metrics.targetWeight}kg)` : metrics.goal === "Build Muscle" ? `build muscle (target: ${metrics.targetWeight}kg)` : "maintain weight";
     const silentBio = `Focusing on ${goalText} with a target of ${targets.calories} kcal & ${targets.protein}g protein daily! 💪`;
 
-    // Fire AI bio enhancement in background asynchronously
     generateAiBioSilently(
       targets.protein,
       targets.carbs,
@@ -329,9 +368,23 @@ export const OnboardingWizard = ({
       artStyle: "gourmet",
       customArtStyle: "",
       requireConfirmation: true,
-      trackWeight: true,
+      trackWeight: selectedVitals.weight,
+      trackWater: selectedVitals.water,
+      trackDigestion: selectedVitals.digestion,
+      trackEnergy: selectedVitals.energy,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     };
+
+    // Filter tracked nutrients according to Step 4 choices
+    const filteredTrackedNutrients = DEFAULT_TRACKED_NUTRIENTS.filter((n) => 
+      selectedNutrients.includes(n.id)
+    ).map((n) => ({
+      ...n,
+      target: { protein: targets.protein, carbs: targets.carbs, fats: targets.fats, fiber: targets.fiber }[n.id] ?? n.target
+    }));
+
+    // Build custom micros array from Step 4 choices
+    const activeMicros = EXTRA_MICRONUTRIENTS.filter((m) => selectedMicros.includes(m.id));
 
     const { error } = await supabase
       .from('profiles')
@@ -354,10 +407,9 @@ export const OnboardingWizard = ({
         daily_calories_goal: targets.calories,
         weight_goal: metrics.targetWeight,
         protein_goal: targets.protein,
-        tracked_nutrients: DEFAULT_TRACKED_NUTRIENTS.map((n) => ({
-          ...n,
-          target: { protein: targets.protein, carbs: targets.carbs, fats: targets.fats, fiber: targets.fiber }[n.id] ?? n.target
-        }))
+        tracked_nutrients: filteredTrackedNutrients,
+        track_micros: activeMicros.length > 0,
+        micros: activeMicros
       })
       .eq('id', activeProfileId);
 
@@ -374,13 +426,6 @@ export const OnboardingWizard = ({
       gender: metrics.gender,
       description: silentBio,
       preferences: updatedPrefs,
-      knowledge: {
-        preferences: metrics.preferences || [],
-        health: [],
-        notes: [],
-        patterns: []
-      },
-      agent_memory: [],
       agent_config: initialAgentConfig,
       goals: {
         dailyCalories: targets.calories,
@@ -392,10 +437,9 @@ export const OnboardingWizard = ({
         fats: targets.fats,
         fiber: targets.fiber
       },
-      tracked_nutrients: DEFAULT_TRACKED_NUTRIENTS.map((n) => ({
-        ...n,
-        target: { protein: targets.protein, carbs: targets.carbs, fats: targets.fats, fiber: targets.fiber }[n.id] ?? n.target
-      }))
+      tracked_nutrients: filteredTrackedNutrients,
+      trackMicros: activeMicros.length > 0,
+      micros: activeMicros
     };
   };
 
@@ -422,7 +466,7 @@ export const OnboardingWizard = ({
       <div className="w-full flex items-center justify-between gap-4 py-2 border-b border-stone-200/50">
         <button
           onClick={handleBack}
-          disabled={step === 1 || step === 4}
+          disabled={step === 1 || step === 5}
           className="w-8 h-8 rounded-full flex items-center justify-center bg-stone-100 hover:bg-stone-200 text-stone-600 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer border-none"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -785,8 +829,119 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 4: AI PLAN GENERATION ANIMATION */}
+        {/* STEP 4: TRACKING PREFERENCES (VITALS & NUTRIENTS) */}
         {step === 4 && (
+          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
+            <div className="text-center space-y-0.5">
+              <h2 className="text-xl font-black tracking-tight text-stone-900">
+                Tracking Preferences
+              </h2>
+              <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">
+                Select the vitals & nutrients you want on your dashboard.
+              </p>
+            </div>
+
+            {/* Daily Vitals Card Toggles */}
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Daily Vitals Cards
+              </label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {[
+                  { id: "weight", label: "Weight Tracker", desc: "Log daily body weight" },
+                  { id: "water", label: "Water Intake", desc: "Track daily hydration" },
+                  { id: "digestion", label: "Gut & Digestion", desc: "Comfort score & notes" },
+                  { id: "energy", label: "Daily Energy", desc: "Track energy levels" },
+                ].map((v) => {
+                  const active = selectedVitals[v.id as keyof typeof selectedVitals];
+                  return (
+                    <div
+                      key={v.id}
+                      onClick={() => setSelectedVitals(prev => ({ ...prev, [v.id]: !active }))}
+                      className={`p-3 rounded-2xl border cursor-pointer transition-all ${
+                        active
+                          ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-100"
+                          : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider">{v.label}</span>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${active ? "border-white bg-white text-orange-500" : "border-stone-300"}`}>
+                          {active && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                        </div>
+                      </div>
+                      <p className={`text-[9px] font-medium mt-1 ${active ? "text-white/80" : "text-stone-400"}`}>{v.desc}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Core Macros & Nutrients to Track */}
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Core Macros to Track
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "protein", label: "Protein", color: "text-orange-500" },
+                  { id: "carbs", label: "Carbs", color: "text-sky-500" },
+                  { id: "fats", label: "Fats", color: "text-amber-500" },
+                  { id: "fiber", label: "Fiber", color: "text-emerald-500" },
+                ].map((n) => {
+                  const active = selectedNutrients.includes(n.id);
+                  return (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => toggleNutrient(n.id)}
+                      className={`py-2.5 px-3 rounded-2xl border text-left text-xs font-black uppercase tracking-wider transition-all flex items-center justify-between cursor-pointer ${
+                        active
+                          ? "bg-white border-stone-850 text-stone-900 shadow-sm"
+                          : "bg-stone-50 border-stone-200 text-stone-400 hover:bg-stone-100"
+                      }`}
+                    >
+                      <span className={active ? n.color : ""}>{n.label}</span>
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${active ? "bg-stone-900 border-stone-900 text-white" : "border-stone-300"}`}>
+                        {active && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Optional Specific Micronutrients */}
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Specific Micronutrients (Optional)
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {EXTRA_MICRONUTRIENTS.map((m) => {
+                  const active = selectedMicros.includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => toggleMicro(m.id)}
+                      className={`py-1.5 px-3 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        active
+                          ? "bg-orange-500 border-orange-500 text-white shadow-xs"
+                          : "bg-white border-stone-200 text-stone-600 hover:bg-stone-50"
+                      }`}
+                    >
+                      {active ? `✓ ${m.name}` : `+ ${m.name}`}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* STEP 5: AI PLAN GENERATION ANIMATION */}
+        {step === 5 && (
           <div className="space-y-6 animate-fadeIn flex flex-col items-center justify-center text-center py-8">
             <div className="w-20 h-20 rounded-full bg-orange-500 shadow-2xl shadow-orange-300 flex items-center justify-center animate-pulse">
               <Sparkles className="w-10 h-10 text-white fill-white" />
@@ -810,8 +965,8 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 5: PRICING & PLAN REVEAL */}
-        {step === 5 && (
+        {/* STEP 6: PRICING & PLAN REVEAL */}
+        {step === 6 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-wider">
@@ -898,7 +1053,7 @@ export const OnboardingWizard = ({
       </div>
 
       {/* Navigation Footer */}
-      {step !== 4 && (
+      {step !== 5 && (
         <div className="w-full pt-4 border-t border-stone-200/50 flex gap-4">
           <button
             type="button"
