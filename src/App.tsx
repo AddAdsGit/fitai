@@ -515,7 +515,7 @@ export default function App() {
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isVitalsLogOpen, setIsVitalsLogOpen] = useState(false);
   const [activeVitalsTab, setActiveVitalsTab] = useState<"weight" | "water" | "digestion" | "energy" | null>(null);
-  const [expandedCardLogs, setExpandedCardLogs] = useState<{ [key: string]: boolean }>({ water: true, digestion: true, energy: true, weight: true });
+  const [expandedCardLogs, setExpandedCardLogs] = useState<{ [key: string]: boolean }>({});
 
   // Password Recovery States
   const [newPassword, setNewPassword] = useState("");
@@ -4464,10 +4464,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             : "Energy"
         } Log Time`}
       />
-
-      {showWalkthrough && (
-        <DashboardWalkthrough onDismiss={() => setShowWalkthrough(false)} />
-      )}
+      {/* Walkthrough disabled for zero-clutter launch */}
     </div>
   );
 }

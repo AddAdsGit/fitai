@@ -5,22 +5,16 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function resetAllProfilesOnboarding() {
+async function checkUserPrefs() {
   const { data: profiles, error } = await supabase.from('profiles').select('id, username, display_name, preferences');
   if (error) {
     console.error("Error fetching profiles:", error);
     return;
   }
-
-  for (const p of profiles) {
-    const updatedPrefs = (p.preferences || []).filter((pref) => pref !== "onboarded");
-    await supabase
-      .from('profiles')
-      .update({ preferences: updatedPrefs })
-      .eq('id', p.id);
-
-    console.log(`✅ Reset onboarding for ${p.display_name} (@${p.username}) [${p.id}]`);
-  }
+  console.log("Current Supabase Profiles:");
+  profiles.forEach((p) => {
+    console.log(`- ${p.display_name} (@${p.username}): preferences =`, JSON.stringify(p.preferences));
+  });
 }
 
-resetAllProfilesOnboarding().catch(console.error);
+checkUserPrefs().catch(console.error);
