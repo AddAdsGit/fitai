@@ -111,3 +111,27 @@ This is the exact gold standard established by the main Dashboard screen:
 * **Consistent Label Placement**: The parameter label MUST ALWAYS sit ABOVE the control pill container (`text-[9px] font-black tracking-widest text-stone-400 uppercase block px-1`).
 * **Clean Pill Interior**: The inside of the pill container (`bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm`) is dedicated strictly to the control inputs (`[-]`, numeric typable input, unit string, `[+]`).
 * **No Duplicate Inner Titles**: NEVER repeat the parameter title inside the pill container! (e.g. Do NOT put `[ Target Weight | [-] 70 kg [+] ]`). Keep every stepper pill across all steps 100% identical in structure.
+
+---
+
+## 🏷️ 8. AI Meal Tag Cards & Explicit Toggle Rule
+
+* **No Ambiguous Pill Tags or Nested Touch Conflict Buttons**:
+  * NEVER use tactile pill tags with invisible touch toggles or nested buttons inside buttons.
+  * NEVER use redundant double-indicator glowing green dots alongside toggle switches.
+* **Unified 1-Line Card Structure**:
+  * ALWAYS use clean 1-line cards (`p-3.5 rounded-[22px] border bg-white shadow-2xs`).
+  * Left Side: Bold Tag Name (`AI Meal Tags`) + AI Prompt Rule Description.
+  * Right Side: Dedicated Pencil Icon (`<Pencil />`) to edit AI guidelines + Explicit Toggle Switch (`ON / OFF`) + `[ ✕ ]` Delete button.
+
+---
+
+## 🔢 9. Numeric Input Backspacing & Header Cleanliness Rules
+
+* **Smooth Numeric Input Backspacing**:
+  * ALWAYS render numeric inputs supporting empty string (`""`) state (`value={val === 0 ? "" : val}`).
+  * NEVER use inline fallback defaults like `parseFloat(val) || 70` inside `onChange` that prevent complete backspacing and lock single digits.
+* **Header Cleanliness**:
+  * Section titles (*"Nutrient Tracking"*, *"Daily Vitals"*, *"AI Meal Tags"*) must remain 100% bold, clean, and un-cluttered.
+  * NEVER add redundant `<Info />` icon buttons to self-explanatory section headers.
+

@@ -34,3 +34,6 @@ This file defines critical rules that all AI developers and code-generation suba
 * **No Unnecessary Section Headers**: Do not add section headers above inputs when the UI context/placeholder is already clear.
 * **No Emoji Soup or Rainbow Icons**: Never use multi-colored emoji soup in section titles. Use clean typography or single-tint monochrome Lucide SVG icons matching the espresso or orange brand palette.
 * **No Shaking / Jittering Animations**: NEVER use continuous keyframe bounce or pulse animations (`animate-bounce`, `animate-pulse`) on empty state icons or empty charts. Keep empty states calm, still, and steady.
+* **AI Tag Card 1-Line Structure**: Use clean 1-line cards with Tag Name, AI Description, dedicated Pencil icon (`<Pencil />`), and explicit Toggle Switches (`ON / OFF`). Never use tactile pill tags with invisible touch toggles or double-indicator green dots.
+* **Numeric Input Backspacing**: ALWAYS support empty string (`""`) state (`value={val === 0 ? "" : val}`) so users can backspace completely without forced fallback digits.
+* **Clean Section Headers**: Keep section titles bold, clean, and un-cluttered. Never add redundant `<Info />` icon buttons to self-explanatory section headers.
