@@ -61,21 +61,6 @@ const COMMON_TAG_TEMPLATES = [
   { name: "Homemade", description: "Apply for home-cooked meals" }
 ];
 
-const DEFAULT_STARTER_RECIPES = [
-  {
-    id: "rec_idly",
-    name: "Idly & Sambar",
-    calories: 240,
-    protein: 12,
-    carbs: 42,
-    fats: 4,
-    fiber: 5,
-    category: "Breakfast",
-    tag: "Homemade",
-    ingredients: ["Steamed Rice & Lentil Idly (2 pcs)", "Vegetable Sambar (150ml)"]
-  }
-];
-
 export const OnboardingWizard = ({
   activeProfileId,
   supabase,
@@ -130,7 +115,7 @@ export const OnboardingWizard = ({
 
   const [selectedPlan, setSelectedPlan] = useState<"free" | "plus" | "pro">("pro");
 
-  // AI Meal Tracking Tags State (Step 4 - Exact Edit Profile Model with Glowing Dots)
+  // AI Meal Tracking Tags State (Option A: Pure 1-Tap Tactile Pills with Glowing Dots)
   const [aiTrackingTags, setAiTrackingTags] = useState([
     { id: "tag_hp", name: "High Protein", description: "Apply when meal has >= 30g protein", enabled: true },
     { id: "tag_gf", name: "Gluten Free", description: "Apply when meal contains no gluten ingredients", enabled: false },
@@ -138,23 +123,6 @@ export const OnboardingWizard = ({
     { id: "tag_if", name: "Intermittent Fasting", description: "Apply during daily eating window", enabled: false },
     { id: "tag_home", name: "Homemade", description: "Apply for home-cooked meals", enabled: true }
   ]);
-  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
-
-  // Custom Tag Creation state
-  const [showCustomTagForm, setShowCustomTagForm] = useState(false);
-  const [customTagName, setCustomTagName] = useState("");
-  const [customTagRule, setCustomTagRule] = useState("");
-
-  // Starter Recipes State (Step 4)
-  const [recipeList, setRecipeList] = useState(DEFAULT_STARTER_RECIPES);
-  const [importedRecipeIds, setImportedRecipeIds] = useState<string[]>(["rec_idly"]);
-
-  // Custom Recipe Creation state
-  const [showAddRecipeForm, setShowAddRecipeForm] = useState(false);
-  const [customRecName, setCustomRecName] = useState("");
-  const [customRecCal, setCustomRecCal] = useState(300);
-  const [customRecProtein, setCustomRecProtein] = useState(25);
-  const [customRecCategory, setCustomRecCategory] = useState<"Breakfast" | "Lunch" | "Dinner" | "Snack">("Lunch");
 
   // Vitals Selection State (Step 6)
   const [selectedVitals, setSelectedVitals] = useState({
@@ -263,59 +231,8 @@ export const OnboardingWizard = ({
     ]);
   };
 
-  const handleCreateCustomTag = () => {
-    const trimmed = customTagName.trim();
-    if (!trimmed) return;
-    setAiTrackingTags(prev => [
-      ...prev,
-      {
-        id: `tag_${Date.now()}`,
-        name: trimmed,
-        description: customTagRule.trim() || `Apply when meal meets ${trimmed} guidelines`,
-        enabled: true
-      }
-    ]);
-    setCustomTagName("");
-    setCustomTagRule("");
-    setShowCustomTagForm(false);
-  };
-
-  const handleUpdateTagDesc = (id: string, description: string) => {
-    setAiTrackingTags(prev => prev.map(t => t.id === id ? { ...t, description } : t));
-  };
-
   const handleDeleteTag = (id: string) => {
     setAiTrackingTags(prev => prev.filter(t => t.id !== id));
-    if (selectedTagId === id) setSelectedTagId(null);
-  };
-
-  const toggleImportRecipe = (id: string) => {
-    setImportedRecipeIds(prev =>
-      prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
-    );
-  };
-
-  const handleCreateCustomRecipe = () => {
-    const trimmed = customRecName.trim();
-    if (!trimmed) return;
-    const newId = `rec_${Date.now()}`;
-    const newRecipe = {
-      id: newId,
-      name: trimmed,
-      calories: customRecCal,
-      protein: customRecProtein,
-      carbs: Math.round(customRecCal * 0.4 / 4),
-      fats: Math.round(customRecCal * 0.25 / 9),
-      fiber: 5,
-      category: customRecCategory,
-      tag: "Custom",
-      ingredients: [trimmed]
-    };
-    setRecipeList(prev => [...prev, newRecipe]);
-    setImportedRecipeIds(prev => [...prev, newId]);
-    setCustomRecName("");
-    setShowAddRecipeForm(false);
-    triggerToast(`Added ${trimmed} to recipes!`);
   };
 
   const activeNutrientCount = trackedNutrientList.filter(n => n.enabled).length;
@@ -596,23 +513,6 @@ export const OnboardingWizard = ({
 
     if (error) {
       throw error;
-    }
-
-    // Insert imported starter recipes into user's recipes table if enabled
-    const importedRecipes = recipeList.filter(r => importedRecipeIds.includes(r.id));
-    for (const rec of importedRecipes) {
-      await supabase.from('user_recipes').insert({
-        user_id: activeProfileId,
-        name: rec.name,
-        calories: rec.calories,
-        protein: rec.protein,
-        carbs: rec.carbs,
-        fats: rec.fats,
-        fiber: rec.fiber,
-        ingredients: rec.ingredients,
-        category: rec.category,
-        is_preset: true
-      }).catch(() => {});
     }
 
     return {
@@ -979,260 +879,79 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 4: AI TRACKING TAGS & STARTER RECIPES (EXACT EDIT PROFILE TACTILE PILL MODEL) */}
+        {/* STEP 4: AI MEAL TRACKING TAGS (OPTION A: PURE 1-TAP TACTILE PILLS, ZERO NESTED BUTTONS) */}
         {step === 4 && (
           <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
-                AI Tags & Recipes
+                AI Tracking Tags
               </h2>
             </div>
 
-            {/* AI Meal Tracking Tags Section (Tactile Pills with Glowing Dots) */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
-                  AI Meal Tracking Tags
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowCustomTagForm(!showCustomTagForm)}
-                  className="text-[9px] font-black uppercase text-orange-500 hover:underline border-none bg-transparent cursor-pointer"
-                >
-                  {showCustomTagForm ? "Cancel" : "+ Custom Tag"}
-                </button>
-              </div>
+            {/* AI Meal Tracking Tags Section */}
+            <div className="space-y-3">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Select Dietary Tags For AI Auto-Tagging
+              </label>
 
-              {/* Custom Tag Creator Form */}
-              {showCustomTagForm && (
-                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2 animate-fadeIn">
-                  <input
-                    type="text"
-                    placeholder="Tag Name (e.g. Nut Free)"
-                    value={customTagName}
-                    onChange={(e) => setCustomTagName(e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-bold text-stone-850 focus:outline-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="AI rule (e.g. Apply when meal contains no nuts)"
-                    value={customTagRule}
-                    onChange={(e) => setCustomTagRule(e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-medium text-stone-700 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCreateCustomTag}
-                    className="w-full bg-orange-500 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl border-none cursor-pointer"
+              {/* List of tags as pure 1-tap tactile pill buttons with glowing dots */}
+              <div className="flex flex-wrap gap-2.5 py-1">
+                {aiTrackingTags.map((tag) => (
+                  <div
+                    key={tag.id}
+                    onClick={() => toggleAiTag(tag.id)}
+                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-extrabold border transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-3xs ${
+                      tag.enabled
+                        ? "bg-emerald-50/80 border-emerald-300/80 text-emerald-950 hover:bg-emerald-100/80"
+                        : "bg-stone-50/70 border-stone-200/80 text-stone-400 hover:border-stone-300 opacity-65 hover:opacity-100"
+                    }`}
                   >
-                    Add Tag
-                  </button>
-                </div>
-              )}
-
-              {/* List of tags as tactile pill buttons */}
-              <div className="flex flex-wrap gap-2 py-1">
-                {aiTrackingTags.map((tag) => {
-                  const isSelected = selectedTagId === tag.id;
-                  return (
-                    <div
-                      key={tag.id}
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-extrabold border transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-3xs ${
+                    {/* Glowing Green Dot Indicator */}
+                    <span
+                      className={`w-2 h-2 rounded-full transition-all shrink-0 ${
                         tag.enabled
-                          ? isSelected
-                            ? "bg-stone-900 border-stone-900 text-white shadow-sm"
-                            : "bg-emerald-50/80 border-emerald-300/80 text-emerald-950 hover:bg-emerald-100/80"
-                          : "bg-stone-50/70 border-stone-200/80 text-stone-400 hover:border-stone-300 opacity-65 hover:opacity-100"
+                          ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+                          : "bg-stone-300"
                       }`}
-                      onClick={() => toggleAiTag(tag.id)}
+                    />
+                    <span>{tag.name}</span>
+
+                    {/* Simple Delete Tag Icon */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTag(tag.id);
+                      }}
+                      className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0 border-none bg-transparent ml-1"
                     >
-                      {/* Glowing Green Dot Indicator */}
-                      <span
-                        className={`w-2 h-2 rounded-full transition-all shrink-0 ${
-                          tag.enabled
-                            ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
-                            : "bg-stone-300"
-                        }`}
-                      />
-                      <span>{tag.name}</span>
-
-                      {/* Edit AI Rule Trigger */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedTagId(isSelected ? null : tag.id);
-                        }}
-                        className="text-[9px] font-black underline opacity-70 hover:opacity-100 border-none bg-transparent cursor-pointer ml-1"
-                      >
-                        {isSelected ? "Close" : "Rule"}
-                      </button>
-
-                      {/* Delete Tag */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTag(tag.id);
-                        }}
-                        className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0 border-none bg-transparent"
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    </div>
-                  );
-                })}
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
 
               {/* Quick Template Chips */}
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {COMMON_TAG_TEMPLATES.map((tmpl) => {
-                  const exists = aiTrackingTags.some(t => t.name.toLowerCase() === tmpl.name.toLowerCase());
-                  if (exists) return null;
-                  return (
-                    <button
-                      key={tmpl.name}
-                      type="button"
-                      onClick={() => handleQuickAddTag(tmpl.name)}
-                      className="py-1 px-2.5 rounded-xl border border-dashed border-stone-300 text-[9px] font-bold text-stone-500 hover:text-stone-800 hover:border-stone-400 cursor-pointer bg-transparent transition-colors"
-                    >
-                      + {tmpl.name}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Selected Tag AI Rule Editor */}
-              {(() => {
-                const activeSelectedTag = aiTrackingTags.find(t => t.id === selectedTagId);
-                if (!activeSelectedTag) return null;
-                return (
-                  <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2 mt-2 animate-fadeIn text-left">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">AI Rule for {activeSelectedTag.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTagId(null)}
-                        className="text-[9px] font-black text-stone-400 hover:text-stone-600 uppercase border-none bg-transparent cursor-pointer"
-                      >
-                        Close
-                      </button>
-                    </div>
-                    <textarea
-                      value={activeSelectedTag.description}
-                      onChange={(e) => handleUpdateTagDesc(activeSelectedTag.id, e.target.value)}
-                      rows={2}
-                      placeholder="Describe guidelines for the AI..."
-                      className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-700 focus:outline-none focus:border-stone-400 placeholder:text-stone-300 resize-none leading-relaxed shadow-3xs"
-                    />
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Starter Recipes Section (Using RecipesView Preview Card Format) */}
-            <div className="space-y-2.5 pt-3 border-t border-stone-100">
-              <div className="flex items-center justify-between">
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
-                  Starter Recipes (1-Tap Import)
+              <div className="space-y-1.5 pt-2">
+                <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                  Add Preset Tags
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setShowAddRecipeForm(!showAddRecipeForm)}
-                  className="text-[9px] font-black uppercase text-orange-500 hover:underline border-none bg-transparent cursor-pointer"
-                >
-                  {showAddRecipeForm ? "Cancel" : "+ Create Recipe"}
-                </button>
-              </div>
-
-              {/* Custom Recipe Creator Inline Form */}
-              {showAddRecipeForm && (
-                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2 animate-fadeIn">
-                  <input
-                    type="text"
-                    placeholder="Recipe Name (e.g. Masala Dosa)"
-                    value={customRecName}
-                    onChange={(e) => setCustomRecName(e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-bold text-stone-850 focus:outline-none"
-                  />
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="text-[8px] font-black text-stone-400 uppercase">Calories</label>
-                      <input
-                        type="number"
-                        value={customRecCal}
-                        onChange={(e) => setCustomRecCal(parseInt(e.target.value) || 0)}
-                        className="w-full bg-white border border-stone-200 rounded-xl px-2 py-1 text-xs font-bold text-stone-850 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[8px] font-black text-stone-400 uppercase">Protein (g)</label>
-                      <input
-                        type="number"
-                        value={customRecProtein}
-                        onChange={(e) => setCustomRecProtein(parseInt(e.target.value) || 0)}
-                        className="w-full bg-white border border-stone-200 rounded-xl px-2 py-1 text-xs font-bold text-stone-850 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[8px] font-black text-stone-400 uppercase">Category</label>
-                      <select
-                        value={customRecCategory}
-                        onChange={(e) => setCustomRecCategory(e.target.value as any)}
-                        className="w-full bg-white border border-stone-200 rounded-xl px-1 py-1 text-xs font-bold text-stone-850 focus:outline-none"
-                      >
-                        <option value="Breakfast">Breakfast</option>
-                        <option value="Lunch">Lunch</option>
-                        <option value="Dinner">Dinner</option>
-                        <option value="Snack">Snack</option>
-                      </select>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleCreateCustomRecipe}
-                    className="w-full bg-orange-500 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl border-none cursor-pointer"
-                  >
-                    Save & Import Recipe
-                  </button>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {recipeList.map((rec) => {
-                  const imported = importedRecipeIds.includes(rec.id);
-                  return (
-                    <div
-                      key={rec.id}
-                      className={`p-3.5 rounded-[22px] border transition-all flex items-center justify-between shadow-2xs ${
-                        imported ? "bg-white border-orange-500 shadow-orange-100/40" : "bg-white border-stone-200"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-black text-stone-900 tracking-tight">{rec.name}</h4>
-                          <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-stone-100 text-stone-500">
-                            {rec.category}
-                          </span>
-                        </div>
-                        <p className="text-[10px] font-bold text-stone-400 mt-1">
-                          {rec.calories} kcal · {rec.protein}g P · {rec.carbs}g C · {rec.fats}g F
-                        </p>
-                      </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {COMMON_TAG_TEMPLATES.map((tmpl) => {
+                    const exists = aiTrackingTags.some(t => t.name.toLowerCase() === tmpl.name.toLowerCase());
+                    if (exists) return null;
+                    return (
                       <button
+                        key={tmpl.name}
                         type="button"
-                        onClick={() => toggleImportRecipe(rec.id)}
-                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border-none ${
-                          imported
-                            ? "bg-orange-500 text-white shadow-xs"
-                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
-                        }`}
+                        onClick={() => handleQuickAddTag(tmpl.name)}
+                        className="py-1 px-2.5 rounded-xl border border-dashed border-stone-300 text-[9px] font-bold text-stone-500 hover:text-stone-800 hover:border-stone-400 cursor-pointer bg-transparent transition-colors"
                       >
-                        {imported ? "✓ Added" : "+ Import"}
+                        + {tmpl.name}
                       </button>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
