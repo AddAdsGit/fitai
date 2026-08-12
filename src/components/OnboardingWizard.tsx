@@ -5,7 +5,6 @@ import {
   Plus, 
   Minus, 
   ArrowRight,
-  Check,
   Search,
   X,
   Pencil
@@ -106,8 +105,6 @@ export const OnboardingWizard = ({
     fiber: 30,
   });
 
-  const [selectedPlan, setSelectedPlan] = useState<"free" | "plus" | "pro">("pro");
-
   // AI Meal Tracking Tags State (Step 6 - Clean Card Model matching Nutrient Tracker)
   const [aiTrackingTags, setAiTrackingTags] = useState([
     { id: "tag_hp", name: "High Protein", description: "Apply when meal has >= 30g protein", enabled: true },
@@ -149,13 +146,13 @@ export const OnboardingWizard = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Step 7 AI Generation Loading animation
+  // Step 7 AI Generation Loading animation (Total steps = 7)
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState("Calculating metabolic baseline...");
 
-  const totalSteps = 8;
+  const totalSteps = 7;
 
-  // Handle Step 7 auto-progress animation
+  // Handle Step 7 auto-progress animation & finish directly
   useEffect(() => {
     if (step === 7) {
       setGenerationProgress(0);
@@ -177,7 +174,7 @@ export const OnboardingWizard = ({
       }, 1800);
 
       const t4 = setTimeout(() => {
-        setStep(8);
+        handleFinish();
       }, 2300);
 
       return () => {
@@ -207,10 +204,6 @@ export const OnboardingWizard = ({
 
   const handleBack = () => {
     if (step === 7) return; // cannot go back during generating step
-    if (step === 8) {
-      setStep(6); // skip generating step when going back from pricing screen
-      return;
-    }
     setStep(prev => Math.max(1, prev - 1));
   };
 
@@ -463,12 +456,6 @@ export const OnboardingWizard = ({
       ...(metrics.preferences || []),
       "onboarded"
     ];
-
-    if (selectedPlan === "pro") {
-      updatedPrefs.push("plan_pro");
-    } else if (selectedPlan === "plus") {
-      updatedPrefs.push("plan_plus");
-    }
 
     const initialAgentConfig = {
       showGptWidget: true,
@@ -1115,7 +1102,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 6: AI MEAL TAGS (CLEAN 1-LINE CARD MODEL WITH NO GREEN DOTS AND NO INFO ICONS) */}
+        {/* STEP 6: AI MEAL TAGS (CLEAN 1-LINE CARD MODEL) */}
         {step === 6 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-0.5">
@@ -1242,7 +1229,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 7: AI PLAN GENERATION ANIMATION */}
+        {/* STEP 7: AI PLAN GENERATION ANIMATION (FINAL ONBOARDING STEP) */}
         {step === 7 && (
           <div className="space-y-6 animate-fadeIn flex flex-col items-center justify-center text-center py-12">
             <div className="space-y-2 max-w-xs">
@@ -1263,121 +1250,6 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 8: PRICING REVEAL */}
-        {step === 8 && (
-          <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
-            <div className="text-center space-y-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-wider">
-                Custom Protocol Ready
-              </div>
-              <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Choose Your Plan
-              </h2>
-            </div>
-
-            {/* 3 Tier Plan Cards */}
-            <div className="space-y-3">
-              
-              {/* 1. FitAI Pro Option (Managed AI) */}
-              <div
-                onClick={() => setSelectedPlan("pro")}
-                className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all relative ${
-                  selectedPlan === "pro"
-                    ? "bg-white border-orange-500 shadow-xl shadow-orange-100"
-                    : "bg-white/60 border-stone-200 hover:border-stone-300"
-                }`}
-              >
-                <div className="absolute -top-3 right-4 bg-orange-500 text-white text-[9px] font-black uppercase tracking-widest px-3 py-0.5 rounded-full shadow-sm">
-                  Popular
-                </div>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === "pro" ? "border-orange-500 bg-orange-500 text-white" : "border-stone-300"}`}>
-                      {selectedPlan === "pro" && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Pro</h4>
-                      <p className="text-[10px] font-bold text-stone-400">Fully Managed AI (All Features Included)</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-black text-stone-900">$9.99</span>
-                    <span className="text-[9px] text-stone-400 block font-bold">/month</span>
-                  </div>
-                </div>
-                <div className="mt-3 pt-3 border-t border-stone-100 space-y-1.5">
-                  {[
-                    "All AI Features Hosted Directly From Our Side",
-                    "Unlimited AI Photo & Text Meal Logging",
-                    "ChatGPT Auto-Sync & Gut Health Analytics",
-                  ].map((feat, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-[10px] font-bold text-stone-600">
-                      <span>•</span>
-                      <span>{feat}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 2. FitAI Plus Option (BYOK Model) */}
-              <div
-                onClick={() => setSelectedPlan("plus")}
-                className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all ${
-                  selectedPlan === "plus"
-                    ? "bg-white border-orange-500 shadow-xl shadow-orange-100"
-                    : "bg-white/60 border-stone-200 hover:border-stone-300"
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === "plus" ? "border-orange-500 bg-orange-500 text-white" : "border-stone-300"}`}>
-                      {selectedPlan === "plus" && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Plus</h4>
-                      <p className="text-[10px] font-bold text-stone-400">BYOK Model (Bring Your Own API Key)</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-black text-stone-900">$4.99</span>
-                    <span className="text-[9px] text-stone-400 block font-bold">/month</span>
-                  </div>
-                </div>
-                <div className="mt-2 text-[9.5px] font-semibold text-stone-500 pl-8">
-                  Unlock all AI features by connecting your own OpenAI / Gemini API key.
-                </div>
-              </div>
-
-              {/* 3. Free Baseline Option */}
-              <div
-                onClick={() => setSelectedPlan("free")}
-                className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all ${
-                  selectedPlan === "free"
-                    ? "bg-white border-orange-500 shadow-xl shadow-orange-100"
-                    : "bg-white/60 border-stone-200 hover:border-stone-300"
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPlan === "free" ? "border-orange-500 bg-orange-500 text-white" : "border-stone-300"}`}>
-                      {selectedPlan === "free" && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">Free Baseline</h4>
-                      <p className="text-[10px] font-bold text-stone-400">Basic Manual Tracking</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-black text-stone-900">$0</span>
-                    <span className="text-[9px] text-stone-400 block font-bold">Forever Free</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
-
       </div>
 
       {/* Navigation Footer */}
@@ -1393,9 +1265,7 @@ export const OnboardingWizard = ({
           >
             <span>
               {step === totalSteps
-                ? selectedPlan === "free"
-                  ? "Launch Free FitAI"
-                  : "Start 7-Day Free Trial"
+                ? "🚀 Launch FitAI"
                 : "Continue"}
             </span>
             {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
