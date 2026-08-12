@@ -7,7 +7,8 @@ import {
   ArrowRight,
   Check,
   Search,
-  X
+  X,
+  Pencil
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -115,7 +116,7 @@ export const OnboardingWizard = ({
 
   const [selectedPlan, setSelectedPlan] = useState<"free" | "plus" | "pro">("pro");
 
-  // AI Meal Tracking Tags State (Option A: Pure 1-Tap Tactile Pills with Glowing Dots)
+  // AI Meal Tracking Tags State (Step 6 - Exact Edit Profile Model with Custom Tag & Rule Editor)
   const [aiTrackingTags, setAiTrackingTags] = useState([
     { id: "tag_hp", name: "High Protein", description: "Apply when meal has >= 30g protein", enabled: true },
     { id: "tag_gf", name: "Gluten Free", description: "Apply when meal contains no gluten ingredients", enabled: false },
@@ -123,8 +124,12 @@ export const OnboardingWizard = ({
     { id: "tag_if", name: "Intermittent Fasting", description: "Apply during daily eating window", enabled: false },
     { id: "tag_home", name: "Homemade", description: "Apply for home-cooked meals", enabled: true }
   ]);
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [showCustomTagForm, setShowCustomTagForm] = useState(false);
+  const [customTagName, setCustomTagName] = useState("");
+  const [customTagRule, setCustomTagRule] = useState("");
 
-  // Vitals Selection State (Step 6)
+  // Vitals Selection State (Step 5)
   const [selectedVitals, setSelectedVitals] = useState({
     weight: true,
     water: false,
@@ -132,7 +137,7 @@ export const OnboardingWizard = ({
     energy: false,
   });
 
-  // Tracked Nutrients List (Step 5 - Edit Profile Model)
+  // Tracked Nutrients List (Step 4 - Edit Profile Model)
   const [trackedNutrientList, setTrackedNutrientList] = useState<any[]>(() => {
     return DEFAULT_TRACKED_NUTRIENTS.map(n => ({ ...n, enabled: true }));
   });
@@ -196,7 +201,7 @@ export const OnboardingWizard = ({
     if (step === 1) return metrics.name.trim() !== "";
     if (step === 2) return metrics.height > 0 && metrics.weight > 0 && metrics.age > 0;
     if (step === 3) return metrics.targetWeight > 0 && targets.calories > 0;
-    if (step === 5) return trackedNutrientList.some(n => n.enabled);
+    if (step === 4) return trackedNutrientList.some(n => n.enabled);
     return true;
   };
 
@@ -231,8 +236,30 @@ export const OnboardingWizard = ({
     ]);
   };
 
+  const handleCreateCustomTag = () => {
+    const trimmed = customTagName.trim();
+    if (!trimmed) return;
+    setAiTrackingTags(prev => [
+      ...prev,
+      {
+        id: `tag_${Date.now()}`,
+        name: trimmed,
+        description: customTagRule.trim() || `Apply when meal meets ${trimmed} guidelines`,
+        enabled: true
+      }
+    ]);
+    setCustomTagName("");
+    setCustomTagRule("");
+    setShowCustomTagForm(false);
+  };
+
+  const handleUpdateTagDesc = (id: string, description: string) => {
+    setAiTrackingTags(prev => prev.map(t => t.id === id ? { ...t, description } : t));
+  };
+
   const handleDeleteTag = (id: string) => {
     setAiTrackingTags(prev => prev.filter(t => t.id !== id));
+    if (editingTagId === id) setEditingTagId(null);
   };
 
   const activeNutrientCount = trackedNutrientList.filter(n => n.enabled).length;
@@ -879,87 +906,8 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 4: AI MEAL TRACKING TAGS (OPTION A: PURE 1-TAP TACTILE PILLS, ZERO NESTED BUTTONS) */}
+        {/* STEP 4: NUTRIENTS & MACROS (WITH X/8 ACTIVE SLOTS BADGE & SUBTLE CUSTOM NUTRIENT ADDER) */}
         {step === 4 && (
-          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
-            <div className="text-center space-y-0.5">
-              <h2 className="text-xl font-black tracking-tight text-stone-900">
-                AI Tracking Tags
-              </h2>
-            </div>
-
-            {/* AI Meal Tracking Tags Section */}
-            <div className="space-y-3">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Select Dietary Tags For AI Auto-Tagging
-              </label>
-
-              {/* List of tags as pure 1-tap tactile pill buttons with glowing dots */}
-              <div className="flex flex-wrap gap-2.5 py-1">
-                {aiTrackingTags.map((tag) => (
-                  <div
-                    key={tag.id}
-                    onClick={() => toggleAiTag(tag.id)}
-                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-extrabold border transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-3xs ${
-                      tag.enabled
-                        ? "bg-emerald-50/80 border-emerald-300/80 text-emerald-950 hover:bg-emerald-100/80"
-                        : "bg-stone-50/70 border-stone-200/80 text-stone-400 hover:border-stone-300 opacity-65 hover:opacity-100"
-                    }`}
-                  >
-                    {/* Glowing Green Dot Indicator */}
-                    <span
-                      className={`w-2 h-2 rounded-full transition-all shrink-0 ${
-                        tag.enabled
-                          ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
-                          : "bg-stone-300"
-                      }`}
-                    />
-                    <span>{tag.name}</span>
-
-                    {/* Simple Delete Tag Icon */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteTag(tag.id);
-                      }}
-                      className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0 border-none bg-transparent ml-1"
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Quick Template Chips */}
-              <div className="space-y-1.5 pt-2">
-                <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                  Add Preset Tags
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {COMMON_TAG_TEMPLATES.map((tmpl) => {
-                    const exists = aiTrackingTags.some(t => t.name.toLowerCase() === tmpl.name.toLowerCase());
-                    if (exists) return null;
-                    return (
-                      <button
-                        key={tmpl.name}
-                        type="button"
-                        onClick={() => handleQuickAddTag(tmpl.name)}
-                        className="py-1 px-2.5 rounded-xl border border-dashed border-stone-300 text-[9px] font-bold text-stone-500 hover:text-stone-800 hover:border-stone-400 cursor-pointer bg-transparent transition-colors"
-                      >
-                        + {tmpl.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* STEP 5: NUTRIENTS & MACROS (WITH X/8 ACTIVE SLOTS BADGE & SUBTLE CUSTOM NUTRIENT ADDER) */}
-        {step === 5 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-1">
               <div className="flex items-center justify-center gap-2">
@@ -1139,8 +1087,8 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 6: DAILY VITALS (SIMPLE QUESTION TOGGLES) */}
-        {step === 6 && (
+        {/* STEP 5: DAILY VITALS (SIMPLE QUESTION TOGGLES) */}
+        {step === 5 && (
           <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
@@ -1183,6 +1131,169 @@ export const OnboardingWizard = ({
                   </div>
                 );
               })}
+            </div>
+
+          </div>
+        )}
+
+        {/* STEP 6: DIETARY PREFERENCES & AI TAGS (PILLS + CUSTOM TAG & SEPARATE RULE EDITOR) */}
+        {step === 6 && (
+          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
+            <div className="text-center space-y-0.5">
+              <h2 className="text-xl font-black tracking-tight text-stone-900">
+                Dietary Preferences & Tags
+              </h2>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                  AI Meal Tracking Tags
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomTagForm(!showCustomTagForm)}
+                  className="text-[9px] font-black uppercase text-orange-500 hover:underline border-none bg-transparent cursor-pointer"
+                >
+                  {showCustomTagForm ? "Cancel" : "+ Custom Tag"}
+                </button>
+              </div>
+
+              {/* Custom Tag Form */}
+              {showCustomTagForm && (
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2 animate-fadeIn">
+                  <input
+                    type="text"
+                    placeholder="Tag Name (e.g. Nut Free)"
+                    value={customTagName}
+                    onChange={(e) => setCustomTagName(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-bold text-stone-850 focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="AI rule (e.g. Apply when meal contains no nuts)"
+                    value={customTagRule}
+                    onChange={(e) => setCustomTagRule(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-medium text-stone-700 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateCustomTag}
+                    className="w-full bg-orange-500 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl border-none cursor-pointer"
+                  >
+                    Add Tag
+                  </button>
+                </div>
+              )}
+
+              {/* Tag Pills List */}
+              <div className="flex flex-wrap gap-2.5 py-1">
+                {aiTrackingTags.map((tag) => {
+                  const isEditing = editingTagId === tag.id;
+                  return (
+                    <div
+                      key={tag.id}
+                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-extrabold border transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-3xs ${
+                        tag.enabled
+                          ? isEditing
+                            ? "bg-stone-900 border-stone-900 text-white shadow-sm"
+                            : "bg-emerald-50/80 border-emerald-300/80 text-emerald-950 hover:bg-emerald-100/80"
+                          : "bg-stone-50/70 border-stone-200/80 text-stone-400 hover:border-stone-300 opacity-65 hover:opacity-100"
+                      }`}
+                      onClick={() => toggleAiTag(tag.id)}
+                    >
+                      {/* Glowing Green Dot */}
+                      <span
+                        className={`w-2 h-2 rounded-full transition-all shrink-0 ${
+                          tag.enabled
+                            ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+                            : "bg-stone-300"
+                        }`}
+                      />
+                      <span>{tag.name}</span>
+
+                      {/* Edit Rule Pencil Icon (Separated from toggle) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTagId(isEditing ? null : tag.id);
+                        }}
+                        className={`p-1 rounded-full transition-colors border-none cursor-pointer flex items-center justify-center ml-0.5 ${
+                          isEditing
+                            ? "bg-white/20 text-white"
+                            : "text-stone-400 hover:text-stone-700 bg-transparent"
+                        }`}
+                        title="Edit AI Rule"
+                      >
+                        <Pencil className="w-2.5 h-2.5" />
+                      </button>
+
+                      {/* Delete Tag */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTag(tag.id);
+                        }}
+                        className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0 border-none bg-transparent"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Quick Template Chips */}
+              <div className="space-y-1.5 pt-2">
+                <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                  Add Preset Tags
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {COMMON_TAG_TEMPLATES.map((tmpl) => {
+                    const exists = aiTrackingTags.some(t => t.name.toLowerCase() === tmpl.name.toLowerCase());
+                    if (exists) return null;
+                    return (
+                      <button
+                        key={tmpl.name}
+                        type="button"
+                        onClick={() => handleQuickAddTag(tmpl.name)}
+                        className="py-1 px-2.5 rounded-xl border border-dashed border-stone-300 text-[9px] font-bold text-stone-500 hover:text-stone-800 hover:border-stone-400 cursor-pointer bg-transparent transition-colors"
+                      >
+                        + {tmpl.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Editing Tag AI Rule Modal Box */}
+              {(() => {
+                const activeTag = aiTrackingTags.find(t => t.id === editingTagId);
+                if (!activeTag) return null;
+                return (
+                  <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3.5 space-y-2 mt-2 animate-fadeIn">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">AI Rule for {activeTag.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTagId(null)}
+                        className="text-[9px] font-black text-stone-400 hover:text-stone-600 uppercase border-none bg-transparent cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <textarea
+                      value={activeTag.description}
+                      onChange={(e) => handleUpdateTagDesc(activeTag.id, e.target.value)}
+                      rows={2}
+                      placeholder="Describe guidelines for the AI..."
+                      className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-700 focus:outline-none focus:border-stone-400 placeholder:text-stone-300 resize-none leading-relaxed shadow-3xs"
+                    />
+                  </div>
+                );
+              })()}
             </div>
 
           </div>
