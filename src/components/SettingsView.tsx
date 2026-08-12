@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
-import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw, Sliders, Heart, Mic } from "lucide-react";
+import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw, Sliders, Heart, Mic, ShieldCheck, AlertTriangle, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProUpgradeModal } from "./ProUpgradeModal";
 import { ChatGPTIcon } from "./ChatGPTIcon";
+import { PrivacyPolicyModal } from "./PrivacyPolicyModal";
 import { DEFAULT_CUSTOM_GPT_URL, TELEGRAM_BOT_URL } from "../constants/app";
 
 const getOpenApiYaml = (edgeFunctionUrl: string) => `openapi: 3.1.0
@@ -690,10 +691,33 @@ export const SettingsView = ({
   session: any;
 }) => {
   const [showPro, setShowPro] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "logging" | "gemini" | "floating_widget" | null>(null);
 
   const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gpt-action`;
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const { supabase } = await import("../lib/supabaseClient");
+      if (session?.user?.id) {
+        await supabase.from("meals").delete().eq("user_id", session.user.id);
+        await supabase.from("recipes").delete().eq("user_id", session.user.id);
+        await supabase.from("profiles").delete().eq("id", session.user.id);
+      }
+      triggerToast("Account & all user data permanently deleted.");
+      onLogout();
+    } catch (err) {
+      console.error("Error deleting account:", err);
+      triggerToast("Failed to delete account. Please try signing out.");
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteConfirm(false);
+    }
+  };
 
   // --- Notion States ---
   const [notionKey, setNotionKey] = useState(profileData.notionApiKey || "");
@@ -1964,32 +1988,135 @@ export const SettingsView = ({
           </div>
         </div>
 
+        {/* Privacy & Legal Policies */}
+        <div>
+          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
+            Privacy & Compliance
+          </h3>
+          <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-3">
+            <button
+              type="button"
+              onClick={() => setShowPrivacyModal(true)}
+              className="w-full flex items-center justify-between text-left group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 shrink-0">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-[#1a1a1a] text-xs">
+                    Privacy Policy & Terms
+                  </div>
+                  <div className="text-[9px] text-stone-400 font-semibold leading-tight mt-0.5">
+                    How FitAI protects your health data and AI meal prompts
+                  </div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform shrink-0" />
+            </button>
+          </div>
+        </div>
+
         {/* Account Management */}
         <div>
           <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
             Account Management
           </h3>
-          <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <div className="font-bold text-[#1a1a1a] text-xs">
-                {profileData.username
-                  ? `Logged in as @${profileData.username}`
-                  : session?.user?.email
-                  ? `Signed in as ${session.user.email}`
-                  : "Signed in"}
+          <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="font-bold text-[#1a1a1a] text-xs truncate">
+                  {session?.user?.email
+                    ? `Signed in as ${session.user.email}`
+                    : profileData.name
+                    ? `Signed in as ${profileData.name}`
+                    : "Signed in"}
+                </div>
+                <div className="text-[9px] text-stone-400 font-semibold leading-tight mt-1">
+                  Sign out of your account on this device
+                </div>
               </div>
-              <div className="text-[9px] text-stone-400 font-semibold leading-tight mt-1">
-                Sign out of your account on this device
-              </div>
+              <button
+                onClick={onLogout}
+                className="bg-stone-900 text-white hover:bg-stone-850 text-[9px] font-black uppercase tracking-wider px-4 py-2 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
+              >
+                Logout
+              </button>
             </div>
-            <button
-              onClick={onLogout}
-              className="bg-stone-900 text-white hover:bg-stone-850 text-[9px] font-black uppercase tracking-wider px-4 py-2 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
-            >
-              Logout
-            </button>
+
+            <div className="pt-3 border-t border-stone-100 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="font-bold text-red-600 text-xs flex items-center gap-1.5">
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Account & Data
+                </div>
+                <div className="text-[9px] text-stone-400 font-semibold leading-tight mt-0.5">
+                  Permanently purge all meal logs, recipes, and user profile
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[9px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
+              >
+                Delete Account
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Privacy Policy Modal */}
+        <PrivacyPolicyModal
+          isOpen={showPrivacyModal}
+          onClose={() => setShowPrivacyModal(false)}
+        />
+
+        {/* Delete Account Confirmation Modal */}
+        <AnimatePresence>
+          {showDeleteConfirm && (
+            <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-[2px] flex items-center justify-center p-6 font-sans">
+              <motion.div
+                initial={{ scale: 0.9, y: 15 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 15 }}
+                className="bg-white rounded-[32px] p-6 max-w-sm w-full shadow-2xl border border-stone-100 text-left space-y-4"
+              >
+                <div className="flex items-center gap-3 text-left">
+                  <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-stone-900">Delete entire account?</h3>
+                    <p className="text-[10px] text-stone-400 font-semibold mt-0.5">This action is permanent and cannot be undone.</p>
+                  </div>
+                </div>
+
+                <div className="bg-red-50 border border-red-100 rounded-2xl p-3.5 text-left text-red-900 text-[11px] leading-relaxed font-medium">
+                  This will permanently delete all your logged meals, recipes, macro records, and custom settings from our servers immediately.
+                </div>
+
+                <div className="flex gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    disabled={isDeletingAccount}
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer select-none"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingAccount}
+                    onClick={handleDeleteAccount}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer select-none shadow-md shadow-red-600/20 flex items-center justify-center gap-1.5"
+                  >
+                    {isDeletingAccount ? "Deleting..." : "Purge Everything"}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </>
   );
