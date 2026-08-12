@@ -54,14 +54,6 @@ const FULL_NUTRIENT_CATALOG = [
   { id: "vit_c", name: "Vitamin C", defaultTarget: 90, unit: "mg", color: "#F97316", type: "micro" },
 ];
 
-const COMMON_TAG_TEMPLATES = [
-  { name: "High Protein", description: "Apply when meal contains >= 30g protein" },
-  { name: "Gluten Free", description: "Apply when meal contains no gluten ingredients" },
-  { name: "Keto", description: "Apply when meal contains <= 10g net carbs" },
-  { name: "Intermittent Fasting", description: "Apply during daily eating window" },
-  { name: "Homemade", description: "Apply for home-cooked meals" }
-];
-
 export const OnboardingWizard = ({
   activeProfileId,
   supabase,
@@ -224,16 +216,6 @@ export const OnboardingWizard = ({
 
   const toggleAiTag = (id: string) => {
     setAiTrackingTags(prev => prev.map(t => t.id === id ? { ...t, enabled: !t.enabled } : t));
-  };
-
-  const handleQuickAddTag = (tagName: string) => {
-    const template = COMMON_TAG_TEMPLATES.find(t => t.name === tagName);
-    if (!template) return;
-    if (aiTrackingTags.some(t => t.name.toLowerCase() === tagName.toLowerCase())) return;
-    setAiTrackingTags(prev => [
-      ...prev,
-      { id: `tag_${Date.now()}`, name: template.name, description: template.description, enabled: true }
-    ]);
   };
 
   const handleCreateCustomTag = () => {
@@ -593,7 +575,7 @@ export const OnboardingWizard = ({
   return (
     <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-6 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
       
-      {/* Sleek Header Progress Bar (No Step Text) */}
+      {/* Sleek Header Progress Bar (No Step Text & No Logos) */}
       <div className="w-full flex items-center justify-between gap-4 py-2 border-b border-stone-200/50">
         <button
           onClick={handleBack}
@@ -614,14 +596,11 @@ export const OnboardingWizard = ({
       {/* Steps Content */}
       <div className="flex-1 flex flex-col justify-center py-4">
         
-        {/* STEP 1: YOUR PROFILE (SLEEK BRANDING) */}
+        {/* STEP 1: YOUR PROFILE (NO LOGO BOX — PURE TYPOGRAPHY) */}
         {step === 1 && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col items-center gap-1.5 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center">
-                <span className="text-white text-xl font-black">F</span>
-              </div>
-              <h2 className="text-xl font-black tracking-tight text-stone-900 mt-1">
+              <h2 className="text-2xl font-black tracking-tight text-stone-900">
                 Welcome to FitAI
               </h2>
             </div>
@@ -1136,7 +1115,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 6: DIETARY PREFERENCES & AI TAGS (PILLS + CUSTOM TAG & SEPARATE RULE EDITOR) */}
+        {/* STEP 6: DIETARY PREFERENCES & AI TAGS (NO PRESET SECTION — PILLS + CUSTOM TAG & SEPARATE RULE EDITOR) */}
         {step === 6 && (
           <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-0.5">
@@ -1245,29 +1224,6 @@ export const OnboardingWizard = ({
                 })}
               </div>
 
-              {/* Quick Template Chips */}
-              <div className="space-y-1.5 pt-2">
-                <label className="text-[8px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                  Add Preset Tags
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {COMMON_TAG_TEMPLATES.map((tmpl) => {
-                    const exists = aiTrackingTags.some(t => t.name.toLowerCase() === tmpl.name.toLowerCase());
-                    if (exists) return null;
-                    return (
-                      <button
-                        key={tmpl.name}
-                        type="button"
-                        onClick={() => handleQuickAddTag(tmpl.name)}
-                        className="py-1 px-2.5 rounded-xl border border-dashed border-stone-300 text-[9px] font-bold text-stone-500 hover:text-stone-800 hover:border-stone-400 cursor-pointer bg-transparent transition-colors"
-                      >
-                        + {tmpl.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Editing Tag AI Rule Modal Box */}
               {(() => {
                 const activeTag = aiTrackingTags.find(t => t.id === editingTagId);
@@ -1299,13 +1255,9 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 7: AI PLAN GENERATION ANIMATION */}
+        {/* STEP 7: AI PLAN GENERATION ANIMATION (NO LOGO BOX — SLEEK PROGRESS BAR) */}
         {step === 7 && (
           <div className="space-y-6 animate-fadeIn flex flex-col items-center justify-center text-center py-8">
-            <div className="w-20 h-20 rounded-full bg-orange-500 shadow-2xl shadow-orange-300 flex items-center justify-center animate-pulse">
-              <span className="text-white text-2xl font-black">F</span>
-            </div>
-            
             <div className="space-y-2 max-w-xs">
               <h2 className="text-xl font-black text-stone-900 tracking-tight">
                 Building Your Assistant...
@@ -1324,7 +1276,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 8: PRICING & PLAN REVEAL (3 TIERS: FREE, PLUS, PRO) */}
+        {/* STEP 8: PRICING REVEAL (FREE, PLUS BYOK, PRO MANAGED) */}
         {step === 8 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-1">
@@ -1339,7 +1291,7 @@ export const OnboardingWizard = ({
             {/* 3 Tier Plan Cards */}
             <div className="space-y-3">
               
-              {/* 1. FitAI Pro Option */}
+              {/* 1. FitAI Pro Option (Managed AI) */}
               <div
                 onClick={() => setSelectedPlan("pro")}
                 className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all relative ${
@@ -1358,7 +1310,7 @@ export const OnboardingWizard = ({
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Pro</h4>
-                      <p className="text-[10px] font-bold text-stone-400">Advanced AI & Gut Analytics</p>
+                      <p className="text-[10px] font-bold text-stone-400">Fully Managed AI (All Features Included)</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -1368,9 +1320,9 @@ export const OnboardingWizard = ({
                 </div>
                 <div className="mt-3 pt-3 border-t border-stone-100 space-y-1.5">
                   {[
+                    "All AI Features Hosted Directly From Our Side",
                     "Unlimited AI Photo & Text Meal Logging",
-                    "ChatGPT Auto-Sync & Custom Memories",
-                    "Gut Health & Micro Nutrient Analytics",
+                    "ChatGPT Auto-Sync & Gut Health Analytics",
                   ].map((feat, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-[10px] font-bold text-stone-600">
                       <span>•</span>
@@ -1380,7 +1332,7 @@ export const OnboardingWizard = ({
                 </div>
               </div>
 
-              {/* 2. FitAI Plus Option */}
+              {/* 2. FitAI Plus Option (BYOK Model) */}
               <div
                 onClick={() => setSelectedPlan("plus")}
                 className={`p-4 rounded-[24px] border-2 cursor-pointer transition-all ${
@@ -1396,13 +1348,16 @@ export const OnboardingWizard = ({
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Plus</h4>
-                      <p className="text-[10px] font-bold text-stone-400">AI Photo Logging & Macro Tracker</p>
+                      <p className="text-[10px] font-bold text-stone-400">BYOK Model (Bring Your Own API Key)</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-black text-stone-900">$4.99</span>
                     <span className="text-[9px] text-stone-400 block font-bold">/month</span>
                   </div>
+                </div>
+                <div className="mt-2 text-[9.5px] font-semibold text-stone-500 pl-8">
+                  Unlock all AI features by connecting your own OpenAI / Gemini API key.
                 </div>
               </div>
 
