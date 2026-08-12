@@ -1,23 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
-  Sparkles, 
   Camera, 
   ChevronLeft, 
   Plus, 
   Minus, 
   ArrowRight,
   Check,
-  Zap,
-  Activity,
-  Scale,
-  Droplet,
   Search,
-  X,
-  Flame,
-  Crown,
-  Tag,
-  BookOpen,
-  Utensils
+  X
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -61,6 +51,14 @@ const FULL_NUTRIENT_CATALOG = [
   { id: "magnesium", name: "Magnesium", defaultTarget: 400, unit: "mg", color: "#6366F1", type: "micro" },
   { id: "zinc", name: "Zinc", defaultTarget: 11, unit: "mg", color: "#14B8A6", type: "micro" },
   { id: "vit_c", name: "Vitamin C", defaultTarget: 90, unit: "mg", color: "#F97316", type: "micro" },
+];
+
+const COMMON_TAG_TEMPLATES = [
+  { name: "High Protein", description: "Apply when meal contains >= 30g protein" },
+  { name: "Gluten Free", description: "Apply when meal contains no gluten ingredients" },
+  { name: "Keto", description: "Apply when meal contains <= 10g net carbs" },
+  { name: "Intermittent Fasting", description: "Apply during daily eating window" },
+  { name: "Homemade", description: "Apply for home-cooked meals" }
 ];
 
 const STARTER_RECIPES = [
@@ -168,7 +166,7 @@ export const OnboardingWizard = ({
 
   const [selectedPlan, setSelectedPlan] = useState<"free" | "plus" | "pro">("pro");
 
-  // AI Meal Tracking Tags State (Step 4 - Edit Profile Model)
+  // AI Meal Tracking Tags State (Step 4 - Exact Edit Profile Model with Glowing Dots)
   const [aiTrackingTags, setAiTrackingTags] = useState([
     { id: "tag_hp", name: "High Protein", description: "Apply when meal has >= 30g protein", enabled: true },
     { id: "tag_gf", name: "Gluten Free", description: "Apply when meal contains no gluten ingredients", enabled: false },
@@ -176,6 +174,7 @@ export const OnboardingWizard = ({
     { id: "tag_if", name: "Intermittent Fasting", description: "Apply during daily eating window", enabled: false },
     { id: "tag_home", name: "Homemade", description: "Apply for home-cooked meals", enabled: true }
   ]);
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
 
   // Selected Starter Recipes State (Step 4)
   const [importedRecipeIds, setImportedRecipeIds] = useState<string[]>(["rec_oats", "rec_chicken"]);
@@ -232,7 +231,7 @@ export const OnboardingWizard = ({
 
       const t3 = setTimeout(() => {
         setGenerationProgress(100);
-        setGenerationStatus("✨ 98% Personalization Match Ready!");
+        setGenerationStatus("98% Personalization Match Ready!");
       }, 1800);
 
       const t4 = setTimeout(() => {
@@ -277,19 +276,49 @@ export const OnboardingWizard = ({
     setAiTrackingTags(prev => prev.map(t => t.id === id ? { ...t, enabled: !t.enabled } : t));
   };
 
+  const handleQuickAddTag = (tagName: string) => {
+    const template = COMMON_TAG_TEMPLATES.find(t => t.name === tagName);
+    if (!template) return;
+    if (aiTrackingTags.some(t => t.name.toLowerCase() === tagName.toLowerCase())) return;
+    setAiTrackingTags(prev => [
+      ...prev,
+      { id: `tag_${Date.now()}`, name: template.name, description: template.description, enabled: true }
+    ]);
+  };
+
+  const handleUpdateTagDesc = (id: string, description: string) => {
+    setAiTrackingTags(prev => prev.map(t => t.id === id ? { ...t, description } : t));
+  };
+
+  const handleDeleteTag = (id: string) => {
+    setAiTrackingTags(prev => prev.filter(t => t.id !== id));
+    if (selectedTagId === id) setSelectedTagId(null);
+  };
+
   const toggleImportRecipe = (id: string) => {
     setImportedRecipeIds(prev =>
       prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
     );
   };
 
+  const activeNutrientCount = trackedNutrientList.filter(n => n.enabled).length;
+
   const toggleNutrientEnabled = (id: string) => {
+    const targetItem = trackedNutrientList.find(n => n.id === id);
+    if (targetItem && !targetItem.enabled && activeNutrientCount >= 8) {
+      triggerToast("⚠️ Max 8 active nutrient slots reached!");
+      return;
+    }
     setTrackedNutrientList(prev => 
       prev.map(n => n.id === id ? { ...n, enabled: !n.enabled } : n)
     );
   };
 
   const addNutrientFromCatalog = (item: any) => {
+    if (activeNutrientCount >= 8) {
+      triggerToast("⚠️ Max 8 active nutrient slots reached!");
+      return;
+    }
     const exists = trackedNutrientList.some(n => n.id === item.id);
     if (exists) {
       setTrackedNutrientList(prev => prev.map(n => n.id === item.id ? { ...n, enabled: true } : n));
@@ -624,7 +653,7 @@ export const OnboardingWizard = ({
           <div className="space-y-6 animate-fadeIn">
             <div className="flex flex-col items-center gap-1.5 text-center">
               <div className="w-12 h-12 rounded-2xl bg-orange-500 shadow-xl shadow-orange-200 flex items-center justify-center">
-                <Flame className="text-white w-6 h-6 fill-white" />
+                <span className="text-white text-xl font-black">F</span>
               </div>
               <h2 className="text-xl font-black tracking-tight text-stone-900 mt-1">
                 Welcome to FitAI
@@ -911,7 +940,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 4: AI TRACKING TAGS & STARTER RECIPES (EDIT PROFILE MODEL) */}
+        {/* STEP 4: AI TRACKING TAGS & STARTER RECIPES (EXACT EDIT PROFILE TACTILE PILL MODEL) */}
         {step === 4 && (
           <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-0.5">
@@ -920,52 +949,119 @@ export const OnboardingWizard = ({
               </h2>
             </div>
 
-            {/* AI Meal Tracking Tags Section */}
+            {/* AI Meal Tracking Tags Section (Tactile Pills with Glowing Dots) */}
             <div className="space-y-2.5">
-              <div className="flex items-center gap-2">
-                <Tag className="w-3.5 h-3.5 text-orange-500" />
+              <div className="flex items-center justify-between">
                 <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
                   AI Meal Tracking Tags
                 </label>
               </div>
-              <div className="space-y-2">
-                {aiTrackingTags.map((t) => (
-                  <div
-                    key={t.id}
-                    className={`p-3 rounded-2xl border transition-all flex items-center justify-between shadow-2xs ${
-                      t.enabled ? "bg-white border-stone-200" : "bg-stone-50 border-stone-150 opacity-60"
-                    }`}
-                  >
-                    <div>
-                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">{t.name}</h4>
-                      <p className="text-[10px] font-bold text-stone-400 mt-0.5">{t.description}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleAiTag(t.id)}
-                      className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0 ${
-                        t.enabled ? "bg-orange-500" : "bg-stone-300"
+
+              {/* List of tags as tactile pill buttons */}
+              <div className="flex flex-wrap gap-2 py-1">
+                {aiTrackingTags.map((tag) => {
+                  const isSelected = selectedTagId === tag.id;
+                  return (
+                    <div
+                      key={tag.id}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-extrabold border transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-3xs ${
+                        tag.enabled
+                          ? isSelected
+                            ? "bg-stone-900 border-stone-900 text-white shadow-sm"
+                            : "bg-emerald-50/80 border-emerald-300/80 text-emerald-950 hover:bg-emerald-100/80"
+                          : "bg-stone-50/70 border-stone-200/80 text-stone-400 hover:border-stone-300 opacity-65 hover:opacity-100"
                       }`}
+                      onClick={() => toggleAiTag(tag.id)}
                     >
-                      <div
-                        className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${
-                          t.enabled ? "translate-x-4" : "translate-x-0"
+                      {/* Glowing Green Dot Indicator */}
+                      <span
+                        className={`w-2 h-2 rounded-full transition-all shrink-0 ${
+                          tag.enabled
+                            ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+                            : "bg-stone-300"
                         }`}
                       />
-                    </button>
-                  </div>
-                ))}
+                      <span>{tag.name}</span>
+
+                      {/* Edit AI Rule Trigger */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTagId(isSelected ? null : tag.id);
+                        }}
+                        className="text-[9px] font-black underline opacity-70 hover:opacity-100 border-none bg-transparent cursor-pointer ml-1"
+                      >
+                        {isSelected ? "Close" : "Rule"}
+                      </button>
+
+                      {/* Delete Tag */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTag(tag.id);
+                        }}
+                        className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
+
+              {/* Quick Template Chips */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {COMMON_TAG_TEMPLATES.map((tmpl) => {
+                  const exists = aiTrackingTags.some(t => t.name.toLowerCase() === tmpl.name.toLowerCase());
+                  if (exists) return null;
+                  return (
+                    <button
+                      key={tmpl.name}
+                      type="button"
+                      onClick={() => handleQuickAddTag(tmpl.name)}
+                      className="py-1 px-2.5 rounded-xl border border-dashed border-stone-300 text-[9px] font-bold text-stone-500 hover:text-stone-800 hover:border-stone-400 cursor-pointer bg-transparent transition-colors"
+                    >
+                      + {tmpl.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Tag AI Rule Editor */}
+              {(() => {
+                const activeSelectedTag = aiTrackingTags.find(t => t.id === selectedTagId);
+                if (!activeSelectedTag) return null;
+                return (
+                  <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2 mt-2 animate-fadeIn text-left">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">AI Rule for {activeSelectedTag.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTagId(null)}
+                        className="text-[9px] font-black text-stone-400 hover:text-stone-600 uppercase border-none bg-transparent cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <textarea
+                      value={activeSelectedTag.description}
+                      onChange={(e) => handleUpdateTagDesc(activeSelectedTag.id, e.target.value)}
+                      rows={2}
+                      placeholder="Describe guidelines for the AI..."
+                      className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-700 focus:outline-none focus:border-stone-400 placeholder:text-stone-300 resize-none leading-relaxed shadow-3xs"
+                    />
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* Starter Recipes Section (1-Tap Import) */}
-            <div className="space-y-2.5 pt-2">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-3.5 h-3.5 text-orange-500" />
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
-                  Starter Recipes (1-Tap Import)
-                </label>
-              </div>
+            {/* Starter Recipes Section (Using RecipesView Preview Card Format) */}
+            <div className="space-y-2.5 pt-3 border-t border-stone-100">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
+                Starter Recipes (1-Tap Import to Library)
+              </label>
               <div className="space-y-2">
                 {STARTER_RECIPES.map((rec) => {
                   const imported = importedRecipeIds.includes(rec.id);
@@ -1007,13 +1103,22 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 5: NUTRIENTS & MACROS (MINIMALIST SPACIOUS CARDS) */}
+        {/* STEP 5: NUTRIENTS & MACROS (WITH X/8 ACTIVE SLOTS BADGE & MAX 8 LIMIT) */}
         {step === 5 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
-            <div className="text-center space-y-0.5">
-              <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Nutrient Tracking
-              </h2>
+            <div className="text-center space-y-1">
+              <div className="flex items-center justify-center gap-2">
+                <h2 className="text-xl font-black tracking-tight text-stone-900">
+                  Nutrient Tracking
+                </h2>
+                <span className={`text-[9px] font-black font-mono px-2 py-0.5 rounded-full border ${
+                  activeNutrientCount >= 8
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : "bg-orange-50 text-orange-600 border-orange-200/80"
+                }`}>
+                  {activeNutrientCount}/8 Active Slots
+                </span>
+              </div>
             </div>
 
             {/* Search Dropdown Input */}
@@ -1028,8 +1133,9 @@ export const OnboardingWizard = ({
                     setIsNutrientDropdownOpen(true);
                   }}
                   onFocus={() => setIsNutrientDropdownOpen(true)}
-                  placeholder="+ Add Nutrient (B12, Iron, Sodium, Vit D, Sugar...)"
-                  className="flex-1 bg-transparent border-none text-xs font-bold text-stone-850 placeholder:text-stone-400 focus:outline-none"
+                  placeholder={activeNutrientCount >= 8 ? "Max 8 slots reached" : "+ Add Nutrient (B12, Iron, Sodium, Vit D, Sugar...)"}
+                  disabled={activeNutrientCount >= 8}
+                  className="flex-1 bg-transparent border-none text-xs font-bold text-stone-850 placeholder:text-stone-400 focus:outline-none disabled:opacity-50"
                 />
                 {nutrientSearchQuery && (
                   <button
@@ -1045,7 +1151,11 @@ export const OnboardingWizard = ({
               {/* Dropdown Options List */}
               {isNutrientDropdownOpen && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-stone-200 rounded-2xl shadow-xl z-30 max-h-48 overflow-y-auto p-1.5 space-y-1">
-                  {filteredCatalog.length > 0 ? (
+                  {activeNutrientCount >= 8 ? (
+                    <div className="p-3 text-center text-xs text-amber-700 font-bold bg-amber-50 rounded-xl">
+                      ⚠️ Max 8 active slots reached. Disable a nutrient to add new ones.
+                    </div>
+                  ) : filteredCatalog.length > 0 ? (
                     filteredCatalog.map((item) => (
                       <div
                         key={item.id}
@@ -1177,13 +1287,12 @@ export const OnboardingWizard = ({
             {/* Simple Question Toggles */}
             <div className="space-y-3">
               {[
-                { id: "weight", question: "Track Daily Weight?", desc: "Body weight logs & trendlines", icon: Scale, defaultOn: true },
-                { id: "water", question: "Track Water Intake?", desc: "Daily hydration volume counter", icon: Droplet, defaultOn: false },
-                { id: "digestion", question: "Track Gut & Digestion?", desc: "Bristol stool spectrum & comfort", icon: Activity, defaultOn: false },
-                { id: "energy", question: "Track Daily Energy?", desc: "1 to 5 vitality & mood scale", icon: Zap, defaultOn: false },
+                { id: "weight", question: "Track Daily Weight?", desc: "Body weight logs & trendlines", defaultOn: true },
+                { id: "water", question: "Track Water Intake?", desc: "Daily hydration volume counter", defaultOn: false },
+                { id: "digestion", question: "Track Gut & Digestion?", desc: "Bristol stool spectrum & comfort", defaultOn: false },
+                { id: "energy", question: "Track Daily Energy?", desc: "1 to 5 vitality & mood scale", defaultOn: false },
               ].map((v) => {
                 const active = selectedVitals[v.id as keyof typeof selectedVitals];
-                const IconComponent = v.icon;
                 return (
                   <div
                     key={v.id}
@@ -1194,14 +1303,9 @@ export const OnboardingWizard = ({
                         : "bg-white border-stone-200 hover:border-stone-300"
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${active ? "bg-orange-500 text-white" : "bg-stone-100 text-stone-400"}`}>
-                        <IconComponent className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black text-stone-900 tracking-tight">{v.question}</h4>
-                        <p className="text-[10px] font-bold text-stone-400 mt-0.5">{v.desc}</p>
-                      </div>
+                    <div>
+                      <h4 className="text-xs font-black text-stone-900 tracking-tight">{v.question}</h4>
+                      <p className="text-[10px] font-bold text-stone-400 mt-0.5">{v.desc}</p>
                     </div>
                     
                     {/* Clean YES / NO Toggle Pill */}
@@ -1224,7 +1328,7 @@ export const OnboardingWizard = ({
         {step === 7 && (
           <div className="space-y-6 animate-fadeIn flex flex-col items-center justify-center text-center py-8">
             <div className="w-20 h-20 rounded-full bg-orange-500 shadow-2xl shadow-orange-300 flex items-center justify-center animate-pulse">
-              <Sparkles className="w-10 h-10 text-white fill-white" />
+              <span className="text-white text-2xl font-black">F</span>
             </div>
             
             <div className="space-y-2 max-w-xs">
@@ -1250,7 +1354,6 @@ export const OnboardingWizard = ({
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
             <div className="text-center space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-600 rounded-full text-[10px] font-black uppercase tracking-wider">
-                <Sparkles className="w-3 h-3 fill-orange-500" />
                 Custom Protocol Ready
               </div>
               <h2 className="text-xl font-black tracking-tight text-stone-900">
@@ -1279,10 +1382,7 @@ export const OnboardingWizard = ({
                       {selectedPlan === "pro" && <Check className="w-3 h-3 stroke-[3]" />}
                     </div>
                     <div>
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Pro</h4>
-                        <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                      </div>
+                      <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">FitAI Pro</h4>
                       <p className="text-[10px] font-bold text-stone-400">Advanced AI & Gut Analytics</p>
                     </div>
                   </div>
@@ -1298,7 +1398,7 @@ export const OnboardingWizard = ({
                     "Gut Health & Micro Nutrient Analytics",
                   ].map((feat, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-[10px] font-bold text-stone-600">
-                      <Zap className="w-3 h-3 text-orange-500 fill-orange-500 shrink-0" />
+                      <span>•</span>
                       <span>{feat}</span>
                     </div>
                   ))}
@@ -1377,8 +1477,8 @@ export const OnboardingWizard = ({
             <span>
               {step === totalSteps
                 ? selectedPlan === "free"
-                  ? "🚀 Launch Free FitAI"
-                  : "🚀 Start 7-Day Free Trial"
+                  ? "Launch Free FitAI"
+                  : "Start 7-Day Free Trial"
                 : "Continue"}
             </span>
             {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
