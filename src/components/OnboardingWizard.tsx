@@ -61,54 +61,18 @@ const COMMON_TAG_TEMPLATES = [
   { name: "Homemade", description: "Apply for home-cooked meals" }
 ];
 
-const STARTER_RECIPES = [
+const DEFAULT_STARTER_RECIPES = [
   {
-    id: "rec_oats",
-    name: "High Protein Berry Oats",
-    calories: 380,
-    protein: 32,
-    carbs: 45,
-    fats: 8,
-    fiber: 9,
+    id: "rec_idly",
+    name: "Idly & Sambar",
+    calories: 240,
+    protein: 12,
+    carbs: 42,
+    fats: 4,
+    fiber: 5,
     category: "Breakfast",
-    tag: "High Protein",
-    ingredients: ["Rolled Oats (60g)", "Whey Protein (30g)", "Mixed Berries (50g)", "Almond Milk (200ml)"]
-  },
-  {
-    id: "rec_chicken",
-    name: "Chicken & Quinoa Bowl",
-    calories: 520,
-    protein: 45,
-    carbs: 48,
-    fats: 14,
-    fiber: 7,
-    category: "Lunch",
-    tag: "High Protein",
-    ingredients: ["Grilled Chicken Breast (180g)", "Cooked Quinoa (120g)", "Steamed Broccoli (100g)", "Olive Oil (10ml)"]
-  },
-  {
-    id: "rec_beef",
-    name: "Beef & Broccoli Stir-Fry",
-    calories: 460,
-    protein: 40,
-    carbs: 35,
-    fats: 16,
-    fiber: 6,
-    category: "Dinner",
-    tag: "High Protein",
-    ingredients: ["Lean Flank Steak (160g)", "Fresh Broccoli (150g)", "Brown Rice (100g)", "Soy Sauce (15ml)"]
-  },
-  {
-    id: "rec_smoothie",
-    name: "Avocado Protein Smoothie",
-    calories: 310,
-    protein: 28,
-    carbs: 22,
-    fats: 12,
-    fiber: 8,
-    category: "Snack",
-    tag: "Gluten Free",
-    ingredients: ["Whey Protein (30g)", "Ripe Avocado (50g)", "Baby Spinach (30g)", "Unsweetened Almond Milk (250ml)"]
+    tag: "Homemade",
+    ingredients: ["Steamed Rice & Lentil Idly (2 pcs)", "Vegetable Sambar (150ml)"]
   }
 ];
 
@@ -176,8 +140,21 @@ export const OnboardingWizard = ({
   ]);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
 
-  // Selected Starter Recipes State (Step 4)
-  const [importedRecipeIds, setImportedRecipeIds] = useState<string[]>(["rec_oats", "rec_chicken"]);
+  // Custom Tag Creation state
+  const [showCustomTagForm, setShowCustomTagForm] = useState(false);
+  const [customTagName, setCustomTagName] = useState("");
+  const [customTagRule, setCustomTagRule] = useState("");
+
+  // Starter Recipes State (Step 4)
+  const [recipeList, setRecipeList] = useState(DEFAULT_STARTER_RECIPES);
+  const [importedRecipeIds, setImportedRecipeIds] = useState<string[]>(["rec_idly"]);
+
+  // Custom Recipe Creation state
+  const [showAddRecipeForm, setShowAddRecipeForm] = useState(false);
+  const [customRecName, setCustomRecName] = useState("");
+  const [customRecCal, setCustomRecCal] = useState(300);
+  const [customRecProtein, setCustomRecProtein] = useState(25);
+  const [customRecCategory, setCustomRecCategory] = useState<"Breakfast" | "Lunch" | "Dinner" | "Snack">("Lunch");
 
   // Vitals Selection State (Step 6)
   const [selectedVitals, setSelectedVitals] = useState({
@@ -286,6 +263,23 @@ export const OnboardingWizard = ({
     ]);
   };
 
+  const handleCreateCustomTag = () => {
+    const trimmed = customTagName.trim();
+    if (!trimmed) return;
+    setAiTrackingTags(prev => [
+      ...prev,
+      {
+        id: `tag_${Date.now()}`,
+        name: trimmed,
+        description: customTagRule.trim() || `Apply when meal meets ${trimmed} guidelines`,
+        enabled: true
+      }
+    ]);
+    setCustomTagName("");
+    setCustomTagRule("");
+    setShowCustomTagForm(false);
+  };
+
   const handleUpdateTagDesc = (id: string, description: string) => {
     setAiTrackingTags(prev => prev.map(t => t.id === id ? { ...t, description } : t));
   };
@@ -299,6 +293,29 @@ export const OnboardingWizard = ({
     setImportedRecipeIds(prev =>
       prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
     );
+  };
+
+  const handleCreateCustomRecipe = () => {
+    const trimmed = customRecName.trim();
+    if (!trimmed) return;
+    const newId = `rec_${Date.now()}`;
+    const newRecipe = {
+      id: newId,
+      name: trimmed,
+      calories: customRecCal,
+      protein: customRecProtein,
+      carbs: Math.round(customRecCal * 0.4 / 4),
+      fats: Math.round(customRecCal * 0.25 / 9),
+      fiber: 5,
+      category: customRecCategory,
+      tag: "Custom",
+      ingredients: [trimmed]
+    };
+    setRecipeList(prev => [...prev, newRecipe]);
+    setImportedRecipeIds(prev => [...prev, newId]);
+    setCustomRecName("");
+    setShowAddRecipeForm(false);
+    triggerToast(`Added ${trimmed} to recipes!`);
   };
 
   const activeNutrientCount = trackedNutrientList.filter(n => n.enabled).length;
@@ -336,6 +353,28 @@ export const OnboardingWizard = ({
         }
       ]);
     }
+    setNutrientSearchQuery("");
+    setIsNutrientDropdownOpen(false);
+  };
+
+  const handleAddCustomNutrient = () => {
+    if (activeNutrientCount >= 8) {
+      triggerToast("⚠️ Max 8 active nutrient slots reached!");
+      return;
+    }
+    const trimmed = nutrientSearchQuery.trim();
+    if (!trimmed) return;
+    const customId = `custom_${Date.now()}`;
+    const newNutrient = {
+      id: customId,
+      name: trimmed,
+      target: 100,
+      unit: "mg",
+      color: "#F97316",
+      enabled: true,
+      type: "micro"
+    };
+    setTrackedNutrientList(prev => [...prev, newNutrient]);
     setNutrientSearchQuery("");
     setIsNutrientDropdownOpen(false);
   };
@@ -560,7 +599,7 @@ export const OnboardingWizard = ({
     }
 
     // Insert imported starter recipes into user's recipes table if enabled
-    const importedRecipes = STARTER_RECIPES.filter(r => importedRecipeIds.includes(r.id));
+    const importedRecipes = recipeList.filter(r => importedRecipeIds.includes(r.id));
     for (const rec of importedRecipes) {
       await supabase.from('user_recipes').insert({
         user_id: activeProfileId,
@@ -955,7 +994,41 @@ export const OnboardingWizard = ({
                 <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
                   AI Meal Tracking Tags
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setShowCustomTagForm(!showCustomTagForm)}
+                  className="text-[9px] font-black uppercase text-orange-500 hover:underline border-none bg-transparent cursor-pointer"
+                >
+                  {showCustomTagForm ? "Cancel" : "+ Custom Tag"}
+                </button>
               </div>
+
+              {/* Custom Tag Creator Form */}
+              {showCustomTagForm && (
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2 animate-fadeIn">
+                  <input
+                    type="text"
+                    placeholder="Tag Name (e.g. Nut Free)"
+                    value={customTagName}
+                    onChange={(e) => setCustomTagName(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-bold text-stone-850 focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="AI rule (e.g. Apply when meal contains no nuts)"
+                    value={customTagRule}
+                    onChange={(e) => setCustomTagRule(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-medium text-stone-700 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateCustomTag}
+                    className="w-full bg-orange-500 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl border-none cursor-pointer"
+                  >
+                    Add Tag
+                  </button>
+                </div>
+              )}
 
               {/* List of tags as tactile pill buttons */}
               <div className="flex flex-wrap gap-2 py-1">
@@ -1002,7 +1075,7 @@ export const OnboardingWizard = ({
                           e.stopPropagation();
                           handleDeleteTag(tag.id);
                         }}
-                        className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0"
+                        className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0 border-none bg-transparent"
                       >
                         <X className="w-2.5 h-2.5" />
                       </button>
@@ -1059,11 +1132,74 @@ export const OnboardingWizard = ({
 
             {/* Starter Recipes Section (Using RecipesView Preview Card Format) */}
             <div className="space-y-2.5 pt-3 border-t border-stone-100">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
-                Starter Recipes (1-Tap Import to Library)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
+                  Starter Recipes (1-Tap Import)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddRecipeForm(!showAddRecipeForm)}
+                  className="text-[9px] font-black uppercase text-orange-500 hover:underline border-none bg-transparent cursor-pointer"
+                >
+                  {showAddRecipeForm ? "Cancel" : "+ Create Recipe"}
+                </button>
+              </div>
+
+              {/* Custom Recipe Creator Inline Form */}
+              {showAddRecipeForm && (
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2 animate-fadeIn">
+                  <input
+                    type="text"
+                    placeholder="Recipe Name (e.g. Masala Dosa)"
+                    value={customRecName}
+                    onChange={(e) => setCustomRecName(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-bold text-stone-850 focus:outline-none"
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[8px] font-black text-stone-400 uppercase">Calories</label>
+                      <input
+                        type="number"
+                        value={customRecCal}
+                        onChange={(e) => setCustomRecCal(parseInt(e.target.value) || 0)}
+                        className="w-full bg-white border border-stone-200 rounded-xl px-2 py-1 text-xs font-bold text-stone-850 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[8px] font-black text-stone-400 uppercase">Protein (g)</label>
+                      <input
+                        type="number"
+                        value={customRecProtein}
+                        onChange={(e) => setCustomRecProtein(parseInt(e.target.value) || 0)}
+                        className="w-full bg-white border border-stone-200 rounded-xl px-2 py-1 text-xs font-bold text-stone-850 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[8px] font-black text-stone-400 uppercase">Category</label>
+                      <select
+                        value={customRecCategory}
+                        onChange={(e) => setCustomRecCategory(e.target.value as any)}
+                        className="w-full bg-white border border-stone-200 rounded-xl px-1 py-1 text-xs font-bold text-stone-850 focus:outline-none"
+                      >
+                        <option value="Breakfast">Breakfast</option>
+                        <option value="Lunch">Lunch</option>
+                        <option value="Dinner">Dinner</option>
+                        <option value="Snack">Snack</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreateCustomRecipe}
+                    className="w-full bg-orange-500 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl border-none cursor-pointer"
+                  >
+                    Save & Import Recipe
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-2">
-                {STARTER_RECIPES.map((rec) => {
+                {recipeList.map((rec) => {
                   const imported = importedRecipeIds.includes(rec.id);
                   return (
                     <div
@@ -1103,7 +1239,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 5: NUTRIENTS & MACROS (WITH X/8 ACTIVE SLOTS BADGE & MAX 8 LIMIT) */}
+        {/* STEP 5: NUTRIENTS & MACROS (WITH X/8 ACTIVE SLOTS BADGE & SUBTLE CUSTOM NUTRIENT ADDER) */}
         {step === 5 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-1">
@@ -1155,24 +1291,33 @@ export const OnboardingWizard = ({
                     <div className="p-3 text-center text-xs text-amber-700 font-bold bg-amber-50 rounded-xl">
                       ⚠️ Max 8 active slots reached. Disable a nutrient to add new ones.
                     </div>
-                  ) : filteredCatalog.length > 0 ? (
-                    filteredCatalog.map((item) => (
-                      <div
-                        key={item.id}
-                        onClick={() => addNutrientFromCatalog(item)}
-                        className="flex items-center justify-between p-2.5 hover:bg-stone-50 rounded-xl cursor-pointer transition-colors"
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-stone-800">{item.name}</span>
-                          <span className="text-[9px] font-medium text-stone-400">Default target: {item.defaultTarget} {item.unit}</span>
-                        </div>
-                        <Plus className="w-4 h-4 text-orange-500" />
-                      </div>
-                    ))
                   ) : (
-                    <div className="p-3 text-center text-xs text-stone-400 font-bold">
-                      No matching nutrients found
-                    </div>
+                    <>
+                      {filteredCatalog.map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => addNutrientFromCatalog(item)}
+                          className="flex items-center justify-between p-2.5 hover:bg-stone-50 rounded-xl cursor-pointer transition-colors"
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-stone-800">{item.name}</span>
+                            <span className="text-[9px] font-medium text-stone-400">Default target: {item.defaultTarget} {item.unit}</span>
+                          </div>
+                          <Plus className="w-4 h-4 text-orange-500" />
+                        </div>
+                      ))}
+
+                      {/* Subtle Low-Emphasis Custom Nutrient Adder at Bottom */}
+                      {nutrientSearchQuery.trim() && !filteredCatalog.some(f => f.name.toLowerCase() === nutrientSearchQuery.trim().toLowerCase()) && (
+                        <div
+                          onClick={handleAddCustomNutrient}
+                          className="p-2.5 hover:bg-stone-50 rounded-xl cursor-pointer transition-colors text-[10px] font-bold text-stone-400 border-t border-stone-100 flex items-center justify-between"
+                        >
+                          <span>+ Add "{nutrientSearchQuery}" as Custom Nutrient</span>
+                          <Plus className="w-3 h-3 text-stone-400" />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
