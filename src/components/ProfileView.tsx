@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import {
   BookOpen, BarChart2, Target, Search, Filter, X, Utensils,
   Plus, Minus, Sparkles, Check, Info, Scale, Ruler, Database, Camera,
-  User, Smile, ChevronDown, Wand2,
+  User, Smile, ChevronDown, Wand2, Clock, Flame, Calendar
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -832,8 +832,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                     <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none z-10" />
 
                     {/* Top Left: Recipe Badge */}
-                    <div className="absolute top-1.5 left-1.5 bg-orange-500/90 backdrop-blur-[4px] border border-white/10 px-1.5 py-0.5 rounded-md text-[7.5px] font-black text-white uppercase tracking-wider z-20 shadow-sm flex items-center gap-0.5">
-                      <span>📖</span> Recipe
+                    <div className="absolute top-1.5 left-1.5 bg-black/45 backdrop-blur-[4px] border border-white/15 px-1.5 py-0.5 rounded-md text-[7.5px] font-black text-white/90 uppercase tracking-widest z-20 shadow-sm">
+                      Recipe
                     </div>
 
                     {/* Top Right: Calories Badge */}
@@ -846,7 +846,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                         {recipe.name}
                       </span>
                       <span className="text-[7px] text-orange-200/90 font-black uppercase tracking-wider mt-0.5">
-                        ⏱️ {recipe.time} {recipe.log_count ? `• Logged ${recipe.log_count}x` : ""}
+                        {recipe.time} {recipe.log_count ? `• Logged ${recipe.log_count}x` : ""}
                       </span>
                     </div>
                   </motion.div>
@@ -1060,9 +1060,9 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                 <div className="flex-1 overflow-y-auto pr-0.5 space-y-3 min-h-[250px]">
                   {isGeneratingRecipe ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
-                      <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-3xl shadow-sm relative">
+                      <div className="w-16 h-16 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shadow-sm relative">
                         <div className="absolute inset-0 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-                        🍳
+                        <Utensils className="w-7 h-7" />
                       </div>
                       <div>
                         <h4 className="font-extrabold text-sm text-[#1a1a1a]">Drafting Gourmet Recipe...</h4>
@@ -1073,7 +1073,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                     </div>
                   ) : filteredLogsForRecipe.length === 0 ? (
                     <div className="text-center py-16 space-y-3">
-                      <div className="text-3xl">🗓️</div>
+                      <Calendar className="w-8 h-8 text-stone-300 mx-auto" />
                       <h5 className="font-extrabold text-xs text-stone-700">
                         {logSearchQuery ? "No Matches Found" : "No Meals Logged Yet"}
                       </h5>
@@ -1096,8 +1096,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                               {meal.image && !hasNoGeneratedImage(meal.image) ? (
                                 <img src={meal.image} className="w-full h-full object-cover" alt={meal.name} />
                               ) : (
-                                <div className="w-full h-full bg-orange-50/55 flex items-center justify-center text-lg select-none">
-                                  {getMealEmoji(meal.name, meal.type)}
+                                <div className="w-full h-full bg-orange-50/55 flex items-center justify-center text-orange-500 select-none">
+                                  <Utensils className="w-5 h-5" />
                                 </div>
                               )}
                             </div>
@@ -1116,8 +1116,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                               </div>
                             </div>
                           </div>
-                          <span className="bg-orange-50 text-orange-600 border border-orange-100 hover:bg-orange-100 rounded-lg text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 shrink-0 transition-colors">
-                            ✨ Convert
+                          <span className="bg-orange-50 text-orange-600 border border-orange-100 hover:bg-orange-100 rounded-lg text-[9px] font-black uppercase tracking-wider px-2.5 py-1.5 shrink-0 transition-colors flex items-center gap-1">
+                            <Wand2 className="w-2.5 h-2.5" /> Convert
                           </span>
                         </div>
                       ))}
@@ -1150,7 +1150,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                 transition={{ type: "spring", damping: 26, stiffness: 240 }}
                 className="relative w-full max-w-[448px] bg-stone-50 rounded-t-[36px] overflow-hidden flex flex-col max-h-[85vh] shadow-2xl z-10 border-t border-white/20 text-left font-sans"
               >
-                {/* Hero Image / Emoji Banner */}
+                {/* Hero Image / Banner */}
                 <div className="h-44 w-full relative shrink-0 bg-stone-900">
                   {selectedMealPopup.image && !hasNoGeneratedImage(selectedMealPopup.image) ? (
                     <img
@@ -1159,10 +1159,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                       alt={selectedMealPopup.name}
                     />
                   ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-stone-850 via-stone-900 to-stone-950 flex items-center justify-center">
-                      <span className="text-6xl filter drop-shadow-md opacity-90 select-none">
-                        {getMealEmoji(selectedMealPopup.name, selectedMealPopup.type)}
-                      </span>
+                    <div className="absolute inset-0 bg-gradient-to-br from-stone-850 via-stone-900 to-stone-950 flex items-center justify-center text-orange-500">
+                      <Utensils className="w-12 h-12" />
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/40 to-black/20 pointer-events-none" />
@@ -1174,7 +1172,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                     </span>
                     <button
                       onClick={() => setSelectedMealPopup(null)}
-                      className="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-md transition-all cursor-pointer active:scale-95"
+                      className="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-md transition-all cursor-pointer active:scale-95 border-none"
                     >
                       <X className="w-4 h-4 text-white" />
                     </button>
@@ -1197,8 +1195,9 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                     <h3 className="text-white text-lg font-black leading-tight tracking-tight drop-shadow-sm font-sans">
                       {selectedMealPopup.name}
                     </h3>
-                    <p className="text-[10px] text-orange-200/90 font-bold font-sans mt-0.5 flex items-center gap-1.5">
-                      <span>🗓️ {selectedMealPopup.date ? new Date(selectedMealPopup.date + "T00:00:00").toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : 'Past Log'}</span>
+                    <p className="text-[10px] text-orange-200/90 font-bold font-sans mt-0.5 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-orange-200" />
+                      <span>{selectedMealPopup.date ? new Date(selectedMealPopup.date + "T00:00:00").toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : 'Past Log'}</span>
                     </p>
                   </div>
                 </div>
@@ -1211,8 +1210,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                       <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest">
                         Macronutrient Density
                       </span>
-                      <span className="text-xs font-black text-orange-600 font-mono">
-                        🔥 {selectedMealPopup.calories} kcal
+                      <span className="text-xs font-black text-orange-600 font-mono flex items-center gap-1">
+                        <Flame className="w-3.5 h-3.5 text-orange-500" /> {selectedMealPopup.calories} kcal
                       </span>
                     </div>
 

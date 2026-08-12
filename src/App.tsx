@@ -253,6 +253,16 @@ export default function App() {
     null,
   );
   const [isDataLoading, setIsDataLoading] = useState(false);
+
+  // Safety timer: Never allow isDataLoading to lock the user interface for more than 3.5 seconds
+  useEffect(() => {
+    if (isDataLoading) {
+      const timer = setTimeout(() => {
+        setIsDataLoading(false);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [isDataLoading]);
   const [isEditingRecipe, setIsEditingRecipe] = useState(false);
   const [editPopupName, setEditPopupName] = useState("");
   const [editPopupTime, setEditPopupTime] = useState("");
@@ -367,9 +377,11 @@ export default function App() {
       trackWeight: true,
       trackWater: false,
       trackDigestion: false,
+      trackEnergy: false,
+      trackBloating: true,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     },
-    preferences: ["Gluten Free", "Keto"],
+    preferences: ["Gluten Free", "Keto", "onboarded"],
     goals: {
       dailyCalories: 2000,
       weightGoal: 75,
@@ -480,27 +492,31 @@ export default function App() {
 
   const [dailyNotes, setDailyNotes] = useState<DailyWellness[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem("fitai_daily_notes") || "[]");
+      const key = activeProfileId ? `fitai_daily_notes_${activeProfileId}` : "fitai_daily_notes";
+      return JSON.parse(localStorage.getItem(key) || "[]");
     } catch (_) {
       return [];
     }
   });
 
   useEffect(() => {
-    localStorage.setItem("fitai_daily_notes", JSON.stringify(dailyNotes));
-  }, [dailyNotes]);
+    if (!activeProfileId) return;
+    localStorage.setItem(`fitai_daily_notes_${activeProfileId}`, JSON.stringify(dailyNotes));
+  }, [dailyNotes, activeProfileId]);
 
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem("fitai_weight_logs") || "[]");
+      const key = activeProfileId ? `fitai_weight_logs_${activeProfileId}` : "fitai_weight_logs";
+      return JSON.parse(localStorage.getItem(key) || "[]");
     } catch (_) {
       return [];
     }
   });
 
   useEffect(() => {
-    localStorage.setItem("fitai_weight_logs", JSON.stringify(weightLogs));
-  }, [weightLogs]);
+    if (!activeProfileId) return;
+    localStorage.setItem(`fitai_weight_logs_${activeProfileId}`, JSON.stringify(weightLogs));
+  }, [weightLogs, activeProfileId]);
 
   const [loginUsername, setLoginUsername] = useState("");
   const [session, setSession] = useState<any>(null);
@@ -514,7 +530,7 @@ export default function App() {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [showWalkthrough, setShowWalkthrough] = useState(false);
   const [isVitalsLogOpen, setIsVitalsLogOpen] = useState(false);
-  const [activeVitalsTab, setActiveVitalsTab] = useState<"weight" | "water" | "digestion" | "energy" | null>(null);
+  const [activeVitalsTab, setActiveVitalsTab] = useState<"weight" | "water" | "digestion" | "energy" | "bloating" | null>(null);
   const [expandedCardLogs, setExpandedCardLogs] = useState<{ [key: string]: boolean }>({ weight: true });
 
   // Password Recovery States
@@ -912,23 +928,22 @@ export default function App() {
       
       let resolvedSession = initialSession;
       
-      // 2. If no initial session, but it is an OAuth callback or we have a local token,
-      // wait a brief period for onAuthStateChange to deliver the session.
-      if (!resolvedSession) {
-        const hasLocalToken = !!localStorage.getItem("sb-twrjigbbgioqdpwvkblo-auth-token");
-        const isOAuth = isOAuthCallback();
-        if (hasLocalToken || isOAuth) {
-          // Wait up to 1.5 seconds for the session to be resolved
-          let count = 0;
-          while (count < 15 && isMounted) {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-              resolvedSession = session;
-              break;
-            }
-            await new Promise(resolve => setTimeout(resolve, 100));
-            count++;
+      const hasStoredAuth = Object.keys(localStorage).some(
+        k => (k.startsWith("sb-") && k.endsWith("-auth-token")) || k === "fitai_active_profile_id"
+      );
+
+      // 2. If no initial session, but stored auth exists or it is OAuth callback,
+      // wait for onAuthStateChange / getSession to resolve.
+      if (!resolvedSession && (hasStoredAuth || isOAuthCallback())) {
+        let count = 0;
+        while (count < 20 && isMounted) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            resolvedSession = session;
+            break;
           }
+          await new Promise(resolve => setTimeout(resolve, 100));
+          count++;
         }
       }
 
@@ -936,10 +951,18 @@ export default function App() {
 
       if (resolvedSession?.user) {
         setIsDataLoading(true);
-        await handleUserAuthenticated(resolvedSession.user);
+        try {
+          await handleUserAuthenticated(resolvedSession.user);
+        } catch (err) {
+          console.error("Error authenticating resolved user:", err);
+        } finally {
+          setIsDataLoading(false);
+        }
       } else {
-        setActiveProfileId(null);
-        localStorage.removeItem("fitai_active_profile_id");
+        const storedProfileId = localStorage.getItem("fitai_active_profile_id");
+        if (!hasStoredAuth && !storedProfileId) {
+          setActiveProfileId(null);
+        }
       }
 
       if (isMounted) {
@@ -961,7 +984,13 @@ export default function App() {
       } else if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
         if (session?.user) {
           setIsDataLoading(true);
-          await handleUserAuthenticated(session.user);
+          try {
+            await handleUserAuthenticated(session.user);
+          } catch (err) {
+            console.error("Error authenticating session user:", err);
+          } finally {
+            setIsDataLoading(false);
+          }
           if (window.location.hash.includes("access_token") || window.location.pathname === "/login") {
             window.history.replaceState(null, "", "/");
             setCurrentPath("/");
@@ -1387,7 +1416,8 @@ export default function App() {
             .select('*')
             .eq('profile_id', activeProfileId);
           if (!error && data) {
-            setDailyNotes(data);
+            const parsedWellness = data.map(parseWellnessRow);
+            setDailyNotes(parsedWellness);
           }
         }
       )
@@ -2032,9 +2062,10 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     const waterLogs = existing?.water_logs || [];
     const stoolLogs = existing?.stool_logs || [];
     const energyLogs = existing?.energy_logs || [];
-    const hasLog = existing && (existing.water_intake || existing.stool_type !== null || waterLogs.length > 0 || stoolLogs.length > 0 || energyLogs.length > 0);
+    const bloatingLogs = existing?.bloating_logs || [];
+    const hasLog = existing && (existing.water_intake || existing.stool_type !== null || waterLogs.length > 0 || stoolLogs.length > 0 || energyLogs.length > 0 || bloatingLogs.length > 0);
     const textTrimmed = text.replace(/\s*<!-- FIT_WELLNESS_META: [\s\S]*? -->/g, "").trim();
-    const formattedNotes = embedWellnessMeta(textTrimmed, waterLogs, stoolLogs, energyLogs);
+    const formattedNotes = embedWellnessMeta(textTrimmed, waterLogs, stoolLogs, energyLogs, bloatingLogs);
     
     const updatedNotes = [...dailyNotes.filter(n => n.date !== dateStr)];
     if (textTrimmed || hasLog) {
@@ -2060,22 +2091,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     if (isSupabaseConfigured && activeProfileId) {
       try {
         if (textTrimmed || hasLog) {
-          await supabase.from("daily_wellness").upsert({
-            profile_id: activeProfileId,
-            date: dateStr,
-            notes: formattedNotes,
-            water_intake: existing ? (existing.water_intake || 0) : 0,
-            water_logs: waterLogs,
-            stool_type: existing ? existing.stool_type : null,
-            stool_size: existing ? existing.stool_size : null,
-            stool_logs: stoolLogs,
-            energy_level: existing ? existing.energy_level : null,
-            energy_logs: energyLogs,
-            weight_log_time: existing ? existing.weight_log_time : null,
-            water_log_time: existing ? existing.water_log_time : null,
-            stool_log_time: existing ? existing.stool_log_time : null,
-            energy_log_time: existing ? existing.energy_log_time : null
-          }, { onConflict: "profile_id,date" });
+          const payload = buildCompleteWellnessPayload(dateStr, { notes: formattedNotes });
+          await supabase.from("daily_wellness").upsert(payload, { onConflict: "profile_id,date" });
         } else {
           // Delete note if cleared and no other log exists
           await supabase.from("daily_wellness").delete().eq("profile_id", activeProfileId).eq("date", dateStr);
@@ -2328,8 +2345,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
-  // --- ROUTING HANDLERS ---
-  const isOnboarded = !!profileData.preferences?.includes("onboarded");
+  const isOnboarded =
+    !!profileData.preferences?.includes("onboarded") ||
+    (activeProfileId
+      ? localStorage.getItem(`fitai_onboarded_${activeProfileId}`) === "true"
+      : true);
 
   // "/" is the main app — no more Redirecting... screen needed
 
@@ -2569,13 +2589,21 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     notesText: string,
     waterLogs: any[],
     stoolLogs: any[],
-    energyLogs: any[]
+    energyLogs: any[],
+    bloatingLogs?: any[]
   ): string => {
+    const existingMeta = extractWellnessMeta(notesText);
+    const resolvedBloatingLogs =
+      bloatingLogs !== undefined
+        ? bloatingLogs
+        : existingMeta?.bloating_logs || [];
+
     const cleanNotes = (notesText || "").replace(/\s*<!-- FIT_WELLNESS_META: [\s\S]*? -->/g, "").trim();
     const metaObj = {
       water_logs: waterLogs,
       stool_logs: stoolLogs,
-      energy_logs: energyLogs
+      energy_logs: energyLogs,
+      bloating_logs: resolvedBloatingLogs
     };
     return cleanNotes ? `${cleanNotes}\n\n<!-- FIT_WELLNESS_META: ${JSON.stringify(metaObj)} -->` : `<!-- FIT_WELLNESS_META: ${JSON.stringify(metaObj)} -->`;
   };
@@ -2597,6 +2625,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     let waterLogs = Array.isArray(row.water_logs) && row.water_logs.length > 0 ? row.water_logs : [];
     let stoolLogs = Array.isArray(row.stool_logs) && row.stool_logs.length > 0 ? row.stool_logs : [];
     let energyLogs = Array.isArray(row.energy_logs) && row.energy_logs.length > 0 ? row.energy_logs : [];
+    let bloatingLogs = Array.isArray(row.bloating_logs) && row.bloating_logs.length > 0 ? row.bloating_logs : [];
 
     const meta = row.notes ? extractWellnessMeta(row.notes) : null;
     if (meta) {
@@ -2609,13 +2638,58 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       if (!energyLogs.length && Array.isArray(meta.energy_logs) && meta.energy_logs.length > 0) {
         energyLogs = meta.energy_logs;
       }
+      if (!bloatingLogs.length && Array.isArray(meta.bloating_logs) && meta.bloating_logs.length > 0) {
+        bloatingLogs = meta.bloating_logs;
+      }
     }
+
+    const lastStool = stoolLogs.length > 0 ? stoolLogs[stoolLogs.length - 1] : null;
+    const derivedStoolType = row.stool_type ?? (lastStool ? lastStool.type : null);
+    const derivedStoolTime = row.stool_log_time ?? (lastStool ? lastStool.time : null);
+
+    const lastEnergy = energyLogs.length > 0 ? energyLogs[energyLogs.length - 1] : null;
+    const derivedEnergyLevel = row.energy_level ?? (lastEnergy ? lastEnergy.level : null);
+    const derivedEnergyTime = row.energy_log_time ?? (lastEnergy ? lastEnergy.time : null);
+
+    const lastBloat = bloatingLogs.length > 0 ? bloatingLogs[bloatingLogs.length - 1] : null;
+    const derivedBloatLevel = row.bloating_level ?? (lastBloat ? lastBloat.level : null);
+    const derivedBloatTime = row.bloating_log_time ?? (lastBloat ? lastBloat.time : null);
 
     return {
       ...row,
       water_logs: waterLogs,
       stool_logs: stoolLogs,
-      energy_logs: energyLogs
+      energy_logs: energyLogs,
+      bloating_logs: bloatingLogs,
+      stool_type: derivedStoolType,
+      stool_log_time: derivedStoolTime,
+      energy_level: derivedEnergyLevel,
+      energy_log_time: derivedEnergyTime,
+      bloating_level: derivedBloatLevel,
+      bloating_log_time: derivedBloatTime
+    };
+  };
+
+  const buildCompleteWellnessPayload = (dateStr: string, overrides: Partial<DailyWellness>) => {
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    const notesText = overrides.notes !== undefined ? overrides.notes : (existing ? existing.notes : "");
+    const waterLogs = overrides.water_logs !== undefined ? overrides.water_logs : (existing?.water_logs || []);
+    const stoolLogs = overrides.stool_logs !== undefined ? overrides.stool_logs : (existing?.stool_logs || []);
+    const energyLogs = overrides.energy_logs !== undefined ? overrides.energy_logs : (existing?.energy_logs || []);
+    const bloatingLogs = overrides.bloating_logs !== undefined ? overrides.bloating_logs : (existing?.bloating_logs || []);
+
+    const syncedNotes = embedWellnessMeta(notesText, waterLogs, stoolLogs, energyLogs, bloatingLogs);
+
+    const weightLogToday = weightLogs.find(w => w.date === dateStr);
+    const weightTime = weightLogToday ? weightLogToday.log_time : null;
+
+    return {
+      profile_id: activeProfileId,
+      date: dateStr,
+      notes: syncedNotes,
+      water_intake: overrides.water_intake !== undefined ? overrides.water_intake : (existing?.water_intake || 0),
+      water_log_time: overrides.water_log_time !== undefined ? overrides.water_log_time : (existing?.water_log_time || null),
+      weight_log_time: overrides.weight_log_time !== undefined ? overrides.weight_log_time : (existing?.weight_log_time || weightTime || null),
     };
   };
 
@@ -2699,30 +2773,17 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
 
     // 4. Sync to daily wellness notes
-    const existingWellness = dailyNotes.find(n => n.date === dateStr);
-    const waterVal = existingWellness ? (existingWellness.water_intake || 0) : 0;
-    const stoolVal = existingWellness ? existingWellness.stool_type : null;
-    const stoolTime = existingWellness ? existingWellness.stool_log_time : null;
-    const notesText = existingWellness ? existingWellness.notes : "";
-    const syncedNotes = syncWellnessLogsToNotes(notesText, weight, timeToLog, waterVal, stoolVal, stoolTime);
-
+    const payload = buildCompleteWellnessPayload(dateStr, { weight_log_time: timeToLog });
     const { data: wellnessData } = await supabase
       .from("daily_wellness")
-      .upsert({
-        profile_id: activeProfileId,
-        date: dateStr,
-        notes: syncedNotes,
-        water_intake: waterVal,
-        stool_type: stoolVal,
-        weight_log_time: timeToLog,
-        stool_log_time: stoolTime
-      }, { onConflict: "profile_id,date" })
+      .upsert(payload, { onConflict: "profile_id,date" })
       .select();
 
     if (wellnessData && wellnessData[0]) {
       setDailyNotes(prev => {
         const filtered = prev.filter(n => n.date !== dateStr);
-        const updated = [...filtered, wellnessData[0]];
+        const parsed = parseWellnessRow(wellnessData[0]);
+        const updated = [...filtered, parsed];
         try {
           localStorage.setItem("fitai_daily_notes", JSON.stringify(updated));
         } catch (_) {}
@@ -2765,30 +2826,17 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
 
     // Sync to notes
-    const existingWellness = dailyNotes.find(n => n.date === dateStr);
-    const waterVal = existingWellness ? (existingWellness.water_intake || 0) : 0;
-    const stoolVal = existingWellness ? existingWellness.stool_type : null;
-    const stoolTime = existingWellness ? existingWellness.stool_log_time : null;
-    const notesText = existingWellness ? existingWellness.notes : "";
-    const syncedNotes = syncWellnessLogsToNotes(notesText, null, null, waterVal, stoolVal, stoolTime);
-
+    const payload = buildCompleteWellnessPayload(dateStr, { weight_log_time: null });
     const { data: wellnessData } = await supabase
       .from("daily_wellness")
-      .upsert({
-        profile_id: activeProfileId,
-        date: dateStr,
-        notes: syncedNotes,
-        water_intake: waterVal,
-        stool_type: stoolVal,
-        weight_log_time: null,
-        stool_log_time: stoolTime
-      }, { onConflict: "profile_id,date" })
+      .upsert(payload, { onConflict: "profile_id,date" })
       .select();
 
     if (wellnessData && wellnessData[0]) {
       setDailyNotes(prev => {
         const filtered = prev.filter(n => n.date !== dateStr);
-        return [...filtered, wellnessData[0]];
+        const parsed = parseWellnessRow(wellnessData[0]);
+        return [...filtered, parsed];
       });
     }
 
@@ -2806,6 +2854,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     const currentEnergyTime = existing ? existing.energy_log_time : null;
     const currentStoolLogs = existing?.stool_logs || [];
     const currentEnergyLogs = existing?.energy_logs || [];
+    const currentBloatingLogs = existing?.bloating_logs || [];
 
     const weightLogToday = weightLogs.find(w => w.date === dateStr);
     const weightVal = weightLogToday ? weightLogToday.weight : null;
@@ -2827,27 +2876,16 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       newTotalWater = updatedWaterLogs.reduce((acc, item) => acc + (item.amount || 0), 0);
     }
 
-    const syncedNotes = embedWellnessMeta(notesText, updatedWaterLogs, currentStoolLogs, currentEnergyLogs);
+    const payload = buildCompleteWellnessPayload(dateStr, {
+      water_intake: newTotalWater,
+      water_log_time: waterTime,
+      water_logs: updatedWaterLogs
+    });
 
     let upsertedData: any = null;
     let { data, error } = await supabase
       .from("daily_wellness")
-      .upsert(
-        {
-          profile_id: activeProfileId,
-          date: dateStr,
-          notes: syncedNotes,
-          water_intake: newTotalWater,
-          water_log_time: waterTime,
-          water_logs: updatedWaterLogs,
-          stool_type: currentStoolType,
-          weight_log_time: weightTime,
-          stool_log_time: currentStoolTime,
-          energy_level: currentEnergyLevel,
-          energy_log_time: currentEnergyTime
-        },
-        { onConflict: "profile_id,date" }
-      )
+      .upsert(payload, { onConflict: "profile_id,date" })
       .select();
 
     upsertedData = data;
@@ -2856,16 +2894,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       console.warn("Retrying water log with fallback payload:", error.message);
       const fallbackRes = await supabase
         .from("daily_wellness")
-        .upsert(
-          {
-            profile_id: activeProfileId,
-            date: dateStr,
-            notes: syncedNotes,
-            water_intake: newTotalWater,
-            stool_type: currentStoolType,
-          },
-          { onConflict: "profile_id,date" }
-        )
+        .upsert(payload, { onConflict: "profile_id,date" })
         .select();
 
       if (!fallbackRes.error) {
@@ -2874,23 +2903,17 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
 
     const dbRow = (upsertedData && upsertedData[0]) || {};
-    const loggedRow: DailyWellness = {
+    const loggedRow: DailyWellness = parseWellnessRow({
+      ...existing,
       ...dbRow,
       id: dbRow.id || existing?.id || crypto.randomUUID(),
       profile_id: activeProfileId,
       date: dateStr,
-      notes: syncedNotes,
+      notes: payload.notes,
       water_intake: newTotalWater,
       water_log_time: waterTime,
-      water_logs: updatedWaterLogs,
-      stool_type: currentStoolType,
-      stool_logs: currentStoolLogs,
-      weight_log_time: weightTime,
-      stool_log_time: currentStoolTime,
-      energy_level: currentEnergyLevel,
-      energy_log_time: currentEnergyTime,
-      energy_logs: currentEnergyLogs
-    };
+      water_logs: updatedWaterLogs
+    });
 
     setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), loggedRow]);
 
@@ -2910,29 +2933,25 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     const existingWaterLogs = existing.water_logs || [];
     const updatedWaterLogs = existingWaterLogs.filter(item => item.id !== itemId);
     const newTotalWater = updatedWaterLogs.reduce((acc, item) => acc + (item.amount || 0), 0);
-    const syncedNotes = embedWellnessMeta(existing.notes, updatedWaterLogs, existing.stool_logs || [], existing.energy_logs || []);
+
+    const payload = buildCompleteWellnessPayload(dateStr, {
+      water_intake: newTotalWater,
+      water_logs: updatedWaterLogs
+    });
 
     const { data } = await supabase
       .from("daily_wellness")
-      .upsert({
-        profile_id: activeProfileId,
-        date: dateStr,
-        notes: syncedNotes,
-        water_intake: newTotalWater,
-        water_logs: updatedWaterLogs,
-        stool_type: existing.stool_type,
-        energy_level: existing.energy_level
-      }, { onConflict: "profile_id,date" })
+      .upsert(payload, { onConflict: "profile_id,date" })
       .select();
 
     const dbRow = (data && data[0]) || {};
-    const updatedRow: DailyWellness = {
+    const updatedRow: DailyWellness = parseWellnessRow({
       ...existing,
       ...dbRow,
-      notes: syncedNotes,
+      notes: payload.notes,
       water_intake: newTotalWater,
       water_logs: updatedWaterLogs
-    };
+    });
 
     setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), updatedRow]);
     showToast("💧 Water entry removed");
@@ -2942,17 +2961,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     if (!activeProfileId) return;
 
     const existing = dailyNotes.find(n => n.date === dateStr);
-    const notesText = existing ? existing.notes : "";
-    const currentWater = existing ? (existing.water_intake || 0) : 0;
-    const currentWaterLogs = existing?.water_logs || [];
-    const currentEnergyLevel = existing ? existing.energy_level : null;
-    const currentEnergyLogs = existing?.energy_logs || [];
-
     const timeToLog = stoolType !== null ? (logTime !== undefined ? logTime : (draftStoolTime || new Date().toTimeString().slice(0, 5))) : null;
-
-    const weightLogToday = weightLogs.find(w => w.date === dateStr);
-    const weightVal = weightLogToday ? weightLogToday.weight : null;
-    const weightTime = weightLogToday ? weightLogToday.log_time : null;
 
     const existingStoolLogs = existing?.stool_logs || [];
     let updatedStoolLogs: any[] = [];
@@ -2967,25 +2976,17 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       activeType = stoolType;
     }
 
-    const syncedNotes = embedWellnessMeta(notesText, currentWaterLogs, updatedStoolLogs, currentEnergyLogs);
+    const payload = buildCompleteWellnessPayload(dateStr, {
+      stool_type: activeType,
+      stool_size: stoolSize,
+      stool_log_time: timeToLog,
+      stool_logs: updatedStoolLogs
+    });
 
     let upsertedData: any = null;
     let { data, error } = await supabase
       .from("daily_wellness")
-      .upsert(
-        {
-          profile_id: activeProfileId,
-          date: dateStr,
-          notes: syncedNotes,
-          water_intake: currentWater,
-          stool_type: activeType,
-          stool_size: stoolSize,
-          stool_logs: updatedStoolLogs,
-          weight_log_time: weightTime,
-          stool_log_time: timeToLog
-        },
-        { onConflict: "profile_id,date" }
-      )
+      .upsert(payload, { onConflict: "profile_id,date" })
       .select();
 
     upsertedData = data;
@@ -2994,16 +2995,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       console.warn("Retrying digestion log with fallback payload:", error.message);
       const fallbackRes = await supabase
         .from("daily_wellness")
-        .upsert(
-          {
-            profile_id: activeProfileId,
-            date: dateStr,
-            notes: syncedNotes,
-            water_intake: currentWater,
-            stool_type: activeType,
-          },
-          { onConflict: "profile_id,date" }
-        )
+        .upsert(payload, { onConflict: "profile_id,date" })
         .select();
 
       if (!fallbackRes.error) {
@@ -3012,22 +3004,18 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
 
     const dbRow = (upsertedData && upsertedData[0]) || {};
-    const loggedRow: DailyWellness = {
+    const loggedRow: DailyWellness = parseWellnessRow({
+      ...existing,
       ...dbRow,
       id: dbRow.id || existing?.id || crypto.randomUUID(),
       profile_id: activeProfileId,
       date: dateStr,
-      notes: syncedNotes,
-      water_intake: currentWater,
-      water_logs: currentWaterLogs,
+      notes: payload.notes,
       stool_type: activeType,
       stool_size: stoolSize,
-      stool_logs: updatedStoolLogs,
-      weight_log_time: weightTime,
       stool_log_time: timeToLog,
-      energy_level: currentEnergyLevel,
-      energy_logs: currentEnergyLogs
-    };
+      stool_logs: updatedStoolLogs
+    });
 
     setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), loggedRow]);
 
@@ -3049,29 +3037,27 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     const lastItem = updatedStoolLogs[updatedStoolLogs.length - 1];
     const newStoolType = lastItem ? lastItem.type : null;
     const newStoolTime = lastItem ? lastItem.time : null;
-    const syncedNotes = embedWellnessMeta(existing.notes, existing.water_logs || [], updatedStoolLogs, existing.energy_logs || []);
 
-    const { data } = await supabase
-      .from("daily_wellness")
-      .upsert({
-        profile_id: activeProfileId,
-        date: dateStr,
-        notes: syncedNotes,
-        stool_type: newStoolType,
-        stool_log_time: newStoolTime,
-        stool_logs: updatedStoolLogs
-      }, { onConflict: "profile_id,date" })
-      .select();
-
-    const dbRow = (data && data[0]) || {};
-    const updatedRow: DailyWellness = {
-      ...existing,
-      ...dbRow,
-      notes: syncedNotes,
+    const payload = buildCompleteWellnessPayload(dateStr, {
       stool_type: newStoolType,
       stool_log_time: newStoolTime,
       stool_logs: updatedStoolLogs
-    };
+    });
+
+    const { data } = await supabase
+      .from("daily_wellness")
+      .upsert(payload, { onConflict: "profile_id,date" })
+      .select();
+
+    const dbRow = (data && data[0]) || {};
+    const updatedRow: DailyWellness = parseWellnessRow({
+      ...existing,
+      ...dbRow,
+      notes: payload.notes,
+      stool_type: newStoolType,
+      stool_log_time: newStoolTime,
+      stool_logs: updatedStoolLogs
+    });
 
     setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), updatedRow]);
     showToast("🧻 Digestion log entry removed");
@@ -3081,18 +3067,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     if (!activeProfileId) return;
 
     const existing = dailyNotes.find(n => n.date === dateStr);
-    const notesText = existing ? existing.notes : "";
-    const currentWater = existing ? (existing.water_intake || 0) : 0;
-    const currentWaterLogs = existing?.water_logs || [];
-    const currentStoolType = existing ? existing.stool_type : null;
-    const currentStoolTime = existing ? existing.stool_log_time : null;
-    const currentStoolLogs = existing?.stool_logs || [];
-
     const timeToLog = energyLevel !== null ? (logTime !== undefined ? logTime : (draftEnergyTime || new Date().toTimeString().slice(0, 5))) : null;
-
-    const weightLogToday = weightLogs.find(w => w.date === dateStr);
-    const weightVal = weightLogToday ? weightLogToday.weight : null;
-    const weightTime = weightLogToday ? weightLogToday.log_time : null;
 
     const existingEnergyLogs = existing?.energy_logs || [];
     let updatedEnergyLogs: any[] = [];
@@ -3107,26 +3082,16 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       activeLevel = energyLevel;
     }
 
-    const syncedNotes = embedWellnessMeta(notesText, currentWaterLogs, currentStoolLogs, updatedEnergyLogs);
+    const payload = buildCompleteWellnessPayload(dateStr, {
+      energy_level: activeLevel,
+      energy_log_time: timeToLog,
+      energy_logs: updatedEnergyLogs
+    });
 
     let upsertedEnergyData: any = null;
     let { data: energyResData, error: energyError } = await supabase
       .from("daily_wellness")
-      .upsert(
-        {
-          profile_id: activeProfileId,
-          date: dateStr,
-          notes: syncedNotes,
-          water_intake: currentWater,
-          stool_type: currentStoolType,
-          weight_log_time: weightTime,
-          stool_log_time: currentStoolTime,
-          energy_level: activeLevel,
-          energy_log_time: timeToLog,
-          energy_logs: updatedEnergyLogs
-        },
-        { onConflict: "profile_id,date" }
-      )
+      .upsert(payload, { onConflict: "profile_id,date" })
       .select();
 
     upsertedEnergyData = energyResData;
@@ -3135,16 +3100,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       console.warn("Retrying energy log with fallback payload:", energyError.message);
       const fallbackRes = await supabase
         .from("daily_wellness")
-        .upsert(
-          {
-            profile_id: activeProfileId,
-            date: dateStr,
-            notes: syncedNotes,
-            water_intake: currentWater,
-            stool_type: currentStoolType,
-          },
-          { onConflict: "profile_id,date" }
-        )
+        .upsert(payload, { onConflict: "profile_id,date" })
         .select();
 
       if (!fallbackRes.error) {
@@ -3153,22 +3109,17 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
 
     const dbRow = (upsertedEnergyData && upsertedEnergyData[0]) || {};
-    const loggedRow: DailyWellness = {
+    const loggedRow: DailyWellness = parseWellnessRow({
+      ...existing,
       ...dbRow,
       id: dbRow.id || existing?.id || crypto.randomUUID(),
       profile_id: activeProfileId,
       date: dateStr,
-      notes: syncedNotes,
-      water_intake: currentWater,
-      water_logs: currentWaterLogs,
-      stool_type: currentStoolType,
-      stool_logs: currentStoolLogs,
-      weight_log_time: weightTime,
-      stool_log_time: currentStoolTime,
+      notes: payload.notes,
       energy_level: activeLevel,
       energy_log_time: timeToLog,
       energy_logs: updatedEnergyLogs
-    };
+    });
 
     setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), loggedRow]);
 
@@ -3190,32 +3141,156 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     const lastItem = updatedEnergyLogs[updatedEnergyLogs.length - 1];
     const newEnergyLevel = lastItem ? lastItem.level : null;
     const newEnergyTime = lastItem ? lastItem.time : null;
-    const syncedNotes = embedWellnessMeta(existing.notes, existing.water_logs || [], existing.stool_logs || [], updatedEnergyLogs);
 
-    const { data } = await supabase
-      .from("daily_wellness")
-      .upsert({
-        profile_id: activeProfileId,
-        date: dateStr,
-        notes: syncedNotes,
-        energy_level: newEnergyLevel,
-        energy_log_time: newEnergyTime,
-        energy_logs: updatedEnergyLogs
-      }, { onConflict: "profile_id,date" })
-      .select();
-
-    const dbRow = (data && data[0]) || {};
-    const updatedRow: DailyWellness = {
-      ...existing,
-      ...dbRow,
-      notes: syncedNotes,
+    const payload = buildCompleteWellnessPayload(dateStr, {
       energy_level: newEnergyLevel,
       energy_log_time: newEnergyTime,
       energy_logs: updatedEnergyLogs
-    };
+    });
+
+    const { data } = await supabase
+      .from("daily_wellness")
+      .upsert(payload, { onConflict: "profile_id,date" })
+      .select();
+
+    const dbRow = (data && data[0]) || {};
+    const updatedRow: DailyWellness = parseWellnessRow({
+      ...existing,
+      ...dbRow,
+      notes: payload.notes,
+      energy_level: newEnergyLevel,
+      energy_log_time: newEnergyTime,
+      energy_logs: updatedEnergyLogs
+    });
 
     setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), updatedRow]);
     showToast("⚡ Vitality log entry removed");
+  };
+
+  const handleLogBloating = async (bloatingLevel: number | null, dateStr: string, logTime?: string | null) => {
+    if (!activeProfileId) return;
+
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    const timeToLog = bloatingLevel !== null ? (logTime !== undefined ? logTime : new Date().toTimeString().slice(0, 5)) : null;
+
+    const existingBloatingLogs = existing?.bloating_logs || [];
+    let updatedBloatingLogs: any[] = [];
+    let activeLevel = bloatingLevel;
+
+    if (bloatingLevel === null) {
+      updatedBloatingLogs = [];
+      activeLevel = null;
+    } else {
+      const newItem = { id: crypto.randomUUID(), level: bloatingLevel, time: timeToLog || new Date().toTimeString().slice(0, 5) };
+      updatedBloatingLogs = [...existingBloatingLogs, newItem];
+      activeLevel = bloatingLevel;
+    }
+
+    const payload = buildCompleteWellnessPayload(dateStr, {
+      bloating_level: activeLevel,
+      bloating_log_time: timeToLog,
+      bloating_logs: updatedBloatingLogs
+    });
+
+    let upsertedBloatingData: any = null;
+    let { data: bloatResData, error: bloatError } = await supabase
+      .from("daily_wellness")
+      .upsert(payload, { onConflict: "profile_id,date" })
+      .select();
+
+    upsertedBloatingData = bloatResData;
+
+    if (bloatError) {
+      console.warn("Retrying bloating log with fallback payload:", bloatError.message);
+      const fallbackRes = await supabase
+        .from("daily_wellness")
+        .upsert(payload, { onConflict: "profile_id,date" })
+        .select();
+
+      if (!fallbackRes.error) {
+        upsertedBloatingData = fallbackRes.data;
+      }
+    }
+
+    const dbRow = (upsertedBloatingData && upsertedBloatingData[0]) || {};
+    const loggedRow: DailyWellness = parseWellnessRow({
+      ...existing,
+      ...dbRow,
+      id: dbRow.id || existing?.id || crypto.randomUUID(),
+      profile_id: activeProfileId,
+      date: dateStr,
+      notes: payload.notes,
+      bloating_level: activeLevel,
+      bloating_log_time: timeToLog,
+      bloating_logs: updatedBloatingLogs
+    });
+
+    setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), loggedRow]);
+
+    if (bloatingLevel === null) {
+      showToast("✨ Bloating log removed");
+    } else {
+      showToast("🎈 Gut comfort logged successfully");
+    }
+  };
+
+  const handleDeleteBloatingLogItem = async (itemId: string, dateStr: string) => {
+    if (!activeProfileId) return;
+
+    const existing = dailyNotes.find(n => n.date === dateStr);
+    if (!existing) return;
+
+    const existingBloatingLogs = existing.bloating_logs || [];
+    const updatedBloatingLogs = existingBloatingLogs.filter(item => item.id !== itemId);
+    const lastItem = updatedBloatingLogs[updatedBloatingLogs.length - 1];
+    const newBloatingLevel = lastItem ? lastItem.level : null;
+    const newBloatingTime = lastItem ? lastItem.time : null;
+
+    const payload = buildCompleteWellnessPayload(dateStr, {
+      bloating_level: newBloatingLevel,
+      bloating_log_time: newBloatingTime,
+      bloating_logs: updatedBloatingLogs
+    });
+
+    let upsertedData: any = null;
+    let { data, error } = await supabase
+      .from("daily_wellness")
+      .upsert(payload, { onConflict: "profile_id,date" })
+      .select();
+
+    upsertedData = data;
+
+    if (error) {
+      console.warn("Retrying bloating log delete with fallback payload:", error.message);
+      const fallbackRes = await supabase
+        .from("daily_wellness")
+        .upsert(
+          {
+            profile_id: activeProfileId,
+            date: dateStr,
+            notes: payload.notes,
+          },
+          { onConflict: "profile_id,date" }
+        )
+        .select();
+
+      if (!fallbackRes.error) {
+        upsertedData = fallbackRes.data;
+      }
+    }
+
+    const dbRow = (upsertedData && upsertedData[0]) || {};
+    const updatedRow: DailyWellness = parseWellnessRow({
+      ...existing,
+      ...dbRow,
+      notes: payload.notes,
+      bloating_level: newBloatingLevel,
+      bloating_log_time: newBloatingTime,
+      bloating_logs: updatedBloatingLogs
+    });
+
+    setDailyNotes(prev => [...prev.filter(n => n.date !== dateStr), updatedRow]);
+    showToast("🎈 Bloating log entry removed");
   };
 
 
@@ -3386,6 +3461,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               handleDeleteStoolLogItem={handleDeleteStoolLogItem}
               handleLogEnergy={handleLogEnergy}
               handleDeleteEnergyLogItem={handleDeleteEnergyLogItem}
+              handleLogBloating={handleLogBloating}
+              handleDeleteBloatingLogItem={handleDeleteBloatingLogItem}
               DAILY_WATER_GOAL_ML={DAILY_WATER_GOAL_ML}
             />
 
@@ -3421,7 +3498,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
 
 
-            {/* Daily Wellness Journal Section */}
+            {/* Daily Wellness Journal Section (Commented out for v2)
             <section className="px-6 mt-10 mb-28 relative z-10">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
@@ -3443,6 +3520,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 trackingTags={profileData.tracking_tags || []}
               />
             </section>
+            */}
           </motion.div>
         )}
         {activeTab === "settings" && (
@@ -4417,6 +4495,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         handleDeleteStoolLogItem={handleDeleteStoolLogItem}
         handleLogEnergy={handleLogEnergy}
         handleDeleteEnergyLogItem={handleDeleteEnergyLogItem}
+        handleLogBloating={handleLogBloating}
+        handleDeleteBloatingLogItem={handleDeleteBloatingLogItem}
       />
 
       {/* Bottom Navigation */}

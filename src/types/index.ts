@@ -33,6 +33,12 @@ export interface EnergyLogItem {
   time: string;
 }
 
+export interface BloatingLogItem {
+  id: string;
+  level: number;
+  time: string;
+}
+
 export interface DailyWellness {
   id?: string;
   profile_id?: string;
@@ -42,13 +48,16 @@ export interface DailyWellness {
   stool_type?: number | null;
   stool_size?: string | null;
   energy_level?: number | null;
+  bloating_level?: number | null;
   weight_log_time?: string | null;
   water_log_time?: string | null;
   stool_log_time?: string | null;
   energy_log_time?: string | null;
+  bloating_log_time?: string | null;
   water_logs?: WaterLogItem[];
   stool_logs?: StoolLogItem[];
   energy_logs?: EnergyLogItem[];
+  bloating_logs?: BloatingLogItem[];
   created_at?: string;
 }
 
@@ -88,6 +97,7 @@ export interface AgentConfig {
   trackWater?: boolean;
   trackDigestion?: boolean;
   trackEnergy?: boolean;
+  trackBloating?: boolean;
   customInstructions?: string;
 }
 

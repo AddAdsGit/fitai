@@ -483,6 +483,7 @@ export const OnboardingWizard = ({
       trackWater: selectedVitals.water,
       trackDigestion: selectedVitals.digestion,
       trackEnergy: selectedVitals.energy,
+      trackBloating: selectedVitals.bloating ?? true,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     };
 

@@ -30,7 +30,7 @@ export function Header({ currentStreak, profileData, setActiveTab }: HeaderProps
           whileHover={{ scale: 1.05 }}
           className="flex items-center gap-1.5 bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-orange-100/50"
         >
-          <span className="text-orange-500 text-lg">🔥</span>
+          <Flame className="w-4 h-4 text-orange-500 fill-orange-500" />
           <span className="font-bold text-orange-900">{currentStreak}</span>
         </motion.div>
         <button

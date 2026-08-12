@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import {
   Scale,
   Droplet,
@@ -11,7 +12,8 @@ import {
   List,
 } from "lucide-react";
 import { cn } from "../lib/utils";
-import { BristolStoolIcon, GutIcon } from "./BristolStoolIcons";
+import { BristolStoolIcon, GutIcon, BloatingIcon, BloatingStomachIcon } from "./BristolStoolIcons";
+import { UniversalVitalLogCard } from "./UniversalVitalLogCard";
 import { Profile, DailyWellness, WeightLog } from "../types";
 
 export interface DailyVitalsSectionProps {
@@ -22,17 +24,18 @@ export interface DailyVitalsSectionProps {
   weightLogs: WeightLog[];
   isVitalsLogOpen: boolean;
   setIsVitalsLogOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
-  activeVitalsTab: "weight" | "water" | "digestion" | "energy" | null;
+  activeVitalsTab: "weight" | "water" | "digestion" | "energy" | "bloating" | null;
   setActiveVitalsTab: (
     tab:
       | "weight"
       | "water"
       | "digestion"
       | "energy"
+      | "bloating"
       | null
       | ((
-          prev: "weight" | "water" | "digestion" | "energy" | null
-        ) => "weight" | "water" | "digestion" | "energy" | null)
+          prev: "weight" | "water" | "digestion" | "energy" | "bloating" | null
+        ) => "weight" | "water" | "digestion" | "energy" | "bloating" | null)
   ) => void;
   draftWeight: number | null;
   setDraftWeight: (w: number | null) => void;
@@ -59,7 +62,7 @@ export interface DailyVitalsSectionProps {
   triggerWeightStepping: () => void;
   triggerWaterStepping: () => void;
   setTimePickerTarget: (
-    target: "weight" | "water" | "digestion" | "energy"
+    target: "weight" | "water" | "digestion" | "energy" | "bloating"
   ) => void;
   setTimePickerInitialTime: (time: string) => void;
   setIsTimePickerOpen: (open: boolean) => void;
@@ -88,6 +91,12 @@ export interface DailyVitalsSectionProps {
     time?: string
   ) => Promise<void>;
   handleDeleteEnergyLogItem: (itemId: string, date: string) => Promise<void>;
+  handleLogBloating: (
+    level: number | null,
+    date: string,
+    time?: string
+  ) => Promise<void>;
+  handleDeleteBloatingLogItem: (itemId: string, date: string) => Promise<void>;
   DAILY_WATER_GOAL_ML: number;
 }
 
@@ -136,13 +145,16 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
   handleDeleteStoolLogItem,
   handleLogEnergy,
   handleDeleteEnergyLogItem,
+  handleLogBloating,
+  handleDeleteBloatingLogItem,
   DAILY_WATER_GOAL_ML,
 }) => {
   if (
     !profileData.agent_config?.trackWeight &&
     !profileData.agent_config?.trackWater &&
     !profileData.agent_config?.trackDigestion &&
-    !profileData.agent_config?.trackEnergy
+    !profileData.agent_config?.trackEnergy &&
+    !profileData.agent_config?.trackBloating
   ) {
     return null;
   }
@@ -152,11 +164,40 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
   const waterIntake = wellnessToday?.water_intake || 0;
   const stoolType = wellnessToday?.stool_type ?? null;
   const energyLevel = wellnessToday?.energy_level ?? null;
+  const bloatingLevel = wellnessToday?.bloating_level ?? null;
 
   const isWeightActive = profileData.agent_config?.trackWeight ?? true;
   const isWaterActive = profileData.agent_config?.trackWater ?? true;
   const isDigestionActive = profileData.agent_config?.trackDigestion ?? true;
   const isEnergyActive = profileData.agent_config?.trackEnergy ?? true;
+  const isBloatingActive = profileData.agent_config?.trackBloating ?? true;
+
+  // Calculate average weight from active logged days (per AGENTS.md Rule 2)
+  const avgWeightData = React.useMemo(() => {
+    if (!weightLogs || weightLogs.length === 0) return null;
+    const sum = weightLogs.reduce((acc, curr) => acc + curr.weight, 0);
+    const avg = (sum / weightLogs.length).toFixed(1);
+    return { avg, count: weightLogs.length };
+  }, [weightLogs]);
+
+  const [localDraftBloating, setLocalDraftBloating] = useState<number | null>(null);
+  const [localDraftBloatingTime, setLocalDraftBloatingTime] = useState<string>("");
+  const [localIsBloatingSliding, setLocalIsBloatingSliding] = useState<boolean>(false);
+
+  // Auto-open input controls for single active vital (e.g. Weight, Water, Digestion, Energy, Bloating)
+  useEffect(() => {
+    const activeList = [
+      isWeightActive && "weight",
+      isWaterActive && "water",
+      isDigestionActive && "digestion",
+      isEnergyActive && "energy",
+      isBloatingActive && "bloating",
+    ].filter(Boolean) as Array<"weight" | "water" | "digestion" | "energy" | "bloating">;
+
+    if (activeList.length === 1 && activeVitalsTab !== activeList[0]) {
+      setActiveVitalsTab(activeList[0]);
+    }
+  }, [isWeightActive, isWaterActive, isDigestionActive, isEnergyActive, isBloatingActive, activeVitalsTab, setActiveVitalsTab]);
 
   // Sync/reset local draft states whenever dailyNotes, weightLogs, or selectedDate updates
   useEffect(() => {
@@ -164,6 +205,8 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
     setDraftWater(null);
     setDraftStoolType(null);
     setDraftEnergy(null);
+    setLocalDraftBloating(null);
+    setLocalDraftBloatingTime("");
   }, [dailyNotes, weightLogs, selectedDate]);
 
   const getNowTimeStr = () => new Date().toTimeString().slice(0, 5);
@@ -207,17 +250,32 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
         ]
       : [];
 
+  const bloatingLogsList =
+    wellnessToday?.bloating_logs && wellnessToday.bloating_logs.length > 0
+      ? wellnessToday.bloating_logs
+      : bloatingLevel !== null
+      ? [
+          {
+            id: "legacy-bloating",
+            level: bloatingLevel,
+            time: wellnessToday?.bloating_log_time || getNowTimeStr(),
+          },
+        ]
+      : [];
+
   const totalLoggedVitals =
     (isWeightActive && weightTodayLog ? 1 : 0) +
     (isWaterActive ? waterLogsList.length : 0) +
     (isDigestionActive ? stoolLogsList.length : 0) +
-    (isEnergyActive ? energyLogsList.length : 0);
+    (isEnergyActive ? energyLogsList.length : 0) +
+    (isBloatingActive ? bloatingLogsList.length : 0);
 
   const activeWeightTime =
     draftWeightTime || weightTodayLog?.log_time || getNowTimeStr();
   const currentWater = draftWater ?? waterIntake;
   const activeType = draftStoolType ?? stoolType ?? 4;
   const currentEnergy = draftEnergy ?? energyLevel ?? 3;
+  const currentBloating = localDraftBloating ?? bloatingLevel ?? 1;
 
   const activeWaterTime =
     draftWaterTime || wellnessToday?.water_log_time || getNowTimeStr();
@@ -225,16 +283,71 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
     draftStoolTime || wellnessToday?.stool_log_time || getNowTimeStr();
   const activeEnergyTime =
     draftEnergyTime || wellnessToday?.energy_log_time || getNowTimeStr();
+  const activeBloatingTime =
+    localDraftBloatingTime || wellnessToday?.bloating_log_time || getNowTimeStr();
+
+  const getBloatingDescription = (level: number) => {
+    if (level === 1) return "Level 1: Normal & comfortable — Zero bloating 🍃";
+    if (level === 2) return "Level 2: Mild tightness / Slight fullness after food 🟡";
+    if (level === 3) return "Level 3: Moderate bloating & noticeable belly pressure 🟠";
+    return "Level 4: Severe swelling, tight balloon distension 🔴";
+  };
 
   const formatInterestingTime = (timeStr?: string | null) => {
     if (!timeStr) return null;
+    if (!timeStr.includes(":")) return timeStr;
     const [hStr, mStr] = timeStr.split(":");
+    if (!hStr || !mStr) return timeStr;
     const h = parseInt(hStr, 10);
     if (isNaN(h)) return timeStr;
     const ampm = h >= 12 ? "PM" : "AM";
     const h12 = h % 12 || 12;
     return `${h12}:${mStr} ${ampm}`;
   };
+
+  const activeVitalsList = [
+    isWeightActive && {
+      id: "weight" as const,
+      label: "Weight",
+      icon: Scale,
+      isLogged: !!weightTodayLog,
+      valText: weightTodayLog ? `${weightTodayLog.weight} kg` : "Weight",
+    },
+    isWaterActive && {
+      id: "water" as const,
+      label: "Water",
+      icon: Droplet,
+      isLogged: waterIntake > 0,
+      valText: waterIntake > 0 ? `${(waterIntake / 1000).toFixed(1)}L` : "Water",
+    },
+    isDigestionActive && {
+      id: "digestion" as const,
+      label: "Digestion",
+      icon: GutIcon,
+      isLogged: stoolType !== null,
+      valText: stoolType !== null ? `Type ${stoolType}` : "Digestion",
+    },
+    isEnergyActive && {
+      id: "energy" as const,
+      label: "Energy",
+      icon: Zap,
+      isLogged: energyLevel !== null,
+      valText: energyLevel !== null ? `Lvl ${energyLevel}` : "Energy",
+    },
+    isBloatingActive && {
+      id: "bloating" as const,
+      label: "Bloating",
+      icon: BloatingIcon,
+      isLogged: bloatingLevel !== null,
+      valText: bloatingLevel !== null ? `Lvl ${bloatingLevel}` : "Bloating",
+    },
+  ].filter(Boolean) as Array<{
+    id: "weight" | "water" | "digestion" | "energy" | "bloating";
+    label: string;
+    icon: any;
+    isLogged: boolean;
+    valText: string;
+  }>;
 
   // True activity-based 30s auto-collapse timer
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
@@ -259,58 +372,61 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
       className="px-6 mt-6 relative z-10 text-left space-y-4 animate-fade-in"
     >
 
-      {/* DYNAMIC ADAPTIVE VITALS BUTTON CARDS (HANDLES 1, 2, 3, or 4 ACTIVE VITALS) */}
+      {/* ADAPTIVE VITALS SELECTOR BAR */}
       {(() => {
-        const activeVitalsList = [
-          isWeightActive && {
-            id: "weight" as const,
-            label: "Weight",
-            icon: Scale,
-            isLogged: !!weightTodayLog,
-            valText: weightTodayLog ? `${weightTodayLog.weight} kg` : "Weight",
-          },
-          isWaterActive && {
-            id: "water" as const,
-            label: "Water",
-            icon: Droplet,
-            isLogged: waterIntake > 0,
-            valText: waterIntake > 0 ? `${(waterIntake / 1000).toFixed(1)}L` : "Water",
-          },
-          isDigestionActive && {
-            id: "digestion" as const,
-            label: "Digestion",
-            icon: GutIcon,
-            isLogged: stoolType !== null,
-            valText: stoolType !== null ? `Type ${stoolType}` : "Digestion",
-          },
-          isEnergyActive && {
-            id: "energy" as const,
-            label: "Energy",
-            icon: Zap,
-            isLogged: energyLevel !== null,
-            valText: energyLevel !== null ? `Lvl ${energyLevel}` : "Energy",
-          },
-        ].filter(Boolean) as Array<{
-          id: "weight" | "water" | "digestion" | "energy";
-          label: string;
-          icon: any;
-          isLogged: boolean;
-          valText: string;
-        }>;
+        if (activeVitalsList.length <= 1) return null;
 
-        if (activeVitalsList.length === 0) return null;
+        const isCompactMorph = activeVitalsList.length > 3;
 
-        const gridClass =
-          activeVitalsList.length === 1
-            ? "grid-cols-1 max-w-xs mx-auto"
-            : activeVitalsList.length === 2
-            ? "grid-cols-2"
-            : activeVitalsList.length === 3
-            ? "grid-cols-3"
-            : "grid-cols-4";
+        if (!isCompactMorph) {
+          // Expanded Full Text Layout: Standalone floating card buttons (for <= 3 active vitals)
+          const gridCols = activeVitalsList.length === 2 ? "grid-cols-2" : "grid-cols-3";
+          return (
+            <div className={cn("grid gap-2.5 select-none mt-1", gridCols)}>
+              {activeVitalsList.map((item) => {
+                const IconComp = item.icon;
+                const isActive = activeVitalsTab === item.id;
 
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() =>
+                      setActiveVitalsTab((prev) =>
+                        prev === item.id ? null : item.id
+                      )
+                    }
+                    className={cn(
+                      "py-2.5 px-3 rounded-2xl transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 min-w-0 border shadow-2xs",
+                      isActive
+                        ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20 font-black"
+                        : "bg-white text-stone-800 border-stone-200/80 hover:bg-stone-50 hover:border-stone-300 font-extrabold"
+                    )}
+                    title={`Toggle ${item.label}`}
+                  >
+                    <IconComp
+                      className={cn(
+                        "w-4 h-4 shrink-0 transition-colors",
+                        isActive
+                          ? "text-white"
+                          : item.isLogged
+                          ? "text-orange-500 font-bold"
+                          : "text-stone-400"
+                      )}
+                    />
+                    <span className="text-[11.5px] font-extrabold truncate tracking-tight">
+                      {item.valText}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        }
+
+        // Compressed Morphing Layout (for > 3 active vitals) - Transparent Tiles
         return (
-          <div className={cn("grid gap-2 select-none mt-1", gridClass)}>
+          <div className="bg-white/90 backdrop-blur-md border border-stone-200/80 rounded-2xl p-1 flex items-center justify-between gap-1 shadow-3xs select-none mt-1">
             {activeVitalsList.map((item) => {
               const IconComp = item.icon;
               const isActive = activeVitalsTab === item.id;
@@ -325,309 +441,56 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                     )
                   }
                   className={cn(
-                    "py-2.5 px-2 rounded-2xl text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer border active:scale-95",
+                    "py-2.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer border-none active:scale-95 min-w-0",
                     isActive
-                      ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/15 font-black"
-                      : item.isLogged
-                      ? "bg-white text-stone-900 border-stone-200/90 hover:bg-stone-50 shadow-2xs font-bold"
-                      : "bg-white/70 text-stone-500 border-stone-200/60 hover:bg-white hover:text-stone-800 shadow-3xs"
+                      ? "flex-[1.8] bg-orange-500 text-white shadow-md shadow-orange-500/20 font-black px-3"
+                      : "flex-1 bg-transparent hover:bg-orange-50/60 text-stone-600 hover:text-stone-900"
                   )}
-                  title={`Toggle ${item.label} Card`}
+                  title={`Toggle ${item.label}`}
                 >
                   <IconComp
                     className={cn(
-                      "w-3.5 h-3.5 shrink-0 transition-colors",
+                      "w-4 h-4 shrink-0 transition-colors",
                       isActive
                         ? "text-white"
                         : item.isLogged
-                        ? "text-stone-700"
+                        ? "text-orange-500 font-bold"
                         : "text-stone-400"
                     )}
                   />
-                  <span className="truncate">{item.valText}</span>
+
+                  {isActive && (
+                    <motion.span
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.2 }}
+                      className="text-[11px] font-black truncate tracking-tight"
+                    >
+                      {item.valText}
+                    </motion.span>
+                  )}
                 </button>
               );
             })}
           </div>
         );
       })()}
-
-      {/* MINIMALIST ALL VITALS LOGS TOGGLE & LIST (ONLY SHOWN IF LOGS EXIST & NO TAB IS ACTIVE) */}
-      {totalLoggedVitals > 0 && !activeVitalsTab && (
-        <div className="w-full mt-1">
-          {!isVitalsLogOpen ? (
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={() => setIsVitalsLogOpen(true)}
-                className="text-[10px] font-medium text-stone-400 hover:text-stone-700 transition-colors flex items-center gap-1 cursor-pointer border-none bg-transparent px-2 py-0.5"
-              >
-                <List className="w-2.5 h-2.5 text-stone-400" />
-                <span>view all vitals logs ({totalLoggedVitals})</span>
-              </button>
-            </div>
-          ) : (
-            <div className="w-full flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
-              <div className="flex items-center justify-between px-0.5 mb-0.5">
-                <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
-                  Today's Logged Vitals ({totalLoggedVitals})
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsVitalsLogOpen(false)}
-                  className="text-[10px] font-bold text-stone-400 hover:text-stone-700 transition-colors flex items-center gap-1 cursor-pointer border-none bg-transparent"
-                >
-                  <span>hide logs</span>
-                  <span className="text-[8px]">▲</span>
-                </button>
-              </div>
-              {weightTodayLog && (
-                <div className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {weightTodayLog.log_time ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
-                        <Clock className="w-2.5 h-2.5 text-stone-400" />
-                        {formatInterestingTime(weightTodayLog.log_time)}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
-                        Today
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Scale className="w-3.5 h-3.5 text-stone-600 shrink-0" />
-                      <strong className="text-stone-900 font-extrabold">
-                        {weightTodayLog.weight} kg
-                      </strong>
-                    </div>
-                  </div>
-                  {selectedDate === todayStr && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (weightTodayLog.id) {
-                          await handleDeleteWeight(weightTodayLog.id);
-                        }
-                      }}
-                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
-                      title="Remove weight log"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {waterLogsList.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {item.time ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
-                        <Clock className="w-2.5 h-2.5 text-stone-400" />
-                        {formatInterestingTime(item.time)}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
-                        Today
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Droplet className="w-3.5 h-3.5 text-stone-600 shrink-0" />
-                      <strong className="text-stone-900 font-extrabold">
-                        {item.amount} ml
-                      </strong>
-                    </div>
-                  </div>
-                  {selectedDate === todayStr && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (item.id === "legacy-water") {
-                          await handleLogWater(0, selectedDate);
-                        } else {
-                          await handleDeleteWaterLogItem(item.id, selectedDate);
-                        }
-                      }}
-                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
-                      title="Remove water entry"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
-
-              {stoolLogsList.map((item) => {
-                const itemConstipated = item.type === 1 || item.type === 2;
-                const itemHealthy = item.type === 3 || item.type === 4;
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {item.time ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
-                          <Clock className="w-2.5 h-2.5 text-stone-400" />
-                          {formatInterestingTime(item.time)}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
-                          Today
-                        </span>
-                      )}
-                      <div className="flex items-center gap-1.5 truncate">
-                        <BristolStoolIcon
-                          type={item.type}
-                          className="w-4 h-4 shrink-0"
-                        />
-                        <strong
-                          className={cn(
-                            "font-extrabold",
-                            itemConstipated
-                              ? "text-amber-600"
-                              : itemHealthy
-                              ? "text-emerald-600"
-                              : "text-sky-600"
-                          )}
-                        >
-                          {itemConstipated
-                            ? "Constipated"
-                            : itemHealthy
-                            ? "Healthy"
-                            : "Loose"}
-                        </strong>
-                        <span className="text-[10px] text-stone-400 font-semibold">
-                          (Type {item.type})
-                        </span>
-                      </div>
-                    </div>
-                    {selectedDate === todayStr && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (item.id === "legacy-stool") {
-                            await handleLogDigestion(null, null, selectedDate);
-                          } else {
-                            await handleDeleteStoolLogItem(
-                              item.id,
-                              selectedDate
-                            );
-                          }
-                        }}
-                        className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
-                        title="Remove digestion entry"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-
-              {energyLogsList.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {item.time ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
-                        <Clock className="w-2.5 h-2.5 text-stone-400" />
-                        {formatInterestingTime(item.time)}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
-                        Today
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Zap className="w-3.5 h-3.5 text-stone-600 shrink-0" />
-                      <strong className="text-stone-900 font-extrabold">
-                        {(() => {
-                          if (item.level === 1) return "😴 Exhausted";
-                          if (item.level === 2) return "🥱 Sluggish";
-                          if (item.level === 3) return "⚡ Steady";
-                          if (item.level === 4) return "🔥 High Energy";
-                          return "🚀 Peak Vitality";
-                        })()}
-                      </strong>
-                      <span className="text-[10px] text-stone-400 font-semibold">
-                        (Level {item.level})
-                      </span>
-                    </div>
-                  </div>
-                  {selectedDate === todayStr && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (item.id === "legacy-energy") {
-                          await handleLogEnergy(null, selectedDate);
-                        } else {
-                          await handleDeleteEnergyLogItem(
-                            item.id,
-                            selectedDate
-                          );
-                        }
-                      }}
-                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
-                      title="Remove energy entry"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* 1. WEIGHT LOG (POPS OUT WHEN TOGGLED) */}
       {isWeightActive && activeVitalsTab === "weight" && (
         <div className="flex flex-col gap-2">
 
           {weightTodayLog ? (
-            <div className="flex flex-col gap-1.5 animate-fade-in">
-              <div className="flex items-center justify-between bg-white border border-stone-200/50 rounded-xl px-3.5 py-3 text-xs transition-all shadow-3xs">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {weightTodayLog.log_time ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-stone-100 border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
-                      <Clock className="w-2.5 h-2.5 text-stone-400" />
-                      {formatInterestingTime(weightTodayLog.log_time)}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-stone-100/50 px-2 py-0.5 rounded-md shrink-0">
-                      Today
-                    </span>
-                  )}
-                  <div className="flex items-center gap-1.5 truncate">
-                    <Scale className="w-3.5 h-3.5 text-stone-600 shrink-0" />
-                    <span className="text-stone-500 font-bold">Weight:</span>
-                    <strong className="text-stone-900 font-black">
-                      {weightTodayLog.weight} kg
-                    </strong>
-                  </div>
-                </div>
-                {selectedDate === todayStr && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (weightTodayLog.id) {
-                        await handleDeleteWeight(weightTodayLog.id);
-                      }
-                    }}
-                    className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
-                    title="Remove weight log"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </div>
+            <UniversalVitalLogCard
+              type="weight"
+              valueText={`${weightTodayLog.weight} kg`}
+              logTime={weightTodayLog.log_time}
+              canDelete={selectedDate === todayStr}
+              onDelete={async () => {
+                if (weightTodayLog.id) {
+                  await handleDeleteWeight(weightTodayLog.id);
+                }
+              }}
+            />
           ) : selectedDate === todayStr ? (
             (() => {
               const baseWeight = (() => {
@@ -902,67 +765,6 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                 </div>
               );
             })()}
-
-          {/* Logged Water Entries List for selectedDate */}
-          {waterLogsList.length > 0 ? (
-            <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase text-stone-400">
-                  Water Logs ({waterLogsList.length})
-                </span>
-                <span className="text-[10px] font-bold text-stone-500">
-                  {waterIntake} ml total
-                </span>
-              </div>
-              {waterLogsList.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {item.time ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
-                        <Clock className="w-2.5 h-2.5 text-stone-400" />
-                        {formatInterestingTime(item.time)}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
-                        Today
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Droplet className="w-3.5 h-3.5 text-stone-600 shrink-0" />
-                      <strong className="text-stone-900 font-extrabold">
-                        {item.amount} ml
-                      </strong>
-                    </div>
-                  </div>
-                  {selectedDate === todayStr && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (item.id === "legacy-water") {
-                          await handleLogWater(0, selectedDate);
-                        } else {
-                          await handleDeleteWaterLogItem(item.id, selectedDate);
-                        }
-                      }}
-                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
-                      title="Remove water entry"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            selectedDate !== todayStr && (
-              <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
-                No water logged for this date
-              </div>
-            )
-          )}
         </div>
       )}
 
@@ -1071,88 +873,6 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                 </div>
               )}
             </div>
-          )}
-
-          {/* Logged Digestion Entries List for selectedDate */}
-          {stoolLogsList.length > 0 ? (
-            <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
-              <span className="text-[10px] font-black uppercase text-stone-400">
-                Digestion Logs ({stoolLogsList.length})
-              </span>
-              {stoolLogsList.map((item) => {
-                const itemConstipated = item.type === 1 || item.type === 2;
-                const itemHealthy = item.type === 3 || item.type === 4;
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {item.time ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
-                          <Clock className="w-2.5 h-2.5 text-stone-400" />
-                          {formatInterestingTime(item.time)}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
-                          Today
-                        </span>
-                      )}
-                      <div className="flex items-center gap-1.5 truncate">
-                        <BristolStoolIcon
-                          type={item.type}
-                          className="w-4 h-4 shrink-0"
-                        />
-                        <strong
-                          className={cn(
-                            "font-extrabold",
-                            itemConstipated
-                              ? "text-amber-600"
-                              : itemHealthy
-                              ? "text-emerald-600"
-                              : "text-sky-600"
-                          )}
-                        >
-                          {itemConstipated
-                            ? "Constipated"
-                            : itemHealthy
-                            ? "Healthy"
-                            : "Loose"}
-                        </strong>
-                        <span className="text-[10px] text-stone-400 font-semibold">
-                          (Type {item.type})
-                        </span>
-                      </div>
-                    </div>
-                    {selectedDate === todayStr && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (item.id === "legacy-stool") {
-                            await handleLogDigestion(null, null, selectedDate);
-                          } else {
-                            await handleDeleteStoolLogItem(
-                              item.id,
-                              selectedDate
-                            );
-                          }
-                        }}
-                        className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
-                        title="Remove digestion entry"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            selectedDate !== todayStr && (
-              <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
-                No digestion logged for this date
-              </div>
-            )
           )}
         </div>
       )}
@@ -1264,73 +984,297 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
               )}
             </div>
           )}
+        </div>
+      )}
 
-          {/* Logged Energy Entries List for selectedDate */}
-          {energyLogsList.length > 0 ? (
-            <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
-              <span className="text-[10px] font-black uppercase text-stone-400">
-                Energy Logs ({energyLogsList.length})
-              </span>
-              {energyLogsList.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between bg-stone-50/90 border border-stone-200/60 rounded-xl px-3 py-2 text-xs transition-all"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {item.time ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-700 bg-white border border-stone-200/80 px-2 py-0.5 rounded-md shrink-0 shadow-3xs">
-                        <Clock className="w-2.5 h-2.5 text-stone-400" />
-                        {formatInterestingTime(item.time)}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-stone-400 bg-white px-2 py-0.5 rounded-md shrink-0">
-                        Today
-                      </span>
+      {/* 5. BLOATING TRACKER (POPS OUT WHEN TOGGLED) */}
+      {isBloatingActive && activeVitalsTab === "bloating" && (
+        <div className="flex flex-col gap-2">
+
+          {selectedDate === todayStr && (
+            <div className="flex flex-col gap-2 w-full animate-fade-in">
+              <div className="flex items-center gap-2.5 w-full">
+                {/* Left: Time Pill */}
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTimePickerTarget("bloating");
+                      setTimePickerInitialTime(activeBloatingTime);
+                      setIsTimePickerOpen(true);
+                    }}
+                    className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-stone-400" />
+                    <span>
+                      {formatInterestingTime(activeBloatingTime) ||
+                        activeBloatingTime}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Middle: Clean 1-4 Slider */}
+                <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
+                  <input
+                    type="range"
+                    min="1"
+                    max="4"
+                    value={currentBloating}
+                    onChange={(e) =>
+                      setLocalDraftBloating(parseInt(e.target.value))
+                    }
+                    onMouseDown={() => setLocalIsBloatingSliding(true)}
+                    onTouchStart={() => setLocalIsBloatingSliding(true)}
+                    onMouseUp={() =>
+                      setTimeout(() => setLocalIsBloatingSliding(false), 200)
+                    }
+                    onTouchEnd={() =>
+                      setTimeout(() => setLocalIsBloatingSliding(false), 200)
+                    }
+                    className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                  />
+                </div>
+
+                {/* Right: Action Box */}
+                <div className="w-12 h-12 [perspective:1000px] shrink-0">
+                  <div
+                    className={cn(
+                      "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
+                      localIsBloatingSliding ? "[transform:rotateY(180deg)]" : ""
                     )}
-                    <div className="flex items-center gap-1.5 truncate">
-                      <Zap className="w-3.5 h-3.5 text-stone-600 shrink-0" />
-                      <strong className="text-stone-900 font-extrabold">
-                        {(() => {
-                          if (item.level === 1) return "😴 Exhausted";
-                          if (item.level === 2) return "🥱 Sluggish";
-                          if (item.level === 3) return "⚡ Steady";
-                          if (item.level === 4) return "🔥 High Energy";
-                          return "🚀 Peak Vitality";
-                        })()}
-                      </strong>
-                      <span className="text-[10px] text-stone-400 font-semibold">
-                        (Level {item.level})
-                      </span>
+                  >
+                    {/* FRONT: Log Button */}
+                    <button
+                      onClick={async () => {
+                        await handleLogBloating(
+                          currentBloating,
+                          selectedDate,
+                          activeBloatingTime
+                        );
+                        setLocalDraftBloating(null);
+                        setLocalDraftBloatingTime("");
+                      }}
+                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                      title="Log Bloating"
+                    >
+                      <Check className="w-5 h-5 text-white" />
+                    </button>
+
+                    {/* BACK: Bloating Stomach Swelling Icon */}
+                    <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs">
+                      <BloatingStomachIcon level={currentBloating} className="w-7 h-7" />
                     </div>
                   </div>
-                  {selectedDate === todayStr && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (item.id === "legacy-energy") {
-                          await handleLogEnergy(null, selectedDate);
-                        } else {
-                          await handleDeleteEnergyLogItem(
-                            item.id,
-                            selectedDate
-                          );
-                        }
-                      }}
-                      className="w-5 h-5 rounded-md hover:bg-red-50 text-stone-400 hover:text-red-500 flex items-center justify-center border-none cursor-pointer transition-colors shrink-0 ml-2"
-                      title="Remove energy entry"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
                 </div>
-              ))}
+              </div>
+
+              {/* Dynamic description below the section (only while sliding) */}
+              {localIsBloatingSliding && (
+                <div className="px-1 text-left animate-fade-in">
+                  <span className="text-[11px] font-medium text-stone-500">
+                    {getBloatingDescription(currentBloating)}
+                  </span>
+                </div>
+              )}
+
+              {/* Logged Bloating Entries List for selectedDate */}
+              {bloatingLogsList.length > 0 && (
+                <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
+                  <span className="text-[10px] font-black uppercase text-stone-400">
+                    Bloating Logs ({bloatingLogsList.length})
+                  </span>
+                  {bloatingLogsList.map((item) => {
+                    const getBloatingLabel = (lvl: number) => {
+                      if (lvl === 1) return "None";
+                      if (lvl === 2) return "Mild Bloat";
+                      if (lvl === 3) return "Moderate Bloat";
+                      return "Severe Bloat";
+                    };
+
+                    return (
+                      <UniversalVitalLogCard
+                        key={item.id}
+                        type="bloating"
+                        bloatingLevel={item.level}
+                        valueText={getBloatingLabel(item.level)}
+                        subText={`(Level ${item.level})`}
+                        logTime={item.time}
+                        canDelete={selectedDate === todayStr}
+                        onDelete={async () => {
+                          if (item.id === "legacy-bloating") {
+                            await handleLogBloating(null, selectedDate);
+                          } else {
+                            await handleDeleteBloatingLogItem(item.id, selectedDate);
+                          }
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* UNIVERSAL COLLAPSIBLE LOGS DRAWER (ONLY SHOWN IF MULTIPLE VITALS OR NON-WEIGHT VITAL TRACKED) */}
+      {totalLoggedVitals > 0 && (activeVitalsList.length > 1 || (activeVitalsList.length === 1 && activeVitalsList[0].id !== "weight")) && (
+        <div className="w-full mt-2">
+          {!isVitalsLogOpen ? (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setIsVitalsLogOpen(true)}
+                className="text-[10.5px] font-bold text-stone-400 hover:text-stone-700 transition-colors flex items-center gap-1 cursor-pointer border-none bg-transparent px-3 py-1"
+              >
+                <List className="w-3 h-3 text-stone-400" />
+                <span>view all vitals logs ({totalLoggedVitals})</span>
+              </button>
             </div>
           ) : (
-            selectedDate !== todayStr && (
-              <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
-                No energy logged for this date
+            <div className="w-full flex flex-col gap-2.5 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
+              <div className="flex items-center justify-between px-0.5 mb-0.5">
+                <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
+                  Today's Logged Vitals ({totalLoggedVitals})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsVitalsLogOpen(false)}
+                  className="text-[10px] font-bold text-stone-400 hover:text-stone-700 transition-colors flex items-center gap-1 cursor-pointer border-none bg-transparent"
+                >
+                  <span>hide logs</span>
+                  <span className="text-[8px]">▲</span>
+                </button>
               </div>
-            )
+
+              {/* 1. Weight Log Card */}
+              {weightTodayLog && (
+                <UniversalVitalLogCard
+                  type="weight"
+                  valueText={`${weightTodayLog.weight} kg`}
+                      logTime={weightTodayLog.log_time}
+                  canDelete={selectedDate === todayStr}
+                  onDelete={async () => {
+                    if (weightTodayLog.id) {
+                      await handleDeleteWeight(weightTodayLog.id);
+                    }
+                  }}
+                />
+              )}
+
+              {/* 2. Water Log Cards */}
+              {waterLogsList.map((item) => (
+                <UniversalVitalLogCard
+                  key={item.id}
+                  type="water"
+                  valueText={`${item.amount} ml`}
+                  logTime={item.time}
+                  canDelete={selectedDate === todayStr}
+                  onDelete={async () => {
+                    if (item.id === "legacy-water") {
+                      await handleLogWater(0, selectedDate);
+                    } else {
+                      await handleDeleteWaterLogItem(item.id, selectedDate);
+                    }
+                  }}
+                />
+              ))}
+
+              {/* 3. Digestion Log Cards */}
+              {stoolLogsList.map((item) => {
+                const itemConstipated = item.type === 1 || item.type === 2;
+                const itemHealthy = item.type === 3 || item.type === 4;
+                const statusLabel = itemConstipated ? "Constipated" : itemHealthy ? "Healthy" : "Loose";
+
+                return (
+                  <UniversalVitalLogCard
+                    key={item.id}
+                    type="digestion"
+                    stoolType={item.type}
+                    valueText={statusLabel}
+                    subText={`(Type ${item.type})`}
+                    logTime={item.time}
+                    canDelete={selectedDate === todayStr}
+                    onDelete={async () => {
+                      if (item.id === "legacy-stool") {
+                        await handleLogDigestion(null, null, selectedDate);
+                      } else {
+                        await handleDeleteStoolLogItem(item.id, selectedDate);
+                      }
+                    }}
+                  />
+                );
+              })}
+
+              {/* 4. Energy Log Cards */}
+              {energyLogsList.map((item) => {
+                const energyLabel = (() => {
+                  if (item.level === 1) return "Exhausted";
+                  if (item.level === 2) return "Sluggish";
+                  if (item.level === 3) return "Steady";
+                  if (item.level === 4) return "High Energy";
+                  return "Peak Vitality";
+                })();
+
+                return (
+                  <UniversalVitalLogCard
+                    key={item.id}
+                    type="energy"
+                    valueText={energyLabel}
+                    subText={`(Level ${item.level})`}
+                    logTime={item.time}
+                    canDelete={selectedDate === todayStr}
+                    onDelete={async () => {
+                      if (item.id === "legacy-energy") {
+                        await handleLogEnergy(null, selectedDate);
+                      } else {
+                        await handleDeleteEnergyLogItem(item.id, selectedDate);
+                      }
+                    }}
+                  />
+                );
+              })}
+
+              {/* 5. Bloating Log Cards */}
+              {((wellnessToday?.bloating_logs || []).length > 0
+                ? wellnessToday!.bloating_logs!
+                : bloatingLevel !== null
+                ? [
+                    {
+                      id: "legacy-bloating",
+                      level: bloatingLevel,
+                      time: wellnessToday?.bloating_log_time || getNowTimeStr(),
+                    },
+                  ]
+                : []
+              ).map((item) => {
+                const bloatText = (() => {
+                  if (item.level === 1) return "None";
+                  if (item.level === 2) return "Mild Bloat";
+                  if (item.level === 3) return "Moderate Bloat";
+                  return "Severe Bloat";
+                })();
+
+                return (
+                  <UniversalVitalLogCard
+                    key={item.id}
+                    type="bloating"
+                    bloatingLevel={item.level}
+                    valueText={bloatText}
+                    subText={`(Level ${item.level})`}
+                    logTime={item.time}
+                    canDelete={selectedDate === todayStr}
+                    onDelete={async () => {
+                      if (item.id === "legacy-bloating") {
+                        await handleLogBloating(null, selectedDate);
+                      } else {
+                        await handleDeleteBloatingLogItem(item.id, selectedDate);
+                      }
+                    }}
+                  />
+                );
+              })}
+            </div>
           )}
         </div>
       )}

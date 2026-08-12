@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { TrendingUp, Minus, Plus, Scale, X, Share2, Droplets, Zap, Activity, Utensils, Home, Sparkles, ChevronDown, Calendar } from "lucide-react";
+import { TrendingUp, Minus, Plus, Scale, X, Share2, Droplets, Zap, Activity, Utensils, Home, Sparkles, ChevronDown, Calendar, Flame } from "lucide-react";
 import { motion } from "motion/react";
 import {
   BarChart,
@@ -507,11 +507,11 @@ export const InsightsView = ({
         <div className="bg-white/60 backdrop-blur-md p-5 rounded-[24px] border border-white/80 shadow-sm flex flex-col justify-between gap-3 relative">
           <div className="flex justify-between items-start">
             <div className="w-10 h-10 rounded-full bg-orange-100/50 flex items-center justify-center text-orange-600">
-              <span className="text-xl">🔥</span>
+              <Flame className="w-5 h-5 text-orange-500 fill-orange-500" />
             </div>
             <button
               onClick={() => {
-                if (triggerToast) triggerToast("🔥 Streak copied to clipboard!");
+                if (triggerToast) triggerToast("Streak copied to clipboard!");
               }}
               title="Share Streak"
               className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95"
@@ -1169,15 +1169,15 @@ export const InsightsView = ({
           <div className="flex justify-between items-center text-[10px] font-black text-orange-950/60 px-1">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-orange-500" />
-              🏡 Home Cooked (65%)
+              Home Cooked (65%)
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-sky-400" />
-              🥩 High Protein (20%)
+              High Protein (20%)
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-400" />
-              🍽️ Eating Out (15%)
+              Eating Out (15%)
             </span>
           </div>
         </div>
@@ -1185,11 +1185,11 @@ export const InsightsView = ({
         {/* Meal Tag Badges */}
         <div className="flex flex-wrap gap-2 pt-1">
           {[
-            { tag: "🏡 Home Cooked", count: 12, pct: "65%" },
-            { tag: "🥩 High Protein", count: 4, pct: "20%" },
-            { tag: "🍽️ Eating Out", count: 3, pct: "15%" },
-            { tag: "🥗 High Fiber", count: 5, pct: "28%" },
-            { tag: "⚡ Fast Food", count: 2, pct: "10%" },
+            { tag: "Home Cooked", count: 12, pct: "65%" },
+            { tag: "High Protein", count: 4, pct: "20%" },
+            { tag: "Eating Out", count: 3, pct: "15%" },
+            { tag: "High Fiber", count: 5, pct: "28%" },
+            { tag: "Fast Food", count: 2, pct: "10%" },
           ].map((item, idx) => (
             <div key={idx} className="bg-white/80 border border-orange-100/80 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-2xs">
               <span className="text-xs font-extrabold text-orange-950">{item.tag}</span>

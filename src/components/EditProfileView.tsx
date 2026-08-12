@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import { DefaultAvatar } from "./DefaultAvatar";
 import { DEFAULT_TRACKING_TAGS } from "./SettingsView";
+import { BloatingIcon } from "./BristolStoolIcons";
 
 export const COMMON_TAG_TEMPLATES = [
   { name: "Gluten Free", description: "Apply when meal contains no wheat, barley, rye, or gluten" },
@@ -501,6 +502,17 @@ export const EditProfileView = ({
                   hasInfo: true,
                   infoTitle: "⚡ Energy & Vitality Spectrum",
                   infoContent: "The 1 to 5 Vitality Spectrum tracks subjective daily energy levels:\n\n1: 😴 Exhausted / Drained\n2: 🥱 Sluggish / Heavy\n3: ⚡ Steady / Normal\n4: 🔥 High Energy / Active\n5: 🚀 Peak Vitality / Unstoppable\n\nTracking energy helps uncover how your macro ratios, sleep, and meal timing impact daily performance.",
+                },
+                {
+                  key: "trackBloating",
+                  defaultOn: true,
+                  label: "Bloating Log",
+                  desc: "4-level stomach distension & gas tightness",
+                  icon: BloatingIcon,
+                  hasGoal: false,
+                  hasInfo: true,
+                  infoTitle: "🎈 Bloating & Gas Spectrum Guide",
+                  infoContent: "The 1 to 4 Bloating Spectrum tracks abdominal gas distension and fullness after meals:\n\n• Level 1 (None): 🍃 Flat, relaxed gut — zero bloat\n• Level 2 (Mild): 🟡 Slight tightness or fullness after food\n• Level 3 (Moderate): 🟠 Visible bloating & belly pressure\n• Level 4 (Severe): 🔴 Tight balloon distension or discomfort\n\nLogging bloating helps FitAI spot food reactions (lactose, high sodium, legumes, FODMAPs, carbonation).",
                 },
               ].map((item) => {
                 const Icon = item.icon;

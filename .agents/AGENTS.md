@@ -37,3 +37,8 @@ This file defines critical rules that all AI developers and code-generation suba
 * **AI Tag Card 1-Line Structure**: Use clean 1-line cards with Tag Name, AI Description, dedicated Pencil icon (`<Pencil />`), and explicit Toggle Switches (`ON / OFF`). Never use tactile pill tags with invisible touch toggles or double-indicator green dots.
 * **Numeric Input Backspacing**: ALWAYS support empty string (`""`) state (`value={val === 0 ? "" : val}`) so users can backspace completely without forced fallback digits.
 * **Clean Section Headers**: Keep section titles bold, clean, and un-cluttered. Never add redundant `<Info />` icon buttons to self-explanatory section headers.
+
+## 6. Today's Notes / Wellness Journal Dashboard Rule (v2 Unhide Directive)
+* **Status:** "Today's Notes" (`WellnessJournal`) section is currently commented out in `src/App.tsx` for v2.
+* **Directive:** If the user asks to enable, restore, or unhide "Today's Notes" or "Wellness Journal", simply remove the comment wrapper `{/* ... */}` around the `<WellnessJournal />` JSX block in `src/App.tsx`.
+

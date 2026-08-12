@@ -18,14 +18,14 @@ const STEPS = [
   {
     icon: Flame,
     iconBg: "bg-amber-500",
-    title: "Real-Time Calorie & Macro Progress 📊",
+    title: "Real-Time Calorie & Macro Progress",
     subtitle: "Daily Target Rings",
     description: "Monitor your remaining daily calories and tracked nutrients at a glance. All 4 macros (Protein, Carbs, Fats, Fiber) update dynamically as you log throughout the day.",
   },
   {
     icon: Bot,
     iconBg: "bg-emerald-500",
-    title: "Log Vitals & Chat with AI Coach 🤖",
+    title: "Log Vitals & Chat with AI Coach",
     subtitle: "Complete Health Tracking",
     description: "Log water intake, weight, energy levels, and gut health. Have questions or need recipe ideas? Chat directly with your 24/7 AI fitness coach anytime!",
   },

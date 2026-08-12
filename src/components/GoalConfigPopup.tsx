@@ -101,19 +101,19 @@ export function GoalConfigPopup({
                       onClick={() => setGoalConfigValue(1600)}
                       className="p-2.5 bg-stone-100 hover:bg-orange-50 hover:text-orange-600 rounded-xl text-[9px] font-black uppercase tracking-wider text-stone-800 transition-all border border-transparent hover:border-orange-200/50 cursor-pointer"
                     >
-                      🔥 Burning Burn <br /> (1600 cal)
+                      Fat Loss <br /> (1600 cal)
                     </button>
                     <button
                       onClick={() => setGoalConfigValue(2000)}
                       className="p-2.5 bg-stone-100 hover:bg-orange-50 hover:text-orange-600 rounded-xl text-[9px] font-black uppercase tracking-wider text-stone-800 transition-all border border-transparent hover:border-orange-200/50 cursor-pointer"
                     >
-                      🥗 Balance Lean <br /> (2000 cal)
+                      Maintain <br /> (2000 cal)
                     </button>
                     <button
                       onClick={() => setGoalConfigValue(2600)}
                       className="p-2.5 bg-stone-100 hover:bg-orange-50 hover:text-orange-600 rounded-xl text-[9px] font-black uppercase tracking-wider text-stone-800 transition-all border border-transparent hover:border-orange-200/50 cursor-pointer"
                     >
-                      💪 Muscle Build <br /> (2600 cal)
+                      Muscle Gain <br /> (2600 cal)
                     </button>
                   </div>
                 </div>
@@ -181,12 +181,12 @@ export function GoalConfigPopup({
                     },
                   } as Profile);
                 }
-                setToastMessage(`Goal updated to ${goalConfigValue.toLocaleString()} successfully! ✨`);
+                setToastMessage(`Goal updated to ${goalConfigValue.toLocaleString()} successfully.`);
                 setActiveGoalConfigPopup(null);
               }}
               className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[11px] py-3 rounded-2xl font-black uppercase tracking-wider shadow-md shadow-orange-500/10 hover:shadow-orange-500/15 cursor-pointer text-center"
             >
-              Apply goal configuration 🚀
+              Apply Goal Configuration
             </button>
           </motion.div>
         </motion.div>

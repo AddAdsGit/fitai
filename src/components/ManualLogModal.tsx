@@ -8,6 +8,8 @@ import {
   Edit2,
   Plus,
   Clock,
+  BookOpen,
+  History
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -508,7 +510,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                       : "bg-orange-50/70 border-orange-200/80 text-orange-700 hover:bg-orange-100/80"
                   )}
                 >
-                  <span>📖 Recipes</span>
+                  <BookOpen className="w-3 h-3" />
+                  <span>Recipes</span>
                   <span className="text-[8px] font-mono opacity-90">({quickLogItems.filter(i => i.source === "recipe").length})</span>
                 </button>
                 <button
@@ -521,7 +524,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                       : "bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100"
                   )}
                 >
-                  <span>🍲 Past Foods</span>
+                  <History className="w-3 h-3" />
+                  <span>Past Foods</span>
                   <span className="text-[8px] font-mono opacity-90">({quickLogItems.filter(i => i.source === "recent").length})</span>
                 </button>
               </div>
@@ -543,8 +547,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                         {/* Left Side: Preview & Name & Macros */}
                         <div className="flex items-center gap-4 min-w-0 flex-1">
                           {isDefaultImage ? (
-                            <div className="w-14 h-14 rounded-[16px] bg-orange-50/70 flex items-center justify-center text-2xl shrink-0 border border-orange-100/50 shadow-inner select-none transition-transform duration-300 group-hover/card:scale-105">
-                              {getMealEmoji(item.name, item.type)}
+                            <div className="w-14 h-14 rounded-[16px] bg-orange-50/70 flex items-center justify-center shrink-0 border border-orange-100/50 shadow-inner select-none transition-transform duration-300 group-hover/card:scale-105 text-orange-500">
+                              <Utensils className="w-6 h-6" />
                             </div>
                           ) : (
                             <div className="w-14 h-14 rounded-[16px] overflow-hidden shrink-0 border border-stone-200/60 shadow-2xs transition-transform duration-300 group-hover/card:scale-105">
@@ -562,12 +566,12 @@ Do not return any markdown formatting, backticks, or "json" prefix. Just return 
                                 {item.name}
                               </h5>
                               {item.source === "recipe" ? (
-                                <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-orange-500 border border-orange-500 text-white shadow-3xs leading-none">
-                                  📖 Recipe
+                                <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-stone-100/90 border border-stone-200/70 text-stone-600 shadow-3xs leading-none">
+                                  Recipe
                                 </span>
                               ) : (
-                                <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200/50 text-stone-500 leading-none">
-                                  🕒 Recent
+                                <span className="text-[7.5px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full bg-stone-100/90 border border-stone-200/70 text-stone-500 leading-none">
+                                  Recent
                                 </span>
                               )}
                               

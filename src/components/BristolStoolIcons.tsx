@@ -136,3 +136,53 @@ export const GreyPoopIcon: React.FC<{ className?: string }> = ({ className = "w-
     <path d="M12 3c-.8 0-1.5.5-1.8 1.2-.4.9.1 2 .9 2.5.9.5.9 1.8 0 2.3-.8.5-1.3 1.6-.9 2.5.4.9 1.5 1.4 2.5 1.1 1.2-.4 2.3.5 2.3 1.7 0 1.2-1 2.2-2.2 2.2H8.5C6.6 16.5 5 18.1 5 20c0 .6.4 1 1 1h12c1.7 0 3-1.3 3-3 0-1.5-1.1-2.7-2.5-2.9 1-.5 1.7-1.5 1.7-2.6 0-1.6-1.2-2.9-2.8-3-.3-.9-1.2-1.5-2.2-1.3-.2-1.1-.9-2-1.9-2.4-.4-.2-.8-.7-.8-1.3 0-1.4-1.1-2.5-2.5-2.5z" />
   </svg>
 );
+
+export const BloatingIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M8 5c0 0 6-2 10 2s2 10-2 12-9 0-9-5c0-4 1-9 1-9Z" />
+    <path d="M11 9c2 0 4 2 4 4" strokeWidth="1.5" opacity="0.6" />
+  </svg>
+);
+
+export const BloatingStomachIcon: React.FC<{ level: number; className?: string }> = ({ level, className = "w-7 h-7" }) => {
+  switch (level) {
+    case 1:
+      // None: Flat, relaxed green belly
+      return (
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+          <path d="M14 12C14 12 16 24 18 28C20 32 26 34 32 34" stroke="#10B981" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="20" cy="22" r="3" fill="#34D399" opacity="0.6" />
+          <path d="M30 18L34 22L38 18" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
+        </svg>
+      );
+    case 2:
+      // Mild: Slightly swollen amber belly
+      return (
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+          <path d="M14 12C14 12 20 20 22 26C24 32 29 36 34 35" stroke="#F59E0B" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="22" cy="24" r="5" fill="#FBBF24" opacity="0.5" />
+          <path d="M26 16C28 18 31 19 34 18" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      );
+    case 3:
+      // Moderate: Swollen orange balloon belly
+      return (
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+          <path d="M13 12C13 12 24 17 26 26C28 35 34 37 37 36" stroke="#F97316" strokeWidth="4.5" strokeLinecap="round" />
+          <circle cx="24" cy="25" r="8" fill="#FB923C" opacity="0.5" />
+          <path d="M18 20C22 20 26 22 28 25" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      );
+    case 4:
+    default:
+      // Severe: Fully distended coral-red swollen balloon
+      return (
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+          <path d="M12 12C12 12 28 15 29 26C30 37 36 39 39 37" stroke="#EF4444" strokeWidth="5" strokeLinecap="round" />
+          <circle cx="25" cy="26" r="11" fill="#FCA5A5" opacity="0.6" />
+          <path d="M17 18C23 18 28 21 30 26" stroke="#EF4444" strokeWidth="3" strokeLinecap="round" />
+          <path d="M12 24H8M40 24H36M24 8V4M24 44V40" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" opacity="0.6" />
+        </svg>
+      );
+  }
+};
