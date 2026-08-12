@@ -45,8 +45,13 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
   const currentVar = variations[currentIndex];
   const cardFormat = currentVar.format;
 
-  const cleanHandle = profileData.name && profileData.name !== "John Doe" ? profileData.name.trim().toLowerCase().replace(/\s+/g, "") : (profileData.username || "user").split('_')[0];
-  const handleStr = `@${cleanHandle}`;
+  const getDisplayName = () => {
+    const name = profileData?.name?.trim();
+    if (name && name !== "John Doe") return name;
+    if (profileData?.username) return profileData.username.split("_")[0];
+    return "FitAI Member";
+  };
+  const handleStr = `@${getDisplayName().toLowerCase().replace(/\s+/g, "")}`;
 
   const name = item.name || "Logged Meal";
   const calories = Number(item.calories || 0);
