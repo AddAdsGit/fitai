@@ -363,16 +363,31 @@ export const OnboardingWizard = ({
     setTargets(recommended);
   }, [metrics.gender, metrics.age, metrics.height, metrics.weight]);
 
-  const handleCurrentWeightChange = (newWeight: number) => {
-    setMetrics(prev => ({ ...prev, weight: newWeight }));
+  const handleCurrentWeightChange = (raw: string) => {
+    if (raw === "") {
+      setMetrics(prev => ({ ...prev, weight: 0 }));
+    } else {
+      const val = parseFloat(raw);
+      if (!isNaN(val)) setMetrics(prev => ({ ...prev, weight: val }));
+    }
   };
 
-  const handleTargetWeightChange = (newTargetWeight: number) => {
-    setMetrics(prev => ({ ...prev, targetWeight: newTargetWeight }));
+  const handleTargetWeightChange = (raw: string) => {
+    if (raw === "") {
+      setMetrics(prev => ({ ...prev, targetWeight: 0 }));
+    } else {
+      const val = parseFloat(raw);
+      if (!isNaN(val)) setMetrics(prev => ({ ...prev, targetWeight: val }));
+    }
   };
 
-  const handleCaloriesChange = (newCalories: number) => {
-    setTargets(prev => ({ ...prev, calories: newCalories }));
+  const handleCaloriesChange = (raw: string) => {
+    if (raw === "") {
+      setTargets(prev => ({ ...prev, calories: 0 }));
+    } else {
+      const val = parseInt(raw);
+      if (!isNaN(val)) setTargets(prev => ({ ...prev, calories: val }));
+    }
   };
 
   const handleMacroChange = (key: "protein" | "carbs" | "fats" | "fiber", val: number) => {
@@ -688,8 +703,11 @@ export const OnboardingWizard = ({
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
-                    value={metrics.age}
-                    onChange={(e) => setMetrics(prev => ({ ...prev, age: parseInt(e.target.value) || 28 }))}
+                    value={metrics.age === 0 ? "" : metrics.age}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMetrics(prev => ({ ...prev, age: val === "" ? 0 : parseInt(val) || 0 }));
+                    }}
                     className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="text-[10px] font-bold text-stone-400">Yrs Old</span>
@@ -720,8 +738,11 @@ export const OnboardingWizard = ({
                   </button>
                   <input
                     type="number"
-                    value={metrics.height}
-                    onChange={(e) => setMetrics(prev => ({ ...prev, height: parseInt(e.target.value) || 170 }))}
+                    value={metrics.height === 0 ? "" : metrics.height}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMetrics(prev => ({ ...prev, height: val === "" ? 0 : parseInt(val) || 0 }));
+                    }}
                     className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
@@ -741,20 +762,20 @@ export const OnboardingWizard = ({
                 <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
                   <button
                     type="button"
-                    onClick={() => handleCurrentWeightChange(Math.max(30, metrics.weight - 1))}
+                    onClick={() => handleCurrentWeightChange(String(Math.max(30, (metrics.weight || 70) - 1)))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
                   <input
                     type="number"
-                    value={metrics.weight}
-                    onChange={(e) => handleCurrentWeightChange(parseFloat(e.target.value) || 70)}
+                    value={metrics.weight === 0 ? "" : metrics.weight}
+                    onChange={(e) => handleCurrentWeightChange(e.target.value)}
                     className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
                     type="button"
-                    onClick={() => handleCurrentWeightChange(Math.min(300, metrics.weight + 1))}
+                    onClick={() => handleCurrentWeightChange(String(Math.min(300, (metrics.weight || 70) + 1)))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -814,7 +835,7 @@ export const OnboardingWizard = ({
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
                 <button
                   type="button"
-                  onClick={() => handleTargetWeightChange(Math.max(35, metrics.targetWeight - 1))}
+                  onClick={() => handleTargetWeightChange(String(Math.max(35, (metrics.targetWeight || 70) - 1)))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Minus className="w-3.5 h-3.5" />
@@ -822,15 +843,15 @@ export const OnboardingWizard = ({
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
-                    value={metrics.targetWeight}
-                    onChange={(e) => handleTargetWeightChange(parseFloat(e.target.value) || 70)}
+                    value={metrics.targetWeight === 0 ? "" : metrics.targetWeight}
+                    onChange={(e) => handleTargetWeightChange(e.target.value)}
                     className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="text-[10px] font-bold text-stone-400">kg</span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleTargetWeightChange(Math.min(250, metrics.targetWeight + 1))}
+                  onClick={() => handleTargetWeightChange(String(Math.min(250, (metrics.targetWeight || 70) + 1)))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -846,7 +867,7 @@ export const OnboardingWizard = ({
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
                 <button
                   type="button"
-                  onClick={() => handleCaloriesChange(Math.max(800, targets.calories - 50))}
+                  onClick={() => handleCaloriesChange(String(Math.max(800, (targets.calories || 2000) - 50)))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Minus className="w-3.5 h-3.5" />
@@ -854,15 +875,15 @@ export const OnboardingWizard = ({
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
-                    value={targets.calories}
-                    onChange={(e) => handleCaloriesChange(parseInt(e.target.value) || 0)}
+                    value={targets.calories === 0 ? "" : targets.calories}
+                    onChange={(e) => handleCaloriesChange(e.target.value)}
                     className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <span className="text-[10px] font-bold text-stone-400">kcal</span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleCaloriesChange(Math.min(10000, targets.calories + 50))}
+                  onClick={() => handleCaloriesChange(String(Math.min(10000, (targets.calories || 2000) + 50)))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Plus className="w-3.5 h-3.5" />

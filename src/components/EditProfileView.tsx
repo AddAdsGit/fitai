@@ -1050,14 +1050,14 @@ export const EditProfileView = ({
                 </div>
               </div>
 
-        {/* Card 5: Tracking Tags */}
+        {/* Card 5: AI Meal Tags */}
           <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
             <div className="flex items-center justify-between pb-2 border-b border-stone-50">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
                   <Tag className="w-4 h-4" />
                 </div>
-                <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">Tracking Tags</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">AI Meal Tags</span>
               </div>
               <button
                 type="button"
@@ -1069,103 +1069,89 @@ export const EditProfileView = ({
             </div>
 
             <p className="text-[9.5px] text-stone-400 font-semibold leading-normal">
-              Toggle tags that the AI automatically applies to your meals based on ingredients or micro-nutrients. Click a tag to configure its AI rules.
+              Tags that FitAI's AI vision automatically assigns to logged meals based on ingredients.
             </p>
 
-            {/* List of tags as tactile pill buttons */}
-            <div className="flex flex-wrap gap-2 py-1.5">
+            {/* List of tags as clean 1-line cards */}
+            <div className="space-y-2.5">
               {currentTags.map((tag: any) => {
                 const isSelected = selectedTagId === tag.id;
                 return (
                   <div
                     key={tag.id}
                     className={cn(
-                      "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-extrabold border transition-all duration-150 cursor-pointer select-none active:scale-95 shadow-3xs",
+                      "p-3.5 rounded-[22px] border transition-all space-y-2 shadow-2xs",
                       tag.enabled
-                        ? isSelected
-                          ? "bg-stone-900 border-stone-900 text-white shadow-sm"
-                          : "bg-emerald-50/80 border-emerald-300/80 text-emerald-950 hover:bg-emerald-100/80"
-                        : "bg-stone-50/70 border-stone-200/80 text-stone-400 hover:border-stone-300 opacity-65 hover:opacity-100"
+                        ? "bg-white border-stone-200"
+                        : "bg-stone-50 border-stone-150 opacity-60"
                     )}
-                    onClick={() => handleToggleTag(tag.id)}
-                    title={tag.enabled ? "Enabled — tap to disable" : "Disabled — tap to enable"}
                   >
-                    {/* Glowing Green Dot Indicator */}
-                    <span
-                      className={cn(
-                        "w-2 h-2 rounded-full transition-all shrink-0",
-                        tag.enabled
-                          ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"
-                          : "bg-stone-300"
-                      )}
-                    />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">{tag.name}</h4>
+                        <p className="text-[10px] font-bold text-stone-400 mt-0.5">{tag.description}</p>
+                      </div>
 
-                    <span>{tag.name}</span>
+                      <div className="flex items-center gap-2">
+                        {/* Pencil Edit Rule Button */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTagId(isSelected ? null : tag.id)}
+                          className="p-1 rounded-full text-stone-400 hover:text-stone-700 border-none bg-transparent cursor-pointer"
+                          title="Edit AI Rule"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
 
-                    {/* Edit AI Rule Icon Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedTagId(isSelected ? null : tag.id);
-                      }}
-                      className={cn(
-                        "p-1 rounded-full transition-colors shrink-0 ml-0.5 border-none cursor-pointer flex items-center justify-center",
-                        isSelected
-                          ? "bg-white/20 text-white"
-                          : tag.enabled
-                          ? "text-emerald-700 hover:bg-emerald-200/60"
-                          : "text-stone-400 hover:bg-stone-200/60"
-                      )}
-                      title="Edit AI rule"
-                    >
-                      <Pencil className="w-2.5 h-2.5" />
-                    </button>
+                        {/* Toggle Switch */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTag(tag.id)}
+                          className={cn(
+                            "w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0",
+                            tag.enabled ? "bg-orange-500" : "bg-stone-300"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform",
+                              tag.enabled ? "translate-x-4" : "translate-x-0"
+                            )}
+                          />
+                        </button>
 
-                    {/* Delete Tag Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteTag(tag.id);
-                        if (isSelected) setSelectedTagId(null);
-                      }}
-                      className="p-0.5 rounded-full hover:bg-black/10 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer shrink-0"
-                      title="Delete tag"
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </button>
+                        {/* Delete Tag Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleDeleteTag(tag.id);
+                            if (isSelected) setSelectedTagId(null);
+                          }}
+                          className="text-stone-300 hover:text-red-500 border-none bg-transparent cursor-pointer transition-colors p-1"
+                          title="Delete tag"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Inline Rule Textarea Expansion */}
+                    {isSelected && (
+                      <div className="pt-2 border-t border-stone-100 space-y-1 text-left animate-fadeIn">
+                        <span className="text-[9px] font-black text-stone-400 uppercase">AI Prompt Guideline</span>
+                        <textarea
+                          value={tag.description}
+                          onChange={(e) => handleUpdateTagDesc(tag.id, e.target.value)}
+                          rows={2}
+                          placeholder="Describe guidelines for the AI..."
+                          className="w-full bg-stone-50 border border-stone-200 rounded-xl p-2 text-xs font-semibold text-stone-700 focus:outline-none resize-none"
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
-
-            {/* Selected Tag description rule editor */}
-            {(() => {
-              const activeSelectedTag = currentTags.find((t: any) => t.id === selectedTagId);
-              if (!activeSelectedTag) return null;
-              return (
-                <div className="bg-stone-50 border border-stone-150 rounded-2xl p-3.5 space-y-2 mt-3 animate-fade-in text-left">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">AI rule for {activeSelectedTag.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTagId(null)}
-                      className="text-[9px] font-black text-stone-400 hover:text-stone-600 uppercase"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <textarea
-                    value={activeSelectedTag.description}
-                    onChange={(e) => handleUpdateTagDesc(activeSelectedTag.id, e.target.value)}
-                    rows={2}
-                    placeholder="Describe guidelines for the AI..."
-                    className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-700 focus:outline-none focus:border-stone-400 placeholder:text-stone-300 resize-none leading-relaxed shadow-3xs"
-                  />
-                </div>
-              );
-            })()}
 
             {/* Add Tags Section */}
             {/* Add Custom Tag Section */}
