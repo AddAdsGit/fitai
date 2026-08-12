@@ -8,8 +8,7 @@ import {
   Check,
   Search,
   X,
-  Pencil,
-  Info
+  Pencil
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
@@ -98,9 +97,6 @@ export const OnboardingWizard = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
-  // Active Tooltip Info Popup state
-  const [activeInfoTooltip, setActiveInfoTooltip] = useState<string | null>(null);
-
   // Targets state (configured on Step 3)
   const [targets, setTargets] = useState({
     calories: 2000,
@@ -112,7 +108,7 @@ export const OnboardingWizard = ({
 
   const [selectedPlan, setSelectedPlan] = useState<"free" | "plus" | "pro">("pro");
 
-  // AI Meal Tracking Tags State (Step 6 - Exact Card Model matching Nutrient Tracker)
+  // AI Meal Tracking Tags State (Step 6 - Clean Card Model matching Nutrient Tracker)
   const [aiTrackingTags, setAiTrackingTags] = useState([
     { id: "tag_hp", name: "High Protein", description: "Apply when meal has >= 30g protein", enabled: true },
     { id: "tag_gf", name: "Gluten Free", description: "Apply when meal contains no gluten ingredients", enabled: false },
@@ -124,7 +120,6 @@ export const OnboardingWizard = ({
   const [showCustomTagForm, setShowCustomTagForm] = useState(false);
   const [customTagName, setCustomTagName] = useState("");
   const [customTagRule, setCustomTagRule] = useState("");
-  const [tagSearchQuery, setTagSearchQuery] = useState("");
 
   // Vitals Selection State (Step 5)
   const [selectedVitals, setSelectedVitals] = useState({
@@ -890,7 +885,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 4: NUTRIENTS & MACROS (WITH SUBTLE INFO ICON) */}
+        {/* STEP 4: NUTRIENTS & MACROS */}
         {step === 4 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
             <div className="text-center space-y-1">
@@ -898,14 +893,6 @@ export const OnboardingWizard = ({
                 <h2 className="text-xl font-black tracking-tight text-stone-900">
                   Nutrient Tracking
                 </h2>
-                <button
-                  type="button"
-                  onClick={() => setActiveInfoTooltip(activeInfoTooltip === "nutrients" ? null : "nutrients")}
-                  className="text-stone-400 hover:text-orange-500 border-none bg-transparent cursor-pointer transition-colors p-0.5"
-                  title="Track macros and essential micro-nutrients to optimize daily energy and health."
-                >
-                  <Info className="w-3.5 h-3.5" />
-                </button>
                 <span className={`text-[9px] font-black font-mono px-2 py-0.5 rounded-full border ${
                   activeNutrientCount >= 8
                     ? "bg-amber-50 text-amber-700 border-amber-200"
@@ -914,12 +901,6 @@ export const OnboardingWizard = ({
                   {activeNutrientCount}/8 Active Slots
                 </span>
               </div>
-
-              {activeInfoTooltip === "nutrients" && (
-                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 text-[10px] font-bold text-stone-600 text-left animate-fadeIn">
-                  💡 Track Protein, Carbs, Fats, Fiber & micros (Iron, B12, Vit D) to optimize daily energy and recovery.
-                </div>
-              )}
             </div>
 
             {/* Search Dropdown Input */}
@@ -1085,29 +1066,13 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 5: DAILY VITALS (WITH SUBTLE INFO ICON) */}
+        {/* STEP 5: DAILY VITALS */}
         {step === 5 && (
           <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
-            <div className="text-center space-y-1">
-              <div className="flex items-center justify-center gap-2">
-                <h2 className="text-xl font-black tracking-tight text-stone-900">
-                  Daily Vitals
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setActiveInfoTooltip(activeInfoTooltip === "vitals" ? null : "vitals")}
-                  className="text-stone-400 hover:text-orange-500 border-none bg-transparent cursor-pointer transition-colors p-0.5"
-                  title="Log weight, water, and gut comfort to build personalized AI wellness trends."
-                >
-                  <Info className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {activeInfoTooltip === "vitals" && (
-                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 text-[10px] font-bold text-stone-600 text-left animate-fadeIn">
-                  💡 Track Weight, Water, Digestion & Energy to power AI health insights and trendlines.
-                </div>
-              )}
+            <div className="text-center space-y-0.5">
+              <h2 className="text-xl font-black tracking-tight text-stone-900">
+                Daily Vitals
+              </h2>
             </div>
 
             {/* Simple Question Toggles */}
@@ -1150,35 +1115,19 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 6: DIETARY PREFERENCES & AI TAGS (UNIFIED CARD UI MATCHING NUTRIENT TRACKER 1:1) */}
+        {/* STEP 6: AI MEAL TAGS (CLEAN 1-LINE CARD MODEL WITH NO GREEN DOTS AND NO INFO ICONS) */}
         {step === 6 && (
           <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
-            <div className="text-center space-y-1">
-              <div className="flex items-center justify-center gap-2">
-                <h2 className="text-xl font-black tracking-tight text-stone-900">
-                  Dietary Preferences & Tags
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setActiveInfoTooltip(activeInfoTooltip === "tags" ? null : "tags")}
-                  className="text-stone-400 hover:text-orange-500 border-none bg-transparent cursor-pointer transition-colors p-0.5"
-                  title="Enable dietary tags that FitAI automatically assigns to logged meals via AI vision."
-                >
-                  <Info className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {activeInfoTooltip === "tags" && (
-                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 text-[10px] font-bold text-stone-600 text-left animate-fadeIn">
-                  💡 Enable tags so FitAI's AI vision automatically tags your logged meals based on ingredients.
-                </div>
-              )}
+            <div className="text-center space-y-0.5">
+              <h2 className="text-xl font-black tracking-tight text-stone-900">
+                AI Meal Tags
+              </h2>
             </div>
 
-            {/* Custom Tag Add Button & Search Header */}
+            {/* Custom Tag Add Button */}
             <div className="flex items-center justify-between">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Active Dietary AI Tags
+                Active AI Meal Tags
               </label>
               <button
                 type="button"
@@ -1216,7 +1165,7 @@ export const OnboardingWizard = ({
               </div>
             )}
 
-            {/* Tag List (Unified Card UI matching Nutrient Tracker 1:1!) */}
+            {/* Tag List Cards */}
             <div className="space-y-2.5">
               {aiTrackingTags.map((t) => {
                 const isEditing = editingTagId === t.id;
@@ -1231,10 +1180,7 @@ export const OnboardingWizard = ({
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">{t.name}</h4>
-                          <span className={`w-2 h-2 rounded-full ${t.enabled ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]" : "bg-stone-300"}`} />
-                        </div>
+                        <h4 className="text-xs font-black text-stone-900 uppercase tracking-wide">{t.name}</h4>
                         <p className="text-[10px] font-bold text-stone-400 mt-0.5">{t.description}</p>
                       </div>
 
@@ -1296,7 +1242,7 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 7: AI PLAN GENERATION ANIMATION (ULTRA-MINIMALISTIC) */}
+        {/* STEP 7: AI PLAN GENERATION ANIMATION */}
         {step === 7 && (
           <div className="space-y-6 animate-fadeIn flex flex-col items-center justify-center text-center py-12">
             <div className="space-y-2 max-w-xs">
