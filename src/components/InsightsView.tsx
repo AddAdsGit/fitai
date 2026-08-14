@@ -1,7 +1,24 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { TrendingUp, Minus, Plus, Scale, X, Share2, Droplets, Zap, Activity, Utensils, Home, Sparkles, ChevronDown, Calendar, Flame } from "lucide-react";
-import { motion } from "motion/react";
+import {
+  TrendingUp,
+  Minus,
+  Plus,
+  Scale,
+  X,
+  Share2,
+  Droplets,
+  Zap,
+  Activity,
+  Utensils,
+  Home,
+  Sparkles,
+  ChevronDown,
+  Calendar,
+  Flame,
+  Wind,
+} from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   BarChart,
   Bar,
@@ -22,7 +39,7 @@ import {
   ZAxis,
 } from "recharts";
 import { cn } from "../lib/utils";
-import type { Meal, WeightLog } from "../types";
+import type { Meal, WeightLog, DailyWellness } from "../types";
 import { normalizeTrackedNutrients } from "../constants/nutrition";
 
 type TimeRangeOption = "7D" | "14D" | "30D" | "60D" | "90D" | "CUSTOM";
@@ -45,19 +62,19 @@ const ProgressBar = ({
   index?: number;
   unit?: string;
 }) => (
-  <div className="space-y-1.5">
-    <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-[0.05em]">
-      <span className="text-orange-950/70">{label}</span>
+  <div className="space-y-1.5 min-w-0">
+    <div className="flex justify-between items-end text-[9.5px] sm:text-[10px] font-black uppercase tracking-[0.05em] gap-1 min-w-0">
+      <span className="text-orange-950/70 truncate min-w-0">{label}</span>
       {max ? (
-        <span style={{ color }}>
+        <span className="shrink-0" style={{ color }}>
           {value}
-          <span className="text-orange-900/40 text-[9px] ml-0.5">
-            / {max}
+          <span className="text-orange-900/40 text-[8.5px] sm:text-[9px] ml-0.5 font-bold">
+            /{max}
             {unit}
           </span>
         </span>
       ) : (
-        <span style={{ color }}>{percentage}%</span>
+        <span className="shrink-0" style={{ color }}>{percentage}%</span>
       )}
     </div>
     <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden border border-white/40 shadow-inner">
@@ -137,6 +154,7 @@ export const InsightsView = ({
   mealsState = [],
   profileData,
   weightLogs = [],
+  dailyNotes = [],
   onLogWeight,
   onDeleteWeight,
   triggerToast,
@@ -145,6 +163,7 @@ export const InsightsView = ({
   mealsState?: Meal[];
   profileData: any;
   weightLogs?: WeightLog[];
+  dailyNotes?: DailyWellness[];
   onLogWeight?: (weight: number, date: string) => void;
   onDeleteWeight?: (id: string) => void;
   triggerToast?: (msg: string) => void;
@@ -249,8 +268,8 @@ export const InsightsView = ({
       const calories = daysMeals.reduce((sum, m) => sum + m.calories, 0);
 
       let dayLabel = "";
-      const totalDaysInRange = Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
-      if (totalDaysInRange <= 7) {
+      const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
+      if (totalDays <= 7) {
         const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         dayLabel = daysOfWeek[current.getDay()];
       } else {
@@ -323,6 +342,18 @@ export const InsightsView = ({
 
   const hasAnyData = loggedDaysCount > 0;
 
+  // Real Wellness Data Map by Date
+  const wellnessByDate = useMemo(() => {
+    const map = new Map<string, DailyWellness>();
+    (dailyNotes || []).forEach((w) => {
+      if (w.date) {
+        map.set(w.date, w);
+      }
+    });
+    return map;
+  }, [dailyNotes]);
+
+  // Reactive Multi-Day Vitals Data (Real Data from Supabase)
   const dynamicVitalsChartData = useMemo(() => {
     const data = [];
     const start = new Date(dateRangeBounds.start);
@@ -333,42 +364,94 @@ export const InsightsView = ({
       const dateStr = localFormatDateStr(current);
 
       let dayLabel = "";
-      const totalDaysInRange = Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
-      if (totalDaysInRange <= 7) {
+      const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
+      if (totalDays <= 7) {
         const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         dayLabel = daysOfWeek[current.getDay()];
       } else {
         dayLabel = `${current.getMonth() + 1}/${current.getDate()}`;
       }
 
-      const dayHash = (current.getDate() * 17 + current.getMonth() * 31) % 100;
-      const water = parseFloat((2.1 + (dayHash % 10) * 0.1).toFixed(1));
-      const energy = parseFloat((3.8 + (dayHash % 13) * 0.1).toFixed(1));
-      const gutScore = 80 + (dayHash % 20);
-      const bristolType = (dayHash % 7 === 0) ? 2 : (dayHash % 9 === 0) ? 5 : (dayHash % 2 === 0) ? 4 : 3;
+      const row = wellnessByDate.get(dateStr);
+      const water = row?.water_intake ?? (row?.water_logs && row.water_logs.length > 0 ? row.water_logs.reduce((s, l) => s + (l.amount || 0), 0) : null);
+      
+      const energyLogs = row?.energy_logs || [];
+      const energy = row?.energy_level ?? (energyLogs.length > 0 ? energyLogs[energyLogs.length - 1].level : null);
+
+      const bloatLogs = row?.bloating_logs || [];
+      const bloating = row?.bloating_level ?? (bloatLogs.length > 0 ? bloatLogs[bloatLogs.length - 1].level : null);
+
+      const stoolLogs = row?.stool_logs || [];
+      const stoolType = row?.stool_type ?? (stoolLogs.length > 0 ? stoolLogs[stoolLogs.length - 1].type : null);
 
       data.push({
         day: dayLabel,
         date: dateStr,
-        water,
-        energy,
-        gutScore,
-        bristolType,
+        water: water !== undefined && water !== null && water > 0 ? parseFloat(water.toFixed(1)) : null,
+        energy: energy !== undefined && energy !== null && energy > 0 ? energy : null,
+        bloating: bloating !== undefined && bloating !== null && bloating > 0 ? bloating : null,
+        stoolType: stoolType !== undefined && stoolType !== null && stoolType > 0 ? stoolType : null,
       });
 
       current.setDate(current.getDate() + 1);
     }
     return data;
-  }, [dateRangeBounds]);
+  }, [dateRangeBounds, wellnessByDate]);
 
+  // Water Stats
+  const waterStats = useMemo(() => {
+    const logged = dynamicVitalsChartData.filter((d) => d.water !== null && d.water > 0);
+    const count = logged.length;
+    const avg = count > 0 ? parseFloat((logged.reduce((sum, d) => sum + (d.water || 0), 0) / count).toFixed(1)) : 0;
+    const goal = profileData?.goals?.dailyWater || 3.0;
+    return { avg, count, goal };
+  }, [dynamicVitalsChartData, profileData?.goals?.dailyWater]);
+
+  // Energy Stats
+  const energyStats = useMemo(() => {
+    const logged = dynamicVitalsChartData.filter((d) => d.energy !== null && d.energy > 0);
+    const count = logged.length;
+    const avg = count > 0 ? parseFloat((logged.reduce((sum, d) => sum + (d.energy || 0), 0) / count).toFixed(1)) : 0;
+    let label = "No energy logs";
+    if (avg >= 4.0) label = "High Energy Average";
+    else if (avg >= 3.0) label = "Moderate Energy";
+    else if (avg > 0) label = "Low Energy";
+    return { avg, count, label };
+  }, [dynamicVitalsChartData]);
+
+  // Bloating Stats
+  const bloatingStats = useMemo(() => {
+    const logged = dynamicVitalsChartData.filter((d) => d.bloating !== null && d.bloating > 0);
+    const count = logged.length;
+    const avg = count > 0 ? parseFloat((logged.reduce((sum, d) => sum + (d.bloating || 0), 0) / count).toFixed(1)) : 0;
+    let label = "No logs";
+    let badgeBg = "text-stone-400";
+    if (avg === 0) {
+      label = "No logs";
+      badgeBg = "text-stone-400";
+    } else if (avg <= 1.5) {
+      label = "Calm / None 🟢";
+      badgeBg = "text-emerald-600";
+    } else if (avg <= 2.5) {
+      label = "Mild Bloating 🟡";
+      badgeBg = "text-amber-600";
+    } else if (avg <= 3.5) {
+      label = "Moderate Bloating 🟠";
+      badgeBg = "text-orange-600";
+    } else {
+      label = "Severe Bloating 🔴";
+      badgeBg = "text-rose-600";
+    }
+    return { avg, count, label, badgeBg };
+  }, [dynamicVitalsChartData]);
+
+  // Real Digestion Scatter Points
   const dynamicDigestionScatterData = useMemo(() => {
-    const data = [];
+    const data: any[] = [];
     const start = new Date(dateRangeBounds.start);
     const end = new Date(dateRangeBounds.end);
     const current = new Date(start);
 
-    const times = ["07:15 AM", "08:45 AM", "09:30 AM", "01:20 PM", "04:10 PM", "08:50 PM", "10:15 PM"];
-    const types = [4, 3, 4, 2, 4, 1, 3, 6, 4, 3, 5, 4];
     const labels: Record<number, string> = {
       1: "Hard/Constipated (Type 1)",
       2: "Mildly Hard (Type 2)",
@@ -376,7 +459,7 @@ export const InsightsView = ({
       4: "Optimal/Smooth (Type 4)",
       5: "Soft (Type 5)",
       6: "Loose (Type 6)",
-      7: "Liquid/Diarrhea (Type 7)"
+      7: "Liquid/Diarrhea (Type 7)",
     };
     const colors: Record<number, string> = {
       1: "#F59E0B",
@@ -385,7 +468,7 @@ export const InsightsView = ({
       4: "#10B981",
       5: "#EF4444",
       6: "#EF4444",
-      7: "#EF4444"
+      7: "#EF4444",
     };
 
     while (current <= end) {
@@ -399,30 +482,82 @@ export const InsightsView = ({
         dayLabel = `${current.getMonth() + 1}/${current.getDate()}`;
       }
 
-      const daySeed = (current.getDate() * 13 + current.getMonth() * 37);
-      
-      // Determine 1, 2, or 3 logs for this day
-      const logCount = (daySeed % 5 === 0) ? 3 : (daySeed % 2 === 0) ? 2 : 1;
-
-      for (let i = 0; i < logCount; i++) {
-        const tIndex = (daySeed + i * 3) % times.length;
-        const typeIndex = (daySeed + i * 5) % types.length;
-        const stoolType = types[typeIndex];
-
-        data.push({
-          day: dayLabel,
-          date: dateStr,
-          time: times[tIndex],
-          type: stoolType,
-          label: labels[stoolType] || `Type ${stoolType}`,
-          fill: colors[stoolType] || "#10B981",
+      const row = wellnessByDate.get(dateStr);
+      if (row) {
+        const logs = row.stool_logs && row.stool_logs.length > 0 ? row.stool_logs : row.stool_type ? [{ id: '1', type: row.stool_type, time: row.stool_log_time || "12:00 PM" }] : [];
+        logs.forEach((log) => {
+          const stoolType = log.type;
+          if (stoolType >= 1 && stoolType <= 7) {
+            data.push({
+              day: dayLabel,
+              date: dateStr,
+              time: log.time || "Logged",
+              type: stoolType,
+              label: labels[stoolType] || `Type ${stoolType}`,
+              fill: colors[stoolType] || "#10B981",
+            });
+          }
         });
       }
 
       current.setDate(current.getDate() + 1);
     }
     return data;
-  }, [dateRangeBounds]);
+  }, [dateRangeBounds, wellnessByDate]);
+
+  const digestionStats = useMemo(() => {
+    if (dynamicDigestionScatterData.length === 0) return { avgType: 0, count: 0, label: "No logs recorded" };
+    const count = dynamicDigestionScatterData.length;
+    const avg = parseFloat((dynamicDigestionScatterData.reduce((s, d) => s + d.type, 0) / count).toFixed(1));
+    let label = "Optimal Zone 🟢";
+    if (avg < 2.8) label = "Constipated Zone 🟡";
+    else if (avg > 4.5) label = "Loose Zone 🔴";
+    return { avgType: avg, count, label };
+  }, [dynamicDigestionScatterData]);
+
+  // Real Eating Habits & Tags Aggregation
+  const eatingHabitsStats = useMemo(() => {
+    const startStr = localFormatDateStr(dateRangeBounds.start);
+    const endStr = localFormatDateStr(dateRangeBounds.end);
+
+    const rangeMeals = (mealsState || []).filter((m) => m.date >= startStr && m.date <= endStr);
+    const totalMeals = rangeMeals.length;
+
+    if (totalMeals === 0) {
+      return { totalMeals: 0, tagCounts: [], topProportions: [] };
+    }
+
+    const tagMap = new Map<string, number>();
+    rangeMeals.forEach((m) => {
+      if (Array.isArray(m.tags) && m.tags.length > 0) {
+        m.tags.forEach((t) => {
+          const clean = t.trim();
+          if (clean) tagMap.set(clean, (tagMap.get(clean) || 0) + 1);
+        });
+      } else {
+        const hour = parseInt((m.time || "").split(":")[0], 10) || 12;
+        const autoTag = hour < 11 ? "Breakfast" : hour < 16 ? "Lunch" : "Dinner";
+        tagMap.set(autoTag, (tagMap.get(autoTag) || 0) + 1);
+      }
+    });
+
+    const sortedTags = Array.from(tagMap.entries())
+      .map(([tag, count]) => ({
+        tag,
+        count,
+        pct: `${Math.round((count / totalMeals) * 100)}%`,
+        rawPct: Math.round((count / totalMeals) * 100),
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    const topProportions = sortedTags.slice(0, 3);
+
+    return {
+      totalMeals,
+      tagCounts: sortedTags.slice(0, 8),
+      topProportions,
+    };
+  }, [mealsState, dateRangeBounds]);
 
   // Compute accurate current streak (today or yesterday start)
   const computedCurrentStreak = useMemo(() => {
@@ -753,7 +888,7 @@ export const InsightsView = ({
                       border: "none", 
                       background: "rgba(255,255,255,0.9)", 
                       backdropFilter: "blur(10px)", 
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)", 
                       fontSize: 10,
                       fontWeight: 900,
                       color: "#431407"
@@ -811,7 +946,7 @@ export const InsightsView = ({
           </button>
         </div>
 
-        {/* Slide 0: Option B Stacked Progress List */}
+        {/* Slide 0: Stacked Progress List */}
         {nutrientSlide === 0 && (
           <motion.div
             key="slide-list"
@@ -954,10 +1089,16 @@ export const InsightsView = ({
                   Water Hydration
                 </div>
                 <div className="text-2xl font-black text-orange-950">
-                  2.6{" "}
-                  <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
-                    L avg/d <span className="font-medium text-sky-600 font-bold">(3.0L daily goal)</span>
-                  </span>
+                  {waterStats.count > 0 ? (
+                    <>
+                      {waterStats.avg}{" "}
+                      <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                        L avg/d <span className="font-medium text-sky-600 font-bold">({waterStats.goal}L daily goal)</span>
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-sm font-black text-orange-950/40">No logs in range</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -975,28 +1116,36 @@ export const InsightsView = ({
 
           {/* Dynamic Water Intake Bar Chart */}
           <div className="h-40 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={dynamicVitalsChartData}
-                margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
-              >
-                <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-                <YAxis domain={[0, 4]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
-                <RechartsTooltip
-                  contentStyle={{
-                    borderRadius: "16px",
-                    border: "none",
-                    background: "rgba(255,255,255,0.9)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                    fontSize: 11,
-                    fontWeight: 900,
-                    color: "#431407",
-                  }}
-                />
-                <Bar dataKey="water" fill="#38BDF8" radius={[6, 6, 6, 6]} name="Water (L)" />
-              </BarChart>
-            </ResponsiveContainer>
+            {waterStats.count > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={dynamicVitalsChartData}
+                  margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
+                >
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
+                  <YAxis domain={[0, 'dataMax + 0.5']} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
+                  <RechartsTooltip
+                    contentStyle={{
+                      borderRadius: "16px",
+                      border: "none",
+                      background: "rgba(255,255,255,0.9)",
+                      backdropFilter: "blur(10px)",
+                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      color: "#431407",
+                    }}
+                  />
+                  <ReferenceLine y={waterStats.goal} stroke="#38BDF8" strokeDasharray="4 4" strokeWidth={1.5} />
+                  <Bar dataKey="water" fill="#38BDF8" radius={[6, 6, 6, 6]} name="Water (L)" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <Droplets className="w-8 h-8 text-orange-950/20" />
+                <span className="text-xs font-bold text-orange-900/40 mt-2">No water logs recorded in this range</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1014,10 +1163,16 @@ export const InsightsView = ({
                   Energy Levels
                 </div>
                 <div className="text-2xl font-black text-orange-950">
-                  4.2{" "}
-                  <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
-                    / 5.0 <span className="font-medium text-amber-600 font-bold">(High Energy Average)</span>
-                  </span>
+                  {energyStats.avg > 0 ? (
+                    <>
+                      {energyStats.avg}{" "}
+                      <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                        / 5.0 <span className="font-medium text-amber-600 font-bold">({energyStats.label})</span>
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-sm font-black text-orange-950/40">No logs in range</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1035,33 +1190,125 @@ export const InsightsView = ({
 
           {/* Dynamic Energy Level Line Chart */}
           <div className="h-40 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={dynamicVitalsChartData}
-                margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-              >
-                <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-                <YAxis domain={[1, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
-                <RechartsTooltip
-                  contentStyle={{
-                    borderRadius: "16px",
-                    border: "none",
-                    background: "rgba(255,255,255,0.9)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                    fontSize: 11,
-                    fontWeight: 900,
-                    color: "#431407",
-                  }}
-                />
-                <Line type="monotone" dataKey="energy" stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} name="Energy (1-5)" />
-              </LineChart>
-            </ResponsiveContainer>
+            {energyStats.count > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={dynamicVitalsChartData}
+                  margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                >
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
+                  <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
+                  <RechartsTooltip
+                    contentStyle={{
+                      borderRadius: "16px",
+                      border: "none",
+                      background: "rgba(255,255,255,0.9)",
+                      backdropFilter: "blur(10px)",
+                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      color: "#431407",
+                    }}
+                    formatter={(val: any) => [`Level ${val}`, "Energy"]}
+                  />
+                  <Line type="monotone" dataKey="energy" connectNulls={true} stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} name="Energy (1-5)" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <Zap className="w-8 h-8 text-orange-950/20" />
+                <span className="text-xs font-bold text-orange-900/40 mt-2">No energy logs recorded in this range</span>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* 3. Dedicated Digestion Card (Respects trackDigestion config) */}
+      {/* 3. Dedicated Bloating Severity Card (Respects trackBloating config) */}
+      {profileData?.agent_config?.trackBloating !== false && (
+        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100/70 text-rose-600 flex items-center justify-center border border-rose-200/50 shadow-2xs">
+                <Wind className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
+                  Bloating Severity
+                </div>
+                <div className="text-2xl font-black text-orange-950">
+                  {bloatingStats.avg > 0 ? (
+                    <>
+                      {bloatingStats.avg}{" "}
+                      <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                        / 5.0 <span className={cn("font-bold", bloatingStats.badgeBg)}>({bloatingStats.label})</span>
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-sm font-black text-orange-950/40">No logs in range</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                if (triggerToast) triggerToast("💨 Bloating report copied!");
+              }}
+              title="Share Bloating Report"
+              className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Dynamic Bloating Level Line Chart */}
+          <div className="h-40 w-full pt-2">
+            {bloatingStats.count > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={dynamicVitalsChartData}
+                  margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                >
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
+                  <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
+                  <RechartsTooltip
+                    contentStyle={{
+                      borderRadius: "16px",
+                      border: "none",
+                      background: "rgba(255,255,255,0.9)",
+                      backdropFilter: "blur(10px)",
+                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                      fontSize: 11,
+                      fontWeight: 900,
+                      color: "#431407",
+                    }}
+                    formatter={(val: any) => {
+                      const num = Number(val);
+                      const labels: Record<number, string> = {
+                        1: "Level 1 (None/Calm)",
+                        2: "Level 2 (Mild)",
+                        3: "Level 3 (Moderate)",
+                        4: "Level 4 (Severe)",
+                        5: "Level 5 (Very Severe)",
+                      };
+                      return [labels[num] || `Level ${num}`, "Bloating"];
+                    }}
+                  />
+                  <Line type="monotone" dataKey="bloating" connectNulls={true} stroke="#F43F5E" strokeWidth={3} dot={{ r: 4, fill: "#F43F5E", stroke: "#fff", strokeWidth: 2 }} name="Bloating (1-5)" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <Wind className="w-8 h-8 text-orange-950/20" />
+                <span className="text-xs font-bold text-orange-900/40 mt-2">No bloating logs recorded in this range</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 4. Dedicated Digestion Card (Respects trackDigestion config) */}
       {profileData?.agent_config?.trackDigestion !== false && (
         <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
           <div className="flex justify-between items-start">
@@ -1074,10 +1321,16 @@ export const InsightsView = ({
                   Digestion (Bristol Scatter)
                 </div>
                 <div className="text-2xl font-black text-orange-950 flex flex-wrap items-baseline gap-2">
-                  <span>Type 3.8</span>
-                  <span className="text-xs font-bold text-emerald-600 tracking-normal font-sans">
-                    Ideal Zone 🟢
-                  </span>
+                  {digestionStats.count > 0 ? (
+                    <>
+                      <span>Type {digestionStats.avgType}</span>
+                      <span className="text-xs font-bold text-emerald-600 tracking-normal font-sans">
+                        {digestionStats.label}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-sm font-black text-orange-950/40">No logs in range</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1095,21 +1348,28 @@ export const InsightsView = ({
 
           {/* Dynamic Multi-Dot Scatter Chart */}
           <div className="h-44 w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <ReferenceLine y={3} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
-                <ReferenceLine y={4} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
-                <XAxis dataKey="date" name="Date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-                <YAxis domain={[1, 7]} ticks={[1, 2, 3, 4, 5, 6, 7]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} tickFormatter={(val) => `Type ${val}`} />
-                <ZAxis range={[60, 60]} />
-                <RechartsTooltip content={<CustomScatterTooltip />} />
-                <Scatter data={dynamicDigestionScatterData} dataKey="type">
-                  {dynamicDigestionScatterData.map((entry, index) => (
-                    <Cell key={`scatter-cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
+            {digestionStats.count > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <ReferenceLine y={3} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
+                  <ReferenceLine y={4} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
+                  <XAxis dataKey="date" name="Date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
+                  <YAxis domain={[1, 7]} ticks={[1, 2, 3, 4, 5, 6, 7]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} tickFormatter={(val) => `Type ${val}`} />
+                  <ZAxis range={[60, 60]} />
+                  <RechartsTooltip content={<CustomScatterTooltip />} />
+                  <Scatter data={dynamicDigestionScatterData} dataKey="type">
+                    {dynamicDigestionScatterData.map((entry, index) => (
+                      <Cell key={`scatter-cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                <Activity className="w-8 h-8 text-orange-950/20" />
+                <span className="text-xs font-bold text-orange-900/40 mt-2">No digestion logs recorded in this range</span>
+              </div>
+            )}
           </div>
 
           {/* Legend */}
@@ -1130,7 +1390,7 @@ export const InsightsView = ({
         </div>
       )}
 
-      {/* 4. Dedicated Eating Habits & Meal Tags Card */}
+      {/* 5. Dedicated Eating Habits & Meal Tags Card */}
       <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-5 font-sans">
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
@@ -1142,7 +1402,7 @@ export const InsightsView = ({
                 Eating Habits & Tags
               </div>
               <div className="text-xs font-bold text-orange-900/60 font-sans">
-                based on 18 logged meals
+                based on {eatingHabitsStats.totalMeals} logged meals
               </div>
             </div>
           </div>
@@ -1158,47 +1418,57 @@ export const InsightsView = ({
           </button>
         </div>
 
-        {/* Habit Proportion Bar */}
-        <div className="space-y-2">
-          <div className="w-full h-4 bg-orange-100/50 rounded-full overflow-hidden flex border border-orange-200/30">
-            <div className="h-full bg-orange-500" style={{ width: "65%" }} title="Home Cooked (65%)" />
-            <div className="h-full bg-sky-400" style={{ width: "20%" }} title="High Protein (20%)" />
-            <div className="h-full bg-amber-400" style={{ width: "15%" }} title="Eating Out (15%)" />
-          </div>
+        {eatingHabitsStats.totalMeals > 0 ? (
+          <>
+            {/* Dynamic Habit Proportion Bar */}
+            {eatingHabitsStats.topProportions.length > 0 && (
+              <div className="space-y-2">
+                <div className="w-full h-4 bg-orange-100/50 rounded-full overflow-hidden flex border border-orange-200/30">
+                  {eatingHabitsStats.topProportions.map((p, pIdx) => {
+                    const colors = ["bg-orange-500", "bg-sky-400", "bg-amber-400"];
+                    return (
+                      <div
+                        key={p.tag}
+                        className={cn("h-full transition-all", colors[pIdx % colors.length])}
+                        style={{ width: `${p.rawPct}%` }}
+                        title={`${p.tag} (${p.pct})`}
+                      />
+                    );
+                  })}
+                </div>
 
-          <div className="flex justify-between items-center text-[10px] font-black text-orange-950/60 px-1">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-orange-500" />
-              Home Cooked (65%)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-sky-400" />
-              High Protein (20%)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
-              Eating Out (15%)
-            </span>
-          </div>
-        </div>
+                <div className="flex justify-between items-center text-[10px] font-black text-orange-950/60 px-1 flex-wrap gap-2">
+                  {eatingHabitsStats.topProportions.map((p, pIdx) => {
+                    const dotColors = ["bg-orange-500", "bg-sky-400", "bg-amber-400"];
+                    return (
+                      <span key={p.tag} className="flex items-center gap-1.5">
+                        <span className={cn("w-2 h-2 rounded-full", dotColors[pIdx % dotColors.length])} />
+                        {p.tag} ({p.pct})
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-        {/* Meal Tag Badges */}
-        <div className="flex flex-wrap gap-2 pt-1">
-          {[
-            { tag: "Home Cooked", count: 12, pct: "65%" },
-            { tag: "High Protein", count: 4, pct: "20%" },
-            { tag: "Eating Out", count: 3, pct: "15%" },
-            { tag: "High Fiber", count: 5, pct: "28%" },
-            { tag: "Fast Food", count: 2, pct: "10%" },
-          ].map((item, idx) => (
-            <div key={idx} className="bg-white/80 border border-orange-100/80 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-2xs">
-              <span className="text-xs font-extrabold text-orange-950">{item.tag}</span>
-              <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-md font-mono">
-                {item.count} meals ({item.pct})
-              </span>
+            {/* Meal Tag Badges */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {eatingHabitsStats.tagCounts.map((item, idx) => (
+                <div key={idx} className="bg-white/80 border border-orange-100/80 rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-2xs">
+                  <span className="text-xs font-extrabold text-orange-950">{item.tag}</span>
+                  <span className="text-[10px] font-black text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-md font-mono">
+                    {item.count} {item.count === 1 ? "meal" : "meals"} ({item.pct})
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <div className="py-6 flex flex-col items-center justify-center text-center">
+            <Utensils className="w-8 h-8 text-orange-950/20" />
+            <span className="text-xs font-bold text-orange-900/40 mt-2">No meals logged in this date range</span>
+          </div>
+        )}
       </div>
 
       {/* TIME RANGE PICKER BOTTOM SHEET MODAL (PORTAL TO BODY) */}

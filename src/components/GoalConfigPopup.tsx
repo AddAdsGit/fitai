@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { X, Target } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Profile } from "../types";
@@ -24,14 +25,16 @@ export function GoalConfigPopup({
   setProfileData,
   setToastMessage,
 }: GoalConfigPopupProps) {
-  return (
+  if (!activeGoalConfigPopup) return null;
+
+  return createPortal(
     <AnimatePresence>
       {activeGoalConfigPopup && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/65 backdrop-blur-md z-[100] flex items-end justify-center font-sans"
+          className="fixed inset-0 bg-black/65 backdrop-blur-md z-[9999] flex items-end justify-center font-sans"
         >
           {/* Slide up sheet panel */}
           <motion.div
@@ -191,6 +194,7 @@ export function GoalConfigPopup({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

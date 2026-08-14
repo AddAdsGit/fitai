@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Clock, Plus, Minus, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -71,9 +72,9 @@ export const TimePickerModal = ({
     onClose();
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 font-sans">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 font-sans">
         {/* Backdrop overlay */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -216,6 +217,7 @@ export const TimePickerModal = ({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

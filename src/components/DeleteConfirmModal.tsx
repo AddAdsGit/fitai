@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Meal } from "../types";
@@ -14,14 +15,16 @@ export function DeleteConfirmModal({
   setMealPendingDelete,
   confirmDeleteMeal,
 }: DeleteConfirmModalProps) {
-  return (
+  if (!mealPendingDelete) return null;
+
+  return createPortal(
     <AnimatePresence>
       {mealPendingDelete && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 z-[100] backdrop-blur-[2px] flex items-center justify-center p-6 font-sans"
+          className="fixed inset-0 bg-black/60 z-[9999] backdrop-blur-[2px] flex items-center justify-center p-6 font-sans"
         >
           <motion.div
             initial={{ scale: 0.9, y: 15 }}
@@ -71,6 +74,7 @@ export function DeleteConfirmModal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

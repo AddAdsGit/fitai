@@ -8,7 +8,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
-import type { Meal, Recipe, WeightLog } from "../types";
+import type { Meal, Recipe, WeightLog, DailyWellness } from "../types";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -63,6 +63,7 @@ export const ProfileView = ({
   currentStreak,
   mealsState,
   weightLogs = [],
+  dailyNotes = [],
   onLogWeight,
   onDeleteWeight,
   onLogout,
@@ -81,11 +82,12 @@ export const ProfileView = ({
   currentStreak: number;
   mealsState: Meal[];
   weightLogs?: WeightLog[];
+  dailyNotes?: DailyWellness[];
   onLogWeight?: (weight: number, date: string) => void;
   onDeleteWeight?: (id: string) => void;
   onLogout?: () => void;
 }) => {
-  const [profileTab, setProfileTab] = useState<"insights" | "meals" | "agent-brain">("insights");
+  const [profileTab, setProfileTab] = useState<"meals" | "insights" | "agent-brain">("meals");
   
   // V3.2 Restructured Agent Brain States (Combined Single Notepad)
   const getCombinedMemoriesText = () => {
@@ -542,18 +544,6 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
 
       <div className="flex justify-between border-b border-black/5 mt-6 px-4">
         <button
-          onClick={() => setProfileTab("insights")}
-          className={cn(
-            "flex-1 py-3 flex justify-center border-b-[3px] transition-colors",
-            profileTab === "insights"
-              ? "border-[#1a1a1a] text-[#1a1a1a]"
-              : "border-transparent text-[#9e9e9e]",
-          )}
-          title="Insights & Weight Progress"
-        >
-          <BarChart2 className="w-6 h-6" />
-        </button>
-        <button
           onClick={() => setProfileTab("meals")}
           className={cn(
             "flex-1 py-3 flex justify-center border-b-[3px] transition-colors",
@@ -564,6 +554,18 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
           title="Food Library"
         >
           <BookOpen className="w-6 h-6" />
+        </button>
+        <button
+          onClick={() => setProfileTab("insights")}
+          className={cn(
+            "flex-1 py-3 flex justify-center border-b-[3px] transition-colors",
+            profileTab === "insights"
+              ? "border-[#1a1a1a] text-[#1a1a1a]"
+              : "border-transparent text-[#9e9e9e]",
+          )}
+          title="Insights & Weight Progress"
+        >
+          <BarChart2 className="w-6 h-6" />
         </button>
         <button
           onClick={() => setProfileTab("agent-brain")}
@@ -923,6 +925,7 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
               mealsState={mealsState} 
               profileData={profileData} 
               weightLogs={weightLogs}
+              dailyNotes={dailyNotes}
               onLogWeight={onLogWeight}
               onDeleteWeight={onDeleteWeight}
               triggerToast={triggerToast}

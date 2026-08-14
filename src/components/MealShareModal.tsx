@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { X, Copy, Download, Share2, Flame, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
 import { SharedItemPayload, generateShareUrl, compressMeal } from "../utils/shareUtils";
@@ -38,6 +39,7 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
   const [previewTab, setPreviewTab] = useState<"card" | "webpage">("card");
   const [canShareFile, setCanShareFile] = useState(false);
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<"obsidian" | "sunset">("sunset");
   const [loadedImg, setLoadedImg] = useState<HTMLImageElement | null>(null);
   const [imgLoadingState, setImgLoadingState] = useState<"idle" | "loading" | "loaded" | "error">("idle");
 
@@ -228,125 +230,57 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
     getOrCreateShortLink();
   }, [payload]);
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-[300] flex items-center justify-center p-6 font-sans"
+      className="fixed inset-0 bg-orange-950/30 backdrop-blur-md z-[9999] flex items-center justify-center p-6 font-sans text-orange-950"
     >
       <motion.div
         initial={{ scale: 0.95, y: 15 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 15 }}
-        className="bg-stone-50 border border-white rounded-[32px] w-full max-w-[400px] shadow-2xl p-6 flex flex-col items-center gap-5 max-h-[90vh] overflow-y-auto no-scrollbar scroll-smooth"
+        className="bg-[#FAF7F2] border border-white rounded-[32px] w-full max-w-[400px] shadow-xl shadow-orange-100/20 p-6 flex flex-col items-center gap-5 max-h-[90vh] overflow-y-auto no-scrollbar scroll-smooth"
       >
         {/* Header */}
         <div className="flex justify-between items-center w-full">
-          <span className="text-[10px] font-black uppercase tracking-widest text-stone-400">
+          <span className="text-[10px] font-black uppercase tracking-widest text-orange-900/40">
             Share Meal Log
           </span>
           <button
             onClick={onClose}
-            className="w-7 h-7 bg-stone-200/50 hover:bg-stone-200 text-stone-500 rounded-full flex items-center justify-center cursor-pointer transition-colors"
+            className="w-7 h-7 bg-orange-100/40 hover:bg-orange-100/80 text-orange-950/60 rounded-full flex items-center justify-center cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Preview tabs */}
-        <div className="flex items-center justify-between w-full gap-2 select-none shrink-0">
-          <div className="flex bg-stone-100 p-1 rounded-xl gap-1 flex-1 font-sans">
-            <button
-              type="button"
-              onClick={() => setPreviewTab("card")}
-              className={cn(
-                "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                previewTab === "card" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
-              )}
-            >
-              🖼️ Image Card
-            </button>
-            <button
-              type="button"
-              onClick={() => setPreviewTab("webpage")}
-              className={cn(
-                "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                previewTab === "webpage" ? "bg-white text-stone-900 shadow-2xs" : "text-stone-500 hover:text-stone-700"
-              )}
-            >
-              🌐 Web Link
-            </button>
-          </div>
+        {/* Preview Container */}
+        <div className="relative w-full aspect-square flex flex-col items-center justify-center">
+          <motion.div
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.4}
+            onDragEnd={(_, info) => {
+              if (info.offset.x > 80) handlePrev();
+              else if (info.offset.x < -80) handleNext();
+            }}
+            className="w-full h-full rounded-[28px] overflow-hidden shadow-lg border border-orange-100/30 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#0A0504]"
+          >
+            <canvas
+              ref={canvasRef}
+              className="w-full h-full object-contain block"
+            />
+          </motion.div>
         </div>
 
-        {/* Preview Container */}
-        {previewTab === "card" ? (
-          <div className="relative w-full aspect-square flex flex-col items-center justify-center">
-            <motion.div
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.4}
-              onDragEnd={(_, info) => {
-                if (info.offset.x > 80) handlePrev();
-                else if (info.offset.x < -80) handleNext();
-              }}
-              className="w-full h-full rounded-[28px] overflow-hidden shadow-xl border border-stone-200/50 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#151413]"
-            >
-              <canvas
-                ref={canvasRef}
-                className="w-full h-full object-contain block"
-              />
-            </motion.div>
-          </div>
-        ) : (
-          /* Web Link View Mockup */
-          <div className="w-full aspect-square bg-[#FAF9F6] rounded-[28px] border border-stone-200 shadow-xl overflow-y-auto p-4.5 text-left font-sans flex flex-col gap-3.5 no-scrollbar">
-            <div className="flex items-center justify-between border-b border-stone-200 pb-2.5">
-              <div className="flex items-center gap-1.5">
-                <div className="w-5.5 h-5.5 rounded-lg bg-orange-500 flex items-center justify-center shadow-xs">
-                  <Flame className="text-white w-3 h-3 fill-white" />
-                </div>
-                <span className="text-[10px] font-black text-stone-700 tracking-tight">FitAI Link View</span>
-              </div>
-              <span className="text-[7.5px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full select-none">
-                Guest View
-              </span>
-            </div>
-
-            <div className="bg-stone-50 border border-stone-100 rounded-xl p-3 text-[10px] text-stone-700 font-extrabold flex justify-between items-center">
-              <span>🍽️ {name}</span>
-              <span className="text-orange-600">{calories} kcal</span>
-            </div>
-
-            {item.meal_description && (
-              <div className="text-[10px] text-stone-600 italic bg-stone-50 border border-stone-100 rounded-xl p-3">
-                "{item.meal_description}"
-              </div>
-            )}
-
-            <div className="grid grid-cols-4 gap-1.5 shrink-0">
-              {[
-                { label: "Kcal", val: calories, color: "text-orange-600" },
-                { label: "Protein", val: `${protein}g`, color: "text-stone-700" },
-                { label: "Carbs", val: `${carbs}g`, color: "text-stone-700" },
-                { label: "Fats", val: `${fats}g`, color: "text-stone-700" }
-              ].map((stat) => (
-                <div key={stat.label} className="bg-white border border-stone-100/70 p-1.5 rounded-xl text-center shadow-3xs">
-                  <span className="text-[6.5px] text-stone-400 block uppercase font-black">{stat.label}</span>
-                  <span className={cn("text-[9.5px] font-black mt-0.5 block", stat.color)}>{stat.val}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Pagination Row */}
-        {previewTab === "card" && variations.length > 1 && (
+        {variations.length > 1 && (
           <div className="flex items-center gap-6 select-none mt-1 mb-2">
             <button
               onClick={handlePrev}
-              className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+              className="w-7 h-7 rounded-full bg-white border border-orange-100 text-orange-950/80 hover:bg-orange-50/50 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -357,7 +291,7 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
                   key={v.id}
                   onClick={() => setCurrentIndex(idx)}
                   className={`h-2 rounded-full transition-all cursor-pointer ${
-                    idx === currentIndex ? "w-5 bg-orange-500" : "w-2 bg-stone-300"
+                    idx === currentIndex ? "w-5 bg-orange-500" : "w-2 bg-orange-200"
                   }`}
                 />
               ))}
@@ -365,7 +299,7 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
 
             <button
               onClick={handleNext}
-              className="w-7 h-7 rounded-full bg-white border border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+              className="w-7 h-7 rounded-full bg-white border border-orange-100 text-orange-950/80 hover:bg-orange-50/50 shadow-2xs flex items-center justify-center cursor-pointer transition-colors active:scale-95"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -377,7 +311,7 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
           {typeof navigator !== "undefined" && navigator.share && (
             <button
               onClick={handleNativeShare}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-100 active:scale-98 transition-all"
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-200 active:scale-98 transition-all"
             >
               <Share2 className="w-4 h-4" />
               <span>Share to Apps (WhatsApp, IG...)</span>
@@ -388,15 +322,15 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
             <button
               onClick={handleCopyLink}
               disabled={loadingUrl}
-              className="flex-1 bg-stone-100 hover:bg-stone-205 text-stone-800 disabled:opacity-60 text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+              className="flex-1 bg-white hover:bg-orange-50/50 border border-orange-100 text-orange-950 disabled:opacity-60 text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? "Copied!" : "Copy URL Link"}</span>
+              <span>{copied ? "Copied!" : "Copy URL"}</span>
             </button>
 
             <button
               onClick={handleDownloadImage}
-              className="flex-1 bg-stone-900 hover:bg-stone-850 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+              className="flex-1 bg-orange-950 hover:bg-orange-900 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download PNG</span>
@@ -404,6 +338,7 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };

@@ -77,7 +77,7 @@ export function WellnessJournal({
   const cleanNoteText = cleanActiveNoteText;
 
   return (
-    <div className="flex flex-col gap-3 text-left w-full relative select-none">
+    <div className="flex flex-col text-left w-full relative select-none">
       <div className="w-full min-h-[90px] flex flex-col justify-start">
         {isEditingNote && !isReadOnly ? (
           <textarea
@@ -86,7 +86,7 @@ export function WellnessJournal({
             onChange={handleTextareaChange}
             onBlur={handleBlur}
             placeholder="Tap here to write down how you felt, symptoms, food reactions, or notes about today..."
-            className="w-full bg-transparent border-0 outline-none ring-0 focus:ring-0 focus:outline-none p-0 text-sm font-semibold text-stone-800 placeholder-stone-400 resize-none min-h-[90px] leading-relaxed transition-all"
+            className="w-full bg-transparent border-0 outline-none ring-0 focus:ring-0 focus:outline-none p-0 m-0 text-sm font-semibold text-stone-800 placeholder-stone-400/80 placeholder:italic resize-none min-h-[90px] leading-relaxed transition-none"
           />
         ) : (
           <div
@@ -94,11 +94,11 @@ export function WellnessJournal({
               if (!isReadOnly) setIsEditingNote(true);
             }}
             className={cn(
-              "text-sm leading-relaxed min-h-[90px] py-0.5 transition-colors duration-200 select-text whitespace-pre-line",
+              "text-sm leading-relaxed min-h-[90px] p-0 m-0 transition-colors duration-150 select-text whitespace-pre-line",
               !isReadOnly ? "cursor-text" : "cursor-default",
               cleanNoteText
                 ? "font-semibold text-stone-800"
-                : "font-medium text-stone-400 italic"
+                : "font-medium text-stone-400/80 italic"
             )}
           >
             {cleanNoteText ||

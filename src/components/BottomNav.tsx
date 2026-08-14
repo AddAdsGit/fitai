@@ -66,7 +66,7 @@ export function BottomNav({
   return (
     <nav
       id="bottom-nav"
-      className="fixed bottom-6 left-6 right-6 max-w-[calc(448px-3rem)] mx-auto z-50"
+      className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] left-4 sm:left-6 right-4 sm:right-6 max-w-[calc(448px-2rem)] sm:max-w-[calc(448px-3rem)] mx-auto z-50 select-none"
     >
       <div
         id="nav-container"

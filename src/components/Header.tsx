@@ -3,6 +3,8 @@ import { Flame } from "lucide-react";
 import { motion } from "motion/react";
 import type { Profile } from "../types";
 import { DefaultAvatar } from "./DefaultAvatar";
+import { DEFAULT_CUSTOM_GPT_URL } from "../constants/app";
+import { ChatGPTIcon } from "./ChatGPTIcon";
 
 export interface HeaderProps {
   currentStreak: number;
@@ -11,10 +13,12 @@ export interface HeaderProps {
 }
 
 export function Header({ currentStreak, profileData, setActiveTab }: HeaderProps) {
+  const gptUrl = localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL;
+
   return (
     <header
       id="header-main"
-      className="px-6 pt-8 flex items-center justify-between relative z-10"
+      className="px-4 sm:px-6 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] flex items-center justify-between relative z-10 select-none"
     >
       <div id="brand-logo" className="flex items-center gap-2">
         <div className="w-9 h-9 rounded-xl bg-orange-500 shadow-lg shadow-orange-200 flex items-center justify-center">

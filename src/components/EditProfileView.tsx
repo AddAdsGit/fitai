@@ -263,11 +263,12 @@ export const EditProfileView = ({
               <span className="text-[9px] font-black text-stone-400 uppercase tracking-wider">Upload or change avatar</span>
             </div>
 
-            {/* Full Name Row */}
+            {/* Preferred Name / Nickname Row */}
             <div>
-              <label className="text-[9px] font-black text-[#9e9e9e] uppercase tracking-widest block mb-1 px-1">Full Name</label>
+              <label className="text-[9px] font-black text-[#9e9e9e] uppercase tracking-widest block mb-1 px-1">Preferred Name / Nickname</label>
               <input
                 type="text"
+                placeholder="e.g. Siva"
                 value={profileData.name}
                 onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
                 className="w-full bg-[#f5f5f5] rounded-xl px-4 py-3 text-sm font-bold text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-orange-500/10 transition-shadow"
@@ -443,6 +444,88 @@ export const EditProfileView = ({
               </div>
               <p className="text-[9.5px] text-stone-500 leading-relaxed font-medium">{bmiStatus.desc}</p>
             </div>
+
+            {/* Target Weight Goal */}
+            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Target Weight</span>
+                <span className="text-[9px] font-black text-stone-400 uppercase">kg</span>
+              </div>
+              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setProfileData({
+                    ...profileData,
+                    goals: { ...profileData.goals, weightGoal: Math.max(30, (profileData.goals?.weightGoal || 70) - 1) }
+                  })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center">
+                  <input
+                    type="number"
+                    value={profileData.goals?.weightGoal || ""}
+                    onChange={(e) => setProfileData({
+                      ...profileData,
+                      goals: { ...profileData.goals, weightGoal: parseFloat(e.target.value) || 0 }
+                    })}
+                    className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileData({
+                    ...profileData,
+                    goals: { ...profileData.goals, weightGoal: Math.min(300, (profileData.goals?.weightGoal || 70) + 1) }
+                  })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Daily Calories Target */}
+            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Daily Calorie Target</span>
+                <span className="text-[9px] font-black text-stone-400 uppercase">kcal</span>
+              </div>
+              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setProfileData({
+                    ...profileData,
+                    goals: { ...profileData.goals, dailyCalories: Math.max(800, (profileData.goals?.dailyCalories || 2000) - 50) }
+                  })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex-1 flex items-center justify-center">
+                  <input
+                    type="number"
+                    value={profileData.goals?.dailyCalories || ""}
+                    onChange={(e) => setProfileData({
+                      ...profileData,
+                      goals: { ...profileData.goals, dailyCalories: parseInt(e.target.value) || 0 }
+                    })}
+                    className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileData({
+                    ...profileData,
+                    goals: { ...profileData.goals, dailyCalories: Math.min(10000, (profileData.goals?.dailyCalories || 2000) + 50) }
+                  })}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Card 4: Daily Vitals Trackers (Separate Dedicated Section) */}
@@ -471,14 +554,7 @@ export const EditProfileView = ({
                   label: "Water Intake",
                   desc: "Quick-log daily hydration in ml",
                   icon: Droplet,
-                  hasGoal: true,
-                  goalKey: "dailyWater",
-                  goalDefault: 2500,
-                  goalStep: 250,
-                  goalMin: 500,
-                  goalMax: 10000,
-                  goalLabel: "Daily Hydration Goal",
-                  goalUnit: "ml",
+                  hasGoal: false,
                   hasInfo: false,
                 },
                 {
@@ -626,97 +702,7 @@ export const EditProfileView = ({
             </div>
           </div>
 
-          {/* Card 5: Goals & Targets */}
-          <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-stone-50">
-              <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
-                <Target className="w-4 h-4" />
-              </div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-stone-700">Goals & Targets</span>
-            </div>
 
-            {/* Daily Calories Goal */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Daily Calorie Target</span>
-                <span className="text-[9px] font-black text-stone-400 uppercase">kcal</span>
-              </div>
-              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, dailyCalories: Math.max(800, (profileData.goals?.dailyCalories || 2000) - 50) }
-                  })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <div className="flex-1 flex items-center justify-center">
-                  <input
-                    type="number"
-                    value={profileData.goals?.dailyCalories || ""}
-                    onChange={(e) => setProfileData({
-                      ...profileData,
-                      goals: { ...profileData.goals, dailyCalories: parseInt(e.target.value) || 0 }
-                    })}
-                    className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, dailyCalories: Math.min(10000, (profileData.goals?.dailyCalories || 2000) + 50) }
-                  })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Target Weight Goal */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Target Weight</span>
-                <span className="text-[9px] font-black text-stone-400 uppercase">kg</span>
-              </div>
-              <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, weightGoal: Math.max(30, (profileData.goals?.weightGoal || 70) - 1) }
-                  })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
-                >
-                  <Minus className="w-3.5 h-3.5" />
-                </button>
-                <div className="flex-1 flex items-center justify-center">
-                  <input
-                    type="number"
-                    value={profileData.goals?.weightGoal || ""}
-                    onChange={(e) => setProfileData({
-                      ...profileData,
-                      goals: { ...profileData.goals, weightGoal: parseFloat(e.target.value) || 0 }
-                    })}
-                    className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, weightGoal: Math.min(300, (profileData.goals?.weightGoal || 70) + 1) }
-                  })}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Card: Nutrient Tracking (Dedicated Section) */}
           <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
@@ -967,60 +953,32 @@ export const EditProfileView = ({
                           Active Target Slots ({activeNutrients.length}/8)
                         </span>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="grid grid-cols-1 gap-2.5">
                           {activeNutrients.map((item: any) => (
                             <div
                               key={item.id}
-                              className="bg-stone-50/80 border border-stone-200/70 rounded-2xl p-2.5 flex flex-col justify-between shadow-3xs hover:border-stone-300 transition-all text-left"
+                              className="bg-stone-50/80 border border-stone-200/70 rounded-2xl p-3 flex items-center justify-between shadow-3xs hover:border-stone-300 transition-all text-left"
                             >
-                              <div className="flex items-center justify-between gap-1">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <div
-                                    className="w-2 h-2 rounded-full shrink-0"
-                                    style={{ backgroundColor: item.color || "#F97316" }}
-                                  />
-                                  <span className="text-xs font-extrabold text-stone-850 truncate">{item.name}</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = trackedList.map((n: any) =>
-                                      n.id === item.id ? { ...n, enabled: false } : n
-                                    );
-                                    setProfileData({ ...profileData, tracked_nutrients: updated });
-                                  }}
-                                  className="w-5 h-5 rounded-lg text-stone-350 hover:text-red-500 hover:bg-red-50 flex items-center justify-center cursor-pointer border-none bg-transparent transition-colors shrink-0"
-                                  title={`Remove ${item.name}`}
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: item.color || "#F97316" }}
+                                />
+                                <span className="text-xs font-black text-stone-850 truncate">{item.name}</span>
+                                {["protein", "carbs", "fats", "fiber"].includes(item.id) && (
+                                  <span className="text-[8.5px] font-extrabold uppercase text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-md border border-orange-100/50 shrink-0">
+                                    Macro
+                                  </span>
+                                )}
                               </div>
 
-                              <div className="flex items-center justify-between mt-2 bg-white border border-stone-200/80 rounded-xl px-1.5 py-0.5 shadow-3xs">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const step = item.unit === "mg" ? 50 : item.unit === "IU" ? 100 : item.unit === "mcg" ? 10 : 5;
-                                    const newVal = Math.max(0, (item.target || 0) - step);
-                                    const updated = trackedList.map((n: any) =>
-                                      n.id === item.id ? { ...n, target: newVal } : n
-                                    );
-                                    const updatedMacros = { ...(profileData.macros || {}) };
-                                    if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
-                                      updatedMacros[item.id] = newVal;
-                                    }
-                                    setProfileData({ ...profileData, macros: updatedMacros, tracked_nutrients: updated });
-                                  }}
-                                  className="w-5 h-5 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
-                                >
-                                  <Minus className="w-2.5 h-2.5" />
-                                </button>
-                                <div className="flex items-center justify-center gap-0.5 min-w-0">
-                                  <input
-                                    type="number"
-                                    value={item.target || 0}
-                                    onChange={(e) => {
-                                      const newVal = Math.max(0, parseFloat(e.target.value) || 0);
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="flex items-center gap-1 bg-white border border-stone-200/80 rounded-xl px-1.5 py-1 shadow-3xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const step = item.unit === "mg" ? 50 : item.unit === "IU" ? 100 : item.unit === "mcg" ? 10 : 5;
+                                      const newVal = Math.max(0, (item.target || 0) - step);
                                       const updated = trackedList.map((n: any) =>
                                         n.id === item.id ? { ...n, target: newVal } : n
                                       );
@@ -1030,27 +988,61 @@ export const EditProfileView = ({
                                       }
                                       setProfileData({ ...profileData, macros: updatedMacros, tracked_nutrients: updated });
                                     }}
-                                    className="w-12 text-center text-xs font-black text-stone-900 bg-transparent border-none focus:outline-none font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  />
-                                  <span className="text-[9px] font-bold text-stone-400 font-mono">{item.unit}</span>
+                                    className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <div className="flex items-center justify-center gap-0.5 min-w-0">
+                                    <input
+                                      type="number"
+                                      value={item.target || 0}
+                                      onChange={(e) => {
+                                        const newVal = Math.max(0, parseFloat(e.target.value) || 0);
+                                        const updated = trackedList.map((n: any) =>
+                                          n.id === item.id ? { ...n, target: newVal } : n
+                                        );
+                                        const updatedMacros = { ...(profileData.macros || {}) };
+                                        if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
+                                          updatedMacros[item.id] = newVal;
+                                        }
+                                        setProfileData({ ...profileData, macros: updatedMacros, tracked_nutrients: updated });
+                                      }}
+                                      className="w-12 text-center text-xs font-black text-stone-900 bg-transparent border-none focus:outline-none font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <span className="text-[10px] font-bold text-stone-400 font-mono">{item.unit}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const step = item.unit === "mg" ? 50 : item.unit === "IU" ? 100 : item.unit === "mcg" ? 10 : 5;
+                                      const newVal = (item.target || 0) + step;
+                                      const updated = trackedList.map((n: any) =>
+                                        n.id === item.id ? { ...n, target: newVal } : n
+                                      );
+                                      const updatedMacros = { ...(profileData.macros || {}) };
+                                      if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
+                                        updatedMacros[item.id] = newVal;
+                                      }
+                                      setProfileData({ ...profileData, macros: updatedMacros, tracked_nutrients: updated });
+                                    }}
+                                    className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
                                 </div>
+
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const step = item.unit === "mg" ? 50 : item.unit === "IU" ? 100 : item.unit === "mcg" ? 10 : 5;
-                                    const newVal = (item.target || 0) + step;
                                     const updated = trackedList.map((n: any) =>
-                                      n.id === item.id ? { ...n, target: newVal } : n
+                                      n.id === item.id ? { ...n, enabled: false } : n
                                     );
-                                    const updatedMacros = { ...(profileData.macros || {}) };
-                                    if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
-                                      updatedMacros[item.id] = newVal;
-                                    }
-                                    setProfileData({ ...profileData, macros: updatedMacros, tracked_nutrients: updated });
+                                    setProfileData({ ...profileData, tracked_nutrients: updated });
                                   }}
-                                  className="w-5 h-5 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                                  className="w-7 h-7 rounded-xl text-stone-350 hover:text-red-500 hover:bg-red-50 flex items-center justify-center cursor-pointer border-none bg-transparent transition-colors shrink-0"
+                                  title={`Remove ${item.name}`}
                                 >
-                                  <Plus className="w-2.5 h-2.5" />
+                                  <X className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             </div>

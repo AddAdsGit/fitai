@@ -480,17 +480,15 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
         <div className="flex flex-col gap-2">
 
           {weightTodayLog ? (
-            <UniversalVitalLogCard
-              type="weight"
-              valueText={`${weightTodayLog.weight} kg`}
-              logTime={weightTodayLog.log_time}
-              canDelete={selectedDate === todayStr}
-              onDelete={async () => {
-                if (weightTodayLog.id) {
-                  await handleDeleteWeight(weightTodayLog.id);
-                }
-              }}
-            />
+            <div className="flex items-center justify-between px-3.5 py-2.5 bg-orange-50/60 rounded-2xl border border-orange-100/60 text-xs font-bold text-orange-950/70 animate-fade-in">
+              <span className="flex items-center gap-1.5">
+                <span className="text-emerald-500 font-black">✓</span>
+                <span>Weight logged for today ({weightTodayLog.weight} kg)</span>
+              </span>
+              <span className="text-[10px] text-stone-400 font-mono font-medium">
+                {weightTodayLog.log_time}
+              </span>
+            </div>
           ) : selectedDate === todayStr ? (
             (() => {
               const baseWeight = (() => {
@@ -743,21 +741,14 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                     </button>
                   </div>
 
-                  {/* Dynamic Motivational Description below (only while stepping) */}
+                  {/* Dynamic Hydration Description (Only when interacting) */}
                   {isWaterStepping && (
                     <div className="px-1 text-left animate-fade-in">
                       <span className="text-[11px] font-medium text-stone-500">
                         {(() => {
-                          if (waterIntake === 0)
-                            return `Goal: ${DAILY_WATER_GOAL_ML}ml — tap + or type to log hydration 💧`;
-                          const remaining = DAILY_WATER_GOAL_ML - waterIntake;
-                          if (remaining > 0)
-                            return `${waterIntake}ml logged (${Math.round(
-                              (waterIntake / DAILY_WATER_GOAL_ML) * 100
-                            )}%) — ${remaining}ml remaining 🌊`;
-                          if (remaining === 0)
-                            return `Daily goal achieved (${DAILY_WATER_GOAL_ML}ml)! Amazing job 🎉`;
-                          return `${waterIntake}ml logged — daily goal exceeded! 🚀`;
+                          const inc = currentWaterIncrement || 250;
+                          const nextTotal = waterIntake + inc;
+                          return `Will add +${inc} ml → Total logged today: ${nextTotal} ml 💧`;
                         })()}
                       </span>
                     </div>
@@ -1074,42 +1065,6 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                   <span className="text-[11px] font-medium text-stone-500">
                     {getBloatingDescription(currentBloating)}
                   </span>
-                </div>
-              )}
-
-              {/* Logged Bloating Entries List for selectedDate */}
-              {bloatingLogsList.length > 0 && (
-                <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-stone-200/60 animate-fade-in">
-                  <span className="text-[10px] font-black uppercase text-stone-400">
-                    Bloating Logs ({bloatingLogsList.length})
-                  </span>
-                  {bloatingLogsList.map((item) => {
-                    const getBloatingLabel = (lvl: number) => {
-                      if (lvl === 1) return "None";
-                      if (lvl === 2) return "Mild Bloat";
-                      if (lvl === 3) return "Moderate Bloat";
-                      return "Severe Bloat";
-                    };
-
-                    return (
-                      <UniversalVitalLogCard
-                        key={item.id}
-                        type="bloating"
-                        bloatingLevel={item.level}
-                        valueText={getBloatingLabel(item.level)}
-                        subText={`(Level ${item.level})`}
-                        logTime={item.time}
-                        canDelete={selectedDate === todayStr}
-                        onDelete={async () => {
-                          if (item.id === "legacy-bloating") {
-                            await handleLogBloating(null, selectedDate);
-                          } else {
-                            await handleDeleteBloatingLogItem(item.id, selectedDate);
-                          }
-                        }}
-                      />
-                    );
-                  })}
                 </div>
               )}
             </div>

@@ -323,32 +323,6 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                     </h3>
                   </div>
 
-                  {/* Hydration Goal Progress Bar */}
-                  {(() => {
-                    const waterGoal = profileData?.goals?.dailyWater || 2000;
-                    const waterPct = Math.min(100, Math.round((currentWater / waterGoal) * 100));
-                    return (
-                      <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs space-y-2 select-none">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-extrabold text-stone-800 font-mono">
-                            {currentWater} / {waterGoal} ml
-                          </span>
-                          <span className="text-[11px] font-bold text-stone-500 font-mono">
-                            {waterPct}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-sky-100/80 h-2 rounded-full overflow-hidden border border-sky-200/40">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${waterPct}%` }}
-                            transition={{ duration: 0.5 }}
-                            className="h-full rounded-full bg-sky-500"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })()}
-
                   <div className="flex flex-col gap-2 w-full">
                     <div className="flex items-center gap-2.5 w-full">
                       {/* Gourmet Sleek Time Pill */}
@@ -385,7 +359,7 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                             max="3000"
                             value={draftWater}
                             onChange={(e) => setDraftWater(parseInt(e.target.value, 10) || 0)}
-                            className="w-16 text-center text-sm font-black text-sky-900 bg-transparent border-none focus:outline-none font-mono"
+                            className="w-16 text-center text-sm font-black text-stone-800 bg-transparent border-none focus:outline-none font-mono"
                           />
                           <span className="text-stone-400">ml</span>
                         </div>
@@ -411,24 +385,20 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                             navigator.vibrate(12);
                           }
                         }}
-                        className="w-12 h-12 bg-sky-500 hover:bg-sky-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                        className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
                         title="Add Water Drink"
                       >
                         <Check className="w-5 h-5 text-white" />
                       </button>
                     </div>
 
-                    {/* Dynamic Description */}
+                    {/* Dynamic Hydration Description (Only when interacting) */}
                     {isWaterStepping && (
                       <div className="px-1 text-left animate-fade-in">
                         <span className="text-[11px] font-medium text-stone-500">
                           {(() => {
-                            const waterGoal = profileData?.goals?.dailyWater || 2000;
                             const nextTotal = currentWater + draftWater;
-                            const remaining = waterGoal - nextTotal;
-                            if (remaining > 0)
-                              return `Adding +${draftWater}ml will bring total to ${nextTotal}ml (${remaining}ml remaining) 🌊`;
-                            return `Adding +${draftWater}ml will complete your daily ${waterGoal}ml goal! 🎉`;
+                            return `Will add +${draftWater} ml → Total logged today: ${nextTotal} ml 💧`;
                           })()}
                         </span>
                       </div>

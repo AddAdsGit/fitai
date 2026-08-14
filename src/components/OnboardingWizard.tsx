@@ -633,11 +633,11 @@ export const OnboardingWizard = ({
             {/* Name input */}
             <div className="space-y-1">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Your Name
+                What should we call you?
               </label>
               <input
                 type="text"
-                placeholder="Full Name (e.g. Alex Doe)"
+                placeholder="Your name or nickname (e.g. Siva)"
                 value={metrics.name}
                 onChange={(e) => setMetrics(prev => ({ ...prev, name: e.target.value }))}
                 autoFocus

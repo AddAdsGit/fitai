@@ -43,6 +43,8 @@ import { supabase, isSupabaseConfigured } from "./lib/supabaseClient";
 // Import extracted components
 import { InsightsView, ProgressBar } from "./components/InsightsView";
 import { ManualLogModal } from "./components/ManualLogModal";
+import { CameraLogModal } from "./components/CameraLogModal";
+import { CameraLogView } from "./components/CameraLogView";
 import { ProfileView } from "./components/ProfileView";
 import { EditProfileView } from "./components/EditProfileView";
 import { SettingsView, DEFAULT_TRACKING_TAGS } from "./components/SettingsView";
@@ -53,6 +55,7 @@ import { CalendarPickerModal } from "./components/CalendarPickerModal";
 import { TimePickerModal } from "./components/TimePickerModal";
 import { DefaultAvatar } from "./components/DefaultAvatar";
 import { RecipeShareModal } from "./components/RecipeShareModal";
+import { RecipeModal } from "./components/RecipeModal";
 import { MealShareModal } from "./components/MealShareModal";
 import { DayShareModal } from "./components/DayShareModal";
 import { PublicShareView } from "./components/PublicShareView";
@@ -70,6 +73,7 @@ import { Header } from "./components/Header";
 import { CalendarStrip } from "./components/CalendarStrip";
 import { AuthScreen } from "./components/AuthScreen";
 import { DailyProgressSection } from "./components/DailyProgressSection";
+import { QuickPastFoodsModal } from "./components/QuickPastFoodsModal";
 
 
 // Import types & helpers
@@ -186,10 +190,7 @@ export default function App() {
     }
 
     if (plusAction === "camera") {
-      setManualLogInitialAiMode(true);
-      setIsCameraFullScreen(true);
-      setManualLogInitialSegment("detailed");
-      setAutoTriggerPhotoScan(true);
+      setActiveTab("camera-log");
       return;
     }
 
@@ -247,6 +248,7 @@ export default function App() {
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null);
   const [mealPendingDelete, setMealPendingDelete] = useState<Meal | null>(null);
   const [isCameraFullScreen, setIsCameraFullScreen] = useState(false);
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
 
   // Custom world-class popup states
   const [selectedRecipePopup, setSelectedRecipePopup] = useState<Recipe | null>(
@@ -280,6 +282,7 @@ export default function App() {
   const [editPopupInstructions, setEditPopupInstructions] = useState("");
   const [editPopupImage, setEditPopupImage] = useState("");
   const [showRecipeImagePanel, setShowRecipeImagePanel] = useState(false);
+  const [showRecipeDeleteConfirm, setShowRecipeDeleteConfirm] = useState(false);
   const [editPopupMicros, setEditPopupMicros] = useState<
     { name: string; value: number; unit: string }[]
   >([]);
@@ -455,6 +458,7 @@ export default function App() {
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [isPastFoodsModalOpen, setIsPastFoodsModalOpen] = useState(false);
   const [timePickerTarget, setTimePickerTarget] = useState<"weight" | "digestion" | null>(null);
   const [timePickerInitialTime, setTimePickerInitialTime] = useState("");
 
@@ -463,7 +467,9 @@ export default function App() {
   const [mealsState, setMealsState] = useState<Meal[]>(() => {
     try {
       const saved = localStorage.getItem("fitai_meals");
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.filter(m => m.name !== "Parotta" && m.name !== "1") : [];
     } catch (_) {
       return [];
     }
@@ -3349,8 +3355,35 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
+  // Initial Supabase DB Sync Barrier (Prevents UI loading before DB fetch finishes)
+  if (isDataLoading) {
+    return (
+      <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans p-6 max-w-md mx-auto space-y-8 flex flex-col justify-center items-center">
+        <div className="animate-pulse flex flex-col items-center gap-6 w-full px-4">
+          <div className="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center border border-orange-500/20 shadow-md">
+            <Flame className="w-8 h-8 text-orange-500 animate-pulse" />
+          </div>
+          <div className="text-center space-y-1">
+            <span className="text-xs font-black uppercase tracking-widest text-orange-950 block">Syncing Your Plate...</span>
+            <span className="text-[10px] font-bold text-orange-900/60 block">Fetching latest meals & vitals</span>
+          </div>
+          <div className="w-56 h-56 bg-white/70 rounded-full flex items-center justify-center border border-white shadow-xl shadow-orange-100/30">
+            <div className="w-40 h-40 bg-[#FAF9F6] rounded-full border border-orange-100/50 flex items-center justify-center">
+              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest animate-pulse">FitAI</span>
+            </div>
+          </div>
+          <div className="w-full h-24 bg-white/60 rounded-[28px] border border-white shadow-md" />
+          <div className="w-full h-14 bg-white/60 rounded-2xl border border-white shadow-sm" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 pb-32 max-w-md mx-auto relative shadow-2xl overflow-x-hidden">
+    <div className={cn(
+      "min-h-screen text-[#1A1A1A] font-sans selection:bg-orange-100 max-w-md mx-auto relative shadow-2xl overflow-x-hidden",
+      activeTab === "camera-log" ? "bg-[#0D0D0D] pb-0" : "bg-[#FAF9F6] pb-[calc(8rem+env(safe-area-inset-bottom,0px))]"
+    )}>
       {/* Absolute Custom Toast Alert */}
       <AnimatePresence>
         {toastMessage && (
@@ -3379,11 +3412,13 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-from)_0%,_transparent_40%)] from-orange-50/30 pointer-events-none" />
 
       {/* Dynamic Header */}
-      <Header
-        currentStreak={currentStreak}
-        profileData={profileData}
-        setActiveTab={setActiveTab}
-      />
+      {activeTab !== "camera-log" && (
+        <Header
+          currentStreak={currentStreak}
+          profileData={profileData}
+          setActiveTab={setActiveTab}
+        />
+      )}
 
       <AnimatePresence mode="wait">
         {activeTab === "home" && (
@@ -3482,6 +3517,10 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               customCalVal={customCalVal}
               setCustomCalVal={setCustomCalVal}
               handleLogMealClick={handleLogMealClick}
+              onOpenPastFoodsModal={() => setIsPastFoodsModalOpen(true)}
+              onOpenCameraScanner={() => {
+                setActiveTab("camera-log");
+              }}
               onAddMeal={onAddMeal}
               showToast={showToast}
               activeMeals={activeMeals}
@@ -3498,10 +3537,13 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
 
 
-            {/* Daily Wellness Journal Section (Commented out for v2)
-            <section className="px-6 mt-10 mb-28 relative z-10">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
+            {/* Soft Curved Capsule Pill Divider */}
+            <div className="w-10 h-1 bg-stone-300/40 rounded-full mx-auto my-8 select-none" />
+
+            {/* Daily Wellness Journal Section */}
+            <section className="px-6 mt-2 mb-28 relative z-10">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-[10px] font-black uppercase text-stone-400 tracking-widest">
                   <span>{selectedDate === todayStr ? "Today's Notes" : "Logged Notes"}</span>
                 </h3>
                 {selectedDate && (
@@ -3520,7 +3562,31 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
                 trackingTags={profileData.tracking_tags || []}
               />
             </section>
-            */}
+          </motion.div>
+        )}
+        {activeTab === "camera-log" && (
+          <motion.div
+            key="camera-log-tab"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.25 }}
+          >
+            <CameraLogView
+              setActiveTab={(tab?: string) => {
+                setIsCameraFullScreen(false);
+                setManualLogInitialAiMode(false);
+                setActiveTab(tab && typeof tab === "string" && tab !== "dashboard" ? tab : "home");
+              }}
+              profileData={profileData}
+              mealsState={mealsState}
+              recipesState={recipes}
+              onAddMeal={onAddMeal}
+              triggerToast={(msg) => setToastMessage(msg)}
+              onShareMeal={(meal) => {
+                setShareItemPopup({ type: "meal", item: meal });
+              }}
+            />
           </motion.div>
         )}
         {activeTab === "settings" && (
@@ -3549,6 +3615,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             currentStreak={currentStreak}
             mealsState={mealsState}
             weightLogs={weightLogs}
+            dailyNotes={dailyNotes}
             onLogWeight={handleLogWeight}
             onDeleteWeight={handleDeleteWeight}
             onLogout={handleLogout}
@@ -3571,819 +3638,100 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         )}
       </AnimatePresence>
 
-      {/* World-Class Detail & Edit Recipe Popup Overlay */}
-      <AnimatePresence>
-        {selectedRecipePopup && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/65 backdrop-blur-md z-[100] flex items-end justify-center font-sans"
-          >
-            {/* Sliding Bottom Sheet Sheet Panel */}
-            <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="bg-stone-50 rounded-t-[36px] w-full max-w-[448px] h-[85vh] overflow-hidden flex flex-col shadow-2xl border-t border-white/20"
-            >
-              {/* Image Title Banner */}
-              <div className="h-44 w-full relative shrink-0 bg-stone-900">
-                {!hasNoGeneratedImage(isEditingRecipe ? editPopupImage : selectedRecipePopup.image) ? (
-                  <img
-                    src={isEditingRecipe ? editPopupImage : selectedRecipePopup.image}
-                    className="w-full h-full object-cover animate-fade-in"
-                    alt={selectedRecipePopup.name}
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-stone-850 to-stone-950 flex items-center justify-center">
-                    <Utensils className="w-12 h-12 text-white opacity-20" />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-stone-900 via-stone-900/30 to-black/10 pointer-events-none" />
+      {/* World-Class Detail & Edit Recipe Modal */}
+      {selectedRecipePopup && (
+        <RecipeModal
+          recipe={selectedRecipePopup}
+          onClose={() => {
+            setSelectedRecipePopup(null);
+            setIsEditingRecipe(false);
+          }}
+          isEditingInitially={isEditingRecipe}
+          profileData={profileData}
+          setToastMessage={setToastMessage}
+          onDeleteRecipe={(recipeId) => {
+            handleDeleteRecipe(recipeId);
+          }}
+          onShareRecipe={(rec) => {
+            handleShareRecipe(rec);
+          }}
+          onAddMeal={(mealObj) => {
+            onAddMeal(mealObj);
+            const newCount = (selectedRecipePopup.log_count || 0) + 1;
+            setRecipesState((prev) =>
+              prev.map((r) =>
+                r.id === selectedRecipePopup.id ? { ...r, log_count: newCount } : r
+              )
+            );
+            if (isSupabaseConfigured) {
+              supabase
+                .from("recipes")
+                .update({ log_count: newCount })
+                .eq("id", selectedRecipePopup.id)
+                .then();
+            }
+            setToastMessage(`Logged "${selectedRecipePopup.name}" for today! 🍽️`);
+          }}
+          onSaveRecipe={async (updated) => {
+            const actualIsNew = selectedRecipePopup.id === "new" || selectedRecipePopup.id?.toString().startsWith("new-ai-");
+            if (isSupabaseConfigured && activeProfileId) {
+              try {
+                const recipeData = {
+                  profile_id: activeProfileId,
+                  name: updated.name,
+                  time: updated.time,
+                  calories: updated.calories,
+                  protein: updated.protein,
+                  carbs: updated.carbs,
+                  fats: updated.fats,
+                  fiber: updated.fiber,
+                  description: updated.description,
+                  tags: updated.tags,
+                  image: updated.image,
+                  ingredients: updated.ingredients,
+                  instructions: updated.instructions,
+                  micros: updated.micros || [],
+                };
 
-                {/* Edit Photo Overlaid Button */}
-                {isEditingRecipe && (
-                  <button
-                    onClick={() => setShowRecipeImagePanel(!showRecipeImagePanel)}
-                    className="absolute bottom-3 right-3 backdrop-blur-md bg-black/45 hover:bg-black/60 border border-white/10 text-white text-[8px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer z-25 shadow-sm shadow-black/10 active:scale-95"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                    <span>{showRecipeImagePanel ? "Close Edit" : "Edit Image"}</span>
-                  </button>
-                )}
+                if (actualIsNew) {
+                  const { data, error } = await supabase
+                    .from("recipes")
+                    .insert(recipeData)
+                    .select()
+                    .single();
 
-                {/* Header buttons */}
-                <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
-                  <span className="px-3 py-1 bg-black/55 backdrop-blur-sm rounded-full text-[9px] font-black uppercase text-orange-400 tracking-wider font-sans">
-                    {isEditingRecipe 
-                      ? "Editing Mode" 
-                      : (selectedRecipePopup.id === "new" || selectedRecipePopup.id?.toString().startsWith("new-ai-") 
-                          ? "New Recipe" 
-                          : `Logged ${selectedRecipePopup.log_count || 0} time${(selectedRecipePopup.log_count || 0) === 1 ? "" : "s"}`)}
-                  </span>
-                  <div className="flex gap-2">
-                    {!isEditingRecipe && selectedRecipePopup.id !== "new" && (
-                      <button
-                        onClick={() => handleShareRecipe(selectedRecipePopup)}
-                        className="w-8 h-8 rounded-full bg-black/60 hover:bg-orange-500/80 text-white flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 cursor-pointer"
-                        title="Share recipe"
-                      >
-                        <Share2 className="w-4 h-4 text-white" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setSelectedRecipePopup(null)}
-                      className="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm transition-transform hover:scale-105 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+                  if (!error && data) {
+                    updated.id = data.id;
+                  }
+                } else {
+                  const { error } = await supabase
+                    .from("recipes")
+                    .update(recipeData)
+                    .eq("id", selectedRecipePopup.id);
 
-                {/* Overlaid Title */}
-                <div className="absolute bottom-4 left-4 right-4 text-left">
-                  <div className="flex gap-1.5 mb-1 flex-wrap">
-                    {(isEditingRecipe ? editPopupTags : selectedRecipePopup.tags).map((t, i) => (
-                      <span
-                        key={i}
-                        className="px-2 py-0.5 bg-orange-500 text-white rounded-md text-[7px] font-black uppercase tracking-widest font-sans"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                  <h3 className="text-white text-base font-black leading-tight tracking-tight drop-shadow-sm font-sans">
-                    {isEditingRecipe ? editPopupName || "Unnamed Recipe" : selectedRecipePopup.name}
-                  </h3>
-                  <p className="text-[10px] text-white/70 font-bold font-sans mt-0.5 flex items-center gap-1.5 flex-wrap">
-                    <span>⏱️ Prep time: {isEditingRecipe ? editPopupTime : selectedRecipePopup.time}</span>
-                  </p>
-                </div>
-              </div>
+                  if (error) {
+                    console.error("Error updating recipe in Supabase:", error);
+                  }
+                }
+              } catch (err) {
+                console.error("Error saving recipe to Supabase:", err);
+              }
+            }
 
-              {/* Scrollable Form / Details Wrapper */}
-              <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-6">
-                {isEditingRecipe && showRecipeImagePanel && (
-                  /* RECIPE COVER IMAGE EDITOR DRAWER */
-                  <div className="bg-white rounded-3xl p-5 border border-black/[0.04] shadow-sm space-y-3 text-left animate-fade-in">
-                    <div className="flex items-center gap-1.5 text-[10px] font-black text-orange-950/40 uppercase tracking-widest border-b border-black/[0.02] pb-2">
-                      <Camera className="w-3.5 h-3.5 text-stone-500" />
-                      <span>Recipe Cover Image Settings</span>
-                    </div>
-                    <div className="flex flex-col gap-2.5">
-                      <input
-                        type="text"
-                        placeholder="Paste image URL here..."
-                        value={editPopupImage.startsWith("data:") ? "" : editPopupImage}
-                        onChange={(e) => setEditPopupImage(e.target.value)}
-                        className="w-full bg-stone-50 border border-stone-200 focus:border-orange-500 rounded-xl px-3 py-2 text-xs font-semibold text-stone-900 focus:outline-none placeholder-stone-400"
-                      />
-                      <div className="flex gap-2 items-center">
-                        <div className="relative inline-block">
-                          <button className="bg-stone-900 hover:bg-stone-850 text-white text-[9px] font-black uppercase tracking-wider px-3.5 py-2.5 rounded-xl transition-all cursor-pointer shadow-3xs">
-                            Upload Photo
-                          </button>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setEditPopupImage(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                          />
-                        </div>
-                        {editPopupImage && (
-                          <button
-                            onClick={() => setEditPopupImage("")}
-                            className="text-[9px] font-bold text-red-500 hover:text-red-655 ml-1.5 cursor-pointer"
-                          >
-                            Remove Photo
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {!isEditingRecipe ? (
-                  /* VIEW MODE */
-                  <div className="space-y-6 text-left font-sans">
-                    {selectedRecipePopup.description && (
-                      <p className="text-xs text-stone-500 font-semibold leading-relaxed bg-stone-50 border border-stone-200/50 rounded-2xl p-4 italic">
-                        "{selectedRecipePopup.description}"
-                      </p>
-                    )}
-                    {/* Calories & Standard Macros HUD block */}
-                    <div className="bg-white rounded-3xl p-5 border border-black/[0.04] shadow-sm space-y-4">
-                      <div className="flex justify-between items-center pb-2 border-b border-black/[0.02]">
-                        <span className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest">
-                          Macronutrient Density
-                        </span>
-                        <span className="text-xs font-black text-[#10B981] font-mono">
-                          🔥 {selectedRecipePopup.calories} kcal
-                        </span>
-                      </div>
+            if (actualIsNew) {
+              setRecipesState((prev) => [updated, ...prev]);
+            } else {
+              setRecipesState((prev) =>
+                prev.map((r) => (r.id === updated.id ? updated : r))
+              );
+            }
 
-                      {/* Bar metrics representing Carb/Prot/Fat distribution */}
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-orange-50/50 rounded-2xl p-3 border border-orange-100 flex flex-col justify-center">
-                          <span className="text-[8px] font-extrabold text-orange-700/60 uppercase">
-                            Protein
-                          </span>
-                          <span className="text-sm font-black text-orange-950 mt-0.5">
-                            {selectedRecipePopup.protein}g
-                          </span>
-                          <div className="w-full bg-orange-100 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div
-                              className="bg-orange-500 h-full rounded-full"
-                              style={{ width: `${Math.min(100, (selectedRecipePopup.protein / 50) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="bg-indigo-50/40 rounded-2xl p-3 border border-indigo-100 flex flex-col justify-center">
-                          <span className="text-[8px] font-extrabold text-indigo-700/60 uppercase">
-                            Carbohydrates
-                          </span>
-                          <span className="text-sm font-black text-[#1E3A8A] mt-0.5">
-                            {selectedRecipePopup.carbs}g
-                          </span>
-                          <div className="w-full bg-indigo-100 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div
-                              className="bg-indigo-600 h-full rounded-full"
-                              style={{ width: `${Math.min(100, (selectedRecipePopup.carbs / 150) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="bg-amber-50/50 rounded-2xl p-3 border border-amber-100 flex flex-col justify-center">
-                          <span className="text-[8px] font-extrabold text-amber-700/60 uppercase">
-                            Fats
-                          </span>
-                          <span className="text-sm font-black text-amber-950 mt-0.5">
-                            {selectedRecipePopup.fats}g
-                          </span>
-                          <div className="w-full bg-amber-100 h-1.5 rounded-full mt-2 overflow-hidden">
-                            <div
-                              className="bg-amber-500 h-full rounded-full"
-                              style={{ width: `${Math.min(100, (selectedRecipePopup.fats / 70) * 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-
-
-                    {/* Ingredients detail */}
-                    <div className="space-y-2">
-                      <span className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest block font-sans">
-                        Ingredients Needed
-                      </span>
-                      <ul className="bg-white rounded-3xl p-5 border border-black/[0.04] shadow-sm divide-y divide-black/[0.02] space-y-2.5">
-                        {selectedRecipePopup.ingredients.map((ing, i) => (
-                          <li
-                            key={i}
-                            className="text-xs font-bold text-orange-950/80 pt-2.5 first:pt-0 flex items-center gap-2 font-sans"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
-                            {ing}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    {/* Instructions detail */}
-                    <div className="space-y-2">
-                      <span className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest block font-sans">
-                        Step-by-Step Instructions
-                      </span>
-                      <div className="bg-white rounded-3xl p-5 border border-black/[0.04] shadow-sm font-sans font-medium">
-                        <p className="text-xs text-orange-950/75 font-semibold leading-relaxed whitespace-pre-line font-sans">
-                          {selectedRecipePopup.instructions || "Enjoy this healthy portion immediately!"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : isRecipeAiMode ? (
-                  /* AI RECIPE GENERATOR MODE */
-                  <div className="space-y-4 text-left font-sans animate-fadeIn">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-orange-600 uppercase tracking-wider">
-                      <Sparkles className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
-                      <span>Generate Recipe with AI</span>
-                    </div>
-                    <div className="bg-white rounded-3xl p-5 border border-stone-200/40 shadow-sm space-y-4">
-                      <p className="text-[10px] text-stone-500 font-medium leading-relaxed font-sans">
-                        Describe the recipe you want to create (e.g. ingredients you have, dietary goals, or a dish name). Gemini will design the instructions, ingredients list, calories, and macros for you.
-                      </p>
-                      <textarea
-                        rows={6}
-                        placeholder='e.g., "A high-protein, low-carb spinach and mushroom quiche using egg whites, feta cheese, and oat flour for crust"'
-                        value={recipeAiPrompt}
-                        onChange={(e) => setRecipeAiPrompt(e.target.value)}
-                        className="w-full bg-stone-50/50 border border-stone-250 focus:border-orange-500 rounded-2xl px-4 py-3.5 text-xs font-semibold text-stone-900 focus:outline-none placeholder-stone-400 resize-none leading-relaxed font-sans"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRecipeAiPromptGenerate(recipeAiPrompt)}
-                        disabled={isRecipeAiGenerating}
-                        className="w-full bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md border-none disabled:opacity-50 font-sans"
-                      >
-                        {isRecipeAiGenerating ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                            <span>Generating Recipe...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Bot className="w-4 h-4 text-white" />
-                            <span>Generate & Auto-Fill Form</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* EDIT / CREATE MODE */
-                  <div className="space-y-6 text-left font-sans animate-none">
-                    {/* General Text Info Inputs */}
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest block">
-                          Recipe Name / Title
-                        </label>
-                        <input
-                          type="text"
-                          value={editPopupName}
-                          onChange={(e) => setEditPopupName(e.target.value)}
-                          placeholder="e.g. Avocado Spinach Superfood Crunch"
-                          className="w-full bg-white border border-stone-200/70 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/50 rounded-2xl px-4 py-3 text-xs font-bold text-orange-950 outline-none transition-all shadow-inner"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest block">
-                          Short Description
-                        </label>
-                        <input
-                          type="text"
-                          value={editPopupDescription}
-                          onChange={(e) => setEditPopupDescription(e.target.value)}
-                          placeholder="e.g. Spiced potato-filled crepe served with chutney"
-                          className="w-full bg-white border border-stone-200/70 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/50 rounded-2xl px-4 py-3 text-xs font-bold text-orange-950 outline-none transition-all shadow-inner"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest block">
-                          Prep Duration
-                        </label>
-                        <input
-                          type="text"
-                          value={editPopupTime}
-                          onChange={(e) => setEditPopupTime(e.target.value)}
-                          placeholder="e.g. 15 mins"
-                          className="w-full bg-white border border-stone-200/70 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/50 rounded-2xl px-4 py-3 text-xs font-bold text-orange-950 outline-none transition-all shadow-inner"
-                        />
-                      </div>
-
-                      {/* Tactile and Modern Dietary Tags Selector */}
-                      <div className="bg-white rounded-3xl p-5 border border-stone-200/40 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center pb-2 border-b border-stone-100">
-                          <label className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest block">
-                            Dietary Labels / Tags
-                          </label>
-                          {editPopupTags.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setEditPopupTags([])}
-                              className="text-[9px] font-black uppercase tracking-wider text-orange-600 hover:opacity-85 active:scale-95 transition-all cursor-pointer"
-                            >
-                              Clear All ({editPopupTags.length})
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Quick Tap & Custom Active Tags Container */}
-                        <div className="space-y-2">
-                          <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest block">
-                            Tap to toggle label filters
-                          </span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {[
-                              { label: "Keto 🥑", value: "Keto" },
-                              { label: "Vegan 🌱", value: "Vegan" },
-                              { label: "High Protein 💪", value: "High Protein" },
-                              { label: "Gluten Free 🌾", value: "Gluten Free" },
-                              { label: "Dairy Free 🥛", value: "Dairy Free" },
-                              { label: "Low Carb 🥩", value: "Low Carb" },
-                              { label: "Low Calorie 🔥", value: "Low Calorie" },
-                            ].map((preset) => {
-                              const isActive = editPopupTags.includes(preset.value);
-                              return (
-                                <motion.button
-                                  key={preset.value}
-                                  type="button"
-                                  whileTap={{ scale: 0.93 }}
-                                  onClick={() => {
-                                    if (isActive) {
-                                      setEditPopupTags(editPopupTags.filter((t) => t !== preset.value));
-                                    } else {
-                                      setEditPopupTags([...editPopupTags, preset.value]);
-                                    }
-                                  }}
-                                  className={cn(
-                                    "px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all border select-none cursor-pointer active:scale-95 flex items-center gap-1",
-                                    isActive
-                                      ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/20"
-                                      : "bg-orange-50/40 border-orange-100 text-stone-600 hover:bg-orange-50 hover:border-orange-200 hover:text-stone-800"
-                                  )}
-                                >
-                                  <span>{preset.label}</span>
-                                  {isActive && <Check className="w-2.5 h-2.5 shrink-0 ml-0.5" />}
-                                </motion.button>
-                              );
-                            })}
-
-                            {/* Render active custom tags dynamically here if they don't match standard presets */}
-                            {editPopupTags
-                              .filter(
-                                (tag) =>
-                                  ![
-                                    "Keto",
-                                    "Vegan",
-                                    "High Protein",
-                                    "Gluten Free",
-                                    "Dairy Free",
-                                    "Low Carb",
-                                    "Low Calorie",
-                                  ].some((std) => std.toLowerCase() === tag.toLowerCase())
-                              )
-                              .map((customTag) => (
-                                <motion.button
-                                  key={customTag}
-                                  type="button"
-                                  whileTap={{ scale: 0.93 }}
-                                  onClick={() => setEditPopupTags(editPopupTags.filter((t) => t !== customTag))}
-                                  className="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider transition-all border bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/20 select-none cursor-pointer active:scale-95 flex items-center gap-1.5"
-                                >
-                                  <span>{customTag} ✨</span>
-                                  <span className="text-[11px] font-light leading-none opacity-80">×</span>
-                                </motion.button>
-                              ))}
-                          </div>
-                        </div>
-
-                        {/* Custom tags input form */}
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Add custom tag... (Type & press enter)"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                const val = e.currentTarget.value.trim();
-                                if (val && !editPopupTags.some((t) => t.toLowerCase() === val.toLowerCase())) {
-                                  const capitalized = val.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
-                                  setEditPopupTags([...editPopupTags, capitalized]);
-                                  e.currentTarget.value = "";
-                                }
-                              }
-                            }}
-                            id="customTagInput"
-                            className="flex-1 bg-white border border-stone-200/70 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/50 rounded-xl px-3 py-2 text-[10px] font-bold text-orange-950 outline-none transition-all shadow-inner"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const input = document.getElementById("customTagInput") as HTMLInputElement | null;
-                              if (input) {
-                                const val = input.value.trim();
-                                if (val && !editPopupTags.some((t) => t.toLowerCase() === val.toLowerCase())) {
-                                  const capitalized = val.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
-                                  setEditPopupTags([...editPopupTags, capitalized]);
-                                  input.value = "";
-                                }
-                              }
-                            }}
-                            className="px-4 py-2 bg-orange-50 hover:bg-orange-100/80 border border-orange-200 text-orange-700 text-[10px] font-black rounded-xl transition-all uppercase tracking-widest active:scale-95 cursor-pointer shadow-sm flex items-center justify-center shrink-0"
-                          >
-                            Add Tag
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest block">
-                          Raw Ingredients (One entry per line)
-                        </label>
-                        <textarea
-                          rows={4}
-                          value={editPopupIngredients}
-                          onChange={(e) => setEditPopupIngredients(e.target.value)}
-                          placeholder="e.g.&#10;2 whole Avocados&#10;100g Fresh Spinach&#10;1 scoop Whey Protein"
-                          className="w-full bg-white border border-stone-200/70 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/50 rounded-2xl px-4 py-3 text-xs font-bold text-orange-950 outline-none transition-all shadow-inner leading-relaxed"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-orange-950/40 uppercase tracking-widest block">
-                          Cooking Instructions step list
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={editPopupInstructions}
-                          onChange={(e) => setEditPopupInstructions(e.target.value)}
-                          placeholder="e.g. Blend/mash avocados and fold in spinach slowly. Complete serving cold!"
-                          className="w-full bg-white border border-stone-200/70 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/50 rounded-2xl px-4 py-3 text-xs font-bold text-orange-950 outline-none transition-all shadow-inner leading-relaxed"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Nutritional Presciption Metrics with Auto-fill button */}
-                    <div className="pt-4 border-t border-black/[0.04]">
-                      <div className="bg-white rounded-3xl p-5 border border-stone-200/40 shadow-sm space-y-4">
-                        <div className="flex justify-between items-center border-b border-stone-100 pb-2">
-                          <h6 className="text-[10px] font-black text-orange-950/50 uppercase tracking-widest block">
-                            Portion Macrographics
-                          </h6>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!editPopupIngredients.trim()) {
-                                setToastMessage("Please enter some ingredients first to extract nutrition! 🥦");
-                                return;
-                              }
-                              setIsAiCalculating(true);
-                              setTimeout(() => {
-                                const ingredientsArr = editPopupIngredients
-                                  .split("\n")
-                                  .map((s) => s.trim())
-                                  .filter(Boolean);
-                                const calculations =
-                                  calculateNutritionFromIngredients(
-                                    editPopupName,
-                                    ingredientsArr,
-                                  );
-
-                                let filledSome = false;
-                                if (!editPopupCalories || editPopupCalories === "0" || editPopupCalories === "") {
-                                  setEditPopupCalories(String(calculations.calories));
-                                  filledSome = true;
-                                }
-                                if (!editPopupProtein || editPopupProtein === "0" || editPopupProtein === "") {
-                                  setEditPopupProtein(String(calculations.protein));
-                                  filledSome = true;
-                                }
-                                if (!editPopupCarbs || editPopupCarbs === "0" || editPopupCarbs === "") {
-                                  setEditPopupCarbs(String(calculations.carbs));
-                                  filledSome = true;
-                                }
-                                if (!editPopupFats || editPopupFats === "0" || editPopupFats === "") {
-                                  setEditPopupFats(String(calculations.fats));
-                                  filledSome = true;
-                                }
-                                if (!editPopupMicros || editPopupMicros.length === 0) {
-                                  setEditPopupMicros(calculations.micros);
-                                }
-
-                                setIsAiCalculating(false);
-                                
-                                if (!filledSome) {
-                                  setEditPopupCalories(String(calculations.calories));
-                                  setEditPopupProtein(String(calculations.protein));
-                                  setEditPopupCarbs(String(calculations.carbs));
-                                  setEditPopupFats(String(calculations.fats));
-                                  setEditPopupMicros(calculations.micros);
-                                  setToastMessage("Estimation calculated and applied! (Values overwritten)");
-                                }
-                              }, 850);
-                            }}
-                            className={cn(
-                              "text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 select-none shrink-0 border",
-                              isAiCalculating
-                                ? "bg-stone-50 border-stone-100 text-stone-400 cursor-not-allowed"
-                                : "bg-orange-50/70 border-orange-100/55 text-orange-600 hover:bg-orange-100/80 hover:text-orange-700"
-                            )}
-                          >
-                            <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-                            {isAiCalculating ? "Extracting..." : "Auto-Fill with AI"}
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
-                              Calories (kcal)
-                            </label>
-                            <input
-                              type="number"
-                              value={editPopupCalories}
-                              onChange={(e) => setEditPopupCalories(e.target.value)}
-                              className="w-full bg-stone-50/50 border border-stone-200/50 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/30 rounded-xl px-3 py-2 text-xs font-mono font-bold text-orange-950 outline-none transition-all shadow-inner animate-none"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
-                              Protein (g)
-                            </label>
-                            <input
-                              type="number"
-                              value={editPopupProtein}
-                              onChange={(e) => setEditPopupProtein(e.target.value)}
-                              className="w-full bg-stone-50/50 border border-stone-200/50 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/30 rounded-xl px-3 py-2 text-xs font-mono font-bold text-orange-950 outline-none transition-all shadow-inner animate-none"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
-                              Carbs (g)
-                            </label>
-                            <input
-                              type="number"
-                              value={editPopupCarbs}
-                              onChange={(e) => setEditPopupCarbs(e.target.value)}
-                              className="w-full bg-stone-50/50 border border-stone-200/50 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/30 rounded-xl px-3 py-2 text-xs font-mono font-bold text-orange-950 outline-none transition-all shadow-inner animate-none"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
-                              Fats (g)
-                            </label>
-                            <input
-                              type="number"
-                              value={editPopupFats}
-                              onChange={(e) => setEditPopupFats(e.target.value)}
-                              className="w-full bg-stone-50/50 border border-stone-200/50 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/30 rounded-xl px-3 py-2 text-xs font-mono font-bold text-orange-950 outline-none transition-all shadow-inner animate-none"
-                            />
-                          </div>
-                          <div className="space-y-1 col-span-2">
-                            <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block">
-                              Fiber (g)
-                            </label>
-                            <input
-                              type="number"
-                              value={editPopupFiber}
-                              onChange={(e) => setEditPopupFiber(e.target.value)}
-                              className="w-full bg-stone-50/50 border border-stone-200/50 focus:border-orange-500 focus:ring-4 focus:ring-orange-100/30 rounded-xl px-3 py-2 text-xs font-mono font-bold text-orange-950 outline-none transition-all shadow-inner animate-none"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Sticky Action Footer bar */}
-              <div className="p-4 bg-white border-t border-black/[0.03] shrink-0 font-sans">
-                {!isEditingRecipe ? (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setEditPopupImage(selectedRecipePopup.image || "");
-                        setShowRecipeImagePanel(false);
-                        setIsEditingRecipe(true);
-                      }}
-                      className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 border border-stone-200/50 text-stone-700 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                    >
-                      ✏️ Edit recipe
-                    </button>
-                    {selectedRecipePopup.id !== "new" && (
-                      <button
-                        onClick={() => handleDeleteRecipe(selectedRecipePopup.id)}
-                        className="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-650 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 border border-red-100"
-                        title="Delete recipe"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-550" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        onAddMeal({
-                          name: selectedRecipePopup.name,
-                          calories: selectedRecipePopup.calories,
-                          protein: selectedRecipePopup.protein,
-                          carbs: selectedRecipePopup.carbs,
-                          fats: selectedRecipePopup.fats,
-                          image: selectedRecipePopup.image,
-                          type: "Favorite",
-                        });
-                        
-                        // Increment recipe log count
-                        const newCount = (selectedRecipePopup.log_count || 0) + 1;
-                        setRecipesState(prev => prev.map(r => r.id === selectedRecipePopup.id ? { ...r, log_count: newCount } : r));
-                        if (isSupabaseConfigured) {
-                          supabase
-                            .from('recipes')
-                            .update({ log_count: newCount })
-                            .eq('id', selectedRecipePopup.id)
-                            .then();
-                        }
-
-                        setToastMessage(`Successfully logged portion of "${selectedRecipePopup.name}" for today! 🍽️`);
-                        setSelectedRecipePopup(null);
-                      }}
-                      className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[10px] py-2.5 rounded-xl font-black uppercase tracking-widest flex items-center justify-center gap-1.5 shadow-md shadow-orange-500/10 transition-colors cursor-pointer"
-                    >
-                      <Utensils className="w-3.5 h-3.5" /> Log to Today's Plate
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2 font-sans">
-                    {selectedRecipePopup.id !== "new" && (
-                      <button
-                        onClick={() => handleDeleteRecipe(selectedRecipePopup.id)}
-                        className="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-red-650 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 border border-red-100"
-                        title="Delete recipe"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-550" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        if (selectedRecipePopup.id === "new") {
-                          setSelectedRecipePopup(null);
-                        } else {
-                          setIsEditingRecipe(false);
-                        }
-                      }}
-                      className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-600 font-black text-[10px] uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsRecipeAiMode(!isRecipeAiMode)}
-                      className="px-3.5 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-655 rounded-xl transition-all cursor-pointer border border-orange-100/55 flex items-center justify-center gap-1 font-black text-[10px] uppercase tracking-wider active:scale-95"
-                    >
-                      {isRecipeAiMode ? "Manual Form" : (selectedRecipePopup.id === "new" ? "AI Generator" : "AI Editor")}
-                    </button>
-                    <button
-                      onClick={async () => {
-                        // Validate
-                        const finalName = editPopupName.trim() || "Unnamed Custom Dish";
-                        const finalIngredients = editPopupIngredients
-                          .split("\n")
-                          .map((s) => s.trim())
-                          .filter(Boolean);
-
-                        const actualIsNew = selectedRecipePopup.id === "new";
-                        const updated: Recipe = {
-                          id: actualIsNew ? "rec-" + Date.now() : selectedRecipePopup.id,
-                          name: finalName,
-                          time: editPopupTime || "15 mins",
-                          calories: parseInt(editPopupCalories) || 0,
-                          protein: parseInt(editPopupProtein) || 0,
-                          carbs: parseInt(editPopupCarbs) || 0,
-                          fats: parseInt(editPopupFats) || 0,
-                          fiber: parseInt(editPopupFiber) || 0,
-                          description: editPopupDescription.trim(),
-                          tags: editPopupTags.length > 0 ? editPopupTags : ["Custom"],
-                          image: editPopupImage || "",
-                          ingredients: finalIngredients,
-                          instructions: editPopupInstructions.trim() || "Mix ingredients and serve fresh!",
-                          micros: editPopupMicros,
-                        };
-
-                        if (isSupabaseConfigured && activeProfileId) {
-                          try {
-                            const recipeData = {
-                              profile_id: activeProfileId,
-                              name: updated.name,
-                              time: updated.time,
-                              calories: updated.calories,
-                              protein: updated.protein,
-                              carbs: updated.carbs,
-                              fats: updated.fats,
-                              fiber: updated.fiber,
-                              description: updated.description,
-                              tags: updated.tags,
-                              image: updated.image,
-                              ingredients: updated.ingredients,
-                              instructions: updated.instructions,
-                              micros: updated.micros
-                            };
-
-                            if (actualIsNew) {
-                              const { data, error } = await supabase
-                                .from('recipes')
-                                .insert(recipeData)
-                                .select('*')
-                                .single();
-
-                              if (error) {
-                                console.error("Error creating recipe in Supabase:", error);
-                                setRecipes([updated, ...recipes]);
-                              } else if (data) {
-                                const mapped: Recipe = {
-                                  id: data.id,
-                                  name: data.name,
-                                  time: data.time,
-                                  calories: data.calories,
-                                  protein: data.protein,
-                                  carbs: data.carbs,
-                                  fats: data.fats,
-                                  fiber: data.fiber,
-                                  description: data.description,
-                                  tags: data.tags || [],
-                                  image: data.image,
-                                  ingredients: data.ingredients || [],
-                                  instructions: data.instructions,
-                                  micros: data.micros || []
-                                };
-                                setRecipes([mapped, ...recipes]);
-                              }
-                            } else {
-                              const { error } = await supabase
-                                .from('recipes')
-                                .update(recipeData)
-                                .eq('id', selectedRecipePopup.id);
-
-                              if (error) {
-                                console.error("Error updating recipe in Supabase:", error);
-                              }
-                              setRecipes(recipes.map((r) => (r.id === updated.id ? updated : r)));
-                            }
-                          } catch (err) {
-                            console.error("Error saving recipe to Supabase:", err);
-                            if (actualIsNew) {
-                              setRecipes([updated, ...recipes]);
-                            } else {
-                              setRecipes(recipes.map((r) => (r.id === updated.id ? updated : r)));
-                            }
-                          }
-                        } else {
-                          if (actualIsNew) {
-                            setRecipes([updated, ...recipes]);
-                          } else {
-                            setRecipes(recipes.map((r) => (r.id === updated.id ? updated : r)));
-                          }
-                        }
-
-                        // Close popups
-                        setSelectedRecipePopup(null);
-                        setToastMessage(`Recipe "${finalName}" saved successfully! 🎉`);
-                      }}
-                      className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-center shadow-md shadow-orange-500/10 transition-colors cursor-pointer"
-                    >
-                      💾 Save changes
-                    </button>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            setSelectedRecipePopup(updated);
+            setIsEditingRecipe(false);
+            setToastMessage(`Recipe "${updated.name}" saved! 🍲`);
+          }}
+        />
+      )}
 
 
       {/* Dynamic World-Class Goals Dial Sliders Picker Popups */}
@@ -4410,18 +3758,45 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
           <ManualLogModal
             onClose={() => {
               setIsCameraFullScreen(false);
+              setAutoTriggerPhotoScan(false);
               setMealToEdit(null);
             }}
             onAddMeal={onAddMeal}
+            onDeleteMeal={(mealToDelete) => {
+              setIsCameraFullScreen(false);
+              setAutoTriggerPhotoScan(false);
+              setMealToEdit(null);
+              confirmDeleteMeal(mealToDelete);
+            }}
+            onShareMeal={(meal) => {
+              setIsCameraFullScreen(false);
+              setAutoTriggerPhotoScan(false);
+              setMealToEdit(null);
+              setShareItemPopup({ type: "meal", item: meal });
+            }}
             mealToEdit={mealToEdit}
             onNavigateToSettings={() => setActiveTab("profile")}
             mealsState={mealsState}
             recipesState={recipes}
             initialAiMode={manualLogInitialAiMode}
+            autoTriggerPhotoScan={autoTriggerPhotoScan}
             profileData={profileData}
           />
         )}
       </AnimatePresence>
+
+      {/* Standalone Dedicated Camera Log Modal */}
+      <CameraLogModal
+        isOpen={isCameraModalOpen}
+        onClose={() => setIsCameraModalOpen(false)}
+        onAddMeal={onAddMeal}
+        profileData={profileData}
+        showToast={showToast}
+        onShareMeal={(meal) => {
+          setIsCameraModalOpen(false);
+          setShareItemPopup({ type: "meal", item: meal });
+        }}
+      />
 
       {/* Visual Share Modal Overlay */}
       <AnimatePresence>
@@ -4453,30 +3828,29 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       </AnimatePresence>
 
       {/* Configurable Single-Action Floating Widget & Vitals Modal */}
-      <FloatingWidget
-        isVisible={profileData.agent_config?.showGptWidget ?? true}
-        actionType={profileData.agent_config?.floatingWidgetAction || "gpt"}
-        onExecuteAction={(action) => {
-          if (action === "gpt") {
-            window.open(localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL, "_blank");
-          } else if (action === "voice") {
-            setManualLogInitialAiMode(true);
-            setManualLogInitialSegment("detailed");
-            setIsCameraFullScreen(true);
-          } else if (action === "camera") {
-            setManualLogInitialAiMode(true);
-            setManualLogInitialSegment("detailed");
-            setAutoTriggerPhotoScan(true);
-            setIsCameraFullScreen(true);
-          } else if (action === "vitals") {
-            setIsVitalsModalOpen(true);
-          } else if (action === "manual") {
-            setManualLogInitialAiMode(false);
-            setManualLogInitialSegment("quick");
-            setIsCameraFullScreen(true);
-          }
-        }}
-      />
+      {activeTab !== "camera-log" && (
+        <FloatingWidget
+          isVisible={profileData.agent_config?.showGptWidget ?? true}
+          actionType={profileData.agent_config?.floatingWidgetAction || "gpt"}
+          onExecuteAction={(action) => {
+            if (action === "gpt") {
+              window.open(localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL, "_blank");
+            } else if (action === "voice") {
+              setManualLogInitialAiMode(true);
+              setManualLogInitialSegment("detailed");
+              setIsCameraFullScreen(true);
+            } else if (action === "camera") {
+              setActiveTab("camera-log");
+            } else if (action === "vitals") {
+              setIsVitalsModalOpen(true);
+            } else if (action === "manual") {
+              setManualLogInitialAiMode(false);
+              setManualLogInitialSegment("quick");
+              setIsCameraFullScreen(true);
+            }
+          }}
+        />
+      )}
 
       {/* Universal Vitals Modal Sheet (Portaled to document.body) */}
       <VitalsModal
@@ -4500,13 +3874,15 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       />
 
       {/* Bottom Navigation */}
-      <BottomNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        selectedDate={selectedDate}
-        todayStr={todayStr}
-        handleLogMealClick={handleLogMealClick}
-      />
+      {activeTab !== "camera-log" && (
+        <BottomNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          selectedDate={selectedDate}
+          todayStr={todayStr}
+          handleLogMealClick={handleLogMealClick}
+        />
+      )}
 
       {/* Custom Premium Calendar Date Picker Modal */}
       <CalendarPickerModal
@@ -4544,7 +3920,16 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             : "Energy"
         } Log Time`}
       />
-      {/* Walkthrough disabled for zero-clutter launch */}
+
+      {/* Quick Past Foods & Saved Recipes Modal */}
+      <QuickPastFoodsModal
+        isOpen={isPastFoodsModalOpen}
+        onClose={() => setIsPastFoodsModalOpen(false)}
+        meals={mealsState}
+        recipes={recipesState}
+        onAddMeal={onAddMeal}
+        showToast={showToast}
+      />
     </div>
   );
 }
