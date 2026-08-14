@@ -9,8 +9,8 @@ import { getMealEmoji } from "../utils/helpers";
 export interface QuickPastFoodsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  meals: Meal[];
-  recipes: Recipe[];
+  meals?: Meal[];
+  recipes?: Recipe[];
   onAddMeal: (meal: any) => Promise<void> | void;
   showToast: (msg: string) => void;
 }
@@ -18,8 +18,8 @@ export interface QuickPastFoodsModalProps {
 export const QuickPastFoodsModal: React.FC<QuickPastFoodsModalProps> = ({
   isOpen,
   onClose,
-  meals,
-  recipes,
+  meals = [],
+  recipes = [],
   onAddMeal,
   showToast,
 }) => {
@@ -30,7 +30,9 @@ export const QuickPastFoodsModal: React.FC<QuickPastFoodsModalProps> = ({
   // Compile unique recent meals (deduplicated by name, showing latest stats)
   const uniqueRecentMeals = useMemo(() => {
     const map = new Map<string, Meal & { logCount: number }>();
-    for (const m of meals) {
+    const safeMeals = Array.isArray(meals) ? meals : [];
+    for (const m of safeMeals) {
+      if (!m || !m.name) continue;
       const key = m.name.trim().toLowerCase();
       if (!map.has(key)) {
         map.set(key, { ...m, logCount: 1 });
@@ -61,6 +63,8 @@ export const QuickPastFoodsModal: React.FC<QuickPastFoodsModalProps> = ({
       description?: string;
     }> = [];
 
+    const safeRecipes = Array.isArray(recipes) ? recipes : [];
+
     if (activeTab === "all" || activeTab === "recent") {
       uniqueRecentMeals.forEach((m) => {
         list.push({
@@ -81,7 +85,8 @@ export const QuickPastFoodsModal: React.FC<QuickPastFoodsModalProps> = ({
     }
 
     if (activeTab === "all" || activeTab === "recipes") {
-      recipes.forEach((r) => {
+      safeRecipes.forEach((r) => {
+        if (!r || !r.name) return;
         list.push({
           id: `recipe-${r.id}`,
           name: r.name,

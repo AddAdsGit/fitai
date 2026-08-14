@@ -3925,8 +3925,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       <QuickPastFoodsModal
         isOpen={isPastFoodsModalOpen}
         onClose={() => setIsPastFoodsModalOpen(false)}
-        meals={mealsState}
-        recipes={recipesState}
+        meals={mealsState || []}
+        recipes={recipes || []}
         onAddMeal={onAddMeal}
         showToast={showToast}
       />
