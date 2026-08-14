@@ -346,30 +346,20 @@ export default function App() {
   const [goalConfigValue, setGoalConfigValue] = useState(2000);
 
   const INITIAL_PROFILE_STATE = {
-    name: "John Doe",
+    name: "",
     imageUrl: "",
-    description:
-      "Fitness enthusiast & tech geek. Building a sustainable, high-protein lifestyle. Always optimizing! ✨ Adding more text here to test out the expansion feature and see how it works when the description gets fairly long.",
-    height: 183,
-    weight: 80,
+    description: "",
+    height: 175,
+    weight: 70,
     dob: "1998-05-15",
     gender: "Male",
     knowledge: {
-      preferences: [
-        "Prefers high protein diet, specifically chicken and eggs."
-      ],
-      health: [
-        "Allergic to shellfish."
-      ],
-      notes: [
-        "Usually works out at 6 PM on weekdays."
-      ],
+      preferences: [],
+      health: [],
+      notes: [],
       patterns: []
     },
-    agent_memory: [
-      "Prefers concise answers with bullet points",
-      "Uses a professional and encouraging tone"
-    ],
+    agent_memory: [],
     agent_config: {
       showGptWidget: true,
       generateImages: true,
@@ -586,6 +576,10 @@ export default function App() {
       }
 
       if (!existing) {
+        try {
+          localStorage.removeItem(`fitai_onboarded_${user.id}`);
+        } catch (_) {}
+
         const newKey = "fit_" + crypto.randomUUID().replace(/-/g, "");
         const baseUsername = user.email ? user.email.split('@')[0] : "user_" + Math.random().toString(36).substring(7);
         
@@ -1115,6 +1109,8 @@ export default function App() {
 
           if (profile.preferences?.includes("onboarded")) {
             localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
+          } else {
+            localStorage.removeItem(`fitai_onboarded_${activeProfileId}`);
           }
 
           // Resolve latest logged weight from history
@@ -2343,19 +2339,18 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
-  if (isSupabaseConfigured && isSessionLoading && currentPath !== "/") {
+  if (isSupabaseConfigured && isSessionLoading) {
     return (
       <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
-        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  const isOnboarded =
-    !!profileData.preferences?.includes("onboarded") ||
-    (activeProfileId
-      ? localStorage.getItem(`fitai_onboarded_${activeProfileId}`) === "true"
-      : true);
+  const isOnboarded = Boolean(
+    profileData.preferences?.includes("onboarded") ||
+    (activeProfileId && localStorage.getItem(`fitai_onboarded_${activeProfileId}`) === "true")
+  );
 
   // "/" is the main app — no more Redirecting... screen needed
 
