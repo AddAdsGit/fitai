@@ -875,8 +875,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                       <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none z-10" />
 
                       {/* Top Left: Past Food Badge */}
-                      <div className="absolute top-1.5 left-1.5 bg-stone-900/80 backdrop-blur-[4px] border border-white/10 px-1.5 py-0.5 rounded-md text-[7.5px] font-black text-white uppercase tracking-wider z-20 shadow-sm flex items-center gap-0.5">
-                        <span>🍲</span> Past Food
+                      <div className="absolute top-1.5 left-1.5 bg-black/45 backdrop-blur-[4px] border border-white/15 px-1.5 py-0.5 rounded-md text-[7.5px] font-black text-white/90 uppercase tracking-widest z-20 shadow-sm">
+                        Past Food
                       </div>
 
                       <div className="absolute top-1.5 right-1.5 bg-black/40 backdrop-blur-[4px] border border-white/5 px-1.5 py-0.5 rounded-md text-[8px] font-black text-white font-mono tracking-wider z-20 shadow-sm">
@@ -1185,14 +1185,18 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                   <div className="absolute bottom-4 left-4 right-4 text-left z-20">
                     {selectedMealPopup.tags && selectedMealPopup.tags.length > 0 && (
                       <div className="flex gap-1.5 mb-1.5 flex-wrap">
-                        {selectedMealPopup.tags.map((t, i) => (
-                          <span
-                            key={i}
-                            className="px-2 py-0.5 bg-orange-500 text-white rounded-md text-[7.5px] font-black uppercase tracking-widest font-sans shadow-xs"
-                          >
-                            {t}
-                          </span>
-                        ))}
+                        {selectedMealPopup.tags.map((t, i) => {
+                          const cleanTag = typeof t === "string" ? t.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "").trim() : t;
+                          if (!cleanTag) return null;
+                          return (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 bg-orange-500 text-white rounded-md text-[7.5px] font-black uppercase tracking-widest font-sans shadow-xs"
+                            >
+                              {cleanTag}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                     <h3 className="text-white text-lg font-black leading-tight tracking-tight drop-shadow-sm font-sans">

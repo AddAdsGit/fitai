@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
 import {
   Utensils,
   X,
@@ -587,8 +586,8 @@ export const ManualLogModal = ({
     };
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-end justify-center font-sans">
+  return (
+    <div className="fixed inset-0 z-[200] flex items-end justify-center font-sans">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -1551,7 +1550,6 @@ export const ManualLogModal = ({
         }}
         title="Set Meal Log Time"
       />
-    </div>,
-    document.body
+    </div>
   );
 };

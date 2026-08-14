@@ -62,19 +62,19 @@ const ProgressBar = ({
   index?: number;
   unit?: string;
 }) => (
-  <div className="space-y-1.5 min-w-0">
-    <div className="flex justify-between items-end text-[9.5px] sm:text-[10px] font-black uppercase tracking-[0.05em] gap-1 min-w-0">
-      <span className="text-orange-950/70 truncate min-w-0">{label}</span>
+  <div className="space-y-1.5">
+    <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-[0.05em]">
+      <span className="text-orange-950/70">{label}</span>
       {max ? (
-        <span className="shrink-0" style={{ color }}>
+        <span style={{ color }}>
           {value}
-          <span className="text-orange-900/40 text-[8.5px] sm:text-[9px] ml-0.5 font-bold">
-            /{max}
+          <span className="text-orange-900/40 text-[9px] ml-0.5">
+            / {max}
             {unit}
           </span>
         </span>
       ) : (
-        <span className="shrink-0" style={{ color }}>{percentage}%</span>
+        <span style={{ color }}>{percentage}%</span>
       )}
     </div>
     <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden border border-white/40 shadow-inner">

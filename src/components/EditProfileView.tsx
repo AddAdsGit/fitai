@@ -648,18 +648,18 @@ export const EditProfileView = ({
                       </button>
                     </div>
 
-                    {isEnabled && item.hasGoal && (
+                    {isEnabled && (item as any).hasGoal && (
                       <div className="pt-2.5 border-t border-stone-150 flex items-center justify-between animate-fade-in">
-                        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">{item.goalLabel}</span>
+                        <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">{(item as any).goalLabel}</span>
                         <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 rounded-xl px-2 py-1 shadow-3xs">
                           <button
                             type="button"
                             onClick={() => {
-                              const currentVal = profileData.goals?.[item.goalKey] ?? item.goalDefault;
-                              const newVal = Math.max(item.goalMin, currentVal - item.goalStep);
+                              const currentVal = profileData.goals?.[(item as any).goalKey] ?? (item as any).goalDefault;
+                              const newVal = Math.max((item as any).goalMin, currentVal - (item as any).goalStep);
                               setProfileData({
                                 ...profileData,
-                                goals: { ...profileData.goals, [item.goalKey]: newVal }
+                                goals: { ...profileData.goals, [(item as any).goalKey]: newVal }
                               });
                             }}
                             className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
@@ -668,25 +668,25 @@ export const EditProfileView = ({
                           </button>
                           <input
                             type="number"
-                            value={profileData.goals?.[item.goalKey] ?? item.goalDefault}
+                            value={profileData.goals?.[(item as any).goalKey] ?? (item as any).goalDefault}
                             onChange={(e) => {
-                              const val = parseInt(e.target.value) || item.goalMin;
+                              const val = parseInt(e.target.value) || (item as any).goalMin;
                               setProfileData({
                                 ...profileData,
-                                goals: { ...profileData.goals, [item.goalKey]: val }
+                                goals: { ...profileData.goals, [(item as any).goalKey]: val }
                               });
                             }}
                             className="bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
-                          <span className="text-[10px] font-bold text-stone-400">{item.goalUnit}</span>
+                          <span className="text-[10px] font-bold text-stone-400">{(item as any).goalUnit}</span>
                           <button
                             type="button"
                             onClick={() => {
-                              const currentVal = profileData.goals?.[item.goalKey] ?? item.goalDefault;
-                              const newVal = Math.min(item.goalMax, currentVal + item.goalStep);
+                              const currentVal = profileData.goals?.[(item as any).goalKey] ?? (item as any).goalDefault;
+                              const newVal = Math.min((item as any).goalMax, currentVal + (item as any).goalStep);
                               setProfileData({
                                 ...profileData,
-                                goals: { ...profileData.goals, [item.goalKey]: newVal }
+                                goals: { ...profileData.goals, [(item as any).goalKey]: newVal }
                               });
                             }}
                             className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"

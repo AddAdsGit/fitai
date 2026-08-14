@@ -73,7 +73,6 @@ import { Header } from "./components/Header";
 import { CalendarStrip } from "./components/CalendarStrip";
 import { AuthScreen } from "./components/AuthScreen";
 import { DailyProgressSection } from "./components/DailyProgressSection";
-import { QuickPastFoodsModal } from "./components/QuickPastFoodsModal";
 
 
 // Import types & helpers
@@ -346,20 +345,30 @@ export default function App() {
   const [goalConfigValue, setGoalConfigValue] = useState(2000);
 
   const INITIAL_PROFILE_STATE = {
-    name: "",
+    name: "John Doe",
     imageUrl: "",
-    description: "",
-    height: 175,
-    weight: 70,
+    description:
+      "Fitness enthusiast & tech geek. Building a sustainable, high-protein lifestyle. Always optimizing! ✨ Adding more text here to test out the expansion feature and see how it works when the description gets fairly long.",
+    height: 183,
+    weight: 80,
     dob: "1998-05-15",
     gender: "Male",
     knowledge: {
-      preferences: [],
-      health: [],
-      notes: [],
+      preferences: [
+        "Prefers high protein diet, specifically chicken and eggs."
+      ],
+      health: [
+        "Allergic to shellfish."
+      ],
+      notes: [
+        "Usually works out at 6 PM on weekdays."
+      ],
       patterns: []
     },
-    agent_memory: [],
+    agent_memory: [
+      "Prefers concise answers with bullet points",
+      "Uses a professional and encouraging tone"
+    ],
     agent_config: {
       showGptWidget: true,
       generateImages: true,
@@ -374,7 +383,7 @@ export default function App() {
       trackBloating: true,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     },
-    preferences: [],
+    preferences: ["Gluten Free", "Keto", "onboarded"],
     goals: {
       dailyCalories: 2000,
       weightGoal: 75,
@@ -385,10 +394,13 @@ export default function App() {
       fats: 80,
       fiber: 30,
     },
-    trackMicros: false,
-    micros: [],
+    trackMicros: true,
+    micros: [
+      { name: "Selenium", target: 55, unit: "mcg" },
+      { name: "Vitamin A", target: 900, unit: "mcg" },
+    ],
     api_key: "",
-    username: "",
+    username: "mk",
     notionApiKey: "",
     notionDatabaseId: "",
     googleSheetsWebhookUrl: "",
@@ -445,7 +457,6 @@ export default function App() {
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
-  const [isPastFoodsModalOpen, setIsPastFoodsModalOpen] = useState(false);
   const [timePickerTarget, setTimePickerTarget] = useState<"weight" | "digestion" | null>(null);
   const [timePickerInitialTime, setTimePickerInitialTime] = useState("");
 
@@ -573,10 +584,6 @@ export default function App() {
       }
 
       if (!existing) {
-        try {
-          localStorage.removeItem(`fitai_onboarded_${user.id}`);
-        } catch (_) {}
-
         const newKey = "fit_" + crypto.randomUUID().replace(/-/g, "");
         const baseUsername = user.email ? user.email.split('@')[0] : "user_" + Math.random().toString(36).substring(7);
         
@@ -1106,8 +1113,6 @@ export default function App() {
 
           if (profile.preferences?.includes("onboarded")) {
             localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
-          } else {
-            localStorage.removeItem(`fitai_onboarded_${activeProfileId}`);
           }
 
           // Resolve latest logged weight from history
@@ -2336,18 +2341,19 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
-  if (isSupabaseConfigured && isSessionLoading) {
+  if (isSupabaseConfigured && isSessionLoading && currentPath !== "/") {
     return (
       <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center font-sans max-w-md mx-auto relative shadow-2xl">
-        <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  const isOnboarded = Boolean(
-    profileData.preferences?.includes("onboarded") ||
-    (activeProfileId && localStorage.getItem(`fitai_onboarded_${activeProfileId}`) === "true")
-  );
+  const isOnboarded =
+    !!profileData.preferences?.includes("onboarded") ||
+    (activeProfileId
+      ? localStorage.getItem(`fitai_onboarded_${activeProfileId}`) === "true"
+      : true);
 
   // "/" is the main app — no more Redirecting... screen needed
 
@@ -3374,7 +3380,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
   return (
     <div className={cn(
       "min-h-screen text-[#1A1A1A] font-sans selection:bg-orange-100 max-w-md mx-auto relative shadow-2xl overflow-x-hidden",
-      activeTab === "camera-log" ? "bg-[#0D0D0D] pb-0" : "bg-[#FAF9F6] pb-[calc(8rem+env(safe-area-inset-bottom,0px))]"
+      activeTab === "camera-log" ? "bg-[#0D0D0D] pb-0" : "bg-[#FAF9F6] pb-32"
     )}>
       {/* Absolute Custom Toast Alert */}
       <AnimatePresence>
@@ -3509,7 +3515,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               customCalVal={customCalVal}
               setCustomCalVal={setCustomCalVal}
               handleLogMealClick={handleLogMealClick}
-              onOpenPastFoodsModal={() => setIsPastFoodsModalOpen(true)}
               onOpenCameraScanner={() => {
                 setActiveTab("camera-log");
               }}
@@ -3822,7 +3827,18 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       {/* Configurable Single-Action Floating Widget & Vitals Modal */}
       {activeTab !== "camera-log" && (
         <FloatingWidget
-          isVisible={profileData.agent_config?.showGptWidget ?? true}
+          isVisible={
+            (profileData.agent_config?.showGptWidget ?? true) &&
+            !isCameraFullScreen &&
+            !isCameraModalOpen &&
+            !isVitalsModalOpen &&
+            !selectedRecipePopup &&
+            !shareItemPopup &&
+            !activeGoalConfigPopup &&
+            !mealPendingDelete &&
+            !isDatePickerOpen &&
+            !isTimePickerOpen
+          }
           actionType={profileData.agent_config?.floatingWidgetAction || "gpt"}
           onExecuteAction={(action) => {
             if (action === "gpt") {
@@ -3912,16 +3928,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             : "Energy"
         } Log Time`}
       />
-
-      {/* Quick Past Foods & Saved Recipes Modal */}
-      <QuickPastFoodsModal
-        isOpen={isPastFoodsModalOpen}
-        onClose={() => setIsPastFoodsModalOpen(false)}
-        meals={mealsState || []}
-        recipes={recipes || []}
-        onAddMeal={onAddMeal}
-        showToast={showToast}
-      />
+      {/* Walkthrough disabled for zero-clutter launch */}
     </div>
   );
 }

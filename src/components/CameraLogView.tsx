@@ -437,7 +437,6 @@ export const CameraLogView = ({
       stopCameraHardware();
       const newImg = reader.result as string;
       setUploadedImage(newImg);
-      setIsTypingNotesInCapture(false);
       handleAnalyzeAndLog(newImg);
     };
     reader.readAsDataURL(file);
@@ -468,7 +467,6 @@ export const CameraLogView = ({
         const dataUrl = canvas.toDataURL("image/jpeg");
         stopCameraHardware();
         setUploadedImage(dataUrl);
-        setIsTypingNotesInCapture(false);
         handleAnalyzeAndLog(dataUrl);
         return;
       }

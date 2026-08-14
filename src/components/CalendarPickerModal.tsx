@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -144,13 +143,13 @@ export const CalendarPickerModal = ({
   // Generate years list
   const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
 
-  return createPortal(
+  return (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-6 font-sans"
+        className="fixed inset-0 bg-black/60 backdrop-blur-md z-[300] flex items-center justify-center p-6 font-sans"
         onClick={onClose}
       >
         <motion.div
@@ -251,7 +250,6 @@ export const CalendarPickerModal = ({
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>,
-    document.body
+    </AnimatePresence>
   );
 };

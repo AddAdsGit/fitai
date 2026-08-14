@@ -31,22 +31,22 @@ export function CalendarStrip({
   daysList,
 }: CalendarStripProps) {
   return (
-    <div id="calendar-strip" className="px-4 sm:px-6 mt-6 sm:mt-8 relative z-10 space-y-3 sm:space-y-4">
+    <div id="calendar-strip" className="px-6 mt-8 relative z-10 space-y-4">
       {/* Date Selector & Snap-to-Today Header */}
       <div className="flex justify-between items-center px-1 gap-2 min-w-0">
-        <span className="text-[11px] sm:text-xs font-black uppercase tracking-widest text-stone-500 truncate min-w-0">
+        <span className="text-xs font-black uppercase tracking-widest text-stone-500 truncate min-w-0">
           {getFormattedSelectedDate()}
         </span>
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-2">
           {selectedDate !== todayStr && (
             <button
               onClick={() => {
                 setSelectedDate(todayStr);
                 recenterDaysList(todayStr);
               }}
-              className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest px-2.5 sm:px-3 py-1.5 rounded-xl shadow-md active:scale-95 transition-all cursor-pointer border-none flex items-center gap-1 shrink-0"
+              className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl shadow-md active:scale-95 transition-all cursor-pointer border-none flex items-center gap-1 shrink-0"
             >
-              <span className="hidden sm:inline">Shift to </span>Today
+              Shift to Today
             </button>
           )}
           <button

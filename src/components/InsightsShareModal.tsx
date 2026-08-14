@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { createPortal } from "react-dom";
 import { X, Copy, Download, Share2, Flame, Check, Sparkles, TrendingUp, Trophy, Scale } from "lucide-react";
 import { motion } from "motion/react";
 import { toPng } from "html-to-image";
@@ -184,12 +183,12 @@ export const InsightsShareModal: React.FC<InsightsShareModalProps> = ({
     }
   };
 
-  return createPortal(
+  return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-stone-900/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 sm:p-6 font-sans"
+      className="fixed inset-0 bg-stone-900/70 backdrop-blur-md z-[300] flex items-center justify-center p-4 sm:p-6 font-sans"
     >
       <motion.div
         initial={{ scale: 0.95, y: 15 }}
@@ -481,7 +480,6 @@ export const InsightsShareModal: React.FC<InsightsShareModalProps> = ({
           </div>
         </div>
       </motion.div>
-    </motion.div>,
-    document.body
+    </motion.div>
   );
 };

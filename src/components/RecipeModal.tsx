@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
 import {
   Utensils,
   Camera,
@@ -285,13 +284,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
   const activeImage = image || recipe.image || FALLBACK_RECIPE_IMAGE;
 
-  return createPortal(
+  return (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-stone-950/40 backdrop-blur-md z-[9999] flex items-end justify-center font-sans"
+        className="fixed inset-0 bg-stone-950/40 backdrop-blur-md z-[100] flex items-end justify-center font-sans"
       >
         {/* Sliding Bottom Sheet Panel */}
         <motion.div
@@ -861,7 +860,6 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>,
-    document.body
+    </AnimatePresence>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Zap, Plus, Check, Share2, Trash2, Camera, History } from "lucide-react";
+import { Zap, Plus, Check, Share2, Trash2, Camera } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProgressBar } from "./InsightsView";
@@ -59,7 +59,6 @@ export interface ConsumptionSectionProps {
   customCalVal: string;
   setCustomCalVal: (val: string) => void;
   handleLogMealClick: () => void;
-  onOpenPastFoodsModal?: () => void;
   onOpenCameraScanner?: () => void;
   onAddMeal: (meal: any) => void;
   showToast: (msg: string) => void;
@@ -84,7 +83,6 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
   customCalVal,
   setCustomCalVal,
   handleLogMealClick,
-  onOpenPastFoodsModal,
   onOpenCameraScanner,
   onAddMeal,
   showToast,
@@ -94,25 +92,15 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
   handleDeleteMeal,
 }) => {
   return (
-    <section className="px-4 sm:px-6 mt-10 sm:mt-12 relative z-10">
-        <div className="flex justify-between items-center mb-5 sm:mb-6">
-          <h3 className="text-lg sm:text-xl font-black tracking-tight text-orange-950">
+    <section className="px-6 mt-12 relative z-10">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-black tracking-tight text-orange-950">
             {selectedDate === todayStr
               ? "Today's Consumption"
               : "Logged Consumption"}
           </h3>
           {selectedDate === todayStr && (
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              {/* History / Previous Meals Button */}
-              {onOpenPastFoodsModal && (
-                <button
-                  onClick={onOpenPastFoodsModal}
-                  className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-sm shadow-stone-200/10 border-none"
-                  title="Log Past Meal or Recipe"
-                >
-                  <History className="w-4 h-4 text-stone-600" />
-                </button>
-              )}
+            <div className="flex gap-2">
               {/* Quick Add Zap Button */}
               <button
                 onClick={() => setShowQuickAdd(!showQuickAdd)}
@@ -121,7 +109,7 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                     ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10"
                     : "bg-stone-100 hover:bg-stone-200 text-stone-500 shadow-stone-200/10"
                 }`}
-                title="Quick Add Numbers"
+                title="Quick Add"
               >
                 <Zap className="w-4 h-4" />
               </button>
@@ -427,16 +415,16 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                   />
 
                   {/* Top Bar: Time, Calories, and Delete */}
-                  <div className="absolute top-3.5 sm:top-5 left-3.5 sm:left-5 right-3.5 sm:right-5 flex justify-between items-center z-20 gap-1.5">
-                    <div className="backdrop-blur-md bg-white/10 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-white/10 shrink-0">
-                      <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.1em] text-white">
+                  <div className="absolute top-5 left-5 right-5 flex justify-between items-center z-20">
+                    <div className="backdrop-blur-md bg-white/10 px-3 py-1.5 rounded-full border border-white/10">
+                      <span className="text-[10px] font-black uppercase tracking-[0.1em] text-white">
                         {meal.time}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                      <div className="backdrop-blur-md bg-orange-500/90 text-white px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-black flex items-center gap-1 shadow-lg border border-orange-400/50">
-                        <span className="text-xs sm:text-sm">{meal.calories}</span>
-                        <span className="text-[8px] sm:text-[9px] uppercase tracking-wider opacity-90">
+                    <div className="flex items-center gap-2">
+                      <div className="backdrop-blur-md bg-orange-500/90 text-white px-3 py-1.5 rounded-full font-black flex items-center gap-1 shadow-lg border border-orange-400/50">
+                        <span className="text-sm">{meal.calories}</span>
+                        <span className="text-[9px] uppercase tracking-wider opacity-90">
                           Kcal
                         </span>
                       </div>
@@ -445,7 +433,7 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                           e.stopPropagation();
                           handleShareMeal(meal);
                         }}
-                        className="w-7 sm:w-8 h-7 sm:h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-orange-500/80 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
+                        className="w-8 h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-orange-500/80 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
                         title="Share meal"
                       >
                         <Share2 className="w-3.5 h-3.5" />
@@ -455,7 +443,7 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                           e.stopPropagation();
                           handleDeleteMeal(meal);
                         }}
-                        className="w-7 sm:w-8 h-7 sm:h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-red-550/85 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
+                        className="w-8 h-8 rounded-full backdrop-blur-md bg-black/30 hover:bg-red-550/85 border border-white/10 flex items-center justify-center text-white cursor-pointer transition-colors"
                         title="Delete log"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -464,8 +452,8 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                   </div>
 
                   {/* Bottom Content: Name and Macros */}
-                  <div className="absolute bottom-3.5 sm:bottom-5 left-3.5 sm:left-5 right-3.5 sm:right-5 text-left font-sans z-20">
-                    <h4 className="text-white text-lg sm:text-2xl font-black mb-1 leading-tight tracking-tight shadow-sm truncate">
+                  <div className="absolute bottom-5 left-5 right-5 text-left font-sans z-20">
+                    <h4 className="text-white text-xl sm:text-2xl font-black mb-1 leading-tight tracking-tight shadow-sm">
                       {meal.name}
                     </h4>
                     {meal.meal_description && (
