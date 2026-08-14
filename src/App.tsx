@@ -374,7 +374,7 @@ export default function App() {
       trackBloating: true,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     },
-    preferences: ["Gluten Free", "Keto", "onboarded"],
+    preferences: [],
     goals: {
       dailyCalories: 2000,
       weightGoal: 75,
@@ -385,13 +385,10 @@ export default function App() {
       fats: 80,
       fiber: 30,
     },
-    trackMicros: true,
-    micros: [
-      { name: "Selenium", target: 55, unit: "mcg" },
-      { name: "Vitamin A", target: 900, unit: "mcg" },
-    ],
+    trackMicros: false,
+    micros: [],
     api_key: "",
-    username: "mk",
+    username: "",
     notionApiKey: "",
     notionDatabaseId: "",
     googleSheetsWebhookUrl: "",
