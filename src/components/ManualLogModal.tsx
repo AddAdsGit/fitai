@@ -673,6 +673,7 @@ export const ManualLogModal = ({
           confidenceScore: confidence,
           isNonFood: isNonFoodDetected,
           detectedObject: calculatedMeal.name || "Pen",
+          image: calculatedMeal.image || uploadedImage || imageUrl,
           question: isNonFoodDetected
             ? `That looks like a ${calculatedMeal.name || "Pen 🖊️"} (non-food item)!`
             : `Is this "${calculatedMeal.name}" prepared with homemade ingredients or restaurant style?`,

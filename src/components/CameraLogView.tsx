@@ -687,6 +687,7 @@ export const CameraLogView = ({
           confidenceScore: confidence,
           isNonFood: isNonFoodDetected,
           detectedObject: mealData.name || "Pen",
+          image: targetImage,
           question: isNonFoodDetected
             ? `That looks like a ${mealData.name || "Pen 🖊️"} (non-food item)!`
             : `Is this "${mealData.name}" prepared with homemade ingredients or restaurant style?`,
