@@ -62,91 +62,62 @@ export const AiClarificationModal: React.FC<AiClarificationModalProps> = ({
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center font-sans select-none pointer-events-auto">
-        {/* Dark Backing Overlay */}
+      <div className="fixed inset-0 z-[99999] flex items-end justify-center font-sans select-none" onClick={onClose}>
+        {/* Dark Backing Overlay matching ManualLogModal */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-stone-950/60 backdrop-blur-md cursor-pointer"
+          className="absolute inset-0 bg-stone-950/40 backdrop-blur-md cursor-pointer"
         />
 
-        {/* BOTTOM SHEET CONTAINER */}
+        {/* BOTTOM SHEET CONTAINER IDENTICAL TO MANUAL LOG MODAL */}
         <motion.div
-          initial={{ y: "100%", opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: "100%", opacity: 0 }}
-          transition={{ type: "spring", damping: 28, stiffness: 280 }}
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 25, stiffness: 220 }}
           onClick={(e) => e.stopPropagation()}
-          className="bg-[#FAF7F2] border-t border-x border-orange-200/80 rounded-t-[36px] sm:rounded-[36px] w-full max-w-lg max-h-[90vh] relative z-10 shadow-2xl flex flex-col text-left overflow-hidden font-sans"
+          className="bg-[#FAF7F2] border-t border-x border-stone-200/80 rounded-t-[36px] w-full max-w-md relative z-10 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col transition-[height,max-height] duration-300 overflow-hidden max-h-[85dvh]"
         >
-          {/* Top Handle Pill */}
-          <div className="w-full pt-3 pb-1 flex justify-center cursor-grab active:cursor-grabbing shrink-0">
-            <div className="w-12 h-1.5 rounded-full bg-stone-300/80" />
-          </div>
-
-          {/* Sheet Header */}
-          <div className="px-5 py-2.5 flex items-center justify-between border-b border-black/[0.04] shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className={cn(
-                "w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 border",
-                isNonFood
-                  ? "bg-red-500/10 border-red-500/20 text-red-600"
-                  : "bg-orange-500/10 border-orange-500/20 text-orange-600"
-              )}>
-                {isNonFood ? (
-                  <AlertTriangle className="w-4.5 h-4.5 text-red-500" />
-                ) : (
-                  <Sparkles className="w-4.5 h-4.5 text-orange-500" />
-                )}
-              </div>
-              <div>
-                <h3 className="text-xs font-black text-orange-950 uppercase tracking-widest leading-none font-sans">
+          {/* Header Bar */}
+          <div className="p-6 pb-3 space-y-3 shrink-0">
+            <div className="flex justify-between items-center pb-2 border-b border-black/[0.04]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-600 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-orange-500" />
+                </div>
+                <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest font-sans">
                   {isNonFood ? "Non-Food Object Detected" : "AI Meal Clarification"}
-                </h3>
-                <p className="text-[10.5px] font-bold text-stone-500 mt-0.5">
-                  {isNonFood ? "Inedible item flagged" : "Ensure 100% nutritional accuracy"}
-                </p>
+                </h4>
               </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 text-stone-600 flex items-center justify-center transition-colors cursor-pointer border border-stone-200/60 shadow-3xs"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 text-stone-500 flex items-center justify-center transition-colors border border-stone-200/60 shadow-3xs cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* SCROLLABLE BODY CONTENT */}
-          <div className="p-5 space-y-4 overflow-y-auto max-h-[calc(88vh-130px)] font-sans">
-            
-            {/* PHOTO PREVIEW & CONFIDENCE METER CARD */}
-            <div className="bg-white border border-stone-200/80 rounded-3xl p-3.5 space-y-3 shadow-3xs">
-              <div className="flex items-center gap-3.5">
-                {/* Photo Thumbnail */}
+            {/* SLEEK CONFIDENCE METER HEADER CARD */}
+            <div className="bg-white/90 border border-stone-200/80 rounded-2xl p-3.5 space-y-2 shadow-3xs">
+              <div className="flex items-center gap-3">
                 {photoUrl ? (
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden border border-stone-200/80 shrink-0 bg-stone-100 shadow-3xs relative">
-                    <img
-                      src={photoUrl}
-                      alt="Scanned dish"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden border border-stone-200/80 shrink-0 bg-stone-100 shadow-3xs relative">
+                    <img src={photoUrl} alt="Scanned food" className="w-full h-full object-cover" />
                   </div>
                 ) : (
-                  <div className="w-16 h-16 rounded-2xl bg-orange-50/80 border border-orange-100 flex items-center justify-center text-orange-500 text-xl font-bold shrink-0">
+                  <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 text-lg shrink-0 font-bold">
                     🍱
                   </div>
                 )}
 
-                {/* Confidence Score Bar */}
-                <div className="flex-1 space-y-1.5 min-w-0 text-left">
+                <div className="flex-1 min-w-0 space-y-1 text-left">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider flex items-center gap-1">
                       <HelpCircle className="w-3 h-3 text-orange-500" />
-                      Confidence Meter
+                      AI Confidence
                     </span>
                     <span className={cn(
                       "font-mono font-black text-[11px] px-2 py-0.5 rounded-full border",
@@ -160,8 +131,7 @@ export const AiClarificationModal: React.FC<AiClarificationModalProps> = ({
                     </span>
                   </div>
 
-                  {/* Progress Meter Bar */}
-                  <div className="w-full h-2.5 bg-stone-100 rounded-full overflow-hidden p-0.5 border border-stone-200/60">
+                  <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden p-0.5 border border-stone-200/60">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${confidenceScore}%` }}
@@ -179,32 +149,34 @@ export const AiClarificationModal: React.FC<AiClarificationModalProps> = ({
 
                   <p className="text-[10px] font-semibold text-stone-500 truncate">
                     {isNonFood
-                      ? "Inedible item flagged. Meal logging blocked."
+                      ? "Inedible item flagged — logging disabled"
                       : confidenceScore >= 90
                       ? "High Certainty Log"
-                      : "Below 90% confidence — confirm 1 quick detail below."}
+                      : "Under 90% confidence — confirm 1 detail below."}
                   </p>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* NON-FOOD VIEW VS CLARIFICATION QUESTION VIEW */}
+          {/* Scrollable Questions Body */}
+          <div className="px-6 pb-6 space-y-4 flex-1 overflow-y-auto min-h-0 text-left">
             {isNonFood ? (
-              <div className="bg-red-50/60 border border-red-200/80 rounded-3xl p-4 space-y-2 text-center">
+              <div className="bg-red-50/60 border border-red-200/80 rounded-2xl p-4 space-y-2 text-center">
                 <div className="text-3xl">🖊️</div>
                 <h4 className="text-sm font-black text-orange-950">
                   That looks like a {clarificationData.detectedObject || clarificationData.mealData?.name || "Pen 🖊️"}!
                 </h4>
                 <p className="text-xs font-medium text-stone-600 leading-relaxed">
-                  FitAI is strictly designed for tracking food and drinks. Non-food entries are disabled to keep your daily macro charts clean.
+                  FitAI is strictly designed for tracking edible meals and beverages. Logging non-food items is disabled to protect your nutritional data integrity.
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
-                <h4 className="text-xs font-black text-orange-950 leading-snug flex items-start gap-2">
+                <h5 className="text-xs font-black text-orange-950 leading-snug flex items-start gap-2">
                   <MessageSquare className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
                   <span>{clarificationData.question}</span>
-                </h4>
+                </h5>
 
                 {/* Multiple Choice Options */}
                 <div className="space-y-2">
@@ -263,8 +235,8 @@ export const AiClarificationModal: React.FC<AiClarificationModalProps> = ({
             )}
           </div>
 
-          {/* STICKY BOTTOM ACTIONS BAR */}
-          <div className="p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 space-y-2 font-sans">
+          {/* STICKY BOTTOM DOCKED ACTIONS BAR (100% Manual Log Style) */}
+          <div className="p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 w-full font-sans space-y-2.5">
             {isNonFood ? (
               <div className="grid grid-cols-2 gap-2">
                 {onRetakePhoto && (
