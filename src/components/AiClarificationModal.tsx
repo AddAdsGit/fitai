@@ -187,10 +187,10 @@ export const AiClarificationModal: React.FC<AiClarificationModalProps> = ({
             )}
           </div>
 
-          {/* 3. STICKY BOTTOM DOCKED 2-BUTTON SHARED ROW */}
-          <div className="p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 w-full font-sans">
+          {/* 3. STICKY BOTTOM DOCKED STACKED CTAS (Text-Only, Zero Icons) */}
+          <div className="p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 w-full font-sans space-y-2">
             {isNonFood ? (
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-2">
                 {onRetakePhoto && (
                   <button
                     type="button"
@@ -198,10 +198,9 @@ export const AiClarificationModal: React.FC<AiClarificationModalProps> = ({
                       onClose();
                       onRetakePhoto();
                     }}
-                    className="py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all font-sans border-none"
+                    className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md shadow-orange-500/20 flex items-center justify-center cursor-pointer active:scale-95 transition-all font-sans border-none"
                   >
-                    <Camera className="w-4 h-4" />
-                    <span>Retake Photo</span>
+                    Retake Photo
                   </button>
                 )}
 
@@ -212,31 +211,28 @@ export const AiClarificationModal: React.FC<AiClarificationModalProps> = ({
                       onClose();
                       onSearchFood();
                     }}
-                    className="py-3.5 bg-stone-100 hover:bg-stone-200 border border-stone-200/80 text-stone-700 font-bold text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all font-sans"
+                    className="w-full py-3 bg-stone-100 hover:bg-stone-200 border border-stone-200/80 text-stone-700 font-bold text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center cursor-pointer active:scale-95 transition-all font-sans"
                   >
-                    <Search className="w-3.5 h-3.5 text-stone-500" />
-                    <span>Search Food</span>
+                    Search Food Library
                   </button>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-2">
                 <button
                   type="button"
                   onClick={handleProceed}
-                  className="py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md shadow-orange-500/25 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all font-sans border-none"
+                  className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md shadow-orange-500/25 flex items-center justify-center cursor-pointer active:scale-95 transition-all font-sans border-none"
                 >
-                  <span>Confirm & Proceed</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  Confirm & Proceed
                 </button>
 
                 <button
                   type="button"
                   onClick={onLogAnyway}
-                  className="py-3.5 bg-stone-100 hover:bg-stone-200 border border-stone-200/80 text-stone-700 font-bold text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all font-sans"
+                  className="w-full py-2.5 bg-stone-100 hover:bg-stone-200 border border-stone-200/80 text-stone-700 font-bold text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center cursor-pointer active:scale-95 transition-all font-sans"
                 >
-                  <Zap className="w-3.5 h-3.5 text-orange-500" />
-                  <span>Log Anyway</span>
+                  Log Anyway
                 </button>
               </div>
             )}
