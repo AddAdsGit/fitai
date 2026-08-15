@@ -662,15 +662,23 @@ export const ManualLogModal = ({
         };
       }
 
-      // AI Confidence Score Check (Threshold: 90%)
-      const confidence = calculatedMeal.confidenceScore || (aiInstruction.length > 15 ? 92 : 78);
+      // AI Confidence Score Check (Threshold: 90% & Non-Food Guardrail)
+      const isNonFoodDetected = calculatedMeal.isFood === false || (calculatedMeal.name && (calculatedMeal.name.toLowerCase().includes("pen") || calculatedMeal.name.toLowerCase().includes("stationery") || calculatedMeal.name.toLowerCase().includes("keys") || calculatedMeal.name.toLowerCase().includes("phone")));
 
-      if (confidence < 90 && !hasBeenClarified) {
+      const confidence = isNonFoodDetected ? 15 : (calculatedMeal.confidenceScore || (aiInstruction.length > 15 ? 92 : 78));
+
+      if ((isNonFoodDetected || confidence < 90) && !hasBeenClarified) {
         setPendingClarification({
           mealData: calculatedMeal,
           confidenceScore: confidence,
-          question: `Is this "${calculatedMeal.name}" prepared with homemade ingredients or restaurant style?`,
-          options: ["Homemade / Healthy Preparation", "Restaurant / Outside Food", "Extra Large Portion"]
+          isNonFood: isNonFoodDetected,
+          detectedObject: calculatedMeal.name || "Pen",
+          question: isNonFoodDetected
+            ? `That looks like a ${calculatedMeal.name || "Pen 🖊️"} (non-food item)!`
+            : `Is this "${calculatedMeal.name}" prepared with homemade ingredients or restaurant style?`,
+          options: isNonFoodDetected
+            ? ["Retake Photo", "Search Food Library"]
+            : ["Homemade / Healthy Preparation", "Restaurant / Outside Food", "Extra Large Portion"]
         });
         setIsClarificationModalOpen(true);
         setIsProcessing(false);
@@ -1910,12 +1918,22 @@ export const ManualLogModal = ({
         title="Set Meal Log Time"
       />
 
-      {/* Antigravity AI Clarification Modal (90% Confidence Threshold) */}
+      {/* Antigravity AI Clarification Modal (90% Confidence Threshold & Non-Food Guardrail) */}
       <AiClarificationModal
         isOpen={isClarificationModalOpen}
         clarificationData={pendingClarification}
         onConfirm={handleConfirmClarification}
         onLogAnyway={handleBypassClarification}
+        onRetakePhoto={() => {
+          setIsClarificationModalOpen(false);
+          setUploadedImage(null);
+          setImageUrl("");
+          setModalStep("type");
+        }}
+        onSearchFood={() => {
+          setIsClarificationModalOpen(false);
+          setShowPastFoodsDrawer(true);
+        }}
         onClose={() => setIsClarificationModalOpen(false)}
       />
     </div>

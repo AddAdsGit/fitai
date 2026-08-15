@@ -625,7 +625,7 @@ export const CameraLogView = ({
           .map((n) => `"${n.id}": (${n.name} in ${n.unit})`)
           .join(", ");
 
-        const promptText = `Analyze this food image. User notes: "${combinedNotes}". Estimate meal name, total calories (kcal), dietary tags (clean text only e.g. ["High Protein","Keto"]), and values for user-tracked nutrients: ${nutrientPromptList}. Return ONLY valid JSON: {"name":"...","calories":0,"tags":["High Protein"],"nutrients":{"protein":0,"carbs":0,"fats":0,"fiber":0}}`;
+        const promptText = `Analyze this image. User notes: "${combinedNotes}". FIRST check if the main subject is edible food or a beverage. If it is NOT food (e.g. pen, stationery, keys, phone, desk, clothing), return JSON: {"isFood": false, "name": "Pen", "confidenceScore": 15}. If it IS food, estimate meal name, confidenceScore (0-100), total calories (kcal), dietary tags (clean text only e.g. ["High Protein"]), and user-tracked nutrients: ${nutrientPromptList}. Return ONLY valid JSON: {"isFood": true, "name":"...", "confidenceScore": 85, "calories":0,"tags":["High Protein"],"nutrients":{"protein":0,"carbs":0,"fats":0,"fiber":0}}`;
 
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
@@ -676,15 +676,23 @@ export const CameraLogView = ({
         };
       }
 
-      // AI Confidence Score Check (Threshold: 90%)
-      const confidence = mealData.confidenceScore || (combinedNotes.length > 15 ? 92 : 78);
+      // AI Confidence Score Check (Threshold: 90% & Non-Food Guardrail)
+      const isNonFoodDetected = mealData.isFood === false || (mealData.name && (mealData.name.toLowerCase().includes("pen") || mealData.name.toLowerCase().includes("stationery") || mealData.name.toLowerCase().includes("keys") || mealData.name.toLowerCase().includes("phone")));
 
-      if (confidence < 90 && !hasBeenClarified) {
+      const confidence = isNonFoodDetected ? 15 : (mealData.confidenceScore || (combinedNotes.length > 15 ? 92 : 78));
+
+      if ((isNonFoodDetected || confidence < 90) && !hasBeenClarified) {
         setPendingClarification({
           mealData,
           confidenceScore: confidence,
-          question: `Is this "${mealData.name}" prepared with homemade ingredients or restaurant style?`,
-          options: ["Homemade / Healthy Preparation", "Restaurant / Outside Food", "Extra Large Portion"]
+          isNonFood: isNonFoodDetected,
+          detectedObject: mealData.name || "Pen",
+          question: isNonFoodDetected
+            ? `That looks like a ${mealData.name || "Pen 🖊️"} (non-food item)!`
+            : `Is this "${mealData.name}" prepared with homemade ingredients or restaurant style?`,
+          options: isNonFoodDetected
+            ? ["Retake Photo", "Search Food Library"]
+            : ["Homemade / Healthy Preparation", "Restaurant / Outside Food", "Extra Large Portion"]
         });
         setIsClarificationModalOpen(true);
         setIsProcessing(false);
@@ -1764,12 +1772,21 @@ export const CameraLogView = ({
         }}
         title="Set Meal Log Time"
       />
-      {/* Antigravity AI Clarification Modal (90% Confidence Threshold) */}
+      {/* Antigravity AI Clarification Modal (90% Confidence Threshold & Non-Food Guardrail) */}
       <AiClarificationModal
         isOpen={isClarificationModalOpen}
         clarificationData={pendingClarification}
         onConfirm={handleConfirmClarification}
         onLogAnyway={handleBypassClarification}
+        onRetakePhoto={() => {
+          setIsClarificationModalOpen(false);
+          setUploadedImage(null);
+          setFlowStep("capture");
+        }}
+        onSearchFood={() => {
+          setIsClarificationModalOpen(false);
+          setShowPastFoodsDrawer(true);
+        }}
         onClose={() => setIsClarificationModalOpen(false)}
       />
     </div>
