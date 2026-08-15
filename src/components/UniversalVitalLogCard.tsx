@@ -1,5 +1,5 @@
 import React from "react";
-import { Scale, Droplet, Zap, X } from "lucide-react";
+import { Scale, Droplet, Zap, X, Pencil } from "lucide-react";
 import { BristolStoolIcon, BloatingIcon, BloatingStomachIcon } from "./BristolStoolIcons";
 import { cn } from "../lib/utils";
 
@@ -22,6 +22,7 @@ export interface UniversalVitalLogCardProps {
   stoolType?: number | null;
   bloatingLevel?: number | null;
   logTime?: string | null;
+  onEdit?: () => void;
   onDelete?: () => void;
   canDelete?: boolean;
   className?: string;
@@ -34,6 +35,7 @@ export const UniversalVitalLogCard: React.FC<UniversalVitalLogCardProps> = ({
   stoolType,
   bloatingLevel,
   logTime,
+  onEdit,
   onDelete,
   canDelete = true,
   className,
@@ -90,16 +92,28 @@ export const UniversalVitalLogCard: React.FC<UniversalVitalLogCardProps> = ({
           )}
         </div>
       </div>
-      {canDelete && onDelete && (
-        <button
-          type="button"
-          onClick={onDelete}
-          className="w-6.5 h-6.5 rounded-[10px] hover:bg-stone-100 text-stone-400 hover:text-stone-700 flex items-center justify-center cursor-pointer transition-colors border-none shrink-0"
-          title="Remove entry"
-        >
-          <X className="w-3 h-3" />
-        </button>
-      )}
+      <div className="flex items-center gap-1 shrink-0">
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="w-6.5 h-6.5 rounded-[10px] bg-orange-50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-colors border border-orange-200/60"
+            title="Edit entry"
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+        )}
+        {canDelete && onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="w-6.5 h-6.5 rounded-[10px] hover:bg-stone-100 text-stone-400 hover:text-stone-700 flex items-center justify-center cursor-pointer transition-colors border-none"
+            title="Remove entry"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
     </div>
   );
 };

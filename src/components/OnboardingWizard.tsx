@@ -7,12 +7,14 @@ import {
   ArrowRight,
   Search,
   X,
-  Pencil
+  Pencil,
+  Sparkles
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
 import { TERMS_AND_CONDITIONS } from "../constants/terms";
 import { DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
+import { StepperButton } from "./StepperButton";
 
 interface BodyMetrics {
   name: string;
@@ -694,13 +696,12 @@ export const OnboardingWizard = ({
                 Age (years)
               </label>
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setMetrics(prev => ({ ...prev, age: Math.max(10, prev.age - 1) }))}
+                <StepperButton
+                  onStep={() => setMetrics(prev => ({ ...prev, age: Math.max(10, prev.age - 1) }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Minus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
@@ -713,13 +714,12 @@ export const OnboardingWizard = ({
                   />
                   <span className="text-[10px] font-bold text-stone-400">Yrs Old</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setMetrics(prev => ({ ...prev, age: Math.min(120, prev.age + 1) }))}
+                <StepperButton
+                  onStep={() => setMetrics(prev => ({ ...prev, age: Math.min(120, prev.age + 1) }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
               </div>
             </div>
 
@@ -730,13 +730,12 @@ export const OnboardingWizard = ({
                   Height (cm)
                 </label>
                 <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, height: Math.max(100, prev.height - 1) }))}
+                  <StepperButton
+                    onStep={() => setMetrics(prev => ({ ...prev, height: Math.max(100, prev.height - 1) }))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Minus className="w-3.5 h-3.5" />
-                  </button>
+                  </StepperButton>
                   <input
                     type="number"
                     value={metrics.height === 0 ? "" : metrics.height}
@@ -746,13 +745,12 @@ export const OnboardingWizard = ({
                     }}
                     className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setMetrics(prev => ({ ...prev, height: Math.min(250, prev.height + 1) }))}
+                  <StepperButton
+                    onStep={() => setMetrics(prev => ({ ...prev, height: Math.min(250, prev.height + 1) }))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                  </button>
+                  </StepperButton>
                 </div>
               </div>
 
@@ -761,26 +759,24 @@ export const OnboardingWizard = ({
                   Weight (kg)
                 </label>
                 <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => handleCurrentWeightChange(String(Math.max(30, (metrics.weight || 70) - 1)))}
+                  <StepperButton
+                    onStep={() => handleCurrentWeightChange(String(Math.max(30, (metrics.weight || 70) - 1)))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Minus className="w-3.5 h-3.5" />
-                  </button>
+                  </StepperButton>
                   <input
                     type="number"
                     value={metrics.weight === 0 ? "" : metrics.weight}
                     onChange={(e) => handleCurrentWeightChange(e.target.value)}
                     className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <button
-                    type="button"
-                    onClick={() => handleCurrentWeightChange(String(Math.min(300, (metrics.weight || 70) + 1)))}
+                  <StepperButton
+                    onStep={() => handleCurrentWeightChange(String(Math.min(300, (metrics.weight || 70) + 1)))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                  </button>
+                  </StepperButton>
                 </div>
               </div>
             </div>
@@ -834,13 +830,12 @@ export const OnboardingWizard = ({
                 Target Weight (kg)
               </label>
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => handleTargetWeightChange(String(Math.max(35, (metrics.targetWeight || 70) - 1)))}
+                <StepperButton
+                  onStep={() => handleTargetWeightChange(String(Math.max(35, (metrics.targetWeight || 70) - 1)))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Minus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
@@ -850,13 +845,12 @@ export const OnboardingWizard = ({
                   />
                   <span className="text-[10px] font-bold text-stone-400">kg</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleTargetWeightChange(String(Math.min(250, (metrics.targetWeight || 70) + 1)))}
+                <StepperButton
+                  onStep={() => handleTargetWeightChange(String(Math.min(250, (metrics.targetWeight || 70) + 1)))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
               </div>
             </div>
 
@@ -866,13 +860,12 @@ export const OnboardingWizard = ({
                 Daily Calories Target (kcal)
               </label>
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => handleCaloriesChange(String(Math.max(800, (targets.calories || 2000) - 50)))}
+                <StepperButton
+                  onStep={() => handleCaloriesChange(String(Math.max(800, (targets.calories || 2000) - 50)))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Minus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
@@ -882,13 +875,12 @@ export const OnboardingWizard = ({
                   />
                   <span className="text-[10px] font-bold text-stone-400">kcal</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleCaloriesChange(String(Math.min(10000, (targets.calories || 2000) + 50)))}
+                <StepperButton
+                  onStep={() => handleCaloriesChange(String(Math.min(10000, (targets.calories || 2000) + 50)))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
               </div>
             </div>
           </div>
@@ -1001,9 +993,8 @@ export const OnboardingWizard = ({
                     {/* Stepper Target Input */}
                     {n.enabled && (
                       <div className="flex items-center gap-1 bg-stone-50 border border-stone-200/90 rounded-xl px-2 py-1 shadow-3xs">
-                        <button
-                          type="button"
-                          onClick={() => {
+                        <StepperButton
+                          onStep={() => {
                             const val = Math.max(0, (n.target || 10) - 5);
                             setTrackedNutrientList(prev => prev.map(item => item.id === n.id ? { ...item, target: val } : item));
                             if (["protein", "carbs", "fats", "fiber"].includes(n.id)) {
@@ -1013,7 +1004,7 @@ export const OnboardingWizard = ({
                           className="w-5 h-5 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
                         >
                           <Minus className="w-3 h-3" />
-                        </button>
+                        </StepperButton>
                         <input
                           type="number"
                           value={n.target || 0}
@@ -1027,9 +1018,8 @@ export const OnboardingWizard = ({
                           className="bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         <span className="text-[9px] font-bold text-stone-400">{n.unit}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
+                        <StepperButton
+                          onStep={() => {
                             const val = (n.target || 0) + 5;
                             setTrackedNutrientList(prev => prev.map(item => item.id === n.id ? { ...item, target: val } : item));
                             if (["protein", "carbs", "fats", "fiber"].includes(n.id)) {
@@ -1038,8 +1028,8 @@ export const OnboardingWizard = ({
                           }}
                           className="w-5 h-5 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
                         >
-                          <Plus className="w-3 h-3" />
-                        </button>
+                          <Plus className="w-3.5 h-3.5" />
+                        </StepperButton>
                       </div>
                     )}
 
@@ -1131,6 +1121,16 @@ export const OnboardingWizard = ({
               <h2 className="text-xl font-black tracking-tight text-stone-900">
                 AI Meal Tags
               </h2>
+            </div>
+
+            {/* Explanatory Callout Note */}
+            <div className="bg-orange-50/70 border border-orange-200/70 rounded-2xl p-3.5 space-y-1">
+              <div className="text-xs font-black text-orange-950 uppercase tracking-wider">
+                What are AI Tags?
+              </div>
+              <p className="text-[10.5px] text-orange-900/80 font-medium leading-relaxed">
+                FitAI automatically labels your logged meals with these tags so you can filter past logs in 1 tap and track habits (like Homemade vs Outside Food). Nutrients like Protein & Fiber are tracked separately via filters.
+              </p>
             </div>
 
             {/* Custom Tag Add Button */}

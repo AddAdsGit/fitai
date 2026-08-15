@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Zap, Plus, Check, Share2, Trash2, Camera } from "lucide-react";
+import { Zap, Plus, Check, Share2, Trash2, Camera, BookOpen } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProgressBar } from "./InsightsView";
@@ -60,6 +60,7 @@ export interface ConsumptionSectionProps {
   setCustomCalVal: (val: string) => void;
   handleLogMealClick: () => void;
   onOpenCameraScanner?: () => void;
+  onOpenFoodLibrary?: () => void;
   onAddMeal: (meal: any) => void;
   showToast: (msg: string) => void;
   activeMeals: Meal[];
@@ -84,6 +85,7 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
   setCustomCalVal,
   handleLogMealClick,
   onOpenCameraScanner,
+  onOpenFoodLibrary,
   onAddMeal,
   showToast,
   activeMeals,
@@ -100,14 +102,24 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
               : "Logged Consumption"}
           </h3>
           {selectedDate === todayStr && (
-            <div className="flex gap-2">
+            <div className="flex items-center gap-1.5">
+              {/* Camera Scanner Button */}
+              {onOpenCameraScanner && (
+                <button
+                  onClick={onOpenCameraScanner}
+                  className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-2xs border-none"
+                  title="Scan with Camera"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+              )}
               {/* Quick Add Zap Button */}
               <button
                 onClick={() => setShowQuickAdd(!showQuickAdd)}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-sm border-none ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer select-none active:scale-95 shadow-2xs border-none ${
                   showQuickAdd
                     ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/10"
-                    : "bg-stone-100 hover:bg-stone-200 text-stone-500 shadow-stone-200/10"
+                    : "bg-stone-100 hover:bg-stone-200 text-stone-600 shadow-stone-200/10"
                 }`}
                 title="Quick Add"
               >
@@ -346,9 +358,14 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                           <span className="text-[8px] text-stone-300 font-bold">
                             •
                           </span>
-                          <span className="text-[8px] font-extrabold text-stone-500 uppercase tracking-wide block">
-                            P: {meal.protein}g • C: {meal.carbs}g • F:{" "}
-                            {meal.fats}g • Fiber: {meal.fiber || 0}g
+                          <span className="text-[8px] font-extrabold text-stone-500 uppercase tracking-wide flex items-center gap-1.5">
+                            <span>P: {meal.protein}g</span>
+                            <span>•</span>
+                            <span>C: {meal.carbs}g</span>
+                            <span>•</span>
+                            <span>F: {meal.fats}g</span>
+                            <span>•</span>
+                            <span>Fb: {meal.fiber || 0}g</span>
                           </span>
                         </div>
                       </div>
@@ -453,7 +470,7 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
 
                   {/* Bottom Content: Name and Macros */}
                   <div className="absolute bottom-5 left-5 right-5 text-left font-sans z-20">
-                    <h4 className="text-white text-xl sm:text-2xl font-black mb-1 leading-tight tracking-tight shadow-sm">
+                    <h4 className="text-white text-xl sm:text-2xl font-black mb-1 leading-tight tracking-tight shadow-sm line-clamp-2" title={meal.name}>
                       {meal.name}
                     </h4>
                     {meal.meal_description && (
@@ -463,24 +480,66 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                     )}
 
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      {[
-                        { l: "Protein", v: meal.protein },
-                        { l: "Carbs", v: meal.carbs },
-                        { l: "Fats", v: meal.fats },
-                        { l: "Fiber", v: meal.fiber || 0 },
-                      ].map((m) => (
-                        <div key={m.l} className="flex items-center gap-1.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-white/70 shadow-xs" />
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-white/60">
-                              {m.l}
-                            </span>
-                            <span className="text-xs sm:text-sm font-bold text-white">
-                              {m.v}g
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                      {(() => {
+                        const nutrientItems = enabledNutrients && enabledNutrients.length > 0
+                          ? enabledNutrients.map((n: any) => {
+                              let val = 0;
+                              if (n.id === "protein") val = meal.protein || 0;
+                              else if (n.id === "carbs") val = meal.carbs || 0;
+                              else if (n.id === "fats") val = meal.fats || 0;
+                              else if (n.id === "fiber") val = meal.fiber || 0;
+                              else val = meal.nutrients?.[n.id] || 0;
+
+                              let code = "P";
+                              if (n.id === "protein") code = "P";
+                              else if (n.id === "carbs") code = "C";
+                              else if (n.id === "fats") code = "F";
+                              else if (n.id === "fiber") code = "Fb";
+                              else if (n.id === "caffeine") code = "Cf";
+                              else if (n.id === "sugar") code = "Sg";
+                              else if (n.id === "sodium") code = "Na";
+                              else code = n.name ? (n.name.length <= 2 ? n.name.toUpperCase() : n.name.slice(0, 2)) : n.id.slice(0, 2).toUpperCase();
+
+                              return {
+                                id: n.id,
+                                code,
+                                val,
+                                unit: n.unit || "g",
+                              };
+                            })
+                          : [
+                              { id: "protein", code: "P", val: meal.protein || 0, unit: "g" },
+                              { id: "carbs", code: "C", val: meal.carbs || 0, unit: "g" },
+                              { id: "fats", code: "F", val: meal.fats || 0, unit: "g" },
+                              { id: "fiber", code: "Fb", val: meal.fiber || 0, unit: "g" },
+                            ];
+
+                        const displayed = nutrientItems.slice(0, 4);
+                        const remainingCount = nutrientItems.length - 4;
+
+                        return (
+                          <>
+                            {displayed.map((m) => (
+                              <div key={m.id} className="flex items-center gap-1.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-white/40 shadow-xs shrink-0" />
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-white/60">
+                                    {m.code}
+                                  </span>
+                                  <span className="text-xs sm:text-sm font-bold text-white">
+                                    {m.val}{m.unit}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                            {remainingCount > 0 && (
+                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-white/50 pl-0.5">
+                                +{remainingCount} more
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </motion.div>
@@ -492,15 +551,15 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
         {/* 2 Stacked Full-Width Minimalist Buttons below the list & empty state */}
         {selectedDate === todayStr && (
           <div className="flex flex-col gap-2.5 mt-6 mb-4">
-            {/* Button 1: Log with Camera */}
+            {/* Button 1: Add from Food Library */}
             <motion.button
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
-              onClick={onOpenCameraScanner}
-              className="w-full h-12 bg-white hover:bg-stone-50 border border-stone-200/80 rounded-2xl px-4 flex items-center justify-center gap-2 text-stone-800 shadow-2xs transition-all cursor-pointer select-none border-none"
+              onClick={onOpenFoodLibrary || (() => handleLogMealClick())}
+              className="w-full h-12 bg-white hover:bg-stone-50 border border-stone-200/80 rounded-2xl px-4 flex items-center justify-center gap-2 text-stone-800 shadow-2xs transition-all cursor-pointer select-none"
             >
-              <Camera className="w-4 h-4 text-stone-700 shrink-0" />
-              <span className="text-xs font-black tracking-tight">Log with Camera</span>
+              <BookOpen className="w-4 h-4 text-orange-500 shrink-0" />
+              <span className="text-xs font-black tracking-tight">Add from Food Library</span>
             </motion.button>
 
             {/* Button 2: Track Meal via ChatGPT (Energetic FitAI Orange) */}

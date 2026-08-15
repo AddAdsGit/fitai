@@ -10,9 +10,13 @@ import {
   Check,
   X,
   List,
+  Edit2,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { BristolStoolIcon, GutIcon, BloatingIcon, BloatingStomachIcon } from "./BristolStoolIcons";
+import { StepperButton } from "./StepperButton";
 import { UniversalVitalLogCard } from "./UniversalVitalLogCard";
 import { Profile, DailyWellness, WeightLog } from "../types";
 
@@ -180,6 +184,7 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
     return { avg, count: weightLogs.length };
   }, [weightLogs]);
 
+  const [isEditingWeight, setIsEditingWeight] = useState<boolean>(false);
   const [localDraftBloating, setLocalDraftBloating] = useState<number | null>(null);
   const [localDraftBloatingTime, setLocalDraftBloatingTime] = useState<string>("");
   const [localIsBloatingSliding, setLocalIsBloatingSliding] = useState<boolean>(false);
@@ -354,6 +359,8 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
   const resetActivity = () => setLastActivity(Date.now());
 
   useEffect(() => {
+    // Past dates stay expanded with NO auto-collapse timer
+    if (selectedDate !== todayStr) return;
     if (!isVitalsLogOpen && !activeVitalsTab) return;
 
     const timer = setTimeout(() => {
@@ -362,7 +369,7 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
     }, 30000);
 
     return () => clearTimeout(timer);
-  }, [isVitalsLogOpen, activeVitalsTab, lastActivity, setIsVitalsLogOpen, setActiveVitalsTab]);
+  }, [isVitalsLogOpen, activeVitalsTab, lastActivity, setIsVitalsLogOpen, setActiveVitalsTab, selectedDate, todayStr]);
 
   return (
     <section
@@ -478,18 +485,58 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
       {/* 1. WEIGHT LOG (POPS OUT WHEN TOGGLED) */}
       {isWeightActive && activeVitalsTab === "weight" && (
         <div className="flex flex-col gap-2">
+          {weightTodayLog && !isEditingWeight ? (
+            <div className="bg-gradient-to-br from-white/95 to-orange-50/50 backdrop-blur-md border border-orange-200/80 rounded-[28px] p-4 shadow-md shadow-orange-100/20 text-left space-y-3 animate-fade-in font-sans">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-600 flex items-center justify-center font-bold text-sm">
+                    ⚖️
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-950/60 block">
+                      Today's Weight Logged
+                    </span>
+                    <span className="text-lg font-black text-orange-950 leading-none">
+                      {weightTodayLog.weight} <span className="text-xs font-bold text-orange-900/60">kg</span>
+                    </span>
+                  </div>
+                </div>
 
-          {weightTodayLog ? (
-            <div className="flex items-center justify-between px-3.5 py-2.5 bg-orange-50/60 rounded-2xl border border-orange-100/60 text-xs font-bold text-orange-950/70 animate-fade-in">
-              <span className="flex items-center gap-1.5">
-                <span className="text-emerald-500 font-black">✓</span>
-                <span>Weight logged for today ({weightTodayLog.weight} kg)</span>
-              </span>
-              <span className="text-[10px] text-stone-400 font-mono font-medium">
-                {weightTodayLog.log_time}
-              </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full border border-stone-200/60 font-mono">
+                    {weightTodayLog.log_time}
+                  </span>
+                  
+                  {/* Dedicated Edit Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftWeight(weightTodayLog.weight);
+                      setDraftWeightTime(weightTodayLog.log_time);
+                      setIsEditingWeight(true);
+                    }}
+                    className="h-8 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm shadow-orange-500/20 active:scale-95 transition-all font-sans"
+                    title="Edit Logged Weight"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
+                  
+                  {/* Delete Button */}
+                  {handleDeleteWeight && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWeight(weightTodayLog.id, weightTodayLog.date)}
+                      className="w-8 h-8 rounded-xl bg-stone-100 hover:bg-red-50 hover:text-red-600 text-stone-500 flex items-center justify-center transition-colors cursor-pointer border border-stone-200/60"
+                      title="Delete Weight Entry"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          ) : selectedDate === todayStr ? (
+          ) : (
             (() => {
               const baseWeight = (() => {
                 const pastLogs = weightLogs.filter((l) => l.date < todayStr);
@@ -528,21 +575,18 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
 
                     {/* Middle: Stepper */}
                     <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraftWeight(
-                            Math.max(
-                              30,
-                              Number((currentWeight - 0.1).toFixed(1))
-                            )
-                          );
+                      <StepperButton
+                        onStep={() => {
+                          setDraftWeight((prev) => {
+                            const base = prev !== null ? prev : currentWeight;
+                            return Math.max(30, Number((base - 0.1).toFixed(1)));
+                          });
                           triggerWeightStepping();
                         }}
                         className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all shrink-0"
                       >
                         <Minus className="w-3.5 h-3.5" />
-                      </button>
+                      </StepperButton>
                       <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750">
                         <input
                           type="number"
@@ -561,21 +605,18 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                         />
                         <span className="text-stone-400">kg</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraftWeight(
-                            Math.min(
-                              300,
-                              Number((currentWeight + 0.1).toFixed(1))
-                            )
-                          );
+                      <StepperButton
+                        onStep={() => {
+                          setDraftWeight((prev) => {
+                            const base = prev !== null ? prev : currentWeight;
+                            return Math.min(300, Number((base + 0.1).toFixed(1)));
+                          });
                           triggerWeightStepping();
                         }}
                         className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all shrink-0"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                      </button>
+                      </StepperButton>
                     </div>
 
                     {/* Right: Log Button */}
@@ -583,68 +624,33 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                       onClick={async () => {
                         await handleLogWeight(
                           currentWeight,
-                          todayStr,
+                          selectedDate,
                           activeWeightTime
                         );
                         setDraftWeight(null);
                         setDraftWeightTime("");
+                        setIsEditingWeight(false);
                       }}
                       className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
-                      title="Log Weight"
+                      title="Save Weight"
                     >
                       <Check className="w-5 h-5 text-white" />
                     </button>
+
+                    {/* Cancel Edit Button if Editing */}
+                    {isEditingWeight && (
+                      <button
+                        onClick={() => setIsEditingWeight(false)}
+                        className="w-12 h-12 bg-stone-100 hover:bg-stone-200 text-stone-600 rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border border-stone-200/80 shadow-3xs active:scale-95"
+                        title="Cancel Editing"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
-
-                  {/* Transient Micro-Feedback (only while stepping) */}
-                  {isWeightStepping && (
-                    <div className="px-1 text-left animate-fade-in">
-                      <span className="text-[11px] font-medium text-stone-500">
-                        {(() => {
-                          const pastLogs = weightLogs.filter(
-                            (l) => l.date < selectedDate
-                          );
-                          if (pastLogs.length > 0) {
-                            const sortedPast = [...pastLogs].sort((a, b) =>
-                              b.date.localeCompare(a.date)
-                            );
-                            const prev = sortedPast[0];
-                            const diff = Number(
-                              (currentWeight - prev.weight).toFixed(1)
-                            );
-
-                            const prevDateObj = new Date(
-                              prev.date + "T00:00:00"
-                            );
-                            const monthStr = prevDateObj.toLocaleString(
-                              "en-US",
-                              { month: "short" }
-                            );
-                            const dayNum = prevDateObj.getDate();
-                            const dayName = prevDateObj.toLocaleString(
-                              "en-US",
-                              { weekday: "short" }
-                            );
-                            const dateFormatted = `${monthStr} ${dayNum} (${dayName})`;
-
-                            if (diff < 0)
-                              return `📉 ${diff} kg from last log on ${dateFormatted}`;
-                            if (diff > 0)
-                              return `📈 +${diff} kg from last log on ${dateFormatted}`;
-                            return `⚖️ Same as last log on ${dateFormatted}`;
-                          }
-                          return `⚖️ Baseline weight recorded (${currentWeight} kg)`;
-                        })()}
-                      </span>
-                    </div>
-                  )}
                 </div>
               );
             })()
-          ) : (
-            <div className="text-xs font-bold text-stone-400 bg-stone-50 border border-dashed border-stone-200 rounded-2xl p-4 text-center shadow-3xs animate-fade-in">
-              No weight logged for this date
-            </div>
           )}
         </div>
       )}
@@ -681,18 +687,18 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
 
                     {/* Stepper with Typeable Input */}
                     <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraftWater(
-                            Math.max(50, currentWaterIncrement - 50)
-                          );
+                      <StepperButton
+                        onStep={() => {
+                          setDraftWater((prev) => {
+                            const base = prev !== null ? prev : currentWaterIncrement;
+                            return Math.max(50, base - 50);
+                          });
                           triggerWaterStepping();
                         }}
                         className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all shrink-0"
                       >
                         <Minus className="w-3.5 h-3.5" />
-                      </button>
+                      </StepperButton>
                       <div className="flex-1 flex items-center justify-center gap-0.5 text-xs font-bold text-stone-750">
                         <input
                           type="number"
@@ -709,18 +715,18 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                         />
                         <span className="text-stone-400">ml</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDraftWater(
-                            Math.min(5000, currentWaterIncrement + 50)
-                          );
+                      <StepperButton
+                        onStep={() => {
+                          setDraftWater((prev) => {
+                            const base = prev !== null ? prev : currentWaterIncrement;
+                            return Math.min(5000, base + 50);
+                          });
                           triggerWaterStepping();
                         }}
                         className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all shrink-0"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                      </button>
+                      </StepperButton>
                     </div>
 
                     {/* Right: Solid Orange Checkmark Button */}
@@ -1107,8 +1113,14 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                 <UniversalVitalLogCard
                   type="weight"
                   valueText={`${weightTodayLog.weight} kg`}
-                      logTime={weightTodayLog.log_time}
+                  logTime={weightTodayLog.log_time}
                   canDelete={selectedDate === todayStr}
+                  onEdit={() => {
+                    setActiveVitalsTab("weight");
+                    setDraftWeight(weightTodayLog.weight);
+                    setDraftWeightTime(weightTodayLog.log_time);
+                    setIsEditingWeight(true);
+                  }}
                   onDelete={async () => {
                     if (weightTodayLog.id) {
                       await handleDeleteWeight(weightTodayLog.id);
@@ -1125,6 +1137,11 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                   valueText={`${item.amount} ml`}
                   logTime={item.time}
                   canDelete={selectedDate === todayStr}
+                  onEdit={() => {
+                    setActiveVitalsTab("water");
+                    setDraftWater(item.amount);
+                    setDraftWaterTime(item.time);
+                  }}
                   onDelete={async () => {
                     if (item.id === "legacy-water") {
                       await handleLogWater(0, selectedDate);
@@ -1150,6 +1167,11 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                     subText={`(Type ${item.type})`}
                     logTime={item.time}
                     canDelete={selectedDate === todayStr}
+                    onEdit={() => {
+                      setActiveVitalsTab("digestion");
+                      setDraftStoolType(item.type);
+                      setDraftStoolTime(item.time);
+                    }}
                     onDelete={async () => {
                       if (item.id === "legacy-stool") {
                         await handleLogDigestion(null, null, selectedDate);
@@ -1179,6 +1201,11 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                     subText={`(Level ${item.level})`}
                     logTime={item.time}
                     canDelete={selectedDate === todayStr}
+                    onEdit={() => {
+                      setActiveVitalsTab("energy");
+                      setDraftEnergy(item.level);
+                      setDraftEnergyTime(item.time);
+                    }}
                     onDelete={async () => {
                       if (item.id === "legacy-energy") {
                         await handleLogEnergy(null, selectedDate);
@@ -1219,6 +1246,11 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                     subText={`(Level ${item.level})`}
                     logTime={item.time}
                     canDelete={selectedDate === todayStr}
+                    onEdit={() => {
+                      setActiveVitalsTab("bloating");
+                      setLocalDraftBloating(item.level);
+                      setLocalDraftBloatingTime(item.time);
+                    }}
                     onDelete={async () => {
                       if (item.id === "legacy-bloating") {
                         await handleLogBloating(null, selectedDate);

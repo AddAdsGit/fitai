@@ -265,7 +265,7 @@ paths:
                   description: Protein in grams
                 nutrients:
                   type: object
-                  description: Map of nutrient id to grams consumed, covering the user's tracked nutrients (see GET /profile tracked_nutrients). Always include carbs, fats, and fiber; add any custom tracked nutrients the user has enabled (e.g. {"carbs":45,"fats":12,"fiber":8,"iron":2}).
+                  description: Map of nutrient id to amount consumed (grams/milligrams), covering the user's tracked nutrients (see GET /profile tracked_nutrients). Always include carbs, fats, and fiber; add any custom tracked nutrients the user has enabled (e.g. {"carbs":45,"fats":12,"fiber":8,"sodium":650,"caffeine":95,"iron":2}). NEVER put these in meal_description.
                   additionalProperties:
                     type: number
                 carbs:
@@ -329,6 +329,9 @@ paths:
                     type: string
                   meal:
                     type: object
+                  share_url:
+                    type: string
+                    description: Web URL to view and share this meal card
                   daily_remaining:
                     type: object
                     description: Remaining amounts for calories, protein, and every nutrient the user tracks (e.g. carbs, fats, fiber, plus custom ones), keyed by nutrient id.
@@ -444,6 +447,9 @@ paths:
                     type: string
                   meal:
                     type: object
+                  share_url:
+                    type: string
+                    description: Web URL to view and share this meal card
                   daily_remaining:
                     type: object
                     description: Remaining amounts for calories, protein, and every nutrient the user tracks (e.g. carbs, fats, fiber, plus custom ones), keyed by nutrient id.
@@ -512,6 +518,9 @@ paths:
                   energy_level:
                     type: integer
                     description: Daily energy & vitality level (1-5), if logged
+                  bloating_level:
+                    type: integer
+                    description: Daily gut comfort / bloating level (1=None, 2=Mild, 3=Moderate, 4=Severe), if logged
                   water_log_time:
                     type: string
                     description: Time water was logged (HH:MM format)
@@ -521,6 +530,9 @@ paths:
                   energy_log_time:
                     type: string
                     description: Time energy level was logged (HH:MM format)
+                  bloating_log_time:
+                    type: string
+                    description: Time bloating level was logged (HH:MM format)
                   wellness_logs:
                     type: array
                     description: Array of daily wellness records when querying date ranges or limit
@@ -548,7 +560,10 @@ paths:
                   description: The text content of the daily wellness or health note.
                 water_intake:
                   type: integer
-                  description: Total water consumed in ml for the day
+                  description: Total water consumed in ml for the day (absolute value)
+                water_add:
+                  type: integer
+                  description: Incremental water to add to existing total in ml (e.g. 250 or 500)
                 stool_type:
                   type: integer
                   description: Bristol stool scale type (1-7)
@@ -558,6 +573,9 @@ paths:
                 energy_level:
                   type: integer
                   description: Daily energy level on 1-5 scale (1=Exhausted, 2=Sluggish, 3=Steady, 4=High, 5=Peak)
+                bloating_level:
+                  type: integer
+                  description: Daily gut comfort / bloating level on 1-4 scale (1=None, 2=Mild, 3=Moderate, 4=Severe)
                 water_log_time:
                   type: string
                   description: Optional time water was logged in HH:MM format
@@ -567,6 +585,9 @@ paths:
                 energy_log_time:
                   type: string
                   description: Optional time energy was logged in HH:MM format
+                bloating_log_time:
+                  type: string
+                  description: Optional time bloating was logged in HH:MM format
       responses:
         '200':
           description: Daily wellness notes saved successfully

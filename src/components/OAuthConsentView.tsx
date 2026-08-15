@@ -118,10 +118,7 @@ export const OAuthConsentView = ({
       const code = data.code;
 
       triggerToast("Authorized successfully! Redirecting...");
-      
-      setTimeout(() => {
-        window.location.href = `${redirectUri}?code=${code}&state=${encodeURIComponent(state)}`;
-      }, 1000);
+      window.location.href = `${redirectUri}?code=${code}&state=${encodeURIComponent(state)}`;
     } catch (err: any) {
       console.error(err);
       triggerToast(`Authorization failed: ${err.message}`);
@@ -132,9 +129,7 @@ export const OAuthConsentView = ({
   const handleCancel = () => {
     setIsRejecting(true);
     triggerToast("Connection cancelled.");
-    setTimeout(() => {
-      window.location.href = `${redirectUri}?error=access_denied&state=${encodeURIComponent(state)}`;
-    }, 1000);
+    window.location.href = `${redirectUri}?error=access_denied&state=${encodeURIComponent(state)}`;
   };
 
   // Track the auth session. Approval is NEVER automatic — handing out an

@@ -7,6 +7,7 @@ import type { Profile, DailyWellness, WeightLog, BloatingLogItem } from "../type
 import { BristolStoolIcon, GutIcon, BloatingIcon, BloatingStomachIcon } from "./BristolStoolIcons";
 import { UniversalVitalLogCard } from "./UniversalVitalLogCard";
 import { TimePickerModal } from "./TimePickerModal";
+import { StepperButton } from "./StepperButton";
 
 export interface VitalsModalProps {
   isOpen: boolean;
@@ -262,16 +263,15 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
 
                         {/* Stepper + Direct Typing Input */}
                         <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-2 py-1 shadow-3xs">
-                          <button
-                            type="button"
-                            onClick={() => {
+                          <StepperButton
+                            onStep={() => {
                               const cur = parseFloat(draftWeight) || 70;
                               setDraftWeight(Math.max(10, cur - 0.5).toFixed(1));
                             }}
                             className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
                           >
                             <Minus className="w-3.5 h-3.5" />
-                          </button>
+                          </StepperButton>
                           <div className="flex-1 flex items-center justify-center gap-1 text-xs font-bold text-stone-750">
                             <input
                               type="number"
@@ -282,16 +282,15 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                             />
                             <span className="text-stone-400">kg</span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
+                          <StepperButton
+                            onStep={() => {
                               const cur = parseFloat(draftWeight) || 70;
                               setDraftWeight((cur + 0.5).toFixed(1));
                             }}
                             className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
                           >
                             <Plus className="w-3.5 h-3.5" />
-                          </button>
+                          </StepperButton>
                         </div>
 
                         {/* Save Button */}
@@ -340,16 +339,15 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
 
                       {/* Stepper + Direct Typing Input */}
                       <div className="flex-1 flex items-center bg-white border border-stone-200/80 rounded-2xl px-1 py-1 shadow-3xs select-none">
-                        <button
-                          type="button"
-                          onClick={() => {
+                        <StepperButton
+                          onStep={() => {
                             setDraftWater(Math.max(50, draftWater - 50));
                             triggerWaterStepping();
                           }}
                           className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
                         >
                           <Minus className="w-3.5 h-3.5" />
-                        </button>
+                        </StepperButton>
                         <div className="flex-1 flex items-center justify-center gap-1 text-xs font-bold text-stone-750 font-mono">
                           <span className="text-xs text-stone-400 font-normal">Add</span>
                           <input
@@ -363,16 +361,15 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                           />
                           <span className="text-stone-400">ml</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
+                        <StepperButton
+                          onStep={() => {
                             setDraftWater(Math.min(3000, draftWater + 50));
                             triggerWaterStepping();
                           }}
                           className="w-9 h-9 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-750 hover:bg-stone-50 cursor-pointer border-none bg-transparent active:scale-95 transition-all"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                        </button>
+                        </StepperButton>
                       </div>
 
                       {/* Save Button */}

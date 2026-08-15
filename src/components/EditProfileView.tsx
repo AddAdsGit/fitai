@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Camera, User, Smile, Scale, Ruler, Target, Info, Plus, Minus, Tag, X, ChevronLeft, Droplet, Activity, Zap, Pencil, Trash2, Search, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Camera, User, Smile, Scale, Ruler, Target, Info, Plus, Minus, Tag, X, ChevronLeft, Droplet, Activity, Zap, Pencil, Trash2, Search, Check, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import { DefaultAvatar } from "./DefaultAvatar";
 import { DEFAULT_TRACKING_TAGS } from "./SettingsView";
 import { BloatingIcon } from "./BristolStoolIcons";
+import { StepperButton } from "./StepperButton";
 
 export const COMMON_TAG_TEMPLATES = [
   { name: "Gluten Free", description: "Apply when meal contains no wheat, barley, rye, or gluten" },
@@ -279,7 +280,7 @@ export const EditProfileView = ({
             <div>
               <div className="flex justify-between items-center mb-1 px-1">
                 <label className="text-[9px] font-black text-[#9e9e9e] uppercase tracking-widest">Personal Self-Note</label>
-                <span className="text-[8px] font-bold text-orange-500/80">✨ AI reads this for context</span>
+                <span className="text-[8px] font-bold text-orange-500/80">AI reads this for context</span>
               </div>
               <div className="relative">
                 <textarea
@@ -304,17 +305,16 @@ export const EditProfileView = ({
                 <span className="text-[9px] font-black text-stone-400 uppercase">Yrs Old</span>
               </div>
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => {
+                <StepperButton
+                  onStep={() => {
                     const currentAge = getAge(profileData.dob) || 28;
                     const newAge = Math.max(10, currentAge - 1);
-                    setProfileData({ ...profileData, dob: `${new Date().getFullYear() - newAge}-01-01` });
+                    setProfileData((prev) => ({ ...prev, dob: `${new Date().getFullYear() - newAge}-01-01` }));
                   }}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Minus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
@@ -327,17 +327,16 @@ export const EditProfileView = ({
                   />
                   <span className="text-xs font-bold text-stone-400">Yrs</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
+                <StepperButton
+                  onStep={() => {
                     const currentAge = getAge(profileData.dob) || 28;
                     const newAge = Math.min(120, currentAge + 1);
-                    setProfileData({ ...profileData, dob: `${new Date().getFullYear() - newAge}-01-01` });
+                    setProfileData((prev) => ({ ...prev, dob: `${new Date().getFullYear() - newAge}-01-01` }));
                   }}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
               </div>
             </div>
 
@@ -351,13 +350,12 @@ export const EditProfileView = ({
                 <span className="text-[9px] font-black text-stone-400 uppercase">cm</span>
               </div>
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setProfileData({ ...profileData, height: Math.max(100, (profileData.height || 170) - 1) })}
+                <StepperButton
+                  onStep={() => setProfileData((prev) => ({ ...prev, height: Math.max(100, (prev.height || 170) - 1) }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Minus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
@@ -367,13 +365,12 @@ export const EditProfileView = ({
                   />
                   <span className="text-xs font-bold text-stone-400">cm</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setProfileData({ ...profileData, height: Math.min(250, (profileData.height || 170) + 1)} )}
+                <StepperButton
+                  onStep={() => setProfileData((prev) => ({ ...prev, height: Math.min(250, (prev.height || 170) + 1) }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
               </div>
             </div>
 
@@ -387,13 +384,12 @@ export const EditProfileView = ({
                 <span className="text-[9px] font-black text-stone-400 uppercase">kg</span>
               </div>
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setProfileData({ ...profileData, weight: Math.max(30, (profileData.weight || 70) - 1) })}
+                <StepperButton
+                  onStep={() => setProfileData((prev) => ({ ...prev, weight: Math.max(30, (prev.weight || 70) - 1) }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Minus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
@@ -403,13 +399,12 @@ export const EditProfileView = ({
                   />
                   <span className="text-xs font-bold text-stone-400">kg</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setProfileData({ ...profileData, weight: Math.min(300, (profileData.weight || 70) + 1) })}
+                <StepperButton
+                  onStep={() => setProfileData((prev) => ({ ...prev, weight: Math.min(300, (prev.weight || 70) + 1) }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
               </div>
             </div>
 
@@ -452,16 +447,15 @@ export const EditProfileView = ({
                 <span className="text-[9px] font-black text-stone-400 uppercase">kg</span>
               </div>
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, weightGoal: Math.max(30, (profileData.goals?.weightGoal || 70) - 1) }
-                  })}
+                <StepperButton
+                  onStep={() => setProfileData((prev) => ({
+                    ...prev,
+                    goals: { ...prev.goals, weightGoal: Math.max(30, (prev.goals?.weightGoal || 70) - 1) }
+                  }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
                 >
                   <Minus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
                 <div className="flex-1 flex items-center justify-center">
                   <input
                     type="number"
@@ -473,16 +467,15 @@ export const EditProfileView = ({
                     className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, weightGoal: Math.min(300, (profileData.goals?.weightGoal || 70) + 1) }
-                  })}
+                <StepperButton
+                  onStep={() => setProfileData((prev) => ({
+                    ...prev,
+                    goals: { ...prev.goals, weightGoal: Math.min(300, (prev.goals?.weightGoal || 70) + 1) }
+                  }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
               </div>
             </div>
 
@@ -493,16 +486,15 @@ export const EditProfileView = ({
                 <span className="text-[9px] font-black text-stone-400 uppercase">kcal</span>
               </div>
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, dailyCalories: Math.max(800, (profileData.goals?.dailyCalories || 2000) - 50) }
-                  })}
+                <StepperButton
+                  onStep={() => setProfileData((prev) => ({
+                    ...prev,
+                    goals: { ...prev.goals, dailyCalories: Math.max(800, (prev.goals?.dailyCalories || 2000) - 50) }
+                  }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
                 >
                   <Minus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
                 <div className="flex-1 flex items-center justify-center">
                   <input
                     type="number"
@@ -514,16 +506,15 @@ export const EditProfileView = ({
                     className="bg-transparent border-none text-center text-sm font-black text-stone-850 focus:outline-none w-20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setProfileData({
-                    ...profileData,
-                    goals: { ...profileData.goals, dailyCalories: Math.min(10000, (profileData.goals?.dailyCalories || 2000) + 50) }
-                  })}
+                <StepperButton
+                  onStep={() => setProfileData((prev) => ({
+                    ...prev,
+                    goals: { ...prev.goals, dailyCalories: Math.min(10000, (prev.goals?.dailyCalories || 2000) + 50) }
+                  }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none bg-transparent"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                </button>
+                </StepperButton>
               </div>
             </div>
           </div>
@@ -652,20 +643,21 @@ export const EditProfileView = ({
                       <div className="pt-2.5 border-t border-stone-150 flex items-center justify-between animate-fade-in">
                         <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">{(item as any).goalLabel}</span>
                         <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 rounded-xl px-2 py-1 shadow-3xs">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentVal = profileData.goals?.[(item as any).goalKey] ?? (item as any).goalDefault;
-                              const newVal = Math.max((item as any).goalMin, currentVal - (item as any).goalStep);
-                              setProfileData({
-                                ...profileData,
-                                goals: { ...profileData.goals, [(item as any).goalKey]: newVal }
+                          <StepperButton
+                            onStep={() => {
+                              setProfileData((prev) => {
+                                const currentVal = prev.goals?.[(item as any).goalKey] ?? (item as any).goalDefault;
+                                const newVal = Math.max((item as any).goalMin, currentVal - (item as any).goalStep);
+                                return {
+                                  ...prev,
+                                  goals: { ...prev.goals, [(item as any).goalKey]: newVal }
+                                };
                               });
                             }}
                             className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
                           >
                             <Minus className="w-3 h-3" />
-                          </button>
+                          </StepperButton>
                           <input
                             type="number"
                             value={profileData.goals?.[(item as any).goalKey] ?? (item as any).goalDefault}
@@ -679,20 +671,21 @@ export const EditProfileView = ({
                             className="bg-transparent border-none text-center text-xs font-black text-stone-850 focus:outline-none w-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                           <span className="text-[10px] font-bold text-stone-400">{(item as any).goalUnit}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentVal = profileData.goals?.[(item as any).goalKey] ?? (item as any).goalDefault;
-                              const newVal = Math.min((item as any).goalMax, currentVal + (item as any).goalStep);
-                              setProfileData({
-                                ...profileData,
-                                goals: { ...profileData.goals, [(item as any).goalKey]: newVal }
+                          <StepperButton
+                            onStep={() => {
+                              setProfileData((prev) => {
+                                const currentVal = prev.goals?.[(item as any).goalKey] ?? (item as any).goalDefault;
+                                const newVal = Math.min((item as any).goalMax, currentVal + (item as any).goalStep);
+                                return {
+                                  ...prev,
+                                  goals: { ...prev.goals, [(item as any).goalKey]: newVal }
+                                };
                               });
                             }}
                             className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
                           >
                             <Plus className="w-3 h-3" />
-                          </button>
+                          </StepperButton>
                         </div>
                       </div>
                     )}
@@ -939,7 +932,7 @@ export const EditProfileView = ({
                     if (activeNutrients.length === 0) {
                       return (
                         <div className="text-center py-4 px-3 bg-stone-50/70 rounded-2xl border border-dashed border-stone-200/80 space-y-1">
-                          <span className="text-xs font-black text-stone-700 block">✨ Pure Calorie Tracking Active</span>
+                          <span className="text-xs font-black text-stone-700 block">Pure Calorie Tracking Active</span>
                           <span className="text-[10px] font-medium text-stone-400 block">
                             You are tracking Calories only! Click &quot;+ Track Nutrient&quot; above to add Protein, Carbs, Sodium, etc.
                           </span>
@@ -973,63 +966,69 @@ export const EditProfileView = ({
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
-                                <div className="flex items-center gap-1 bg-white border border-stone-200/80 rounded-xl px-1.5 py-1 shadow-3xs">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const step = item.unit === "mg" ? 50 : item.unit === "IU" ? 100 : item.unit === "mcg" ? 10 : 5;
-                                      const newVal = Math.max(0, (item.target || 0) - step);
-                                      const updated = trackedList.map((n: any) =>
-                                        n.id === item.id ? { ...n, target: newVal } : n
-                                      );
-                                      const updatedMacros = { ...(profileData.macros || {}) };
-                                      if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
-                                        updatedMacros[item.id] = newVal;
-                                      }
-                                      setProfileData({ ...profileData, macros: updatedMacros, tracked_nutrients: updated });
-                                    }}
-                                    className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
-                                  >
-                                    <Minus className="w-3 h-3" />
-                                  </button>
-                                  <div className="flex items-center justify-center gap-0.5 min-w-0">
-                                    <input
-                                      type="number"
-                                      value={item.target || 0}
-                                      onChange={(e) => {
-                                        const newVal = Math.max(0, parseFloat(e.target.value) || 0);
-                                        const updated = trackedList.map((n: any) =>
-                                          n.id === item.id ? { ...n, target: newVal } : n
-                                        );
-                                        const updatedMacros = { ...(profileData.macros || {}) };
-                                        if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
-                                          updatedMacros[item.id] = newVal;
-                                        }
-                                        setProfileData({ ...profileData, macros: updatedMacros, tracked_nutrients: updated });
+                                  <div className="flex items-center gap-1 bg-white border border-stone-200/80 rounded-xl px-1.5 py-1 shadow-3xs">
+                                    <StepperButton
+                                      onStep={() => {
+                                        const step = item.unit === "mg" ? 50 : item.unit === "IU" ? 100 : item.unit === "mcg" ? 10 : 5;
+                                        setProfileData((prev) => {
+                                          const prevList = prev.tracked_nutrients || [];
+                                          const currentTarget = prevList.find((n: any) => n.id === item.id)?.target || item.target || 0;
+                                          const newVal = Math.max(0, currentTarget - step);
+                                          const updated = prevList.map((n: any) =>
+                                            n.id === item.id ? { ...n, target: newVal } : n
+                                          );
+                                          const updatedMacros = { ...(prev.macros || {}) };
+                                          if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
+                                            updatedMacros[item.id] = newVal;
+                                          }
+                                          return { ...prev, macros: updatedMacros, tracked_nutrients: updated };
+                                        });
                                       }}
-                                      className="w-12 text-center text-xs font-black text-stone-900 bg-transparent border-none focus:outline-none font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                    />
-                                    <span className="text-[10px] font-bold text-stone-400 font-mono">{item.unit}</span>
+                                      className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </StepperButton>
+                                    <div className="flex items-center justify-center gap-0.5 min-w-0">
+                                      <input
+                                        type="number"
+                                        value={item.target || 0}
+                                        onChange={(e) => {
+                                          const newVal = Math.max(0, parseFloat(e.target.value) || 0);
+                                          const updated = trackedList.map((n: any) =>
+                                            n.id === item.id ? { ...n, target: newVal } : n
+                                          );
+                                          const updatedMacros = { ...(profileData.macros || {}) };
+                                          if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
+                                            updatedMacros[item.id] = newVal;
+                                          }
+                                          setProfileData({ ...profileData, macros: updatedMacros, tracked_nutrients: updated });
+                                        }}
+                                        className="w-12 text-center text-xs font-black text-stone-900 bg-transparent border-none focus:outline-none font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      />
+                                      <span className="text-[10px] font-bold text-stone-400 font-mono">{item.unit}</span>
+                                    </div>
+                                    <StepperButton
+                                      onStep={() => {
+                                        const step = item.unit === "mg" ? 50 : item.unit === "IU" ? 100 : item.unit === "mcg" ? 10 : 5;
+                                        setProfileData((prev) => {
+                                          const prevList = prev.tracked_nutrients || [];
+                                          const currentTarget = prevList.find((n: any) => n.id === item.id)?.target || item.target || 0;
+                                          const newVal = currentTarget + step;
+                                          const updated = prevList.map((n: any) =>
+                                            n.id === item.id ? { ...n, target: newVal } : n
+                                          );
+                                          const updatedMacros = { ...(prev.macros || {}) };
+                                          if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
+                                            updatedMacros[item.id] = newVal;
+                                          }
+                                          return { ...prev, macros: updatedMacros, tracked_nutrients: updated };
+                                        });
+                                      }}
+                                      className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </StepperButton>
                                   </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const step = item.unit === "mg" ? 50 : item.unit === "IU" ? 100 : item.unit === "mcg" ? 10 : 5;
-                                      const newVal = (item.target || 0) + step;
-                                      const updated = trackedList.map((n: any) =>
-                                        n.id === item.id ? { ...n, target: newVal } : n
-                                      );
-                                      const updatedMacros = { ...(profileData.macros || {}) };
-                                      if (["protein", "carbs", "fats", "fiber"].includes(item.id)) {
-                                        updatedMacros[item.id] = newVal;
-                                      }
-                                      setProfileData({ ...profileData, macros: updatedMacros, tracked_nutrients: updated });
-                                    }}
-                                    className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 cursor-pointer border-none bg-transparent active:scale-90"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </button>
-                                </div>
 
                                 <button
                                   type="button"
@@ -1072,9 +1071,15 @@ export const EditProfileView = ({
               </button>
             </div>
 
-            <p className="text-[9.5px] text-stone-400 font-semibold leading-normal">
-              Tags that FitAI's AI vision automatically assigns to logged meals based on ingredients.
-            </p>
+            {/* Explanatory Callout Note */}
+            <div className="bg-orange-50/70 border border-orange-200/70 rounded-2xl p-3.5 space-y-1">
+              <div className="text-xs font-black text-orange-950 uppercase tracking-wider">
+                What are AI Tags?
+              </div>
+              <p className="text-[10.5px] text-orange-900/80 font-medium leading-relaxed">
+                FitAI automatically labels your logged meals with these tags so you can filter past logs in 1 tap and track habits (like Homemade vs Outside Food). Nutrients like Protein & Fiber are tracked separately via filters.
+              </p>
+            </div>
 
             {/* List of tags as clean 1-line cards */}
             <div className="space-y-2.5">

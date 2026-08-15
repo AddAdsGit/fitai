@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Meal } from "../types";
@@ -14,63 +15,89 @@ export function DeleteConfirmModal({
   setMealPendingDelete,
   confirmDeleteMeal,
 }: DeleteConfirmModalProps) {
-  return (
+  if (!mealPendingDelete || typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
-      {mealPendingDelete && (
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 font-sans">
+        {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 z-[100] backdrop-blur-[2px] flex items-center justify-center p-6 font-sans"
-        >
-          <motion.div
-            initial={{ scale: 0.9, y: 15 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 15 }}
-            className="bg-white rounded-[32px] p-6 max-w-sm w-full shadow-2xl border border-stone-100 text-left space-y-4"
-          >
-            <div className="flex items-center gap-3 text-left">
-              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-500 shrink-0">
-                <Trash2 className="w-5 h-5 text-red-500" />
-              </div>
-              <div>
-                <h3 className="text-sm font-black text-stone-900">Delete meal log?</h3>
-                <p className="text-[10px] text-stone-400 font-semibold mt-0.5">This action cannot be undone.</p>
-              </div>
-            </div>
+          onClick={() => setMealPendingDelete(null)}
+          className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm"
+        />
 
-            <div className="bg-stone-50 border border-stone-200/50 rounded-2xl p-3.5 text-left">
-              <div className="text-[11px] font-black text-stone-800 leading-snug truncate">
+        {/* Spacious, Confident Confirmation Dialog */}
+        <motion.div
+          initial={{ scale: 0.92, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.92, opacity: 0, y: 20 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          className="bg-white rounded-[32px] p-6 sm:p-7 max-w-md w-full relative z-10 shadow-2xl border border-stone-100 text-left space-y-5"
+        >
+          {/* Header Icon + Titles */}
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-500 shrink-0 shadow-3xs">
+              <Trash2 className="w-6 h-6 text-red-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-black text-stone-900 tracking-tight">Delete meal log?</h3>
+              <p className="text-xs text-stone-500 font-medium mt-0.5 leading-relaxed">
+                This meal log will be permanently removed from your history. This action cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          {/* Meal Details Box */}
+          <div className="bg-[#FAF7F2] border border-stone-200/80 rounded-2xl p-4 text-left flex items-center gap-3.5 shadow-3xs">
+            {mealPendingDelete.image ? (
+              <img
+                src={mealPendingDelete.image}
+                alt={mealPendingDelete.name}
+                className="w-12 h-12 rounded-xl object-cover shrink-0 border border-stone-200/60"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-xl bg-orange-100/60 flex items-center justify-center text-lg shrink-0">
+                🍽️
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="text-xs sm:text-sm font-black text-stone-900 truncate">
                 {mealPendingDelete.name}
               </div>
-              <div className="text-[9px] font-bold text-stone-500 mt-1 flex items-center gap-1.5">
+              <div className="text-[11px] font-bold text-stone-500 mt-0.5 flex items-center gap-1.5">
                 <span className="text-orange-600 font-extrabold">{mealPendingDelete.calories} kcal</span>
                 <span className="text-stone-300">•</span>
-                <span>{mealPendingDelete.time}</span>
+                <span>{mealPendingDelete.time || "Logged"}</span>
               </div>
             </div>
+          </div>
 
-            <div className="flex gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => setMealPendingDelete(null)}
-                className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer select-none"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  confirmDeleteMeal(mealPendingDelete);
-                }}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer select-none shadow-md shadow-red-500/10"
-              >
-                Delete Log
-              </button>
-            </div>
-          </motion.div>
+          {/* Action Buttons: Full-Height Touch Targets */}
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setMealPendingDelete(null)}
+              className="h-12 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer select-none transition-all active:scale-[0.98] border-none"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                confirmDeleteMeal(mealPendingDelete);
+              }}
+              className="h-12 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer select-none transition-all active:scale-[0.98] shadow-md shadow-red-600/25 border-none flex items-center justify-center gap-1.5"
+            >
+              <Trash2 className="w-4 h-4 text-white" />
+              <span>Delete Log</span>
+            </button>
+          </div>
         </motion.div>
-      )}
-    </AnimatePresence>
+      </div>
+    </AnimatePresence>,
+    document.body
   );
 }

@@ -147,3 +147,25 @@ export const getMealEmoji = (name: string, type?: string): string => {
   return "🍽️";
 };
 
+// Utility: format time string to clean 12-hour AM/PM format (e.g. "4:43 AM", "12:30 PM")
+export const formatDisplayTime = (timeStr?: string): string => {
+  if (!timeStr || timeStr.trim() === "") {
+    return new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  }
+  const s = timeStr.trim();
+  if (s.toLowerCase().includes("am") || s.toLowerCase().includes("pm")) {
+    return s;
+  }
+  const parts = s.split(":");
+  if (parts.length >= 2) {
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (!isNaN(h) && !isNaN(m)) {
+      const period = h >= 12 ? "PM" : "AM";
+      const displayHours = h % 12 === 0 ? 12 : h % 12;
+      const displayMinutes = String(m).padStart(2, "0");
+      return `${displayHours}:${displayMinutes} ${period}`;
+    }
+  }
+  return s;
+};

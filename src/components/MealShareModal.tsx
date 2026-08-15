@@ -234,13 +234,15 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-orange-950/30 backdrop-blur-md z-[300] flex items-center justify-center p-6 font-sans text-orange-950"
+      onClick={onClose}
+      className="fixed inset-0 bg-orange-950/30 backdrop-blur-md z-[300] flex items-center justify-center p-6 font-sans text-orange-950 cursor-pointer"
     >
       <motion.div
         initial={{ scale: 0.95, y: 15 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 15 }}
-        className="bg-[#FAF7F2] border border-white rounded-[32px] w-full max-w-[400px] shadow-xl shadow-orange-100/20 p-6 flex flex-col items-center gap-5 max-h-[90vh] overflow-y-auto no-scrollbar scroll-smooth"
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#FAF7F2] border border-white rounded-[32px] w-full max-w-[400px] shadow-xl shadow-orange-100/20 p-6 flex flex-col items-center gap-5 max-h-[90vh] overflow-y-auto no-scrollbar scroll-smooth cursor-default"
       >
         {/* Header */}
         <div className="flex justify-between items-center w-full">

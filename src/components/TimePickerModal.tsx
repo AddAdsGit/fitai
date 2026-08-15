@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Clock, Plus, Minus, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { StepperButton } from "./StepperButton";
 
 interface TimePickerModalProps {
   isOpen: boolean;
@@ -110,14 +111,13 @@ export const TimePickerModal = ({
             <div className="flex items-center gap-3">
               {/* Hour Input + Stepper */}
               <div className="flex flex-col items-center">
-                <button
-                  type="button"
-                  onClick={incrementHours}
+                <StepperButton
+                  onStep={incrementHours}
                   className="w-9 h-9 rounded-xl bg-white border border-stone-200/80 shadow-3xs flex items-center justify-center text-stone-500 hover:text-stone-800 hover:bg-stone-100 active:scale-95 transition-all cursor-pointer border-none"
                   title="Next Hour (+1h)"
                 >
                   <Plus className="w-4 h-4" />
-                </button>
+                </StepperButton>
                 <div className="my-1.5 relative">
                   <input
                     type="number"
@@ -135,14 +135,13 @@ export const TimePickerModal = ({
                     className="w-16 text-center text-3xl font-black text-stone-900 bg-white border border-stone-200/80 rounded-xl py-1 focus:outline-none focus:ring-2 focus:ring-orange-500/50 font-mono shadow-3xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={decrementHours}
+                <StepperButton
+                  onStep={decrementHours}
                   className="w-9 h-9 rounded-xl bg-white border border-stone-200/80 shadow-3xs flex items-center justify-center text-stone-500 hover:text-stone-800 hover:bg-stone-100 active:scale-95 transition-all cursor-pointer border-none"
                   title="Previous Hour (-1h)"
                 >
                   <Minus className="w-4 h-4" />
-                </button>
+                </StepperButton>
               </div>
 
               {/* Separator */}
@@ -150,14 +149,13 @@ export const TimePickerModal = ({
 
               {/* Minute Input + Stepper */}
               <div className="flex flex-col items-center">
-                <button
-                  type="button"
-                  onClick={incrementMinutes}
+                <StepperButton
+                  onStep={incrementMinutes}
                   className="w-9 h-9 rounded-xl bg-white border border-stone-200/80 shadow-3xs flex items-center justify-center text-stone-500 hover:text-stone-800 hover:bg-stone-100 active:scale-95 transition-all cursor-pointer border-none"
                   title="Forward 5 Minutes (+5m)"
                 >
                   <Plus className="w-4 h-4" />
-                </button>
+                </StepperButton>
                 <div className="my-1.5 relative">
                   <input
                     type="number"
@@ -175,14 +173,13 @@ export const TimePickerModal = ({
                     className="w-16 text-center text-3xl font-black text-stone-900 bg-white border border-stone-200/80 rounded-xl py-1 focus:outline-none focus:ring-2 focus:ring-orange-500/50 font-mono shadow-3xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={decrementMinutes}
+                <StepperButton
+                  onStep={decrementMinutes}
                   className="w-9 h-9 rounded-xl bg-white border border-stone-200/80 shadow-3xs flex items-center justify-center text-stone-500 hover:text-stone-800 hover:bg-stone-100 active:scale-95 transition-all cursor-pointer border-none"
                   title="Back 5 Minutes (-5m)"
                 >
                   <Minus className="w-4 h-4" />
-                </button>
+                </StepperButton>
               </div>
             </div>
 

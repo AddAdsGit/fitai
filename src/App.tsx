@@ -56,6 +56,7 @@ import { TimePickerModal } from "./components/TimePickerModal";
 import { DefaultAvatar } from "./components/DefaultAvatar";
 import { RecipeShareModal } from "./components/RecipeShareModal";
 import { RecipeModal } from "./components/RecipeModal";
+import { FoodLibraryModal } from "./components/FoodLibraryModal";
 import { MealShareModal } from "./components/MealShareModal";
 import { DayShareModal } from "./components/DayShareModal";
 import { PublicShareView } from "./components/PublicShareView";
@@ -248,6 +249,8 @@ export default function App() {
   const [mealPendingDelete, setMealPendingDelete] = useState<Meal | null>(null);
   const [isCameraFullScreen, setIsCameraFullScreen] = useState(false);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [isFoodLibraryModalOpen, setIsFoodLibraryModalOpen] = useState(false);
+  const [cameraInitialNotes, setCameraInitialNotes] = useState<string>("");
 
   // Custom world-class popup states
   const [selectedRecipePopup, setSelectedRecipePopup] = useState<Recipe | null>(
@@ -345,30 +348,20 @@ export default function App() {
   const [goalConfigValue, setGoalConfigValue] = useState(2000);
 
   const INITIAL_PROFILE_STATE = {
-    name: "John Doe",
+    name: "",
     imageUrl: "",
-    description:
-      "Fitness enthusiast & tech geek. Building a sustainable, high-protein lifestyle. Always optimizing! ✨ Adding more text here to test out the expansion feature and see how it works when the description gets fairly long.",
-    height: 183,
-    weight: 80,
+    description: "",
+    height: 175,
+    weight: 70,
     dob: "1998-05-15",
     gender: "Male",
     knowledge: {
-      preferences: [
-        "Prefers high protein diet, specifically chicken and eggs."
-      ],
-      health: [
-        "Allergic to shellfish."
-      ],
-      notes: [
-        "Usually works out at 6 PM on weekdays."
-      ],
+      preferences: [],
+      health: [],
+      notes: [],
       patterns: []
     },
-    agent_memory: [
-      "Prefers concise answers with bullet points",
-      "Uses a professional and encouraging tone"
-    ],
+    agent_memory: [],
     agent_config: {
       showGptWidget: true,
       generateImages: true,
@@ -383,24 +376,21 @@ export default function App() {
       trackBloating: true,
       customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
     },
-    preferences: ["Gluten Free", "Keto", "onboarded"],
+    preferences: [],
     goals: {
       dailyCalories: 2000,
-      weightGoal: 75,
+      weightGoal: 70,
     },
     macros: {
       protein: 150,
-      carbs: 50,
-      fats: 80,
+      carbs: 200,
+      fats: 65,
       fiber: 30,
     },
-    trackMicros: true,
-    micros: [
-      { name: "Selenium", target: 55, unit: "mcg" },
-      { name: "Vitamin A", target: 900, unit: "mcg" },
-    ],
+    trackMicros: false,
+    micros: [],
     api_key: "",
-    username: "mk",
+    username: "",
     notionApiKey: "",
     notionDatabaseId: "",
     googleSheetsWebhookUrl: "",
@@ -536,6 +526,14 @@ export default function App() {
   const [isVitalsLogOpen, setIsVitalsLogOpen] = useState(false);
   const [activeVitalsTab, setActiveVitalsTab] = useState<"weight" | "water" | "digestion" | "energy" | "bloating" | null>(null);
   const [expandedCardLogs, setExpandedCardLogs] = useState<{ [key: string]: boolean }>({ weight: true });
+
+  useEffect(() => {
+    if (selectedDate !== todayStr) {
+      setIsVitalsLogOpen(true);
+    } else {
+      setIsVitalsLogOpen(false);
+    }
+  }, [selectedDate, todayStr]);
 
   // Password Recovery States
   const [newPassword, setNewPassword] = useState("");
@@ -1113,6 +1111,8 @@ export default function App() {
 
           if (profile.preferences?.includes("onboarded")) {
             localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
+          } else {
+            localStorage.removeItem(`fitai_onboarded_${activeProfileId}`);
           }
 
           // Resolve latest logged weight from history
@@ -1126,14 +1126,14 @@ export default function App() {
           }
 
           setProfileDataState({
-            name: profile.display_name,
+            name: profile.display_name || "",
             username: profile.username || "",
-            imageUrl: profile.image_url,
-            description: profile.description,
-            height: profile.height,
-            weight: latestWeight,
-            dob: profile.dob,
-            gender: profile.gender,
+            imageUrl: profile.image_url || "",
+            description: profile.description || "",
+            height: profile.height || 175,
+            weight: latestWeight || 70,
+            dob: profile.dob || "1998-05-15",
+            gender: profile.gender || "Male",
             knowledge: {
               preferences: profile.knowledge_preferences || [],
               health: profile.knowledge_health || [],
@@ -2349,11 +2349,12 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     );
   }
 
-  const isOnboarded =
-    !!profileData.preferences?.includes("onboarded") ||
-    (activeProfileId
-      ? localStorage.getItem(`fitai_onboarded_${activeProfileId}`) === "true"
-      : true);
+  const isOnboarded = Boolean(
+    activeProfileId && (
+      profileData.preferences?.includes("onboarded") ||
+      (typeof window !== "undefined" && localStorage.getItem(`fitai_onboarded_${activeProfileId}`) === "true")
+    )
+  );
 
   // "/" is the main app — no more Redirecting... screen needed
 
@@ -2493,24 +2494,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
   // 4. OAuth Consent View (Must render even if activeProfileId is null / user is unauthenticated)
   if (currentPath === "/oauth-consent" || activeTab === "oauth-consent") {
-    // If logged in but data is still loading, show skeleton
-    if (activeProfileId && isDataLoading) {
-      return (
-        <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans p-6 max-w-md mx-auto space-y-8 flex flex-col justify-center items-center">
-          <div className="animate-pulse flex flex-col items-center gap-6 w-full px-4">
-            <div className="w-16 h-16 bg-orange-200/50 rounded-2xl animate-bounce" />
-            <div className="w-48 h-6 bg-orange-200/40 rounded-lg" />
-            <div className="w-56 h-56 bg-orange-200/30 rounded-full flex items-center justify-center">
-              <div className="w-40 h-40 bg-[#FAF9F6] rounded-full" />
-            </div>
-            <div className="w-full h-24 bg-orange-200/20 rounded-[24px]" />
-            <div className="w-full h-12 bg-orange-200/25 rounded-2xl" />
-            <div className="w-full h-32 bg-orange-200/20 rounded-[28px]" />
-          </div>
-        </div>
-      );
-    }
-
     // Force onboarding if logged in but not onboarded
     if (activeProfileId && !isOnboarded) {
       return (
@@ -3299,23 +3282,31 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
 
 
+  // 1. Initial Supabase DB Sync Barrier (Prevents UI loading / onboarding flashes before DB fetch finishes)
   if (isDataLoading) {
     return (
       <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans p-6 max-w-md mx-auto space-y-8 flex flex-col justify-center items-center">
         <div className="animate-pulse flex flex-col items-center gap-6 w-full px-4">
-          <div className="w-16 h-16 bg-orange-200/50 rounded-2xl animate-bounce" />
-          <div className="w-48 h-6 bg-orange-200/40 rounded-lg" />
-          <div className="w-56 h-56 bg-orange-200/30 rounded-full flex items-center justify-center">
-            <div className="w-40 h-40 bg-[#FAF9F6] rounded-full" />
+          <div className="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center border border-orange-500/20 shadow-md">
+            <Flame className="w-8 h-8 text-orange-500 animate-pulse" />
           </div>
-          <div className="w-full h-24 bg-orange-200/20 rounded-[24px]" />
-          <div className="w-full h-12 bg-orange-200/25 rounded-2xl" />
-          <div className="w-full h-32 bg-orange-200/20 rounded-[28px]" />
+          <div className="text-center space-y-1">
+            <span className="text-xs font-black uppercase tracking-widest text-orange-950 block">Syncing Your Plate...</span>
+            <span className="text-[10px] font-bold text-orange-900/60 block">Fetching latest meals & vitals</span>
+          </div>
+          <div className="w-56 h-56 bg-white/70 rounded-full flex items-center justify-center border border-white shadow-xl shadow-orange-100/30">
+            <div className="w-40 h-40 bg-[#FAF9F6] rounded-full border border-orange-100/50 flex items-center justify-center">
+              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest animate-pulse">FitAI</span>
+            </div>
+          </div>
+          <div className="w-full h-24 bg-white/60 rounded-[28px] border border-white shadow-md" />
+          <div className="w-full h-14 bg-white/60 rounded-2xl border border-white shadow-sm" />
         </div>
       </div>
     );
   }
 
+  // 2. Main app Onboarding Wizard (if logged in but not yet onboarded)
   if (isSupabaseConfigured && activeProfileId && !isOnboarded) {
     return (
       <OnboardingWizard
@@ -3350,30 +3341,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         }}
         triggerToast={showToast}
       />
-    );
-  }
-
-  // Initial Supabase DB Sync Barrier (Prevents UI loading before DB fetch finishes)
-  if (isDataLoading) {
-    return (
-      <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans p-6 max-w-md mx-auto space-y-8 flex flex-col justify-center items-center">
-        <div className="animate-pulse flex flex-col items-center gap-6 w-full px-4">
-          <div className="w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center border border-orange-500/20 shadow-md">
-            <Flame className="w-8 h-8 text-orange-500 animate-pulse" />
-          </div>
-          <div className="text-center space-y-1">
-            <span className="text-xs font-black uppercase tracking-widest text-orange-950 block">Syncing Your Plate...</span>
-            <span className="text-[10px] font-bold text-orange-900/60 block">Fetching latest meals & vitals</span>
-          </div>
-          <div className="w-56 h-56 bg-white/70 rounded-full flex items-center justify-center border border-white shadow-xl shadow-orange-100/30">
-            <div className="w-40 h-40 bg-[#FAF9F6] rounded-full border border-orange-100/50 flex items-center justify-center">
-              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest animate-pulse">FitAI</span>
-            </div>
-          </div>
-          <div className="w-full h-24 bg-white/60 rounded-[28px] border border-white shadow-md" />
-          <div className="w-full h-14 bg-white/60 rounded-2xl border border-white shadow-sm" />
-        </div>
-      </div>
     );
   }
 
@@ -3518,6 +3485,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               onOpenCameraScanner={() => {
                 setActiveTab("camera-log");
               }}
+              onOpenFoodLibrary={() => {
+                setIsFoodLibraryModalOpen(true);
+              }}
               onAddMeal={onAddMeal}
               showToast={showToast}
               activeMeals={activeMeals}
@@ -3583,6 +3553,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               onShareMeal={(meal) => {
                 setShareItemPopup({ type: "meal", item: meal });
               }}
+              initialNotes={cameraInitialNotes}
             />
           </motion.div>
         )}
@@ -3616,6 +3587,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             onLogWeight={handleLogWeight}
             onDeleteWeight={handleDeleteWeight}
             onLogout={handleLogout}
+            onEditMeal={handleEditMeal}
+            onShareMeal={(meal) => setShareItemPopup({ type: "meal", item: meal })}
+            onDeleteMeal={handleDeleteMeal}
           />
         )}
         {activeTab === "edit-profile" && (
@@ -3778,6 +3752,13 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             initialAiMode={manualLogInitialAiMode}
             autoTriggerPhotoScan={autoTriggerPhotoScan}
             profileData={profileData}
+            onOpenCamera={(initialText) => {
+              setIsCameraFullScreen(false);
+              setAutoTriggerPhotoScan(false);
+              setMealToEdit(null);
+              if (initialText) setCameraInitialNotes(initialText);
+              setActiveTab("camera-log");
+            }}
           />
         )}
       </AnimatePresence>
@@ -3824,6 +3805,41 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         )}
       </AnimatePresence>
 
+      {/* Food Library 1-Tap Quick Log Popup Modal */}
+      <FoodLibraryModal
+        isOpen={isFoodLibraryModalOpen}
+        onClose={() => setIsFoodLibraryModalOpen(false)}
+        onAddMeal={(newMeal) => {
+          onAddMeal(newMeal);
+        }}
+        onModifyMeal={(item) => {
+          setMealToEdit({
+            id: `edit-${Date.now()}`,
+            name: item.name,
+            calories: item.calories,
+            protein: item.protein,
+            carbs: item.carbs,
+            fats: item.fats,
+            fiber: item.fiber || 0,
+            time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            date: selectedDate,
+            type: item.type || "Meal",
+            image: item.image || "",
+            meal_description: item.meal_description || "",
+            tags: item.tags || [],
+            nutrients: item.nutrients || {},
+          } as any);
+          setManualLogInitialAiMode(false);
+          setManualLogInitialSegment("quick");
+          setIsCameraFullScreen(true);
+        }}
+        recipesState={recipes}
+        mealsState={mealsState}
+        profileData={profileData}
+        selectedDate={selectedDate}
+        triggerToast={showToast}
+      />
+
       {/* Configurable Single-Action Floating Widget & Vitals Modal */}
       {activeTab !== "camera-log" && (
         <FloatingWidget
@@ -3832,6 +3848,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             !isCameraFullScreen &&
             !isCameraModalOpen &&
             !isVitalsModalOpen &&
+            !isFoodLibraryModalOpen &&
             !selectedRecipePopup &&
             !shareItemPopup &&
             !activeGoalConfigPopup &&

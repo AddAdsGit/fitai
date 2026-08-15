@@ -671,9 +671,16 @@ security:
 `;
 
 export const DEFAULT_TRACKING_TAGS = [
-  { id: 'gluten_free', name: 'Gluten Free', description: 'Apply when meal contains no wheat, barley, rye, or gluten', enabled: true },
-  { id: 'lactose_free', name: 'Lactose Free', description: 'Apply when meal contains no lactose or dairy products', enabled: true },
+  { id: 'best_meal', name: 'Best Meal for Me', description: 'Apply when meal is exceptionally nutrient-dense, goal-aligned, or a top-rated saved recipe', enabled: true },
+  { id: 'homemade', name: 'Homemade', description: 'Apply when meal is cooked at home from scratch', enabled: true },
+  { id: 'outside_food', name: 'Outside Food', description: 'Apply when meal is from a restaurant, street vendor, or food delivery', enabled: true },
   { id: 'vegan', name: 'Vegan', description: 'Apply when meal contains no animal products', enabled: true },
+  { id: 'vegetarian', name: 'Vegetarian', description: 'Apply when meal contains no meat, poultry, or seafood', enabled: false },
+  { id: 'gluten_free', name: 'Gluten Free', description: 'Apply when meal contains no wheat, barley, rye, or gluten', enabled: false },
+  { id: 'lactose_free', name: 'Lactose Free', description: 'Apply when meal contains no lactose or dairy products', enabled: false },
+  { id: 'halal', name: 'Halal', description: 'Apply when meal complies with Islamic dietary guidelines', enabled: false },
+  { id: 'nut_free', name: 'Nut Free', description: 'Apply when meal contains no peanuts or tree nuts', enabled: false },
+  { id: 'quick_prep', name: 'Quick Prep', description: 'Apply when meal takes under 15 minutes to prepare', enabled: false },
 ];
 
 export const SettingsView = ({

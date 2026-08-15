@@ -15,6 +15,7 @@ import {
   Plus,
   Minus,
   Edit2,
+  Pencil,
   Check,
   X,
   Square,
@@ -22,15 +23,29 @@ import {
   Smartphone,
   Search,
   Paperclip,
+  AtSign,
   Utensils,
   Clock,
   Flame,
+  Wand2,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { DEFAULT_TRACKED_NUTRIENTS, normalizeTrackedNutrients } from "../constants/nutrition";
 import type { TrackedNutrient } from "../types";
 import { PastFoodCard, PastFoodItem } from "./PastFoodCard";
+import { StepperButton } from "./StepperButton";
+import { TimePickerModal } from "./TimePickerModal";
+import { formatDisplayTime } from "../utils/helpers";
+import { FoodFilterBar } from "./FoodFilterBar";
+import {
+  filterAndSortFoods,
+  getUserActiveAiTags,
+  INITIAL_FOOD_FILTER_STATE,
+  FoodFilterState,
+} from "../utils/foodFilter";
+import { AiClarificationModal, PendingAiClarification } from "./AiClarificationModal";
 
 export const CameraLogView = ({
   setActiveTab,
@@ -40,6 +55,7 @@ export const CameraLogView = ({
   onAddMeal,
   triggerToast,
   onShareMeal,
+  initialNotes,
 }: {
   setActiveTab: (tab?: string) => void;
   profileData: any;
@@ -48,6 +64,7 @@ export const CameraLogView = ({
   onAddMeal: (meal: any) => void;
   triggerToast: (msg: string) => void;
   onShareMeal?: (meal: any) => void;
+  initialNotes?: string;
 }) => {
   // Flow States: "capture" -> "confirm" -> "preview"
   const [flowStep, setFlowStep] = useState<"capture" | "confirm" | "preview">("capture");
@@ -56,8 +73,14 @@ export const CameraLogView = ({
   const [isEditingDetails, setIsEditingDetails] = useState<boolean>(false);
   
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(initialNotes || "");
   const [hasMediaPermission, setHasMediaPermission] = useState<boolean | null>(true);
+
+  useEffect(() => {
+    if (initialNotes) {
+      setNotes(initialNotes);
+    }
+  }, [initialNotes]);
   
   // Step 1 Notes Bottom-Sheet Popup State
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -67,12 +90,12 @@ export const CameraLogView = ({
   
   // Toggle State for Expandable Past Foods & Recipes Drawer
   const [showPastFoodsDrawer, setShowPastFoodsDrawer] = useState(false);
-  const [pastSearchQuery, setPastSearchQuery] = useState("");
-  const [pastFilter, setPastFilter] = useState<"all" | "recent" | "recipes">("all");
+  const [pastFoodFilters, setPastFoodFilters] = useState<FoodFilterState>(INITIAL_FOOD_FILTER_STATE);
 
   // Inline "@" Mention Auto-Complete Menu States
   const [showMentionMenu, setShowMentionMenu] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
+  const [taggedNames, setTaggedNames] = useState<string[]>([]);
 
   // Instagram/TikTok-Grade Aspect Ratio Switcher: "1:1" -> "3:4" -> "9:16"
   const [aspectRatioMode, setAspectRatioMode] = useState<"1:1" | "3:4" | "9:16">("3:4");
@@ -84,10 +107,17 @@ export const CameraLogView = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [loggedMealResult, setLoggedMealResult] = useState<any | null>(null);
+  const [showAiRefineInput, setShowAiRefineInput] = useState(false);
+
+  // AI Confidence & Clarification Flow States (90% Threshold)
+  const [pendingClarification, setPendingClarification] = useState<PendingAiClarification | null>(null);
+  const [isClarificationModalOpen, setIsClarificationModalOpen] = useState(false);
+  const [hasBeenClarified, setHasBeenClarified] = useState(false);
 
   // Live WebRTC Stream State for Macbook / Desktop / Mobile
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const notesAreaRef = useRef<HTMLTextAreaElement>(null);
   
   // Master Registry of ALL requested hardware tracks to guarantee 100% termination
   const allTracksRef = useRef<MediaStreamTrack[]>([]);
@@ -99,14 +129,12 @@ export const CameraLogView = ({
   const [editableTime, setEditableTime] = useState<string>("");
   const [editableTags, setEditableTags] = useState<string[]>([]);
   const [editableNutrients, setEditableNutrients] = useState<Record<string, number>>({});
-  const [newTagInput, setNewTagInput] = useState("");
-  const [showAddTagInput, setShowAddTagInput] = useState(false);
 
   // AI Refine Prompt in Step 3
   const [refinePrompt, setRefinePrompt] = useState("");
   const [isRefining, setIsRefining] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
-  const timeInputRef = useRef<HTMLInputElement>(null);
   const changePhotoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -147,18 +175,6 @@ export const CameraLogView = ({
     if (t.includes("AM") || t.includes("PM")) return t;
     return convert24hTo12h(t);
   };
-
-  // Clean Text-Only Tag Presets (Zero Emojis)
-  const PRESET_TAGS = [
-    "High Protein",
-    "Keto",
-    "Gluten Free",
-    "Caffeine",
-    "Low Carb",
-    "Dairy Free",
-    "Vegan",
-    "Photo Log",
-  ];
 
   // Dynamic Guidance Metadata (Label & Placeholder changes in real time!)
   const contextGuidance = useMemo(() => {
@@ -259,23 +275,20 @@ export const CameraLogView = ({
     return items;
   }, [mealsState, recipesState, profileData?.meals, profileData?.recipes]);
 
-  const filteredPastItems = useMemo(() => {
-    let result = quickLogItems;
-    if (pastFilter === "recipes") {
-      result = result.filter(item => item.source === "recipe");
-    } else if (pastFilter === "recent") {
-      result = result.filter(item => item.source === "recent");
-    }
+  const allFoodFilterTags = useMemo(() => {
+    return getUserActiveAiTags(profileData?.tracking_tags);
+  }, [profileData?.tracking_tags]);
 
-    if (pastSearchQuery.trim()) {
-      const q = pastSearchQuery.toLowerCase();
-      result = result.filter(item => 
-        item.name.toLowerCase().includes(q) || 
-        (item.meal_description || "").toLowerCase().includes(q)
-      );
+  const filteredPastItems = useMemo(() => {
+    let list = quickLogItems;
+    if (pastFoodFilters.showRecipes === false) {
+      list = list.filter((item) => item.source !== "recipe");
     }
-    return result;
-  }, [quickLogItems, pastFilter, pastSearchQuery]);
+    if (pastFoodFilters.showLogs === false) {
+      list = list.filter((item) => item.source !== "recent");
+    }
+    return filterAndSortFoods(list as any, pastFoodFilters, undefined, activeTrackedNutrients);
+  }, [quickLogItems, pastFoodFilters, activeTrackedNutrients]);
 
   const mentionSuggestions = useMemo(() => {
     if (!mentionQuery.trim()) return quickLogItems.slice(0, 5);
@@ -288,7 +301,12 @@ export const CameraLogView = ({
     setAttachedItem(item);
     triggerToast(`📎 Attached "${item.name}"`);
     setShowMentionMenu(false);
-    setShowPastFoodsDrawer(false); // AUTO-COLLAPSE IMMEDIATELY
+    setShowPastFoodsDrawer(false);
+    setShowNotesModal(false); // 100% CLOSE ALL POPUPS
+    setNotes((prev) => {
+      const lastAt = prev.lastIndexOf("@");
+      return lastAt !== -1 ? prev.slice(0, lastAt).trim() : prev;
+    });
   };
 
   const handleRemoveAttached = () => {
@@ -315,12 +333,64 @@ export const CameraLogView = ({
   };
 
   const handleSelectMention = (item: PastFoodItem) => {
-    handleAttachItem(item);
+    setTaggedNames((prev) => Array.from(new Set([...prev, item.name])));
     const lastAtIndex = notes.lastIndexOf("@");
     if (lastAtIndex !== -1) {
-      setNotes(notes.slice(0, lastAtIndex).trim());
+      setNotes(notes.slice(0, lastAtIndex) + `@${item.name} `);
+    } else {
+      setNotes((prev) => prev + ` @${item.name} `);
     }
     setShowMentionMenu(false);
+    triggerToast(`🏷️ Tagged "@${item.name}"`);
+  };
+
+  const handleNotesKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Backspace") {
+      const textarea = e.currentTarget;
+      const cursorPos = textarea.selectionStart;
+      const textBeforeCursor = notes.slice(0, cursorPos);
+
+      for (const name of taggedNames) {
+        const tagStr1 = `@${name} `;
+        const tagStr2 = `@${name}`;
+        if (textBeforeCursor.endsWith(tagStr1)) {
+          e.preventDefault();
+          const newNotes = notes.slice(0, cursorPos - tagStr1.length) + notes.slice(cursorPos);
+          setNotes(newNotes);
+          return;
+        }
+        if (textBeforeCursor.endsWith(tagStr2)) {
+          e.preventDefault();
+          const newNotes = notes.slice(0, cursorPos - tagStr2.length) + notes.slice(cursorPos);
+          setNotes(newNotes);
+          return;
+        }
+      }
+    }
+  };
+
+  const renderHighlightedNotes = (text: string) => {
+    if (!text) return null;
+    
+    // Sort tagged names by length descending so longer phrases match first
+    const sortedTagged = [...taggedNames].sort((a, b) => b.length - a.length);
+    const knownTags = sortedTagged.map((n) => `@${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+    const patternStr = knownTags.length > 0
+      ? `(${knownTags.join("|")}|@[\\w&]+)`
+      : `(@[\\w&]+)`;
+    const regex = new RegExp(patternStr, "g");
+    
+    const parts = text.split(regex);
+    return parts.map((part, i) => {
+      if (part.startsWith("@")) {
+        return (
+          <span key={i} className="text-orange-400 font-bold bg-orange-500/30 rounded font-sans">
+            {part}
+          </span>
+        );
+      }
+      return <span key={i} className="text-white">{part}</span>;
+    });
   };
 
   const getFullCombinedPrompt = (): string => {
@@ -362,6 +432,18 @@ export const CameraLogView = ({
 
   const handleExitToDashboard = () => {
     stopCameraHardware();
+    if (flowStep === "preview" && loggedMealResult) {
+      const finalMealObj = {
+        ...loggedMealResult,
+        name: editableName,
+        meal_description: editableDesc,
+        calories: editableCalories,
+        time: editableTime || loggedMealResult.time || "12:00 PM",
+        tags: editableTags,
+        nutrients: editableNutrients,
+      };
+      onAddMeal(finalMealObj);
+    }
     setActiveTab("home");
   };
 
@@ -376,14 +458,9 @@ export const CameraLogView = ({
 
       if (!cameraStream && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+          .catch(() => navigator.mediaDevices.getUserMedia({ video: true }))
           .then((stream) => {
-            if (isCancelled) {
-              stream.getTracks().forEach((t) => {
-                t.enabled = false;
-                t.stop();
-              });
-              return;
-            }
+            if (isCancelled || !stream) return;
             
             const videoTracks = stream.getVideoTracks();
             allTracksRef.current.push(...videoTracks);
@@ -395,6 +472,7 @@ export const CameraLogView = ({
           })
           .catch((err) => {
             console.log("WebRTC fallback to file input:", err);
+            setHasMediaPermission(false);
           });
       }
     }
@@ -598,6 +676,21 @@ export const CameraLogView = ({
         };
       }
 
+      // AI Confidence Score Check (Threshold: 90%)
+      const confidence = mealData.confidenceScore || (combinedNotes.length > 15 ? 92 : 78);
+
+      if (confidence < 90 && !hasBeenClarified) {
+        setPendingClarification({
+          mealData,
+          confidenceScore: confidence,
+          question: `Is this "${mealData.name}" prepared with homemade ingredients or restaurant style?`,
+          options: ["Homemade / Healthy Preparation", "Restaurant / Outside Food", "Extra Large Portion"]
+        });
+        setIsClarificationModalOpen(true);
+        setIsProcessing(false);
+        return;
+      }
+
       onAddMeal(mealData);
       setLoggedMealResult(mealData);
       setEditableName(mealData.name);
@@ -616,6 +709,43 @@ export const CameraLogView = ({
       setErrorMessage(err.message || "Failed to analyze photo.");
       setIsProcessing(false);
     }
+  };
+
+  const handleConfirmClarification = (answer: string) => {
+    if (!pendingClarification) return;
+    const meal = { ...pendingClarification.mealData };
+    if (answer) {
+      meal.meal_description = `${meal.meal_description} (${answer})`.trim();
+    }
+    setHasBeenClarified(true);
+    setIsClarificationModalOpen(false);
+    onAddMeal(meal);
+    setLoggedMealResult(meal);
+    setEditableName(meal.name);
+    setEditableDesc(meal.meal_description);
+    setEditableCalories(meal.calories);
+    setEditableTags(meal.tags || []);
+    setEditableNutrients(meal.nutrients || {});
+    setEditableTime(meal.time || "");
+    triggerToast("Photo Meal Logged! ✨");
+    setFlowStep("preview");
+  };
+
+  const handleBypassClarification = () => {
+    if (!pendingClarification) return;
+    const meal = pendingClarification.mealData;
+    setHasBeenClarified(true);
+    setIsClarificationModalOpen(false);
+    onAddMeal(meal);
+    setLoggedMealResult(meal);
+    setEditableName(meal.name);
+    setEditableDesc(meal.meal_description);
+    setEditableCalories(meal.calories);
+    setEditableTags(meal.tags || []);
+    setEditableNutrients(meal.nutrients || {});
+    setEditableTime(meal.time || "");
+    triggerToast("Photo Meal Logged! ✨");
+    setFlowStep("preview");
   };
 
   const handleRefineWithAI = async () => {
@@ -672,6 +802,7 @@ export const CameraLogView = ({
         onAddMeal(updatedMeal);
         setRefinePrompt("");
         setAttachedItem(null);
+        setShowAiRefineInput(false);
         triggerToast("Meal refined with AI! ✨");
         setIsRefining(false);
         return;
@@ -723,6 +854,7 @@ export const CameraLogView = ({
         onAddMeal(updatedMeal);
         setRefinePrompt("");
         setAttachedItem(null);
+        setShowAiRefineInput(false);
         triggerToast("Meal refined with AI! ✨");
       }
       setIsRefining(false);
@@ -739,16 +871,6 @@ export const CameraLogView = ({
     } else {
       setEditableTags([...editableTags, tagToToggle]);
     }
-  };
-
-  const handleAddCustomTag = () => {
-    if (!newTagInput.trim()) return;
-    const tagFormatted = newTagInput.trim().replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "").trim();
-    if (tagFormatted && !editableTags.includes(tagFormatted)) {
-      setEditableTags([...editableTags, tagFormatted]);
-    }
-    setNewTagInput("");
-    setShowAddTagInput(false);
   };
 
   const handleNutrientValueChange = (id: string, valStr: string) => {
@@ -772,12 +894,8 @@ export const CameraLogView = ({
   };
 
   const availableTags = useMemo(() => {
-    const userTrackingTags = (profileData?.tracking_tags || [])
-      .filter((t: any) => t.enabled !== false)
-      .map((t: any) => t.name);
-    
-    return Array.from(new Set([...userTrackingTags, ...PRESET_TAGS, ...editableTags]));
-  }, [profileData?.tracking_tags, editableTags]);
+    return getUserActiveAiTags(profileData?.tracking_tags);
+  }, [profileData?.tracking_tags]);
 
   const mealLogCount = useMemo(() => {
     if (!editableName.trim() || !mealsState) return 1;
@@ -790,7 +908,7 @@ export const CameraLogView = ({
     <div
       className={cn(
         "w-full min-h-[100dvh] flex flex-col justify-between select-none animate-fade-in text-left transition-colors duration-300 relative overflow-hidden",
-        flowStep === "preview" ? "bg-[#FAF7F2] text-stone-900 p-0" : "bg-[#0D0D0D] text-white p-4 sm:p-5"
+        flowStep === "preview" ? "bg-[#FAF7F2] text-stone-900 p-0" : "bg-black text-white p-0 m-0"
       )}
     >
       {/* Hidden Native File Inputs */}
@@ -817,14 +935,56 @@ export const CameraLogView = ({
         className="hidden"
       />
 
+      {/* 100% EDGE-TO-EDGE LIVE CAMERA BACKGROUND (CAPTURE STEP) */}
+      {flowStep === "capture" && (
+        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto" onClick={handleCaptureFromWebcam}>
+          {cameraStream ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover min-w-full min-h-full"
+            />
+          ) : null}
+
+          {showGridTarget && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+              <div className="w-48 h-48 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
+                  Plate Center
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* High-End Gourmet Analyzing Spinner Overlay */}
+          {isProcessing && (
+            <div className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white space-y-4 animate-fade-in">
+              <div className="w-16 h-16 rounded-3xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center animate-pulse">
+                <Sparkles className="w-8 h-8 text-orange-400 animate-spin" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black tracking-tight text-white font-sans">
+                  Analyzing Dish & Nutrition...
+                </h3>
+                <p className="text-xs font-medium text-stone-400">
+                  Calculating calories, macros, and tags...
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* STANDARD CAMERA & PREVIEW FLOW */}
-      <div className={cn("w-full flex flex-col justify-between flex-1 min-h-0", flowStep === "preview" ? "space-y-0" : "space-y-4")}>
+      <div className={cn("w-full flex flex-col justify-between flex-1 min-h-0 relative z-10", flowStep === "preview" ? "space-y-0" : "space-y-0")}>
         {flowStep !== "preview" && (
-          <div className="flex items-center justify-between z-30 w-full pt-1 sm:pt-0">
+          <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-auto">
             <button
               type="button"
               onClick={handleExitToDashboard}
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer border active:scale-90 shadow-md bg-black/40 hover:bg-black/60 border-white/20 text-white backdrop-blur-md"
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer border active:scale-90 shadow-md bg-black/50 hover:bg-black/70 border-white/20 text-white backdrop-blur-md"
               title="Back to Dashboard"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -833,13 +993,10 @@ export const CameraLogView = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setIsFlashOn(!isFlashOn);
-                  triggerToast(isFlashOn ? "⚡ Flash Off" : "⚡ Flash On");
-                }}
+                onClick={() => setIsFlashOn(!isFlashOn)}
                 className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center transition-all border cursor-pointer active:scale-90 backdrop-blur-md shadow-md",
-                  isFlashOn ? "bg-amber-400 text-stone-950 border-amber-400" : "bg-black/40 text-white border-white/20 hover:bg-black/60"
+                  isFlashOn ? "bg-amber-400 text-stone-950 border-amber-400" : "bg-black/50 text-white border-white/20 hover:bg-black/70"
                 )}
                 title="Toggle Flash"
               >
@@ -848,13 +1005,10 @@ export const CameraLogView = ({
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowGridTarget(!showGridTarget);
-                  triggerToast(showGridTarget ? "🎯 Framing Guide Off" : "🎯 Framing Guide On");
-                }}
+                onClick={() => setShowGridTarget(!showGridTarget)}
                 className={cn(
                   "w-8 h-8 rounded-full flex items-center justify-center transition-all border cursor-pointer active:scale-90 backdrop-blur-md shadow-md",
-                  showGridTarget ? "bg-orange-500 text-white border-orange-500" : "bg-black/40 text-white border-white/20 hover:bg-black/60"
+                  showGridTarget ? "bg-orange-500 text-white border-orange-500" : "bg-black/50 text-white border-white/20 hover:bg-black/70"
                 )}
                 title="Toggle Center Plate Target"
               >
@@ -864,7 +1018,7 @@ export const CameraLogView = ({
               <button
                 type="button"
                 onClick={handleCycleAspectRatio}
-                className="w-8 h-8 rounded-full flex items-center justify-center transition-all border cursor-pointer active:scale-90 backdrop-blur-md shadow-md bg-black/40 text-white border-white/20 hover:bg-black/60"
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-all border cursor-pointer active:scale-90 backdrop-blur-md shadow-md bg-black/50 text-white border-white/20 hover:bg-black/70"
                 title={`Aspect Ratio Mode: ${aspectRatioMode} (Tap to cycle)`}
               >
                 {aspectRatioMode === "1:1" && <Square className="w-3.5 h-3.5 text-white" />}
@@ -876,115 +1030,129 @@ export const CameraLogView = ({
         )}
 
         {errorMessage && (
-          <div className="z-20 bg-red-500 text-white p-3 rounded-2xl text-xs font-bold text-center shadow-lg my-2 w-full">
+          <div className="absolute top-16 left-4 right-4 z-40 bg-red-500 text-white p-3 rounded-2xl text-xs font-bold text-center shadow-lg">
             {errorMessage}
           </div>
         )}
 
         {flowStep === "capture" && (
-          <div className="flex-1 flex flex-col items-center justify-center relative min-h-0 w-full my-2 space-y-3">
-            {hasMediaPermission === false ? (
-              <div className="w-full h-[55vh] rounded-[28px] border border-stone-800 bg-stone-900/90 backdrop-blur-md shadow-xl flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <div className="absolute bottom-4 left-3 right-3 z-30 flex flex-col items-center gap-2.5 pointer-events-auto">
+            {/* FULL-WIDTH FROSTED GLASS ATTACHED MEAL BAR */}
+            {attachedItem && (
+              <div className="w-full bg-black/65 backdrop-blur-2xl border border-white/25 rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 shadow-2xl animate-fade-in font-sans">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Paperclip className="w-4 h-4 text-orange-400 shrink-0" />
+                  <span className="text-xs font-black text-white truncate font-sans">
+                    {attachedItem.name}
+                  </span>
+                  {attachedItem.calories > 0 && (
+                    <span className="text-[10px] font-bold text-orange-300 bg-orange-950/80 border border-orange-700/60 px-2.5 py-0.5 rounded-full shrink-0">
+                      {attachedItem.calories} kcal
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  className="px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider shadow-md active:scale-95 transition-all cursor-pointer"
+                  onClick={() => setAttachedItem(null)}
+                  className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-stone-300 hover:text-white flex items-center justify-center text-xs font-bold cursor-pointer shrink-0 transition-colors"
+                  title="Remove attached meal"
                 >
-                  Select Photo From Gallery
+                  ✕
                 </button>
               </div>
-            ) : (
-              <div
-                onClick={handleCaptureFromWebcam}
-                className={cn(
-                  "w-full bg-black shadow-xl flex flex-col items-center justify-center relative cursor-pointer overflow-hidden transition-all duration-300 rounded-[28px] border border-stone-900",
-                  aspectRatioMode === "1:1" ? "aspect-square max-h-[46vh]" : aspectRatioMode === "3:4" ? "aspect-[3/4] max-h-[54vh]" : "aspect-[9/16] h-[65vh]"
-                )}
+            )}
+
+            {/* HEADER ROW WITH SLEEK [@ TAG MEAL] BUTTON */}
+            <div className="w-full flex items-center justify-between px-1.5 pt-0.5">
+              <span className="text-[9.5px] font-black uppercase text-stone-300 tracking-wider font-sans">
+                Notes & Details (Optional)
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  notesAreaRef.current?.focus();
+                  setNotes((prev) => (prev ? `${prev} @` : "@"));
+                  setMentionQuery("");
+                  setShowMentionMenu(true);
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/20 hover:bg-orange-500/35 border border-orange-400/40 text-orange-300 text-[10px] font-black uppercase tracking-wider backdrop-blur-md cursor-pointer transition-all active:scale-90"
+                title="Tag a past meal or recipe with @"
               >
-                {cameraStream ? (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover min-w-full min-h-full"
-                  />
-                ) : null}
+                <AtSign className="w-3 h-3 text-orange-400" />
+                <span>Tag Meal</span>
+              </button>
+            </div>
 
-                {showGridTarget && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                    <div className="w-40 h-40 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-white/70 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-xs">
-                        Plate Center
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* High-End Gourmet Analyzing Spinner Overlay */}
-                {isProcessing && (
-                  <div className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white space-y-4 animate-fade-in">
-                    <div className="w-16 h-16 rounded-3xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center animate-pulse">
-                      <Sparkles className="w-8 h-8 text-orange-400 animate-spin" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-base font-black tracking-tight text-white font-sans">
-                        Analyzing Dish & Nutrition...
-                      </h3>
-                      <p className="text-xs font-medium text-stone-400">
-                        Calculating calories, macros, and tags ✨
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {flowStep === "capture" && (
-          <div className="w-full flex flex-col items-center gap-2 z-30 pb-2">
-            {/* STICKY FROSTED NOTES & ATTACHMENT PREVIEW PILL */}
-            {(notes.trim() || attachedItem) && (
-              <div className="w-full max-w-sm px-2 animate-fade-in">
+            {/* SINGLE SMOOTH FROSTED TEXT INPUT BOX WITH INLINE @ SHORTLIST DROPDOWN */}
+            <div className="w-full relative">
+              {/* BACKDROP HIGHLIGHT LAYER FOR ORANGE @MENTIONS */}
+              {notes && (
                 <div
-                  onClick={() => setShowNotesModal(true)}
-                  className="bg-black/75 backdrop-blur-md border border-white/25 text-white rounded-2xl p-2.5 px-3.5 shadow-xl flex items-center justify-between gap-2 cursor-pointer hover:bg-black/85 active:scale-[0.98] transition-all"
-                  title="Tap to edit notes"
+                  aria-hidden="true"
+                  className="absolute inset-0 p-3 text-xs font-bold leading-relaxed whitespace-pre-wrap break-words pointer-events-none overflow-hidden h-28 font-sans z-[11] select-none"
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {attachedItem ? (
-                      <Paperclip className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                    ) : (
-                      <FileText className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                    )}
-                    <span className="text-xs font-bold text-white truncate">
-                      {attachedItem ? `Attached: ${attachedItem.name}` : `"${notes}"`}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setNotes("");
-                      setAttachedItem(null);
-                      triggerToast("Note cleared");
-                    }}
-                    className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-[10px] font-bold cursor-pointer shrink-0"
-                    title="Clear Note"
-                  >
-                    ✕
-                  </button>
+                  {renderHighlightedNotes(notes)}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Viewfinder Controls Row */}
-            <div className="flex items-center justify-between w-full px-4 py-1.5 rounded-full">
+              <textarea
+                ref={notesAreaRef}
+                value={notes}
+                onChange={handleNotesTextChange}
+                onKeyDown={handleNotesKeyDown}
+                placeholder={`Try typing details like:\n• "Air fried with 1 tbsp olive oil & extra cheese"\n• "Portion tweak: Only ate half portion in photo"\n• "Half portion of @Pasta + @MorningShake"`}
+                rows={4}
+                className={cn(
+                  "w-full bg-black/60 backdrop-blur-xl border border-white/20 focus:border-orange-500 focus:outline-none rounded-2xl p-3 text-xs font-bold placeholder:text-white/45 placeholder:text-[11px] placeholder:font-normal resize-none h-28 leading-relaxed shadow-xl relative z-10 font-sans",
+                  notes ? "text-transparent caret-white selection:bg-orange-500/30" : "text-white"
+                )}
+              />
+
+              {/* Inline "@" Mention Auto-Complete Dropdown (Dark Gourmet) */}
+              <AnimatePresence>
+                {showMentionMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute bottom-full mb-2 left-0 right-0 bg-stone-900/98 backdrop-blur-2xl border border-stone-700/80 rounded-2xl shadow-2xl p-2 z-50 max-h-48 overflow-y-auto space-y-1 text-left font-sans"
+                  >
+                    <span className="text-[9px] font-black uppercase text-orange-400 tracking-wider block px-2.5 py-1">
+                      Tap to Tag Item (@{mentionQuery})
+                    </span>
+                    {mentionSuggestions.length === 0 ? (
+                      <p className="text-[10px] text-stone-400 font-semibold px-2.5 py-2">
+                        No matching past meals found
+                      </p>
+                    ) : (
+                      mentionSuggestions.map((item) => (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => handleSelectMention(item)}
+                          className="w-full p-2 rounded-xl hover:bg-stone-800 text-left flex items-center justify-between transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Utensils className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                            <span className="text-xs font-bold text-white truncate">{item.name}</span>
+                          </div>
+                          <span className="text-[9px] font-black text-orange-400 bg-orange-950/80 border border-orange-800/60 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                            + Tag
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Viewfinder Controls Row (Symmetrical 3-Button Action Bar) */}
+            <div className="flex items-center justify-between w-full px-6 py-1">
               <button
                 type="button"
                 onClick={() => galleryInputRef.current?.click()}
-                className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 shadow-md flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
+                className="w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-md border border-white/20 shadow-md flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
                 title="Open Photo Gallery"
               >
                 <ImageIcon className="w-5.5 h-5.5 text-white" />
@@ -994,7 +1162,7 @@ export const CameraLogView = ({
                 type="button"
                 onClick={handleCaptureFromWebcam}
                 disabled={isProcessing}
-                className="w-18 h-18 rounded-full bg-orange-500 hover:bg-orange-600 border-4 border-white shadow-md flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0 disabled:opacity-50"
+                className="w-16 h-16 rounded-full bg-orange-500 hover:bg-orange-600 border-4 border-white shadow-xl flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0 disabled:opacity-50"
                 title="Take Photo"
               >
                 <Camera className="w-7 h-7 text-white" />
@@ -1002,14 +1170,17 @@ export const CameraLogView = ({
 
               <button
                 type="button"
-                onClick={() => setShowNotesModal(true)}
+                onClick={() => {
+                  setShowPastFoodsDrawer(true);
+                  setShowNotesModal(true);
+                }}
                 className={cn(
-                  "w-12 h-12 rounded-full backdrop-blur-md border shadow-md flex items-center justify-center active:scale-90 transition-all cursor-pointer shrink-0",
-                  notes.trim() || attachedItem ? "bg-orange-500 text-white border-orange-400" : "bg-white/10 hover:bg-white/20 border-white/20 text-white"
+                  "w-12 h-12 rounded-full backdrop-blur-md border shadow-md flex items-center justify-center active:scale-90 transition-transform cursor-pointer shrink-0",
+                  attachedItem ? "bg-orange-500 text-white border-orange-400 shadow-orange-500/30" : "bg-black/50 hover:bg-black/70 border-white/20 text-white"
                 )}
-                title="Add Notes & Attachment"
+                title={attachedItem ? `Attached: ${attachedItem.name}` : "Attach Past Meal or Recipe"}
               >
-                <FileText className="w-5.5 h-5.5" />
+                <Paperclip className="w-5.5 h-5.5 text-white" />
               </button>
             </div>
           </div>
@@ -1025,8 +1196,8 @@ export const CameraLogView = ({
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
               
-              {/* Gourmet Dark Ambient Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-stone-950/85 via-stone-950/30 to-black/20 pointer-events-none" />
+              {/* Gourmet Dark Ambient Gradient Overlay (Ensures 100% legibility on light images) */}
+              <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/45 to-black/20 pointer-events-none" />
 
               {/* Top Controls: Back Button & Camera Upload (Left) + Share Icon & Close Icon (Right) */}
               <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
@@ -1034,7 +1205,7 @@ export const CameraLogView = ({
                   <button
                     type="button"
                     onClick={handleExitToDashboard}
-                    className="w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
+                    className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
                     title="Back to Dashboard"
                   >
                     <ArrowLeft className="w-4 h-4 text-white" />
@@ -1043,7 +1214,7 @@ export const CameraLogView = ({
                   <button
                     type="button"
                     onClick={() => changePhotoInputRef.current?.click()}
-                    className="w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
+                    className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
                     title="Change / Upload Photo"
                   >
                     <Camera className="w-4 h-4 text-white" />
@@ -1066,45 +1237,40 @@ export const CameraLogView = ({
                         };
                         onShareMeal(currentMealObj);
                       }}
-                      className="w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
+                      className="h-8 px-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border border-orange-400/40"
                       title="Share Meal Card"
                     >
-                      <Share2 className="w-4 h-4 text-white" />
+                      <Share2 className="w-3.5 h-3.5 text-white" />
+                      <span>Share</span>
                     </button>
                   )}
-
-                  <button
-                    onClick={handleExitToDashboard}
-                    className="w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
-                    title="Done & Close"
-                  >
-                    <X className="w-4 h-4 text-white" />
-                  </button>
                 </div>
               </div>
 
-              {/* Bottom Image Overlay: Option A Minimalist Design */}
-              <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between text-white z-10">
-                <div className="min-w-0 flex-1 pr-3 text-left">
-                  {/* Reassuring Confirmation Subtitle: Logged Successfully */}
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 drop-shadow-xs block mb-0.5">
-                    ✓ Logged Successfully
-                  </span>
-
-                  <h3 className="text-xl font-black tracking-tight drop-shadow-md truncate font-sans leading-tight text-white">
-                    {editableName || "Gourmet Meal Log"}
-                  </h3>
+              {/* Bottom Image Overlay: Single Frosted Pill + Hero Title + Clean Grey Metadata */}
+              <div className="absolute bottom-4 left-4 right-4 z-10 text-left space-y-1.5">
+                {/* Green Confirmation Frosted Pill (High contrast dark frosted capsule with emerald text) */}
+                <div>
+                  <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-emerald-400/60 px-3 py-1 rounded-full shadow-md">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400/80 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                      Logged Successfully
+                    </span>
+                  </div>
                 </div>
 
-                {/* Single Unified Frosted Glassmorphic Stat Pill */}
-                <div className="bg-black/50 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-full shadow-md text-center flex items-center gap-1.5 shrink-0">
-                  <span className="text-xs font-black tracking-wider uppercase text-white block">
-                    {editableCalories || 0} KCAL
-                  </span>
-                  <span className="text-white/40 text-[10px] select-none">•</span>
-                  <span className="text-[10px] font-bold tracking-wider uppercase text-white/90 block">
-                    {formatDisplayTime(editableTime || loggedMealResult.time)}
-                  </span>
+                {/* Full Width Meal Title */}
+                <h3 className="text-xl sm:text-2xl font-black tracking-tight drop-shadow-md truncate font-sans leading-tight text-white">
+                  {editableName || "Gourmet Meal Log"}
+                </h3>
+
+                {/* Clean Grey Text Metadata Line (Below Title) */}
+                <div className="flex items-center gap-1.5 text-stone-300 text-[11px] font-bold tracking-wide drop-shadow-sm">
+                  <span className="text-orange-400 font-extrabold">{editableCalories || 0} KCAL</span>
+                  <span className="text-stone-400 select-none">•</span>
+                  <span>{formatDisplayTime(editableTime || loggedMealResult?.time)}</span>
+                  <span className="text-stone-400 select-none">•</span>
+                  <span>{new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                 </div>
               </div>
             </div>
@@ -1113,15 +1279,11 @@ export const CameraLogView = ({
             <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-0 text-left">
               {/* Row 1: Key Stats Banner (Logged Time Picker & Calories Stepper) */}
               <div className="grid grid-cols-2 gap-2.5">
-                {/* Logged Time Picker Card (Entire Card Clickable to trigger clock picker) */}
-                <div
-                  onClick={() => {
-                    try {
-                      (timeInputRef.current as any)?.showPicker?.();
-                    } catch (_) {}
-                    timeInputRef.current?.focus();
-                  }}
-                  className="bg-white border border-stone-200/80 hover:border-orange-400 focus-within:border-orange-500 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5 cursor-pointer transition-all active:scale-[0.98]"
+                {/* Logged Time Picker Card (Entire Card Clickable to trigger custom TimePickerModal) */}
+                <button
+                  type="button"
+                  onClick={() => setIsTimePickerOpen(true)}
+                  className="bg-white border border-stone-200/80 hover:border-orange-400 focus:border-orange-500 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5 cursor-pointer transition-all active:scale-[0.98] text-left border-none"
                   title="Tap to change logged time"
                 >
                   <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
@@ -1131,27 +1293,11 @@ export const CameraLogView = ({
                     <span className="text-[8.5px] font-black uppercase text-stone-400 tracking-wider block">
                       Logged Time
                     </span>
-                    <input
-                      ref={timeInputRef}
-                      type="time"
-                      value={
-                        editableTime
-                          ? editableTime.includes("AM") || editableTime.includes("PM")
-                            ? convert12hTo24h(editableTime)
-                            : editableTime
-                          : "12:00"
-                      }
-                      onChange={(e) => setEditableTime(convert24hTo12h(e.target.value))}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        try {
-                          (e.target as any).showPicker?.();
-                        } catch (_) {}
-                      }}
-                      className="w-full bg-transparent border-none text-xs font-black text-stone-900 focus:outline-none p-0 cursor-pointer"
-                    />
+                    <span className="text-xs font-black text-stone-900 block truncate">
+                      {editableTime || loggedMealResult?.time || "12:00 PM"}
+                    </span>
                   </div>
-                </div>
+                </button>
 
                 {/* Total Energy Stepper Card */}
                 <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5">
@@ -1163,13 +1309,12 @@ export const CameraLogView = ({
                       Total Energy
                     </span>
                     <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setEditableCalories(Math.max(0, editableCalories - 25))}
+                      <StepperButton
+                        onStep={() => setEditableCalories((prev) => Math.max(0, prev - 25))}
                         className="w-5 h-5 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 active:scale-90 cursor-pointer"
                       >
                         <Minus className="w-3 h-3" />
-                      </button>
+                      </StepperButton>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -1180,13 +1325,12 @@ export const CameraLogView = ({
                       <span className="text-[10px] font-bold text-stone-400 select-none">
                         kcal
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setEditableCalories(editableCalories + 25)}
+                      <StepperButton
+                        onStep={() => setEditableCalories((prev) => prev + 25)}
                         className="w-5 h-5 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 active:scale-90 cursor-pointer"
                       >
                         <Plus className="w-3 h-3" />
-                      </button>
+                      </StepperButton>
                     </div>
                   </div>
                 </div>
@@ -1206,57 +1350,18 @@ export const CameraLogView = ({
                 />
               </div>
 
-              {/* Row 3: Smart AI Refine / Notes Prompt Card */}
-              <div className="bg-white border border-stone-200/80 focus-within:border-orange-500 rounded-2xl p-3.5 shadow-3xs space-y-2.5 transition-all">
-                <div className="flex items-center justify-between">
-                  <span className="text-[8.5px] font-black uppercase text-stone-400 tracking-widest flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-                    Refine with AI / Notes
-                  </span>
-
-                  {!attachedItem ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowPastFoodsDrawer(true)}
-                      className="text-[9px] font-black uppercase tracking-wider text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-full cursor-pointer flex items-center gap-1 transition-all active:scale-95 shadow-3xs"
-                    >
-                      <Paperclip className="w-3 h-3 text-orange-500" />
-                      <span>Attach Past Meal</span>
-                    </button>
-                  ) : null}
-                </div>
-
-                {attachedItem && (
-                  <div className="flex items-center justify-between bg-orange-50/80 border border-orange-200 rounded-xl p-2 px-3 animate-fade-in shadow-2xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Paperclip className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                      <span className="text-xs font-bold text-orange-950 truncate">
-                        Attached: {attachedItem.name}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleRemoveAttached}
-                      className="text-orange-400 hover:text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded-md cursor-pointer"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-
+              {/* Row 3: Meal Description */}
+              <div>
+                <label className="text-[8.5px] font-black text-stone-400 uppercase tracking-widest block mb-1">
+                  Description / Extra Notes
+                </label>
                 <textarea
-                  rows={2}
-                  value={refinePrompt}
-                  onChange={(e) => setRefinePrompt(e.target.value)}
-                  placeholder='Tell AI to adjust (e.g. "I only ate half", "no dressing", "add 1 espresso")...'
-                  className="w-full bg-transparent border-none focus:outline-none text-xs font-medium text-stone-800 placeholder:text-stone-400 resize-none"
+                  rows={4}
+                  value={editableDesc}
+                  onChange={(e) => setEditableDesc(e.target.value)}
+                  placeholder="Add meal description, preparation notes, or ingredients..."
+                  className="w-full bg-white border border-stone-200 focus:border-orange-500 focus:outline-none rounded-2xl p-3 text-xs font-medium text-stone-800 shadow-3xs resize-none h-28 leading-relaxed"
                 />
-
-                {editableDesc && !refinePrompt && (
-                  <div className="pt-2 border-t border-stone-100 text-[10.5px] text-stone-500 font-medium italic truncate">
-                    Current Notes: "{editableDesc}"
-                  </div>
-                )}
               </div>
 
               {/* Row 4: Tracked Nutrients Grid */}
@@ -1284,13 +1389,12 @@ export const CameraLogView = ({
                         </span>
                         
                         <div className="flex items-center bg-white border border-stone-200/80 focus-within:border-orange-500 rounded-xl px-1 py-1 shadow-inner transition-all">
-                          <button
-                            type="button"
-                            onClick={() => handleNutrientStep(nutrient.id, -1)}
+                          <StepperButton
+                            onStep={() => handleNutrientStep(nutrient.id, -1)}
                             className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 cursor-pointer active:scale-90 transition-all border-none bg-transparent"
                           >
                             <Minus className="w-3 h-3" />
-                          </button>
+                          </StepperButton>
                           <div className="flex-1 flex items-center justify-center gap-0.5">
                             <input
                               type="number"
@@ -1303,13 +1407,12 @@ export const CameraLogView = ({
                               {nutrient.unit}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleNutrientStep(nutrient.id, 1)}
+                          <StepperButton
+                            onStep={() => handleNutrientStep(nutrient.id, 1)}
                             className="w-6 h-6 rounded-md flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 cursor-pointer active:scale-90 transition-all border-none bg-transparent"
                           >
                             <Plus className="w-3 h-3" />
-                          </button>
+                          </StepperButton>
                         </div>
                       </div>
                     );
@@ -1319,39 +1422,10 @@ export const CameraLogView = ({
 
               {/* Row 5: Dietary Tags Selector */}
               <div className="pt-3 border-t border-stone-200/60 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9.5px] font-black uppercase text-stone-400 tracking-widest flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-orange-500" />
-                    Tracking & Dietary Tags
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddTagInput(!showAddTagInput)}
-                    className="text-[9px] font-black uppercase tracking-wider text-orange-600 hover:text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full cursor-pointer flex items-center gap-1"
-                  >
-                    <Plus className="w-2.5 h-2.5" />
-                    Custom Tag
-                  </button>
-                </div>
-
-                {showAddTagInput && (
-                  <div className="flex gap-1.5 pt-1">
-                    <input
-                      type="text"
-                      placeholder="Add custom tag (e.g. Organic)..."
-                      value={newTagInput}
-                      onChange={(e) => setNewTagInput(e.target.value)}
-                      className="flex-1 bg-white border border-stone-200 focus:border-orange-500 focus:outline-none rounded-xl px-2.5 py-1 text-xs font-bold text-stone-900"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddCustomTag}
-                      className="px-3 py-1 bg-orange-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer"
-                    >
-                      Add
-                    </button>
-                  </div>
-                )}
+                <span className="text-[8.5px] font-black uppercase text-stone-400 tracking-widest flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-stone-400" />
+                  Dietary & Tracking Tags
+                </span>
 
                 <div className="flex flex-wrap gap-1.5 py-1">
                   {availableTags.map((tag) => {
@@ -1376,40 +1450,71 @@ export const CameraLogView = ({
               </div>
             </div>
 
-            {/* 2 STACKED ACTION BUTTONS: [ 🪄 Edit with AI ] + [ 📤 Share Meal Card ] */}
-            <div className="p-4 bg-white/90 backdrop-blur-md border-t border-stone-200/60 flex flex-col gap-2.5 shrink-0 w-full font-sans">
-              <button
-                type="button"
-                onClick={handleRefineWithAI}
-                disabled={isRefining}
-                className="w-full py-4 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-orange-500/25 active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <Sparkles className={cn("w-4 h-4 text-amber-200", isRefining && "animate-spin")} />
-                <span>{isRefining ? "Refining with AI..." : "Edit with AI"}</span>
-              </button>
-
-              {onShareMeal && (
+            {/* BOTTOM ACTION SECTION: GENERATE WITH AI & DONE / SAVE BUTTONS */}
+            <div className="p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 w-full font-sans space-y-2.5">
+              {showAiRefineInput ? (
+                /* STICKY BOTTOM DOCKED AI PANEL */
+                <div className="space-y-2.5 animate-fade-in text-left">
+                  <textarea
+                    rows={3}
+                    value={refinePrompt}
+                    onChange={(e) => setRefinePrompt(e.target.value)}
+                    placeholder="Describe changes (e.g. 'I only ate half', 'no dressing', 'add 20g protein')..."
+                    className="w-full bg-stone-50 border border-stone-200 focus:border-orange-500 focus:bg-white focus:outline-none rounded-2xl p-3 text-xs font-bold text-stone-900 placeholder:text-stone-400 resize-none h-24 shadow-inner leading-relaxed"
+                    autoFocus
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAiRefineInput(false);
+                        setRefinePrompt("");
+                      }}
+                      className="h-10 rounded-2xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-3xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isRefining || (!refinePrompt.trim() && !attachedItem)}
+                      onClick={handleRefineWithAI}
+                      className="h-10 rounded-2xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-xs font-black uppercase tracking-wider cursor-pointer shadow-md shadow-orange-500/25 active:scale-95 transition-all flex items-center justify-center gap-1.5 border-none"
+                    >
+                      {isRefining ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                          <span>Transforming...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-3.5 h-3.5 text-white" />
+                          <span>Transform</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Row 1: White AI Button */
                 <button
                   type="button"
-                  onClick={() => {
-                    const currentMealObj = {
-                      ...loggedMealResult,
-                      name: editableName,
-                      meal_description: editableDesc,
-                      calories: editableCalories,
-                      time: editableTime || loggedMealResult.time || "12:00 PM",
-                      tags: editableTags,
-                      nutrients: editableNutrients,
-                    };
-                    onAddMeal(currentMealObj);
-                    onShareMeal(currentMealObj);
-                  }}
-                  className="w-full py-3.5 rounded-2xl bg-white hover:bg-orange-50/60 text-stone-700 border border-stone-200/80 text-xs font-black uppercase tracking-wider cursor-pointer shadow-3xs active:scale-95 transition-all flex items-center justify-center gap-2"
+                  onClick={() => setShowAiRefineInput(true)}
+                  className="w-full h-11 rounded-2xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-3xs"
                 >
-                  <Share2 className="w-4 h-4 text-orange-500" />
-                  <span>Share Meal Card</span>
+                  <Wand2 className="w-3.5 h-3.5 text-orange-500" />
+                  <span>Edit with AI Assist</span>
                 </button>
               )}
+
+              {/* Row 2: Full-Width Signature Orange Done Button */}
+              <button
+                type="button"
+                onClick={handleExitToDashboard}
+                className="w-full h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-orange-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border-none"
+              >
+                <Check className="w-4 h-4 text-white stroke-[3]" />
+                <span>Done & View Dashboard</span>
+              </button>
             </div>
           </div>
         )}
@@ -1435,235 +1540,238 @@ export const CameraLogView = ({
                   initial={{ y: "100%" }}
                   animate={{ y: 0 }}
                   exit={{ y: "100%" }}
-                  transition={{ type: "spring", damping: 28, stiffness: 300 }}
-                  className="relative w-full max-w-lg bg-stone-900/98 backdrop-blur-2xl rounded-t-[32px] sm:rounded-t-[36px] border-t border-x border-stone-800 shadow-2xl flex flex-col max-h-[90dvh] text-left text-white overflow-hidden z-10 mx-auto"
+                  transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                  className={cn(
+                    "relative w-full max-w-md bg-stone-900/98 backdrop-blur-2xl rounded-t-[36px] border-t border-x border-stone-800 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col text-left text-white overflow-hidden z-10 mx-auto transition-[max-height,height] duration-300",
+                    showPastFoodsDrawer ? "h-[85vh] max-h-[85dvh]" : "max-h-[62dvh]"
+                  )}
                 >
                   {/* Native Pull Indicator */}
-                  <div className="w-12 h-1.5 bg-stone-700/80 rounded-full mx-auto mt-3 mb-1 shrink-0" />
+                  <div className="w-10 h-1 bg-stone-700/80 rounded-full mx-auto mt-3 mb-1 shrink-0 select-none" />
 
                   {/* Modal Header */}
-                  <div className="p-4 sm:p-5 pb-3 flex items-center justify-between shrink-0 border-b border-stone-800/70">
-                    <span className="text-xs font-black uppercase tracking-widest text-white flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-orange-400" />
-                      Initial Meal Notes
-                    </span>
+                  <div className="px-6 py-3 flex items-center justify-between shrink-0 border-b border-stone-800/80">
+                    {showPastFoodsDrawer ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowPastFoodsDrawer(false)}
+                        className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-stone-200 hover:text-white transition-colors cursor-pointer"
+                      >
+                        <ArrowLeft className="w-4 h-4 text-orange-400" />
+                        <span>Select Meal to Attach</span>
+                      </button>
+                    ) : (
+                      <span className="text-xs font-black uppercase tracking-widest text-white flex items-center gap-2 font-sans">
+                        <FileText className="w-4 h-4 text-orange-400" />
+                        Initial Meal Notes
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowNotesModal(false)}
-                      className="w-8 h-8 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-300 flex items-center justify-center text-xs font-bold cursor-pointer transition-all border border-stone-700/60 active:scale-90"
+                      className="w-8 h-8 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-300 flex items-center justify-center transition-all cursor-pointer border border-stone-700/60 active:scale-90"
                       title="Close"
                     >
-                      ✕
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
 
-                  {/* Scrollable Content Body */}
-                  <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 min-h-0 text-left">
-                    <div className="space-y-1.5 text-left">
-                      <span className="text-[9.5px] font-black uppercase text-stone-400 tracking-wider block">
-                        {contextGuidance.title}
-                      </span>
-                      <div className="relative">
-                        <textarea
-                          autoFocus
-                          placeholder={contextGuidance.placeholder}
-                          value={notes}
-                          onChange={handleNotesTextChange}
-                          rows={3}
-                          className="w-full bg-stone-800/90 border border-stone-700 focus:border-orange-500 focus:outline-none rounded-2xl p-3.5 text-xs font-bold text-white placeholder:text-stone-500 resize-none shadow-inner leading-relaxed"
-                        />
+                {showPastFoodsDrawer ? (
+                  /* FULL HEIGHT DEDICATED FOOD PICKER VIEW */
+                  <div className="flex-1 flex flex-col p-4 sm:p-5 space-y-3.5 min-h-0 overflow-hidden text-left">
 
-                        {/* Inline "@" Mention Auto-Complete Dropdown (Dark Gourmet) */}
-                        <AnimatePresence>
-                          {showMentionMenu && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                              className="absolute bottom-full mb-2 left-0 right-0 bg-stone-850/98 backdrop-blur-xl border border-stone-700 rounded-2xl shadow-2xl p-2 z-50 max-h-44 overflow-y-auto space-y-1 text-left"
-                            >
-                              <span className="text-[9px] font-black uppercase text-orange-400 tracking-wider block px-2.5 py-1">
-                                Tap to Attach Item (@{mentionQuery})
-                              </span>
-                              {mentionSuggestions.length === 0 ? (
-                                <p className="text-[10px] text-stone-400 font-semibold px-2.5 py-2">
-                                  No matching past meals found
-                                </p>
-                              ) : (
-                                mentionSuggestions.map((item) => (
-                                  <button
-                                    key={item.name}
-                                    type="button"
-                                    onClick={() => handleSelectMention(item)}
-                                    className="w-full p-2 rounded-xl hover:bg-stone-800 text-left flex items-center justify-between transition-colors cursor-pointer"
-                                  >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <Utensils className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                                      <span className="text-xs font-bold text-white truncate">{item.name}</span>
-                                    </div>
-                                    <span className="text-[9px] font-black text-orange-400 bg-orange-950/80 border border-orange-800/60 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
-                                      + Attach
-                                    </span>
-                                  </button>
-                                ))
+                    <FoodFilterBar
+                      filters={pastFoodFilters}
+                      onChange={setPastFoodFilters}
+                      availableTags={allFoodFilterTags}
+                      trackedNutrients={activeTrackedNutrients}
+                      showTypeToggles={true}
+                      matchCount={filteredPastItems.length}
+                      placeholder="Search past meals & recipes..."
+                      variant="dark"
+                    />
+
+                    <div className="flex-1 min-h-0 overflow-y-auto space-y-2.5 pt-1 pr-0.5">
+                      {filteredPastItems.length === 0 ? (
+                        <div className="text-center py-12 space-y-2">
+                          <Utensils className="w-8 h-8 text-stone-600 mx-auto" />
+                          <p className="text-xs text-stone-400 font-semibold">
+                            No matching past meals or recipes found
+                          </p>
+                        </div>
+                      ) : (
+                        filteredPastItems.map((item) => {
+                          const isAttached = attachedItem?.name.toLowerCase() === item.name.toLowerCase();
+                          return (
+                            <div key={item.name} className="relative w-full">
+                              <PastFoodCard
+                                item={item}
+                                trackedNutrients={activeTrackedNutrients}
+                                actionType="pin"
+                                variant="dark"
+                                onPin={isAttached ? undefined : handleAttachItem}
+                                onModify={undefined}
+                              />
+                              {isAttached && (
+                                <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-[1px] rounded-2xl flex items-center justify-end px-4 border border-emerald-500/40">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-950 border border-emerald-700 px-3 py-1 rounded-full shadow-2xs">
+                                    ✓ Attached
+                                  </span>
+                                </div>
                               )}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Scrollable Content Body */}
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 min-h-0 text-left">
+                      <div className="space-y-1.5 text-left">
+                        <span className="text-[9.5px] font-black uppercase text-stone-400 tracking-wider block">
+                          {contextGuidance.title}
+                        </span>
+                        <div className="relative">
+                          <textarea
+                            autoFocus
+                            placeholder={contextGuidance.placeholder}
+                            value={notes}
+                            onChange={handleNotesTextChange}
+                            rows={4}
+                            className="w-full bg-stone-800/90 border border-stone-700 focus:border-orange-500 focus:outline-none rounded-2xl p-3.5 text-xs font-bold text-white placeholder:text-stone-500 resize-none shadow-inner leading-relaxed h-28"
+                          />
+
+                          {/* Inline "@" Mention Auto-Complete Dropdown (Dark Gourmet) */}
+                          <AnimatePresence>
+                            {showMentionMenu && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                className="absolute bottom-full mb-2 left-0 right-0 bg-stone-850/98 backdrop-blur-xl border border-stone-700 rounded-2xl shadow-2xl p-2 z-50 max-h-44 overflow-y-auto space-y-1 text-left"
+                              >
+                                <span className="text-[9px] font-black uppercase text-orange-400 tracking-wider block px-2.5 py-1">
+                                  Tap to Attach Item (@{mentionQuery})
+                                </span>
+                                {mentionSuggestions.length === 0 ? (
+                                  <p className="text-[10px] text-stone-400 font-semibold px-2.5 py-2">
+                                    No matching past meals found
+                                  </p>
+                                ) : (
+                                  mentionSuggestions.map((item) => (
+                                    <button
+                                      key={item.name}
+                                      type="button"
+                                      onClick={() => handleSelectMention(item)}
+                                      className="w-full p-2 rounded-xl hover:bg-stone-800 text-left flex items-center justify-between transition-colors cursor-pointer"
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <Utensils className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                                        <span className="text-xs font-bold text-white truncate">{item.name}</span>
+                                      </div>
+                                      <span className="text-[9px] font-black text-orange-400 bg-orange-950/80 border border-orange-800/60 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                                        + Attach
+                                      </span>
+                                    </button>
+                                  ))
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
+
+                      {attachedItem && (
+                        <div className="flex items-center justify-between bg-stone-800/90 border border-orange-500/40 rounded-xl p-2.5 px-3 animate-fade-in shadow-inner">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Paperclip className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                            <span className="text-xs font-bold text-orange-200 truncate">
+                              Attached: {attachedItem.name}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRemoveAttached}
+                            className="text-stone-400 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded-md hover:bg-stone-700 cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setShowPastFoodsDrawer(!showPastFoodsDrawer)}
+                        className="w-full py-3.5 rounded-2xl bg-stone-800/80 hover:bg-stone-750 border border-stone-700 hover:border-orange-500/50 text-stone-200 text-xs font-black uppercase tracking-wider text-center shadow-xs cursor-pointer flex items-center justify-center gap-2 transition-all active:scale-95"
+                      >
+                        <Paperclip className="w-4 h-4 text-orange-400 font-bold" />
+                        <span>Attach a Meal or Recipe</span>
+                      </button>
                     </div>
 
-                    {attachedItem && (
-                      <div className="flex items-center justify-between bg-stone-800/90 border border-orange-500/40 rounded-xl p-2.5 px-3 animate-fade-in shadow-inner">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Paperclip className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                          <span className="text-xs font-bold text-orange-200 truncate">
-                            Attached: {attachedItem.name}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleRemoveAttached}
-                          className="text-stone-400 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded-md hover:bg-stone-700 cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )}
+                    {/* Sticky Bottom Actions Bar (With Mobile Safe Area) */}
+                    <div className="p-4 sm:p-5 pt-3 pb-8 sm:pb-6 bg-stone-900/98 backdrop-blur-md border-t border-stone-800 shrink-0 flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNotes("");
+                          setAttachedItem(null);
+                          setShowNotesModal(false);
+                          triggerToast("Note cleared");
+                        }}
+                        className="py-3.5 px-4 rounded-2xl bg-stone-800 hover:bg-stone-750 text-stone-300 text-xs font-black uppercase tracking-wider text-center border border-stone-700 cursor-pointer active:scale-95 transition-all"
+                      >
+                        Clear
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowPastFoodsDrawer(!showPastFoodsDrawer)}
-                      className="w-full py-3.5 rounded-2xl bg-stone-800/80 hover:bg-stone-750 border border-stone-700 hover:border-orange-500/50 text-stone-200 text-xs font-black uppercase tracking-wider text-center shadow-xs cursor-pointer flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <Paperclip className="w-4 h-4 text-orange-400 font-bold" />
-                      <span>Attach a Meal or Recipe</span>
-                    </button>
-
-                    {/* Expandable Past Foods & Recipes Drawer (Dark Theme Single-Scroll) */}
-                    <AnimatePresence>
-                      {showPastFoodsDrawer && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="bg-stone-800/90 backdrop-blur-md rounded-3xl border border-stone-700/80 p-4 flex flex-col space-y-3.5 shadow-xl text-left overflow-hidden w-full"
-                        >
-                          <div className="flex items-center justify-between shrink-0">
-                            <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider flex items-center gap-1.5">
-                              <Search className="w-3.5 h-3.5 text-orange-400" />
-                              Select Meal to Attach
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setShowPastFoodsDrawer(false)}
-                              className="text-[9.5px] font-black uppercase text-stone-400 hover:text-white bg-stone-700/80 hover:bg-stone-700 px-2.5 py-1 rounded-full cursor-pointer transition-colors"
-                            >
-                              ✕ Close
-                            </button>
-                          </div>
-
-                          <div className="relative w-full shrink-0">
-                            <Search className="w-4 h-4 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                            <input
-                              type="text"
-                              placeholder="Search past meals & recipes..."
-                              value={pastSearchQuery}
-                              onChange={(e) => setPastSearchQuery(e.target.value)}
-                              className="w-full bg-stone-900 border border-stone-700/80 focus:border-orange-500 focus:outline-none rounded-2xl pl-9 pr-3 py-2.5 text-xs font-bold text-white placeholder:text-stone-500 shadow-inner"
-                            />
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto pb-0.5 scrollbar-none">
-                            {(["all", "recent", "recipes"] as const).map((filter) => (
-                              <button
-                                key={filter}
-                                type="button"
-                                onClick={() => setPastFilter(filter)}
-                                className={cn(
-                                  "px-3 py-1.5 rounded-full text-[9.5px] font-black uppercase tracking-wider transition-all border cursor-pointer shrink-0",
-                                  pastFilter === filter
-                                    ? "bg-orange-500 text-white border-orange-500 shadow-2xs"
-                                    : "bg-stone-900 text-stone-400 border-stone-700 hover:bg-stone-800"
-                                )}
-                              >
-                                {filter === "all" ? "All Items" : filter === "recent" ? "Recent Meals" : "Saved Recipes"}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className="space-y-2.5 pt-1">
-                            {filteredPastItems.length === 0 ? (
-                              <div className="text-center py-5 space-y-1.5">
-                                <Utensils className="w-6 h-6 text-stone-600 mx-auto" />
-                                <p className="text-[10px] text-stone-500 font-semibold">
-                                  No matching past meals found
-                                </p>
-                              </div>
-                            ) : (
-                              filteredPastItems.map((item) => {
-                                const isAttached = attachedItem?.name.toLowerCase() === item.name.toLowerCase();
-                                return (
-                                  <div key={item.name} className="relative w-full">
-                                    <PastFoodCard
-                                      item={item}
-                                      trackedNutrients={activeTrackedNutrients}
-                                      actionType="pin"
-                                      variant="dark"
-                                      onPin={isAttached ? undefined : handleAttachItem}
-                                      onModify={undefined}
-                                    />
-                                    {isAttached && (
-                                      <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-[1px] rounded-2xl flex items-center justify-end px-4 border border-emerald-500/40">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-300 bg-emerald-950 border border-emerald-700 px-3 py-1 rounded-full shadow-2xs">
-                                          ✓ Attached
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Sticky Bottom Actions Bar (With Mobile Safe Area) */}
-                  <div className="p-4 sm:p-5 pt-3 pb-8 sm:pb-6 bg-stone-900/98 backdrop-blur-md border-t border-stone-800 shrink-0 flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNotes("");
-                        setAttachedItem(null);
-                        setShowNotesModal(false);
-                        triggerToast("Note cleared");
-                      }}
-                      className="py-3.5 px-4 rounded-2xl bg-stone-800 hover:bg-stone-750 text-stone-300 text-xs font-black uppercase tracking-wider text-center border border-stone-700 cursor-pointer active:scale-95 transition-all"
-                    >
-                      Clear
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowNotesModal(false);
-                        if (notes.trim() || attachedItem) {
-                          triggerToast("Note saved! 📝");
-                        }
-                      }}
-                      className="flex-1 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider text-center shadow-lg shadow-orange-500/25 cursor-pointer active:scale-95 transition-all"
-                    >
-                      Save Note
-                    </button>
-                  </div>
-                </motion.div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNotesModal(false);
+                          if (notes.trim() || attachedItem) {
+                            triggerToast("Note saved! 📝");
+                          }
+                        }}
+                        className="flex-1 py-3.5 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider text-center shadow-md shadow-orange-500/20 cursor-pointer active:scale-95 transition-all"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </>
+                )}
+              </motion.div>
               </div>
             )}
           </AnimatePresence>,
           document.body
         )}
+
+      {/* Classic FitAI Custom Time Picker Modal */}
+      <TimePickerModal
+        isOpen={isTimePickerOpen}
+        onClose={() => setIsTimePickerOpen(false)}
+        initialTime={
+          editableTime
+            ? editableTime.includes("AM") || editableTime.includes("PM")
+              ? convert12hTo24h(editableTime)
+              : editableTime
+            : "12:00"
+        }
+        onSave={(timeStr) => {
+          setEditableTime(convert24hTo12h(timeStr));
+        }}
+        title="Set Meal Log Time"
+      />
+      {/* Antigravity AI Clarification Modal (90% Confidence Threshold) */}
+      <AiClarificationModal
+        isOpen={isClarificationModalOpen}
+        clarificationData={pendingClarification}
+        onConfirm={handleConfirmClarification}
+        onLogAnyway={handleBypassClarification}
+        onClose={() => setIsClarificationModalOpen(false)}
+      />
     </div>
   );
 };

@@ -562,6 +562,59 @@ serve(async (req) => {
       return tagCounts;
     };
 
+    const createMealShareUrl = async (meal: any, profileId?: string): Promise<string | null> => {
+      try {
+        const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://fitpush.vercel.app";
+        const payload = {
+          n: meal.name || "Meal",
+          c: Number(meal.calories || 0),
+          p: Number(meal.protein || 0),
+          cb: Number(meal.nutrients?.carbs ?? meal.carbs ?? 0),
+          f: Number(meal.nutrients?.fats ?? meal.fats ?? 0),
+          fb: Number(meal.nutrients?.fiber ?? meal.fiber ?? 0),
+          img: (meal.image && meal.image.startsWith("http")) ? meal.image : undefined,
+          t: meal.time || undefined,
+          d: meal.meal_description || undefined,
+        };
+
+        // 1. Preferred: Insert into shares table for clean short ID link (identical to dashboard)
+        const { data: inserted } = await supabase
+          .from("shares")
+          .insert({
+            type: "meal",
+            data: payload,
+            ...(profileId ? { profile_id: profileId } : {})
+          })
+          .select("id")
+          .maybeSingle();
+
+        if (inserted?.id) {
+          return `${frontendUrl}/?shareId=${inserted.id}`;
+        }
+
+        // 2. Fallback: Compact base64 string (strictly excluding any huge base64 image data)
+        const minimalPayload = {
+          n: meal.name || "Meal",
+          c: Number(meal.calories || 0),
+          p: Number(meal.protein || 0),
+          cb: Number(meal.nutrients?.carbs ?? meal.carbs ?? 0),
+          f: Number(meal.nutrients?.fats ?? meal.fats ?? 0),
+          fb: Number(meal.nutrients?.fiber ?? meal.fiber ?? 0),
+          t: meal.time || undefined,
+        };
+        const jsonStr = JSON.stringify(minimalPayload);
+        const base64 = btoa(
+          encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+            String.fromCharCode(parseInt(p1, 16))
+          )
+        );
+        return `${frontendUrl}/?share=meal&data=${base64}`;
+      } catch (err) {
+        console.error("Error generating meal share URL:", err);
+        return null;
+      }
+    };
+
     console.log(`[gpt-action] Request: ${method} ${path} for user: ${profile.username} (timezoneOffset: ${timezoneOffset})`);
 
     // 4. API Router
@@ -792,9 +845,12 @@ serve(async (req) => {
           stool_type: record ? record.stool_type : null,
           stool_size: record ? record.stool_size : null,
           energy_level: record ? record.energy_level : null,
+          bloating_level: record ? record.bloating_level : null,
           water_log_time: record ? record.water_log_time : null,
           stool_log_time: record ? record.stool_log_time : null,
           energy_log_time: record ? record.energy_log_time : null,
+          bloating_log_time: record ? record.bloating_log_time : null,
+          bloating_logs: record ? record.bloating_logs : [],
         }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -803,31 +859,57 @@ serve(async (req) => {
         const body = await req.json();
         const targetDate = body.date || getLocalTimeAndDate().dateStr;
 
+        const { data: existing } = await supabase
+          .from("daily_wellness")
+          .select("id, water_intake, water_logs, bloating_logs")
+          .eq("profile_id", profile.id)
+          .eq("date", targetDate)
+          .maybeSingle();
+
         // Only touch fields the caller actually sent — omitted fields keep their
         // stored values (previously an omitted `notes` wiped the day's notes).
         const fields: Record<string, unknown> = {};
         if (body.notes !== undefined) fields.notes = body.notes;
-        if (body.water_intake !== undefined) fields.water_intake = parseInt(body.water_intake) || 0;
+        if (body.water_add !== undefined) {
+          const addAmount = parseInt(body.water_add) || 0;
+          const currentWater = (existing && existing.water_intake) || 0;
+          const newTotal = Math.max(0, currentWater + addAmount);
+          fields.water_intake = newTotal;
+          const waterTime = body.water_log_time || getLocalTimeAndDate().timeStr;
+          fields.water_log_time = waterTime;
+          const existingWaterLogs = Array.isArray(existing?.water_logs) ? existing.water_logs : [];
+          fields.water_logs = [...existingWaterLogs, { id: crypto.randomUUID(), amount: addAmount, time: waterTime }];
+        } else if (body.water_intake !== undefined) {
+          const intakeVal = parseInt(body.water_intake) || 0;
+          fields.water_intake = intakeVal;
+          if (body.water_log_time !== undefined) fields.water_log_time = body.water_log_time;
+        }
         if (body.stool_type !== undefined) fields.stool_type = body.stool_type === null ? null : parseInt(body.stool_type);
         if (body.stool_size !== undefined) fields.stool_size = body.stool_size;
         if (body.energy_level !== undefined) fields.energy_level = body.energy_level === null ? null : parseInt(body.energy_level);
-        if (body.water_log_time !== undefined) fields.water_log_time = body.water_log_time;
+        if (body.bloating_level !== undefined) {
+          const bloatVal = body.bloating_level === null ? null : parseInt(body.bloating_level);
+          fields.bloating_level = bloatVal;
+          const bloatTime = body.bloating_log_time || getLocalTimeAndDate().timeStr;
+          fields.bloating_log_time = bloatVal !== null ? bloatTime : null;
+          const existingLogs = Array.isArray(existing?.bloating_logs) ? existing.bloating_logs : [];
+          if (bloatVal === null) {
+            fields.bloating_logs = [];
+          } else {
+            fields.bloating_logs = [...existingLogs, { id: crypto.randomUUID(), level: bloatVal, time: bloatTime }];
+          }
+        }
+        if (body.water_log_time !== undefined && body.water_add === undefined && body.water_intake === undefined) fields.water_log_time = body.water_log_time;
         if (body.stool_log_time !== undefined) fields.stool_log_time = body.stool_log_time;
         if (body.energy_log_time !== undefined) fields.energy_log_time = body.energy_log_time;
+        if (body.bloating_log_time !== undefined && body.bloating_level === undefined) fields.bloating_log_time = body.bloating_log_time;
 
         if (Object.keys(fields).length === 0) {
-          return new Response(JSON.stringify({ error: "No valid fields provided. Allowed: notes, water_intake, stool_type, stool_size, energy_level, water_log_time, stool_log_time, energy_log_time" }), {
+          return new Response(JSON.stringify({ error: "No valid fields provided. Allowed: notes, water_intake, water_add, stool_type, stool_size, energy_level, bloating_level, water_log_time, stool_log_time, energy_log_time, bloating_log_time" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-
-        const { data: existing } = await supabase
-          .from("daily_wellness")
-          .select("id")
-          .eq("profile_id", profile.id)
-          .eq("date", targetDate)
-          .maybeSingle();
 
         let record: any = null;
         let saveError: any = null;
@@ -1299,7 +1381,14 @@ serve(async (req) => {
 
         const remaining = await getDailyRemaining(profile.id, resolvedDate);
         const tagHits = await getDailyTagHits(profile.id, resolvedDate);
-        return new Response(JSON.stringify({ message: "Meal logged successfully", meal: newMeal, daily_remaining: remaining, daily_tag_hits: tagHits }), {
+        const shareUrl = await createMealShareUrl(newMeal, profile.id);
+        return new Response(JSON.stringify({
+          message: "Meal logged successfully",
+          meal: newMeal,
+          share_url: shareUrl,
+          daily_remaining: remaining,
+          daily_tag_hits: tagHits
+        }), {
           status: 201,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -1413,7 +1502,14 @@ serve(async (req) => {
         const targetDate = updatedMeal.date || getLocalTimeAndDate().dateStr;
         const remaining = await getDailyRemaining(profile.id, targetDate);
         const tagHits = await getDailyTagHits(profile.id, targetDate);
-        return new Response(JSON.stringify({ message: "Meal updated successfully", meal: updatedMeal, daily_remaining: remaining, daily_tag_hits: tagHits }), {
+        const shareUrl = await createMealShareUrl(updatedMeal, profile.id);
+        return new Response(JSON.stringify({
+          message: "Meal updated successfully",
+          meal: updatedMeal,
+          share_url: shareUrl,
+          daily_remaining: remaining,
+          daily_tag_hits: tagHits
+        }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
