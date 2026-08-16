@@ -67,7 +67,7 @@ export function CalendarStrip({
       </div>
 
       {/* Day Strips */}
-      <div className="flex justify-between items-center overflow-x-auto pb-1.5 scrollbar-hide gap-3">
+      <div className="flex justify-between items-center overflow-x-auto py-2 -my-2 px-1 -mx-1 scrollbar-hide gap-3">
         {daysList.map((day, idx) => {
           const isActive = day.fullDate === selectedDate;
           const d = new Date(day.fullDate + "T00:00:00");
@@ -81,10 +81,10 @@ export function CalendarStrip({
                 setSelectedDate(day.fullDate);
               }}
               className={cn(
-                "flex flex-col items-center justify-center min-w-[58px] py-3.5 rounded-2xl transition-all duration-300 shadow-sm grow cursor-pointer shrink-0",
+                "flex flex-col items-center justify-center min-w-[50px] sm:min-w-[56px] py-2.5 sm:py-3 rounded-2xl transition-all duration-300 grow cursor-pointer shrink-0",
                 isActive
-                  ? "bg-orange-500 text-white shadow-lg shadow-orange-200 ring-4 ring-orange-50"
-                  : "bg-white/60 backdrop-blur-sm text-gray-500 border border-orange-50/50 hover:bg-white/90",
+                  ? "bg-gradient-to-b from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/25 border border-orange-400/50"
+                  : "bg-white/60 backdrop-blur-sm text-stone-500 border border-stone-200/60 hover:bg-white/90 shadow-3xs",
               )}
             >
               <span className="text-[10px] font-black opacity-60 tracking-tighter">
