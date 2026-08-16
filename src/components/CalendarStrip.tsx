@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { Calendar as CalendarIcon, Share2 } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
@@ -30,6 +30,20 @@ export function CalendarStrip({
   handleShareDay,
   daysList,
 }: CalendarStripProps) {
+  const activeItemRef = useRef<HTMLButtonElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll active date button into exact center of scroll container
+  useEffect(() => {
+    if (activeItemRef.current) {
+      activeItemRef.current.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    }
+  }, [selectedDate, daysList]);
+
   return (
     <div id="calendar-strip" className="px-6 mt-8 relative z-10 space-y-4">
       {/* Date Selector & Snap-to-Today Header */}
@@ -67,7 +81,10 @@ export function CalendarStrip({
       </div>
 
       {/* Scrollable Day Strips */}
-      <div className="flex justify-between items-center overflow-x-auto pb-4 scrollbar-hide gap-3">
+      <div
+        ref={containerRef}
+        className="flex justify-between items-center overflow-x-auto pb-4 scrollbar-hide gap-3"
+      >
         {daysList.map((day, idx) => {
           const isActive = day.fullDate === selectedDate;
           const d = new Date(day.fullDate + "T00:00:00");
@@ -76,6 +93,7 @@ export function CalendarStrip({
           return (
             <motion.button
               key={idx}
+              ref={isActive ? activeItemRef : null}
               whileTap={{ scale: 0.95 }}
               onClick={() => {
                 setSelectedDate(day.fullDate);
@@ -84,7 +102,7 @@ export function CalendarStrip({
                 "flex flex-col items-center justify-center min-w-[58px] py-3.5 rounded-2xl transition-all duration-300 shadow-sm grow cursor-pointer shrink-0",
                 isActive
                   ? "bg-orange-500 text-white shadow-lg shadow-orange-200 ring-4 ring-orange-50"
-                  : "bg-white/60 backdrop-blur-sm text-gray-500 border border-orange-50/50 hover:bg-white/90",
+                  : "bg-white/60 backdrop-blur-sm text-gray-500 border border-orange-50/50 hover:bg-white/90"
               )}
             >
               <span className="text-[10px] font-black opacity-60 tracking-tighter">
