@@ -944,9 +944,9 @@ export const CameraLogView = ({
         className="hidden"
       />
 
-      {/* 100% EDGE-TO-EDGE LIVE CAMERA BACKGROUND & ASPECT RATIO CONTAINER (CAPTURE STEP) */}
+      {/* LIVE CAMERA BACKGROUND & ASPECT RATIO CONTAINER (CAPTURE STEP) */}
       {flowStep === "capture" && (
-        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto flex flex-col items-center justify-center">
+        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto flex flex-col justify-between">
           {aspectRatioMode === "9:16" ? (
             <div className="absolute inset-0 w-full h-full overflow-hidden bg-black cursor-pointer" onClick={handleCaptureFromWebcam}>
               {cameraStream ? (
@@ -958,15 +958,45 @@ export const CameraLogView = ({
                   className="w-full h-full object-cover min-w-full min-h-full"
                 />
               ) : null}
+
+              {showGridTarget && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                  <div className="w-48 h-48 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
+                      Plate Center
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : aspectRatioMode === "3:4" ? (
+            <div className="absolute top-0 left-0 right-0 w-full aspect-[3/4] overflow-hidden bg-black cursor-pointer" onClick={handleCaptureFromWebcam}>
+              {cameraStream ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
+              ) : null}
+
+              {showGridTarget && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                  <div className="w-44 h-44 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
+                      Plate Center
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="w-full flex-1 flex flex-col items-center justify-center p-4 pt-16 pb-48 z-10 pointer-events-auto">
+            /* 1:1 SQUARE ASPECT RATIO (BALANCED CENTER) */
+            <div className="w-full flex-1 flex flex-col items-center justify-center p-4 pt-16 pb-44 z-10 pointer-events-auto">
               <div
                 onClick={handleCaptureFromWebcam}
-                className={cn(
-                  "w-full max-w-md bg-stone-900 rounded-[32px] overflow-hidden border border-white/20 shadow-2xl relative transition-all duration-300 cursor-pointer",
-                  aspectRatioMode === "1:1" ? "aspect-square" : "aspect-[3/4]"
-                )}
+                className="w-full max-w-md aspect-square bg-stone-900 rounded-[32px] overflow-hidden border border-white/20 shadow-2xl relative transition-all duration-300 cursor-pointer my-auto"
               >
                 {cameraStream ? (
                   <video
@@ -987,16 +1017,6 @@ export const CameraLogView = ({
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-          )}
-
-          {showGridTarget && aspectRatioMode === "9:16" && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-              <div className="w-48 h-48 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
-                <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
-                  Plate Center
-                </span>
               </div>
             </div>
           )}
