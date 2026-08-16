@@ -946,80 +946,39 @@ export const CameraLogView = ({
 
       {/* LIVE CAMERA BACKGROUND & ASPECT RATIO CONTAINER (CAPTURE STEP) */}
       {flowStep === "capture" && (
-        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto flex flex-col justify-between">
-          {aspectRatioMode === "9:16" ? (
-            <div className="absolute inset-0 w-full h-full overflow-hidden bg-black cursor-pointer" onClick={handleCaptureFromWebcam}>
-              {cameraStream ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover min-w-full min-h-full"
-                />
-              ) : null}
+        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto">
+          {/* Full-width video container matching selected aspect ratio */}
+          <div
+            onClick={handleCaptureFromWebcam}
+            className={cn(
+              "absolute top-0 left-0 right-0 w-full bg-black overflow-hidden transition-all duration-300 ease-out cursor-pointer z-0",
+              aspectRatioMode === "9:16"
+                ? "h-full"
+                : aspectRatioMode === "3:4"
+                ? "aspect-[3/4]"
+                : "aspect-square"
+            )}
+          >
+            {cameraStream ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+            ) : null}
 
-              {showGridTarget && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                  <div className="w-48 h-48 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
-                      Plate Center
-                    </span>
-                  </div>
+            {showGridTarget && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                <div className="w-44 h-44 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
+                    Plate Center
+                  </span>
                 </div>
-              )}
-            </div>
-          ) : aspectRatioMode === "3:4" ? (
-            <div className="absolute top-0 left-0 right-0 w-full aspect-[3/4] overflow-hidden bg-black cursor-pointer" onClick={handleCaptureFromWebcam}>
-              {cameraStream ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-              ) : null}
-
-              {showGridTarget && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                  <div className="w-44 h-44 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
-                      Plate Center
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* 1:1 SQUARE ASPECT RATIO (BALANCED CENTER) */
-            <div className="w-full flex-1 flex flex-col items-center justify-center p-4 pt-16 pb-44 z-10 pointer-events-auto">
-              <div
-                onClick={handleCaptureFromWebcam}
-                className="w-full max-w-md aspect-square bg-stone-900 rounded-[32px] overflow-hidden border border-white/20 shadow-2xl relative transition-all duration-300 cursor-pointer my-auto"
-              >
-                {cameraStream ? (
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                ) : null}
-
-                {showGridTarget && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                    <div className="w-40 h-40 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
-                        Plate Center
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* High-End Gourmet Analyzing Spinner Overlay */}
           {isProcessing && (
