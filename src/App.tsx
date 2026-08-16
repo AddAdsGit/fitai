@@ -3347,7 +3347,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
   return (
     <div className={cn(
       "min-h-screen text-[#1A1A1A] font-sans selection:bg-orange-100 max-w-md mx-auto relative shadow-2xl overflow-x-hidden",
-      activeTab === "camera-log" ? "bg-[#0D0D0D] pb-0" : "bg-[#FAF9F6] pb-36 sm:pb-32"
+      activeTab === "camera-log" ? "bg-[#0D0D0D] pb-0" : "bg-[#FAF9F6] pb-32"
     )}>
       {/* Absolute Custom Toast Alert */}
       <AnimatePresence>
