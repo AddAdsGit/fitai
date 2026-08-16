@@ -1250,18 +1250,6 @@ export const ManualLogModal = ({
                         >
                           <ImageIcon className="w-3.5 h-3.5" />
                         </button>
-                        <div className="w-[1px] h-3 bg-stone-300" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDrawerMode("attach");
-                            setShowPastFoodsDrawer(!showPastFoodsDrawer);
-                          }}
-                          className="p-1 text-stone-500 hover:text-orange-600 transition-colors cursor-pointer"
-                          title="Attach Past Meal"
-                        >
-                          <Paperclip className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -1283,7 +1271,7 @@ export const ManualLogModal = ({
                   {attachedItem && (
                     <div className="space-y-2 shrink-0 text-left">
                       <span className="text-[9.5px] font-black uppercase text-orange-950/60 tracking-widest flex items-center gap-1.5 font-sans">
-                        <Paperclip className="w-3.5 h-3.5 text-orange-500" />
+                        <AtSign className="w-3.5 h-3.5 text-orange-500" />
                         Attached Meal
                       </span>
                       <PastFoodCard

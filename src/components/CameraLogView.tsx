@@ -944,20 +944,54 @@ export const CameraLogView = ({
         className="hidden"
       />
 
-      {/* 100% EDGE-TO-EDGE LIVE CAMERA BACKGROUND (CAPTURE STEP) */}
+      {/* 100% EDGE-TO-EDGE LIVE CAMERA BACKGROUND & ASPECT RATIO CONTAINER (CAPTURE STEP) */}
       {flowStep === "capture" && (
-        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto" onClick={handleCaptureFromWebcam}>
-          {cameraStream ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover min-w-full min-h-full"
-            />
-          ) : null}
+        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto flex flex-col items-center justify-center">
+          {aspectRatioMode === "9:16" ? (
+            <div className="absolute inset-0 w-full h-full overflow-hidden bg-black cursor-pointer" onClick={handleCaptureFromWebcam}>
+              {cameraStream ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover min-w-full min-h-full"
+                />
+              ) : null}
+            </div>
+          ) : (
+            <div className="w-full flex-1 flex flex-col items-center justify-center p-4 pt-16 pb-48 z-10 pointer-events-auto">
+              <div
+                onClick={handleCaptureFromWebcam}
+                className={cn(
+                  "w-full max-w-md bg-stone-900 rounded-[32px] overflow-hidden border border-white/20 shadow-2xl relative transition-all duration-300 cursor-pointer",
+                  aspectRatioMode === "1:1" ? "aspect-square" : "aspect-[3/4]"
+                )}
+              >
+                {cameraStream ? (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                ) : null}
 
-          {showGridTarget && (
+                {showGridTarget && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                    <div className="w-40 h-40 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
+                        Plate Center
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showGridTarget && aspectRatioMode === "9:16" && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
               <div className="w-48 h-48 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
                 <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
