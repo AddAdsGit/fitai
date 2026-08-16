@@ -3347,7 +3347,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
   return (
     <div className={cn(
-      "min-h-[100dvh] text-orange-950 font-sans selection:bg-orange-100 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between",
+      "w-full sm:max-w-md mx-auto min-h-[100dvh] text-orange-950 font-sans selection:bg-orange-100 relative sm:shadow-2xl overflow-x-hidden flex flex-col justify-between",
       activeTab === "camera-log" ? "bg-black pb-0" : "bg-[#FAF7F2] pb-28"
     )}>
       {/* Absolute Custom Toast Alert */}

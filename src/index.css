@@ -7,15 +7,9 @@
 
 @layer base {
   html {
-    font-size: 14.5px;
     -webkit-text-size-adjust: 100% !important;
     text-size-adjust: 100% !important;
     touch-action: manipulation;
-  }
-  @media (min-width: 640px) {
-    html {
-      font-size: 16px;
-    }
   }
   body {
     @apply bg-[#FAF7F2] text-orange-950 font-sans;
