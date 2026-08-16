@@ -31,7 +31,7 @@ export function CalendarStrip({
   daysList,
 }: CalendarStripProps) {
   return (
-    <div id="calendar-strip" className="px-6 mt-8 relative z-10 space-y-4">
+    <div id="calendar-strip" className="px-4 sm:px-6 mt-3 sm:mt-4 relative z-10 space-y-2.5">
       {/* Date Selector & Snap-to-Today Header */}
       <div className="flex justify-between items-center px-1 gap-2 min-w-0">
         <span className="text-xs font-black uppercase tracking-widest text-stone-500 truncate min-w-0">
@@ -67,7 +67,7 @@ export function CalendarStrip({
       </div>
 
       {/* Day Strips */}
-      <div className="flex justify-between items-center overflow-x-auto pb-4 scrollbar-hide gap-3">
+      <div className="flex justify-between items-center overflow-x-auto pb-1.5 scrollbar-hide gap-3">
         {daysList.map((day, idx) => {
           const isActive = day.fullDate === selectedDate;
           const d = new Date(day.fullDate + "T00:00:00");

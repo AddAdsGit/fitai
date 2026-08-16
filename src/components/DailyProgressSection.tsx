@@ -21,9 +21,9 @@ export function DailyProgressSection({
   const [activeMacroPage, setActiveMacroPage] = useState(0);
 
   return (
-    <div className="px-6 mt-4 relative z-10">
+    <div className="px-4 sm:px-6 mt-2 relative z-10">
       {/* Circular Progress for Calories */}
-      <div className="relative w-full aspect-square max-w-[280px] mx-auto flex items-center justify-center my-8">
+      <div className="relative w-full aspect-square max-w-[280px] mx-auto flex items-center justify-center my-3 sm:my-5">
         <svg
           className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-xl"
           viewBox="0 0 240 240"
@@ -74,10 +74,10 @@ export function DailyProgressSection({
         }
 
         return (
-          <div className="mt-6 flex flex-col gap-3">
-            <div className="bg-white/60 backdrop-blur-md p-6 rounded-[32px] border border-white/80 shadow-xl shadow-orange-100/20 overflow-hidden">
+          <div className="mt-3 sm:mt-4 flex flex-col gap-2">
+            <div className="bg-white/60 backdrop-blur-md p-4 sm:p-5 rounded-[28px] sm:rounded-[32px] border border-white/80 shadow-xl shadow-orange-100/20 overflow-hidden">
               {pages.length === 1 ? (
-                <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-3.5 sm:gap-y-4">
                   {pages[0].map((macro: any, idx: number) => {
                     const totalVal = getLoggedNutrientTotal(macro.id);
                     return (
@@ -110,7 +110,7 @@ export function DailyProgressSection({
                   {pages.map((pageItems, pageIdx) => (
                     <div
                       key={pageIdx}
-                      className="w-full shrink-0 snap-center grid grid-cols-2 gap-x-6 gap-y-5"
+                      className="w-full shrink-0 snap-center grid grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-3.5 sm:gap-y-4"
                     >
                       {pageItems.map((macro: any, idx: number) => {
                         const totalVal = getLoggedNutrientTotal(macro.id);
