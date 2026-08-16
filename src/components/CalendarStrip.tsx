@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Calendar as CalendarIcon, Share2 } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
@@ -32,17 +32,30 @@ export function CalendarStrip({
 }: CalendarStripProps) {
   const activeItemRef = useRef<HTMLButtonElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [shouldAutoCenter, setShouldAutoCenter] = useState(false);
 
-  // Auto-scroll active date button into exact center of scroll container
+  const handleShiftToToday = () => {
+    setSelectedDate(todayStr);
+    recenterDaysList(todayStr);
+    setShouldAutoCenter(true);
+  };
+
   useEffect(() => {
-    if (activeItemRef.current) {
-      activeItemRef.current.scrollIntoView({
-        behavior: "smooth",
-        inline: "center",
-        block: "nearest",
+    if (shouldAutoCenter) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (activeItemRef.current) {
+            activeItemRef.current.scrollIntoView({
+              behavior: "smooth",
+              inline: "center",
+              block: "nearest",
+            });
+            setShouldAutoCenter(false);
+          }
+        });
       });
     }
-  }, [selectedDate, daysList]);
+  }, [selectedDate, daysList, shouldAutoCenter]);
 
   return (
     <div id="calendar-strip" className="px-6 mt-4 relative z-10 space-y-2.5">
@@ -54,10 +67,7 @@ export function CalendarStrip({
         <div className="flex items-center gap-2">
           {selectedDate !== todayStr && (
             <button
-              onClick={() => {
-                setSelectedDate(todayStr);
-                recenterDaysList(todayStr);
-              }}
+              onClick={handleShiftToToday}
               className="bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl shadow-md active:scale-95 transition-all cursor-pointer border-none flex items-center gap-1 shrink-0"
             >
               Shift to Today
@@ -83,7 +93,7 @@ export function CalendarStrip({
       {/* Scrollable Day Strips */}
       <div
         ref={containerRef}
-        className="flex justify-between items-center overflow-x-auto pb-1 scrollbar-hide gap-3"
+        className="flex items-center overflow-x-auto pb-1 scrollbar-hide gap-3 select-none"
       >
         {daysList.map((day, idx) => {
           const isActive = day.fullDate === selectedDate;
@@ -99,10 +109,10 @@ export function CalendarStrip({
                 setSelectedDate(day.fullDate);
               }}
               className={cn(
-                "flex flex-col items-center justify-center min-w-[58px] py-3.5 rounded-2xl transition-all duration-300 shadow-sm grow cursor-pointer shrink-0",
+                "flex flex-col items-center justify-center min-w-[58px] py-3.5 rounded-2xl transition-all duration-300 grow cursor-pointer shrink-0",
                 isActive
-                  ? "bg-orange-500 text-white shadow-lg shadow-orange-200 ring-4 ring-orange-50"
-                  : "bg-white/60 backdrop-blur-sm text-gray-500 border border-orange-50/50 hover:bg-white/90"
+                  ? "bg-orange-500 text-white shadow-none border-none"
+                  : "bg-white/60 backdrop-blur-sm text-gray-500 border border-orange-50/50 hover:bg-white/90 shadow-2xs"
               )}
             >
               <span className="text-[10px] font-black opacity-60 tracking-tighter">
