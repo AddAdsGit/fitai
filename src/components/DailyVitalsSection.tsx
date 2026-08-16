@@ -486,54 +486,27 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
       {isWeightActive && activeVitalsTab === "weight" && (
         <div className="flex flex-col gap-2">
           {weightTodayLog && !isEditingWeight ? (
-            <div className="bg-gradient-to-br from-white/95 to-orange-50/50 backdrop-blur-md border border-orange-200/80 rounded-[28px] p-4 shadow-md shadow-orange-100/20 text-left space-y-3 animate-fade-in font-sans">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-600 flex items-center justify-center font-bold text-sm">
-                    ⚖️
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-950/60 block">
-                      Today's Weight Logged
-                    </span>
-                    <span className="text-lg font-black text-orange-950 leading-none">
-                      {weightTodayLog.weight} <span className="text-xs font-bold text-orange-900/60">kg</span>
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full border border-stone-200/60 font-mono">
-                    {weightTodayLog.log_time}
-                  </span>
-                  
-                  {/* Dedicated Edit Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDraftWeight(weightTodayLog.weight);
-                      setDraftWeightTime(weightTodayLog.log_time);
-                      setIsEditingWeight(true);
-                    }}
-                    className="h-8 px-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm shadow-orange-500/20 active:scale-95 transition-all font-sans"
-                    title="Edit Logged Weight"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                    <span>Edit</span>
-                  </button>
-                  
-                  {/* Delete Button */}
-                  {handleDeleteWeight && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteWeight(weightTodayLog.id, weightTodayLog.date)}
-                      className="w-8 h-8 rounded-xl bg-stone-100 hover:bg-red-50 hover:text-red-600 text-stone-500 flex items-center justify-center transition-colors cursor-pointer border border-stone-200/60"
-                      title="Delete Weight Entry"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
+            <div className="flex items-center justify-between px-3.5 py-2.5 bg-orange-50/60 rounded-2xl border border-orange-100/60 text-xs font-bold text-orange-950/70 animate-fade-in font-sans">
+              <span className="flex items-center gap-1.5">
+                <span className="text-emerald-500 font-black">✓</span>
+                <span>Weight logged for today ({weightTodayLog.weight} kg)</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-stone-400 font-mono font-medium">
+                  {weightTodayLog.log_time}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraftWeight(weightTodayLog.weight);
+                    setDraftWeightTime(weightTodayLog.log_time);
+                    setIsEditingWeight(true);
+                  }}
+                  className="text-[10px] font-bold text-orange-600 hover:text-orange-700 bg-orange-100/80 px-2 py-0.5 rounded-md transition-colors cursor-pointer border border-orange-200/60"
+                  title="Edit Weight"
+                >
+                  Edit
+                </button>
               </div>
             </div>
           ) : (
@@ -1115,12 +1088,6 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                   valueText={`${weightTodayLog.weight} kg`}
                   logTime={weightTodayLog.log_time}
                   canDelete={selectedDate === todayStr}
-                  onEdit={() => {
-                    setActiveVitalsTab("weight");
-                    setDraftWeight(weightTodayLog.weight);
-                    setDraftWeightTime(weightTodayLog.log_time);
-                    setIsEditingWeight(true);
-                  }}
                   onDelete={async () => {
                     if (weightTodayLog.id) {
                       await handleDeleteWeight(weightTodayLog.id);
@@ -1137,11 +1104,6 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                   valueText={`${item.amount} ml`}
                   logTime={item.time}
                   canDelete={selectedDate === todayStr}
-                  onEdit={() => {
-                    setActiveVitalsTab("water");
-                    setDraftWater(item.amount);
-                    setDraftWaterTime(item.time);
-                  }}
                   onDelete={async () => {
                     if (item.id === "legacy-water") {
                       await handleLogWater(0, selectedDate);
@@ -1167,11 +1129,6 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                     subText={`(Type ${item.type})`}
                     logTime={item.time}
                     canDelete={selectedDate === todayStr}
-                    onEdit={() => {
-                      setActiveVitalsTab("digestion");
-                      setDraftStoolType(item.type);
-                      setDraftStoolTime(item.time);
-                    }}
                     onDelete={async () => {
                       if (item.id === "legacy-stool") {
                         await handleLogDigestion(null, null, selectedDate);
@@ -1201,11 +1158,6 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                     subText={`(Level ${item.level})`}
                     logTime={item.time}
                     canDelete={selectedDate === todayStr}
-                    onEdit={() => {
-                      setActiveVitalsTab("energy");
-                      setDraftEnergy(item.level);
-                      setDraftEnergyTime(item.time);
-                    }}
                     onDelete={async () => {
                       if (item.id === "legacy-energy") {
                         await handleLogEnergy(null, selectedDate);
@@ -1246,11 +1198,6 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                     subText={`(Level ${item.level})`}
                     logTime={item.time}
                     canDelete={selectedDate === todayStr}
-                    onEdit={() => {
-                      setActiveVitalsTab("bloating");
-                      setLocalDraftBloating(item.level);
-                      setLocalDraftBloatingTime(item.time);
-                    }}
                     onDelete={async () => {
                       if (item.id === "legacy-bloating") {
                         await handleLogBloating(null, selectedDate);

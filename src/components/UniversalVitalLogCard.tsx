@@ -93,16 +93,6 @@ export const UniversalVitalLogCard: React.FC<UniversalVitalLogCardProps> = ({
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        {onEdit && (
-          <button
-            type="button"
-            onClick={onEdit}
-            className="w-6.5 h-6.5 rounded-[10px] bg-orange-50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-colors border border-orange-200/60"
-            title="Edit entry"
-          >
-            <Pencil className="w-3 h-3" />
-          </button>
-        )}
         {canDelete && onDelete && (
           <button
             type="button"
