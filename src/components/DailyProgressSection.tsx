@@ -21,9 +21,9 @@ export function DailyProgressSection({
   const [activeMacroPage, setActiveMacroPage] = useState(0);
 
   return (
-    <div className="px-4 sm:px-6 mt-2 sm:mt-4 relative z-10">
+    <div className="px-6 mt-4 relative z-10">
       {/* Circular Progress for Calories */}
-      <div className="relative w-full aspect-square max-w-[210px] sm:max-w-[240px] mx-auto flex items-center justify-center my-4 sm:my-6">
+      <div className="relative w-full aspect-square max-w-[280px] mx-auto flex items-center justify-center my-8">
         <svg
           className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-xl"
           viewBox="0 0 240 240"
@@ -32,7 +32,7 @@ export function DailyProgressSection({
             cx="120"
             cy="120"
             r="104"
-            strokeWidth="18"
+            strokeWidth="20"
             fill="transparent"
             className="stroke-orange-100/50"
           />
@@ -40,7 +40,7 @@ export function DailyProgressSection({
             cx="120"
             cy="120"
             r="104"
-            strokeWidth="18"
+            strokeWidth="20"
             fill="transparent"
             strokeLinecap="round"
             className="stroke-orange-500"
@@ -55,12 +55,12 @@ export function DailyProgressSection({
             transition={{ duration: 1.5, ease: "easeOut" }}
           />
         </svg>
-        <div className="text-center z-10 bg-white/40 backdrop-blur-md w-32 h-32 sm:w-36 sm:h-36 rounded-full flex flex-col items-center justify-center shadow-inner border border-white/50">
-          <div className="text-3xl sm:text-4xl font-black mb-0.5 text-orange-950 px-2 truncate selection:bg-orange-500 select-none font-sans">
+        <div className="text-center z-10 bg-white/40 backdrop-blur-md w-40 h-40 rounded-full flex flex-col items-center justify-center shadow-inner border border-white/50">
+          <div className="text-5xl font-black mb-1 text-orange-950 px-2 truncate selection:bg-orange-500 select-none">
             {totalCalories.toLocaleString()}
           </div>
-          <div className="h-1.5 w-7 bg-orange-500 rounded-full mb-1" />
-          <div className="text-orange-900/50 font-black tracking-[0.1em] text-[9.5px] sm:text-[10px] uppercase font-sans">
+          <div className="h-1.5 w-8 bg-orange-500 rounded-full mb-1" />
+          <div className="text-orange-900/50 font-black tracking-[0.1em] text-[10px] uppercase">
             / {((profileData as any).goals?.dailyCalories || profileData.daily_calories_goal || 2000).toLocaleString()} KCAL
           </div>
         </div>
@@ -74,14 +74,14 @@ export function DailyProgressSection({
         }
 
         return (
-          <div className="mt-4 flex flex-col gap-2.5">
-            <div className="bg-white/60 backdrop-blur-md p-4 sm:p-5 rounded-[28px] border border-white/80 shadow-xl shadow-orange-100/20 overflow-hidden">
+          <div className="mt-6 flex flex-col gap-3">
+            <div className="bg-white/60 backdrop-blur-md p-6 rounded-[32px] border border-white/80 shadow-xl shadow-orange-100/20 overflow-hidden">
               {pages.length === 1 ? (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                   {pages[0].map((macro: any, idx: number) => {
                     const totalVal = getLoggedNutrientTotal(macro.id);
                     return (
-                      <div key={macro.id} className="min-w-0">
+                      <div key={macro.id}>
                         <ProgressBar
                           label={macro.name}
                           value={totalVal}
@@ -110,12 +110,12 @@ export function DailyProgressSection({
                   {pages.map((pageItems, pageIdx) => (
                     <div
                       key={pageIdx}
-                      className="w-full shrink-0 snap-center grid grid-cols-2 gap-x-4 gap-y-3.5"
+                      className="w-full shrink-0 snap-center grid grid-cols-2 gap-x-6 gap-y-5"
                     >
                       {pageItems.map((macro: any, idx: number) => {
                         const totalVal = getLoggedNutrientTotal(macro.id);
                         return (
-                          <div key={macro.id} className="min-w-0">
+                          <div key={macro.id}>
                             <ProgressBar
                               label={macro.name}
                               value={totalVal}

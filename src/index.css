@@ -6,8 +6,15 @@
 }
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
   body {
-    @apply bg-gray-100;
+    @apply bg-[#FAF7F2] text-orange-950 font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
@@ -21,7 +28,7 @@
   }
 }
 
-/* Custom Scrollbar for the preview container if it gets too long */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
