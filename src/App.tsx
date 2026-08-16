@@ -3347,8 +3347,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
   return (
     <div className={cn(
-      "min-h-screen text-[#1A1A1A] font-sans selection:bg-orange-100 max-w-md mx-auto relative shadow-2xl overflow-x-hidden",
-      activeTab === "camera-log" ? "bg-[#0D0D0D] pb-0" : "bg-[#FAF9F6] pb-32"
+      "min-h-[100dvh] text-orange-950 font-sans selection:bg-orange-100 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between",
+      activeTab === "camera-log" ? "bg-black pb-0" : "bg-[#FAF7F2] pb-28"
     )}>
       {/* Absolute Custom Toast Alert */}
       <AnimatePresence>
@@ -3506,7 +3506,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
 
             {/* Soft Curved Capsule Pill Divider */}
-            <div className="w-10 h-1 bg-stone-300/40 rounded-full mx-auto my-8 select-none" />
+            <div className="w-10 h-1 bg-stone-300/40 rounded-full mx-auto my-4 select-none" />
 
             {/* Daily Wellness Journal Section */}
             <section className="px-6 mt-2 mb-28 relative z-10">

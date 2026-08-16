@@ -23,7 +23,7 @@ export function DailyProgressSection({
   return (
     <div className="px-6 mt-4 relative z-10">
       {/* Circular Progress for Calories */}
-      <div className="relative w-full aspect-square max-w-[280px] mx-auto flex items-center justify-center my-8">
+      <div className="relative w-full aspect-square max-w-[280px] mx-auto flex items-center justify-center my-4">
         <svg
           className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-xl"
           viewBox="0 0 240 240"
@@ -74,7 +74,7 @@ export function DailyProgressSection({
         }
 
         return (
-          <div className="mt-6 flex flex-col gap-3">
+          <div className="mt-4 flex flex-col gap-3">
             <div className="bg-white/60 backdrop-blur-md p-6 rounded-[32px] border border-white/80 shadow-xl shadow-orange-100/20 overflow-hidden">
               {pages.length === 1 ? (
                 <div className="grid grid-cols-2 gap-x-6 gap-y-5">
