@@ -98,7 +98,7 @@ export const CameraLogView = ({
   const [taggedNames, setTaggedNames] = useState<string[]>([]);
 
   // Instagram/TikTok-Grade Aspect Ratio Switcher: "1:1" -> "3:4" -> "9:16"
-  const [aspectRatioMode, setAspectRatioMode] = useState<"1:1" | "3:4" | "9:16">("3:4");
+  const [aspectRatioMode, setAspectRatioMode] = useState<"1:1" | "3:4" | "9:16">("1:1");
   
   // Toolbar Toggles
   const [showGridTarget, setShowGridTarget] = useState(false);
@@ -944,41 +944,33 @@ export const CameraLogView = ({
         className="hidden"
       />
 
-      {/* LIVE CAMERA BACKGROUND & ASPECT RATIO CONTAINER (CAPTURE STEP) */}
+      {/* 100% EDGE-TO-EDGE FULL-BLEED LIVE CAMERA BACKGROUND (CAPTURE STEP) */}
       {flowStep === "capture" && (
-        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto">
-          {/* Full-width video container matching selected aspect ratio */}
-          <div
-            onClick={handleCaptureFromWebcam}
-            className={cn(
-              "absolute top-0 left-0 right-0 w-full bg-black overflow-hidden transition-all duration-300 ease-out cursor-pointer z-0",
-              aspectRatioMode === "9:16"
-                ? "h-full"
-                : aspectRatioMode === "3:4"
-                ? "aspect-[3/4]"
-                : "aspect-square"
-            )}
-          >
-            {cameraStream ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-            ) : null}
+        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto" onClick={handleCaptureFromWebcam}>
+          {cameraStream ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover min-w-full min-h-full"
+            />
+          ) : null}
 
-            {showGridTarget && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                <div className="w-44 h-44 rounded-full border-2 border-dashed border-white/40 flex items-center justify-center">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-white/80 bg-black/50 px-3 py-1 rounded-full backdrop-blur-xs">
-                    Plate Center
-                  </span>
-                </div>
+          {showGridTarget && (
+            <div
+              className={cn(
+                "absolute inset-0 flex items-center justify-center pointer-events-none z-20 transition-all duration-300",
+                attachedItem ? "pb-36" : "pb-24"
+              )}
+            >
+              <div className="w-40 h-40 rounded-full border-2 border-dashed border-white/35 flex items-center justify-center shadow-xl backdrop-blur-xs">
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/90 bg-black/60 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md font-sans">
+                  Plate Center
+                </span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* High-End Gourmet Analyzing Spinner Overlay */}
           {isProcessing && (
@@ -1035,17 +1027,6 @@ export const CameraLogView = ({
                 title="Toggle Center Plate Target"
               >
                 <Grid className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCycleAspectRatio}
-                className="w-8 h-8 rounded-full flex items-center justify-center transition-all border cursor-pointer active:scale-90 backdrop-blur-md shadow-md bg-black/50 text-white border-white/20 hover:bg-black/70"
-                title={`Aspect Ratio Mode: ${aspectRatioMode} (Tap to cycle)`}
-              >
-                {aspectRatioMode === "1:1" && <Square className="w-3.5 h-3.5 text-white" />}
-                {aspectRatioMode === "3:4" && <RectangleVertical className="w-3.5 h-3.5 text-white" />}
-                {aspectRatioMode === "9:16" && <Smartphone className="w-3.5 h-3.5 text-orange-400" />}
               </button>
             </div>
           </div>

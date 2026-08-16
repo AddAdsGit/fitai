@@ -18,7 +18,7 @@ export function Header({ currentStreak, profileData, setActiveTab }: HeaderProps
   return (
     <header
       id="header-main"
-      className="px-6 pt-8 flex items-center justify-between relative z-10"
+      className="px-5 sm:px-6 pt-5 sm:pt-6 flex items-center justify-between relative z-10"
     >
       <div id="brand-logo" className="flex items-center gap-2">
         <div className="w-9 h-9 rounded-xl bg-orange-500 shadow-lg shadow-orange-200 flex items-center justify-center">

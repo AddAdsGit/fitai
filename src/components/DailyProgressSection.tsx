@@ -21,26 +21,26 @@ export function DailyProgressSection({
   const [activeMacroPage, setActiveMacroPage] = useState(0);
 
   return (
-    <div className="px-6 mt-4 relative z-10">
+    <div className="px-5 sm:px-6 mt-3 relative z-10 font-sans">
       {/* Circular Progress for Calories */}
-      <div className="relative w-full aspect-square max-w-[280px] mx-auto flex items-center justify-center my-8">
+      <div className="relative w-full aspect-square max-w-[210px] sm:max-w-[230px] mx-auto flex items-center justify-center my-4 sm:my-5">
         <svg
-          className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-xl"
+          className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-md"
           viewBox="0 0 240 240"
         >
           <circle
             cx="120"
             cy="120"
             r="104"
-            strokeWidth="20"
+            strokeWidth="18"
             fill="transparent"
-            className="stroke-orange-100/50"
+            className="stroke-orange-100/60"
           />
           <motion.circle
             cx="120"
             cy="120"
             r="104"
-            strokeWidth="20"
+            strokeWidth="18"
             fill="transparent"
             strokeLinecap="round"
             className="stroke-orange-500"
@@ -52,15 +52,15 @@ export function DailyProgressSection({
                   (Math.PI * 2 * 104),
             }}
             strokeDasharray={Math.PI * 2 * 104}
-            transition={{ duration: 1.5, ease: "easeOut" }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
           />
         </svg>
-        <div className="text-center z-10 bg-white/40 backdrop-blur-md w-40 h-40 rounded-full flex flex-col items-center justify-center shadow-inner border border-white/50">
-          <div className="text-5xl font-black mb-1 text-orange-950 px-2 truncate selection:bg-orange-500 select-none">
+        <div className="text-center z-10 bg-white/50 backdrop-blur-md w-32 h-32 sm:w-36 sm:h-36 rounded-full flex flex-col items-center justify-center shadow-inner border border-white/60">
+          <div className="text-3xl sm:text-4xl font-black mb-0.5 text-orange-950 px-2 truncate selection:bg-orange-500 select-none">
             {totalCalories.toLocaleString()}
           </div>
-          <div className="h-1.5 w-8 bg-orange-500 rounded-full mb-1" />
-          <div className="text-orange-900/50 font-black tracking-[0.1em] text-[10px] uppercase">
+          <div className="h-1 w-6 bg-orange-500 rounded-full mb-1" />
+          <div className="text-orange-900/50 font-black tracking-[0.1em] text-[9.5px] uppercase">
             / {((profileData as any).goals?.dailyCalories || profileData.daily_calories_goal || 2000).toLocaleString()} KCAL
           </div>
         </div>
