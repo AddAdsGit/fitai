@@ -410,11 +410,11 @@ export default function App() {
   const [daysList, setDaysList] = useState(() => {
     const DAYS_OF_WEEK = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     const today = new Date();
-    return Array.from({ length: 6 }, (_, i) => {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(today);
-      d.setDate(today.getDate() + (i - 2));
+      d.setDate(today.getDate() + (i - 3));
       return {
-        day: DAYS_OF_WEEK[d.getDay()],
+        dayName: DAYS_OF_WEEK[d.getDay()],
         date: d.getDate(),
         fullDate: formatDateStr(d),
       };
@@ -423,11 +423,11 @@ export default function App() {
   const recenterDaysList = (dateString: string) => {
     const daysOfWeek = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     const d = new Date(dateString + "T00:00:00");
-    const newList = Array.from({ length: 6 }, (_, i) => {
+    const newList = Array.from({ length: 7 }, (_, i) => {
       const tempD = new Date(d);
-      tempD.setDate(d.getDate() + (i - 2));
+      tempD.setDate(d.getDate() + (i - 3));
       return {
-        day: daysOfWeek[tempD.getDay()],
+        dayName: daysOfWeek[tempD.getDay()],
         date: tempD.getDate(),
         fullDate: formatDateStr(tempD),
       };

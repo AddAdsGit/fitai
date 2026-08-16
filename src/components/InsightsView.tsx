@@ -62,11 +62,11 @@ const ProgressBar = ({
   index?: number;
   unit?: string;
 }) => (
-  <div className="space-y-1.5">
-    <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-[0.05em]">
-      <span className="text-orange-950/70">{label}</span>
+  <div className="space-y-1.5 min-w-0 font-sans">
+    <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-[0.05em] gap-1 min-w-0">
+      <span className="text-orange-950/70 truncate">{label}</span>
       {max ? (
-        <span style={{ color }}>
+        <span style={{ color }} className="whitespace-nowrap shrink-0 font-mono font-bold">
           {value}
           <span className="text-orange-900/40 text-[9px] ml-0.5">
             / {max}
@@ -74,13 +74,13 @@ const ProgressBar = ({
           </span>
         </span>
       ) : (
-        <span style={{ color }}>{percentage}%</span>
+        <span style={{ color }} className="whitespace-nowrap shrink-0 font-mono font-bold">{percentage}%</span>
       )}
     </div>
     <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden border border-white/40 shadow-inner">
       <motion.div
         initial={{ width: 0 }}
-        animate={{ width: `${max ? (value / max) * 100 : value}%` }}
+        animate={{ width: `${max ? Math.min(100, (value / max) * 100) : value}%` }}
         transition={{ duration: 1, delay: index * 0.1 + 0.2, ease: "easeOut" }}
         className="h-full rounded-full"
         style={{ backgroundColor: color }}

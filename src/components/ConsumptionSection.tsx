@@ -94,7 +94,7 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
   handleDeleteMeal,
 }) => {
   return (
-    <section className="px-6 mt-12 relative z-10">
+    <section className="px-4 sm:px-6 mt-6 sm:mt-8 relative z-10 font-sans">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-black tracking-tight text-orange-950">
             {selectedDate === todayStr

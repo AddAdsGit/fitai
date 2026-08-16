@@ -376,7 +376,7 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
       onPointerDownCapture={resetActivity}
       onClickCapture={resetActivity}
       onKeyDownCapture={resetActivity}
-      className="px-6 mt-6 relative z-10 text-left space-y-4 animate-fade-in"
+      className="px-4 sm:px-6 mt-5 sm:mt-6 relative z-10 text-left space-y-4 animate-fade-in font-sans"
     >
 
       {/* ADAPTIVE VITALS SELECTOR BAR */}
