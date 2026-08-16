@@ -31,7 +31,7 @@ export function CalendarStrip({
   daysList,
 }: CalendarStripProps) {
   return (
-    <div id="calendar-strip" className="px-4 sm:px-6 mt-2 sm:mt-2.5 relative z-10 space-y-2 font-sans">
+    <div id="calendar-strip" className="px-5 sm:px-6 mt-3.5 sm:mt-4 relative z-10 space-y-2.5">
       {/* Date Selector & Snap-to-Today Header */}
       <div className="flex justify-between items-center px-1 gap-2 min-w-0">
         <span className="text-xs font-black uppercase tracking-widest text-stone-500 truncate min-w-0">
