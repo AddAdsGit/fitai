@@ -111,8 +111,21 @@ export const OnboardingWizard = ({
 
   const initialAvatarUrl = profileData?.imageUrl || profileData?.image_url || profileData?.user_metadata?.avatar_url || profileData?.user_metadata?.picture || "";
   const [avatarPreview, setAvatarPreview] = useState(initialAvatarUrl);
+  const [userEmail, setUserEmail] = useState(profileData?.email || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+
+  useEffect(() => {
+    if (!userEmail && supabase?.auth) {
+      supabase.auth.getUser().then((res: any) => {
+        const emailVal = res?.data?.user?.email;
+        if (emailVal) {
+          setUserEmail(emailVal);
+          setMetrics(prev => ({ ...prev, email: emailVal }));
+        }
+      });
+    }
+  }, [supabase]);
 
   // Targets state (configured on Step 3)
   const [targets, setTargets] = useState({
@@ -584,7 +597,8 @@ export const OnboardingWizard = ({
   };
 
   const saveProfileData = async () => {
-    const userHandle = metrics.username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "") || (metrics.name.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "") || "user");
+    const emailPrefix = (userEmail || metrics.email || profileData?.email || "").split("@")[0].toLowerCase().replace(/[^a-z0-9_.]/g, "");
+    const userHandle = metrics.username || emailPrefix || (metrics.name.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "") || "user");
 
     const goalText = metrics.goal === "Lose Weight" ? `lose weight (target: ${metrics.targetWeight}kg)` : metrics.goal === "Build Muscle" ? `build muscle (target: ${metrics.targetWeight}kg)` : "maintain weight";
     const silentBio = `Focusing on ${goalText} with a target of ${targets.calories} kcal & ${targets.protein}g protein daily! 💪`;
@@ -776,10 +790,10 @@ export const OnboardingWizard = ({
               </label>
               <input
                 type="text"
-                value={profileData?.email || "Signed in account"}
+                value={userEmail || metrics.email || profileData?.email || "Signed in account"}
                 readOnly
                 disabled
-                className="w-full bg-stone-100/80 border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-500 cursor-not-allowed shadow-inner"
+                className="w-full bg-stone-100/80 border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-600 cursor-not-allowed shadow-inner"
               />
             </div>
 
@@ -797,26 +811,6 @@ export const OnboardingWizard = ({
                 required
                 className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
               />
-            </div>
-
-            {/* Username handle input */}
-            <div className="space-y-1 text-left">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Your Unique Handle (@username)
-              </label>
-              <div className="relative flex items-center">
-                <span className="absolute left-4 text-xs font-black text-stone-400">@</span>
-                <input
-                  type="text"
-                  placeholder="username"
-                  value={metrics.username}
-                  onChange={(e) => {
-                    const cleanVal = e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, "");
-                    setMetrics(prev => ({ ...prev, username: cleanVal }));
-                  }}
-                  className="w-full bg-white border border-stone-200 rounded-2xl pl-8 pr-4 py-3 text-xs font-bold text-stone-900 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-2xs transition-all"
-                />
-              </div>
             </div>
 
             {/* Clean Terms Reference Link & Sign Out */}
