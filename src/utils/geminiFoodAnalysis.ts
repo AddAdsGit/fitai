@@ -32,9 +32,6 @@ export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
         .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
         .map((m) => m.name.replace(/^models\//, ""));
 
-      // Prefer Flash models for interactive food-photo logging. Do not select
-      // Pro/preview models first: free-tier projects commonly have no quota
-      // for those models even when Flash is available.
       const priorityPatterns = [
         /^gemini-2\.5-flash-lite/i,
         /^gemini-2\.5-flash$/i,
@@ -135,8 +132,24 @@ Return ONLY a valid JSON object in this format:
 
   let responseData: any = null;
 
-  // 1. Direct Gemini API call if key exists
-  if (key) {
+  // Camera photo analysis always goes through the authenticated Supabase
+  // Edge Function when configured. This keeps the Gemini key server-side and
+  // prevents the browser from selecting an unintended Pro/preview model.
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase.functions.invoke("gemini", {
+      body: {
+        prompt: promptText,
+        image: cleanBase64,
+        mimeType,
+      },
+    });
+
+    if (error || !data) {
+      throw new Error(error?.message || "AI photo analysis failed. Please try again.");
+    }
+    responseData = data;
+  } else if (key) {
+    // Local/development fallback only when Supabase is not configured.
     const modelName = await getBestGeminiModel(key);
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
@@ -144,14 +157,12 @@ Return ONLY a valid JSON object in this format:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: promptText },
-                { inline_data: { mime_type: mimeType, data: cleanBase64 } },
-              ],
-            },
-          ],
+          contents: [{
+            parts: [
+              { text: promptText },
+              { inline_data: { mime_type: mimeType, data: cleanBase64 } },
+            ],
+          }],
         }),
       }
     );
@@ -162,22 +173,8 @@ Return ONLY a valid JSON object in this format:
     }
 
     responseData = await res.json();
-  } else if (isSupabaseConfigured) {
-    // 2. Supabase Edge Function fallback
-    const { data, error } = await supabase.functions.invoke("gemini", {
-      body: {
-        prompt: promptText,
-        image: cleanBase64,
-        mimeType,
-      },
-    });
-
-    if (error || !data) {
-      throw new Error("No Gemini API key found. Please add your API key in Settings -> Gemini AI.");
-    }
-    responseData = data;
   } else {
-    throw new Error("Gemini API key missing. Please configure your Gemini API Key in Settings to scan food photos.");
+    throw new Error("Gemini API is not configured. Please configure Supabase or a local Gemini API key.");
   }
 
   const rawText = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || responseData?.text || "";
