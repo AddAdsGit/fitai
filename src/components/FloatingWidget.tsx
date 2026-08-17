@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Plus, Camera, Mic, Heart } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
@@ -51,7 +52,7 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
     }
   };
 
-  return (
+  const widget = (
     <motion.button
       initial={{ scale: 0, opacity: 0, y: 20 }}
       animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -60,13 +61,17 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
       whileTap={{ scale: 0.95 }}
       onClick={() => onExecuteAction(actionType)}
       className={cn(
-        "fixed bottom-28 right-5 sm:right-[calc(50%-210px)] w-12 h-12 rounded-full flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 z-40 border-none cursor-pointer transition-all active:scale-95 select-none"
+        "fixed bottom-28 right-5 sm:right-[calc(50%-210px)] w-12 h-12 rounded-full flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 z-[60] border-none cursor-pointer transition-all active:scale-95 select-none"
       )}
       title={getLabel()}
     >
       {renderIcon()}
     </motion.button>
   );
+
+  // The dashboard root is transformed on narrow Samsung viewports. Portal the
+  // widget to body so its fixed position remains relative to the browser viewport.
+  return createPortal(widget, document.body);
 };
 
 
