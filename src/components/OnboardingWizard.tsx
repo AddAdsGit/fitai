@@ -837,12 +837,12 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 2: PERSONAL VITALS & PHYSICAL METRICS */}
+        {/* STEP 2: YOUR VITALS */}
         {step === 2 && (
           <div className="space-y-5 animate-fadeIn">
             <div className="text-center space-y-0.5">
-              <h2 className="text-xl font-black tracking-tight text-stone-900">
-                Personal Vitals & Physical Metrics
+              <h2 className="text-2xl font-black tracking-tight text-stone-900">
+                Your Vitals
               </h2>
             </div>
 
