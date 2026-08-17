@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Camera, Mic, Heart } from "lucide-react";
 import { motion } from "motion/react";
@@ -18,6 +18,25 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
   actionType = "gpt",
   onExecuteAction,
 }) => {
+  const [viewportScale, setViewportScale] = useState(1);
+
+  useEffect(() => {
+    // Keep the viewport-owned widget visually stable when Android/Samsung
+    // display zoom reduces the CSS viewport width.
+    const updateViewportScale = () => {
+      const width = Math.max(1, window.innerWidth);
+      setViewportScale(Math.min(1, Math.max(0.75, width / 412)));
+    };
+
+    updateViewportScale();
+    window.addEventListener("resize", updateViewportScale);
+    window.visualViewport?.addEventListener("resize", updateViewportScale);
+    return () => {
+      window.removeEventListener("resize", updateViewportScale);
+      window.visualViewport?.removeEventListener("resize", updateViewportScale);
+    };
+  }, []);
+
   if (!isVisible) return null;
 
   const renderIcon = () => {
@@ -53,25 +72,36 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
   };
 
   const widget = (
-    <motion.button
-      initial={{ scale: 0, opacity: 0, y: 20 }}
-      animate={{ scale: 1, opacity: 1, y: 0 }}
-      exit={{ scale: 0, opacity: 0, y: 20 }}
-      whileHover={{ scale: 1.08 }}
-      whileTap={{ scale: 0.95 }}
-      onClick={() => onExecuteAction(actionType)}
-      className={cn(
-        "fixed bottom-28 right-5 sm:right-[calc(50%-210px)] w-12 h-12 rounded-full flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 z-[60] border-none cursor-pointer transition-all active:scale-95 select-none"
-      )}
-      title={getLabel()}
+    <div
+      id="floating-widget-viewport-layer"
+      style={{
+        position: "fixed",
+        right: `${20 * viewportScale}px`,
+        bottom: `${112 * viewportScale}px`,
+        width: `${48 / viewportScale}px`,
+        height: `${48 / viewportScale}px`,
+        transform: `scale(${viewportScale})`,
+        transformOrigin: "bottom right",
+        zIndex: 2147483646,
+        isolation: "isolate",
+      }}
     >
-      {renderIcon()}
-    </motion.button>
+      <motion.button
+        initial={{ scale: 0, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0, opacity: 0, y: 20 }}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => onExecuteAction(actionType)}
+        className={cn(
+          "w-full h-full rounded-full flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 border-none cursor-pointer transition-all active:scale-95 select-none"
+        )}
+        title={getLabel()}
+      >
+        {renderIcon()}
+      </motion.button>
+    </div>
   );
 
-  // The dashboard root is transformed on narrow Samsung viewports. Portal the
-  // widget to body so its fixed position remains relative to the browser viewport.
   return createPortal(widget, document.body);
 };
-
-
