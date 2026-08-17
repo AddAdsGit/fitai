@@ -113,6 +113,10 @@ export default function App() {
     if (params.get("page") === "oauth-consent" || window.location.pathname === "/oauth-consent") {
       return "oauth-consent";
     }
+    const saved = localStorage.getItem("fitai_active_tab");
+    if (saved && ["home", "insights", "settings", "profile", "edit-profile"].includes(saved)) {
+      return saved;
+    }
     return "home";
   });
   const [shareItemPopup, setShareItemPopup] = useState<{ type: "meal" | "recipe" | "day", item: any } | null>(null);
@@ -1017,6 +1021,13 @@ export default function App() {
     }
   }, [currentPath]);
 
+  // Persist active tab to localStorage so refreshing stays on the active view
+  useEffect(() => {
+    if (activeTab && activeTab !== "camera-log" && activeTab !== "oauth-consent") {
+      localStorage.setItem("fitai_active_tab", activeTab);
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     if (!isSupabaseConfigured || !activeProfileId) return;
 
@@ -1070,10 +1081,10 @@ export default function App() {
           }
 
           setProfileDataState({
-            name: profile.display_name || resolvedSession?.user?.user_metadata?.full_name || resolvedSession?.user?.user_metadata?.name || "",
+            name: profile.display_name || session?.user?.user_metadata?.full_name || session?.user?.user_metadata?.name || "",
             username: profile.username || "",
-            email: resolvedSession?.user?.email || resolvedSession?.user?.user_metadata?.email || "",
-            imageUrl: profile.image_url || resolvedSession?.user?.user_metadata?.avatar_url || resolvedSession?.user?.user_metadata?.picture || "",
+            email: session?.user?.email || session?.user?.user_metadata?.email || "",
+            imageUrl: profile.image_url || session?.user?.user_metadata?.avatar_url || session?.user?.user_metadata?.picture || "",
             description: profile.description || "",
             height: profile.height || 0,
             weight: latestWeight || profile.weight || 0,

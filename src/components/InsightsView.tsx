@@ -839,13 +839,26 @@ export const InsightsView = ({
                 <span>Daily Metabolism (TDEE)</span>
               </div>
               <div className="text-3xl font-black text-orange-950">
-                {tdeeStats.tdee.toLocaleString()}{" "}
-                <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
-                  kcal/day avg
-                </span>
+                {tdeeStats.isRealAI ? (
+                  <>
+                    {tdeeStats.tdee.toLocaleString()}{" "}
+                    <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                      kcal/day avg
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-orange-950/30 font-mono">--</span>{" "}
+                    <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                      kcal/day
+                    </span>
+                  </>
+                )}
               </div>
               <div className="text-[10px] font-medium text-orange-900/50 mt-1">
-                (based on {tdeeStats.foodLogsCount} food logs &amp; {tdeeStats.weightLogsCount} weight logs)
+                {tdeeStats.isRealAI
+                  ? `(based on ${tdeeStats.foodLogsCount} food logs & ${tdeeStats.weightLogsCount} weight logs)`
+                  : "(Complete requirements below to unlock)"}
               </div>
             </div>
 
@@ -860,7 +873,7 @@ export const InsightsView = ({
             </button>
           </div>
 
-          {/* Accuracy & Quality Status Pill */}
+          {/* Accuracy Status & Single Merged Progress Indicator */}
           {tdeeStats.isRealAI ? (
             <div className="space-y-3 pt-1">
               <div className="flex items-center gap-2">
@@ -875,41 +888,24 @@ export const InsightsView = ({
             </div>
           ) : (
             <div className="space-y-3 pt-1">
-              <div className="flex items-center gap-2">
-                <span className="bg-amber-500/10 text-amber-700 border border-amber-500/20 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                  Estimated Baseline
-                </span>
-              </div>
-              <p className="text-xs text-orange-950/60 font-medium leading-relaxed">
-                Requires at least <span className="font-bold text-orange-950">4 food days</span> &amp; <span className="font-bold text-orange-950">4 weight logs</span> in this timeframe to unlock True AI TDEE.
-              </p>
-              
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div className="space-y-1 bg-black/5 rounded-2xl p-2.5 border border-white/40">
-                  <div className="flex justify-between text-[9px] font-black text-orange-950/50 uppercase tracking-wider">
-                    <span>Food Logs</span>
-                    <span>{tdeeStats.loggedDays} / 4 Days</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden border border-white/40">
-                    <div
-                      className="h-full bg-orange-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, (tdeeStats.loggedDays / 4) * 100)}%` }}
-                    />
-                  </div>
+              {/* Single Merged Clean Progress Bar */}
+              <div className="space-y-1.5 bg-black/5 rounded-2xl p-3 border border-white/40">
+                <div className="flex justify-between text-[9px] font-black text-orange-950/60 uppercase tracking-wider">
+                  <span>Unlock Progress</span>
+                  <span>
+                    {Math.min(4, tdeeStats.loggedDays)}/4 Days Logged &bull; {Math.min(4, tdeeStats.weightLogsCount)}/4 Weight Logs
+                  </span>
                 </div>
-
-                <div className="space-y-1 bg-black/5 rounded-2xl p-2.5 border border-white/40">
-                  <div className="flex justify-between text-[9px] font-black text-orange-950/50 uppercase tracking-wider">
-                    <span>Weight Logs</span>
-                    <span>{tdeeStats.weightLogsCount} / 4 Logs</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden border border-white/40">
-                    <div
-                      className="h-full bg-orange-500 rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, (tdeeStats.weightLogsCount / 4) * 100)}%` }}
-                    />
-                  </div>
+                <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden border border-white/40">
+                  <div
+                    className="h-full bg-orange-500 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        ((Math.min(4, tdeeStats.loggedDays) + Math.min(4, tdeeStats.weightLogsCount)) / 8) * 100
+                      )}%`,
+                    }}
+                  />
                 </div>
               </div>
             </div>
