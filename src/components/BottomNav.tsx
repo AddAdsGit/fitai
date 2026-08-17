@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Home, User, Plus } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
@@ -63,7 +64,7 @@ export function BottomNav({
 }: BottomNavProps) {
   if (activeTab === "oauth-consent") return null;
 
-  return (
+  const nav = (
     <nav
       id="bottom-nav"
       className="fixed bottom-6 left-6 right-6 max-w-[calc(448px-3rem)] mx-auto z-50"
@@ -116,4 +117,9 @@ export function BottomNav({
       </div>
     </nav>
   );
+
+  // The dashboard root is transformed on narrow Samsung viewports. A fixed
+  // descendant of a transformed ancestor is no longer fixed to the browser
+  // viewport, so portal the nav directly to <body> to keep it viewport-fixed.
+  return createPortal(nav, document.body);
 }
