@@ -21,8 +21,8 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
   const [viewportScale, setViewportScale] = useState(1);
 
   useEffect(() => {
-    // Keep the viewport-owned widget visually stable when Android/Samsung
-    // display zoom reduces the CSS viewport width.
+    // Samsung display zoom reduces the CSS viewport while increasing the
+    // physical size of each CSS pixel. Counter-scale this viewport-owned layer.
     const updateViewportScale = () => {
       const width = Math.max(1, window.innerWidth);
       setViewportScale(Math.min(1, Math.max(0.75, width / 412)));
@@ -78,8 +78,8 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
         position: "fixed",
         right: `${20 * viewportScale}px`,
         bottom: `${112 * viewportScale}px`,
-        width: `${48 / viewportScale}px`,
-        height: `${48 / viewportScale}px`,
+        width: "48px",
+        height: "48px",
         transform: `scale(${viewportScale})`,
         transformOrigin: "bottom right",
         zIndex: 2147483646,
