@@ -38,24 +38,17 @@
 }
 
 /*
- * FitAI mobile viewport normalization.
- *
- * Samsung/Android display-size ("Screen zoom") can reduce the browser's
- * CSS viewport from ~411px to ~320px. Rather than redesigning individual
- * components, keep the master 411px composition intact and uniformly scale
- * the whole app down on narrow CSS viewports.
- *
- * At 411px+ this does NOTHING, so the approved design remains unchanged.
+ * Samsung/Android device-zoom protection.
+ * Keep the approved 411px design as the master canvas and uniformly scale
+ * that canvas into narrower CSS viewports. This avoids changing individual
+ * components, spacing, typography, dial size, or layout.
  */
 @media (max-width: 410px) {
-  :root {
-    --fitai-scale: clamp(0.78, calc(100vw / 411px), 1);
-  }
-
   #root {
-    width: calc(100% / var(--fitai-scale));
-    min-height: calc(100dvh / var(--fitai-scale));
-    zoom: var(--fitai-scale);
+    width: 411px;
+    min-height: 100dvh;
+    transform: scale(calc(100vw / 411px));
+    transform-origin: top left;
   }
 }
 
