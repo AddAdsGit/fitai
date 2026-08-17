@@ -17,6 +17,64 @@ export const resolveGeminiApiKey = (profileData?: Profile): string => {
   return "";
 };
 
+let cachedBestModel: string | null = null;
+
+export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
+  if (cachedBestModel) return cachedBestModel;
+  if (!apiKey) return "gemini-2.0-flash";
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (res.ok) {
+      const data = await res.json();
+      const modelsList: Array<{ name: string; supportedGenerationMethods?: string[] }> = data.models || [];
+      const supportedNames = modelsList
+        .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+        .map((m) => m.name.replace(/^models\//, ""));
+
+      const priorityPatterns = [
+        /^gemini-3\./i,
+        /^gemini-2\.5/i,
+        /^gemini-2\.0-flash$/i,
+        /^gemini-2\.0-flash-lite/i,
+        /^gemini-2\.0/i,
+        /^gemini-1\.5-flash/i,
+      ];
+
+      for (const pattern of priorityPatterns) {
+        const found = supportedNames.find((n) => pattern.test(n));
+        if (found) {
+          cachedBestModel = found;
+          return found;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[Gemini API] Dynamic model fetch fallback to gemini-2.0-flash:", e);
+  }
+
+  cachedBestModel = "gemini-2.0-flash";
+  return "gemini-2.0-flash";
+};
+
+export const listAvailableGeminiModels = async (apiKey: string) => {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (res.ok) {
+      const data = await res.json();
+      return (data.models || []).map((m: any) => ({
+        name: m.name.replace(/^models\//, ""),
+        displayName: m.displayName || m.name,
+        description: m.description,
+        supportedMethods: m.supportedGenerationMethods || [],
+      }));
+    }
+  } catch (err) {
+    console.error("Error listing Gemini models:", err);
+  }
+  return [];
+};
+
 export interface AnalyzeFoodPhotoOptions {
   imageBase64: string;
   notes?: string;
@@ -75,8 +133,9 @@ Return ONLY a valid JSON object in this format:
 
   // 1. Direct Gemini API call if key exists
   if (key) {
+    const modelName = await getBestGeminiModel(key);
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -202,8 +261,9 @@ Return ONLY valid JSON:
   let responseData: any = null;
 
   if (key) {
+    const modelName = await getBestGeminiModel(key);
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -218,23 +278,20 @@ Return ONLY valid JSON:
     const { data, error } = await supabase.functions.invoke("gemini", {
       body: { prompt: promptText },
     });
-    if (error || !data) throw new Error("Supabase Gemini Edge function failed.");
+    if (error || !data) throw new Error("Gemini refinement failed via backend.");
     responseData = data;
   }
 
   const rawText = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || responseData?.text || "";
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-
-  if (!jsonMatch) throw new Error("Could not parse AI meal refinement.");
+  if (!jsonMatch) throw new Error("Could not parse refined meal object.");
 
   const parsed = JSON.parse(jsonMatch[0]);
-  const parsedNutrients = parsed.nutrients || {};
-
   return {
-    name: parsed.name || currentMeal.name,
-    calories: parseInt(parsed.calories) || currentMeal.calories,
-    meal_description: parsed.meal_description || `${currentMeal.meal_description ? currentMeal.meal_description + " • " : ""}${refinePrompt}`,
-    nutrients: parsedNutrients,
-    tags: parsed.tags || currentMeal.tags,
+    name: parsed.name,
+    calories: parseInt(parsed.calories),
+    meal_description: parsed.meal_description,
+    tags: parsed.tags,
+    nutrients: parsed.nutrients,
   };
 };

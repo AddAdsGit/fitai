@@ -27,6 +27,7 @@ import { cn } from "../lib/utils";
 import type { Meal, TrackedNutrient } from "../types";
 import { hasNoGeneratedImage, formatDisplayTime } from "../utils/helpers";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { getBestGeminiModel } from "../utils/geminiFoodAnalysis";
 import { TimePickerModal } from "./TimePickerModal";
 import { PastFoodCard, PastFoodItem } from "./PastFoodCard";
 import { DEFAULT_TRACKED_NUTRIENTS, normalizeTrackedNutrients } from "../constants/nutrition";
@@ -583,7 +584,8 @@ export const ManualLogModal = ({
         
         const imagePrompt = `Analyze the food plate in this image. User notes & attached item: "${fullInstruction}". Estimate meal name, total calories, protein, carbs, fats, fiber, description. Return ONLY valid JSON: {"name":"...","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0,"description":"..."}`;
         
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+        const modelName = await getBestGeminiModel(key);
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -811,8 +813,9 @@ export const ManualLogModal = ({
       // Live Gemini 1.5 Flash AI Refinement
       const promptText = `The user has logged a meal: "${name}" with ${currentCal} kcal, current notes: "${mealDescription}", nutrients: ${JSON.stringify(editableNutrients)}, tags: ${JSON.stringify(selectedTags)}. The user now wants to refine this meal with these specific instructions: "${combinedRefinement}". Calculate the new meal name, updated total calories (kcal), new meal description/notes, updated clean dietary tags (e.g. ["High Protein"]), and updated user nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":{"protein":0,"carbs":0,"fats":0,"fiber":0}}`;
 
+      const modelName = await getBestGeminiModel(key);
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

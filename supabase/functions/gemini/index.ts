@@ -48,6 +48,17 @@ serve(async (req) => {
 
     // 3. Retrieve Gemini API Key (Priority: Remote Secret -> Central Backup)
     const apiKey = Deno.env.get("GEMINI_API_KEY") || "";
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          error: "GEMINI_API_KEY secret is not set in Supabase Edge Function environment. Please set GEMINI_API_KEY in Supabase Dashboard or enter a custom Gemini API key in App Settings.",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     const parts: any[] = [{ text: prompt }];
     if (image) {
@@ -60,11 +71,11 @@ serve(async (req) => {
       });
     }
 
-    // 4. Fallback Model Loop for Multimodal & Text Recognition
+    // 4. Priority Fallback Model Loop for Multimodal & Text Recognition
     let response = null;
     let lastError = "";
 
-    for (const model of ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]) {
+    for (const model of ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]) {
       try {
         response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
           method: "POST",

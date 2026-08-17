@@ -230,37 +230,15 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
 
         <div className="space-y-6">
           {activeMeals.length === 0 ? (
-            selectedDate === todayStr ? (
-              <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 text-center space-y-4 font-sans my-2 animate-fade-in">
-                <div className="w-12 h-12 rounded-2xl bg-orange-100/70 text-orange-600 flex items-center justify-center mx-auto border border-orange-200/50 shadow-2xs">
-                  <Camera className="w-6 h-6" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-base font-black text-orange-950">Log Your First Meal Today</h3>
-                  <p className="text-xs text-orange-900/60 font-medium max-w-xs mx-auto">
-                    Snap a photo or type what you ate to ignite your ring and track your macros.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onOpenCameraScanner}
-                  className="w-full py-3.5 px-4 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-orange-500/25 active:scale-98 transition-all cursor-pointer border-none flex items-center justify-center gap-2"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>Open Camera Scanner</span>
-                </button>
-              </div>
-            ) : (
-              <div className="text-center py-12 px-6">
-                <p className="text-sm font-bold text-stone-500">
-                  No logs for this date yet
-                </p>
-                <p className="text-[10px] text-stone-400 mt-1 font-medium leading-relaxed">
-                  All meals, quick calories, or recipe favorites logged on this
-                  date will show up here.
-                </p>
-              </div>
-            )
+            <div className="text-center py-12 px-6">
+              <p className="text-sm font-bold text-stone-500">
+                No logs for this date yet
+              </p>
+              <p className="text-[10px] text-stone-400 mt-1 font-medium leading-relaxed">
+                All meals, quick calories, or recipe favorites logged on this
+                date will show up here.
+              </p>
+            </div>
           ) : (
             activeMeals.map((meal) => {
               const isQuickCal =

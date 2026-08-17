@@ -21,6 +21,7 @@ import { cn } from "../lib/utils";
 import type { Recipe, TrackedNutrient } from "../types";
 import { hasNoGeneratedImage } from "../utils/helpers";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
+import { getBestGeminiModel } from "../utils/geminiFoodAnalysis";
 import { DEFAULT_TRACKED_NUTRIENTS, normalizeTrackedNutrients } from "../constants/nutrition";
 import { StepperButton } from "./StepperButton";
 import { getUserActiveAiTags } from "../utils/foodFilter";
@@ -161,7 +162,8 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       const prompt = `Create a gourmet healthy recipe based on: "${aiPrompt}". Return ONLY valid JSON format: {"name":"...","time":"...","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0,"description":"...","ingredients":["..."],"instructions":"..."}`;
 
       if (key) {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+        const modelName = await getBestGeminiModel(key);
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

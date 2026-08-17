@@ -39,6 +39,7 @@ import { normalizeTrackedNutrients, macroTargetsFromTracked, DEFAULT_TRACKED_NUT
 import { DEFAULT_CUSTOM_GPT_URL, DAILY_WATER_GOAL_ML } from "./constants/app";
 import { calculateNutritionFromIngredients } from "./utils/nutritionCalculator";
 import { supabase, isSupabaseConfigured } from "./lib/supabaseClient";
+import { getBestGeminiModel } from "./utils/geminiFoodAnalysis";
 
 // Import extracted components
 import { InsightsView, ProgressBar } from "./components/InsightsView";
@@ -1583,7 +1584,8 @@ Do not include any extra text, markdown styling, backticks, or "json" prefix. Ju
         
         if (preferenceGeminiKey) {
           try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${preferenceGeminiKey}`, {
+            const modelName = await getBestGeminiModel(preferenceGeminiKey);
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${preferenceGeminiKey}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
