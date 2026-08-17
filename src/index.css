@@ -82,3 +82,5 @@ div.flex.flex-col.min-w-0 > div[class*="text-[9px]"] > span:nth-child(2) {
 ::-webkit-scrollbar-thumb:hover {
   background: #d1d5db;
 }
+
+/* Deployment smoke-test: intentionally no-op. */
