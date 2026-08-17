@@ -32,13 +32,17 @@ export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
         .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
         .map((m) => m.name.replace(/^models\//, ""));
 
+      // Prefer Flash models for interactive food-photo logging. Do not select
+      // Pro/preview models first: free-tier projects commonly have no quota
+      // for those models even when Flash is available.
       const priorityPatterns = [
-        /^gemini-3\./i,
-        /^gemini-2\.5/i,
+        /^gemini-2\.5-flash-lite/i,
+        /^gemini-2\.5-flash$/i,
         /^gemini-2\.0-flash$/i,
         /^gemini-2\.0-flash-lite/i,
         /^gemini-2\.0/i,
         /^gemini-1\.5-flash/i,
+        /^gemini-3\..*flash/i,
       ];
 
       for (const pattern of priorityPatterns) {
