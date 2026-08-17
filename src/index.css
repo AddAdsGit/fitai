@@ -47,6 +47,12 @@
   }
 }
 
+/* Nutrient picker: show nutrient name + target only; hide category labels. */
+div.flex.flex-col.min-w-0 > div[class*="text-[9px]"] > span:first-child,
+div.flex.flex-col.min-w-0 > div[class*="text-[9px]"] > span:nth-child(2) {
+  display: none;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
