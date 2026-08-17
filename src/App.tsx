@@ -532,11 +532,16 @@ export default function App() {
           .maybeSingle();
 
         if (dupCheck) {
-          resolvedUsername = `${baseUsername}_${Math.random().toString(36).substring(7)}`;
+          const countRes = await supabase
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .ilike('username', `${baseUsername}%`);
+          const count = (countRes.count || 1) + 1;
+          resolvedUsername = `${baseUsername}${count}`;
         }
 
-        const googleName = user.user_metadata?.full_name || resolvedUsername;
-        const googleAvatar = user.user_metadata?.avatar_url || null;
+        const googleName = user.user_metadata?.full_name || user.user_metadata?.name || resolvedUsername;
+        const googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || null;
 
         const newProfile = {
           id: user.id,
@@ -1065,9 +1070,10 @@ export default function App() {
           }
 
           setProfileDataState({
-            name: profile.display_name || "",
+            name: profile.display_name || resolvedSession?.user?.user_metadata?.full_name || resolvedSession?.user?.user_metadata?.name || "",
             username: profile.username || "",
-            imageUrl: profile.image_url || "",
+            email: resolvedSession?.user?.email || resolvedSession?.user?.user_metadata?.email || "",
+            imageUrl: profile.image_url || resolvedSession?.user?.user_metadata?.avatar_url || resolvedSession?.user?.user_metadata?.picture || "",
             description: profile.description || "",
             height: profile.height || 175,
             weight: latestWeight || 70,

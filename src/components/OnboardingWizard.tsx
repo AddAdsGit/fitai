@@ -21,7 +21,9 @@ import { parseAiHealthPrompt } from "../utils/aiGoalSetter";
 
 interface BodyMetrics {
   name: string;
+  username: string;
   avatar: string;
+  email?: string;
   gender: "Male" | "Female";
   age: number;
   height: number;
@@ -34,6 +36,7 @@ interface BodyMetrics {
 
 const DEFAULT_METRICS: BodyMetrics = {
   name: "",
+  username: "",
   avatar: "",
   gender: "Male",
   age: 0,
@@ -86,10 +89,19 @@ export const OnboardingWizard = ({
         initialAge = ageVal > 0 ? ageVal : 0;
       }
     }
+    const userMeta = profileData?.user_metadata || profileData?.user?.user_metadata;
+    const initialName = profileData?.name || profileData?.display_name || userMeta?.full_name || userMeta?.name || "";
+    const emailPrefix = (profileData?.email || profileData?.user?.email || userMeta?.email || "").split("@")[0].toLowerCase().replace(/[^a-z0-9_.]/g, "");
+    const initialUsername = profileData?.username || emailPrefix || initialName.toLowerCase().replace(/[^a-z0-9_.]/g, "");
+    const initialAvatar = profileData?.imageUrl || profileData?.image_url || userMeta?.avatar_url || userMeta?.picture || "";
+    const initialEmail = profileData?.email || profileData?.user?.email || userMeta?.email || "";
+
     return {
       ...DEFAULT_METRICS,
-      name: profileData?.name || profileData?.display_name || "",
-      avatar: profileData?.imageUrl || profileData?.image_url || "",
+      name: initialName,
+      username: initialUsername,
+      avatar: initialAvatar,
+      email: initialEmail,
       age: initialAge,
       height: profileData?.height || 0,
       weight: profileData?.weight || 0,
@@ -97,7 +109,8 @@ export const OnboardingWizard = ({
     };
   });
 
-  const [avatarPreview, setAvatarPreview] = useState(profileData?.imageUrl || profileData?.image_url || "");
+  const initialAvatarUrl = profileData?.imageUrl || profileData?.image_url || profileData?.user_metadata?.avatar_url || profileData?.user_metadata?.picture || "";
+  const [avatarPreview, setAvatarPreview] = useState(initialAvatarUrl);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
@@ -571,7 +584,7 @@ export const OnboardingWizard = ({
   };
 
   const saveProfileData = async () => {
-    const cleanUsername = (metrics.name.trim().toLowerCase().replace(/[^a-z0-9_]/g, "") || "user") + "_" + Math.random().toString(36).substring(7);
+    const userHandle = metrics.username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "") || (metrics.name.trim().toLowerCase().replace(/[^a-z0-9_.]/g, "") || "user");
 
     const goalText = metrics.goal === "Lose Weight" ? `lose weight (target: ${metrics.targetWeight}kg)` : metrics.goal === "Build Muscle" ? `build muscle (target: ${metrics.targetWeight}kg)` : "maintain weight";
     const silentBio = `Focusing on ${goalText} with a target of ${targets.calories} kcal & ${targets.protein}g protein daily! 💪`;
@@ -619,7 +632,7 @@ export const OnboardingWizard = ({
     const { error } = await supabase
       .from('profiles')
       .update({
-        username: cleanUsername,
+        username: userHandle,
         display_name: metrics.name.trim(),
         image_url: metrics.avatar || null,
         height: metrics.height,
@@ -738,8 +751,8 @@ export const OnboardingWizard = ({
             <div className="flex flex-col items-center gap-2 py-1">
               <div className="relative">
                 <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-stone-200 shadow-inner flex items-center justify-center bg-stone-100">
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                  {(avatarPreview || metrics.avatar) ? (
+                    <img src={avatarPreview || metrics.avatar} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
                     <DefaultAvatar />
                   )}
@@ -784,6 +797,26 @@ export const OnboardingWizard = ({
                 required
                 className="w-full bg-white border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-700 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-sm transition-all"
               />
+            </div>
+
+            {/* Username handle input */}
+            <div className="space-y-1 text-left">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Your Unique Handle (@username)
+              </label>
+              <div className="relative flex items-center">
+                <span className="absolute left-4 text-xs font-black text-stone-400">@</span>
+                <input
+                  type="text"
+                  placeholder="username"
+                  value={metrics.username}
+                  onChange={(e) => {
+                    const cleanVal = e.target.value.toLowerCase().replace(/[^a-z0-9_.]/g, "");
+                    setMetrics(prev => ({ ...prev, username: cleanVal }));
+                  }}
+                  className="w-full bg-white border border-stone-200 rounded-2xl pl-8 pr-4 py-3 text-xs font-bold text-stone-900 placeholder-stone-400 focus:outline-none focus:border-orange-500 shadow-2xs transition-all"
+                />
+              </div>
             </div>
 
             {/* Clean Terms Reference Link & Sign Out */}
