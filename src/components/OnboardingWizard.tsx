@@ -837,12 +837,12 @@ export const OnboardingWizard = ({
           </div>
         )}
 
-        {/* STEP 2: YOUR VITALS */}
+        {/* STEP 2: ABOUT YOU */}
         {step === 2 && (
           <div className="space-y-5 animate-fadeIn">
             <div className="text-center space-y-0.5">
               <h2 className="text-2xl font-black tracking-tight text-stone-900">
-                Your Vitals
+                About You
               </h2>
             </div>
 
@@ -876,7 +876,7 @@ export const OnboardingWizard = ({
               </label>
               <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
                 <StepperButton
-                  onStep={() => setMetrics(prev => ({ ...prev, age: Math.max(1, prev.age - 1) }))}
+                  onStep={() => setMetrics(prev => ({ ...prev, age: prev.age === 0 ? 25 : Math.max(1, prev.age - 1) }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Minus className="w-3.5 h-3.5" />
@@ -884,7 +884,7 @@ export const OnboardingWizard = ({
                 <div className="flex-1 flex items-center justify-center gap-0.5">
                   <input
                     type="number"
-                    placeholder="e.g. 25"
+                    placeholder="25"
                     value={metrics.age === 0 ? "" : metrics.age}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -895,7 +895,7 @@ export const OnboardingWizard = ({
                   <span className="text-[10px] font-bold text-stone-400">Yrs Old</span>
                 </div>
                 <StepperButton
-                  onStep={() => setMetrics(prev => ({ ...prev, age: Math.min(120, prev.age + 1) }))}
+                  onStep={() => setMetrics(prev => ({ ...prev, age: prev.age === 0 ? 25 : Math.min(120, prev.age + 1) }))}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -911,14 +911,14 @@ export const OnboardingWizard = ({
                 </label>
                 <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
                   <StepperButton
-                    onStep={() => setMetrics(prev => ({ ...prev, height: Math.max(1, prev.height - 1) }))}
+                    onStep={() => setMetrics(prev => ({ ...prev, height: prev.height === 0 ? 170 : Math.max(1, prev.height - 1) }))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </StepperButton>
                   <input
                     type="number"
-                    placeholder="175"
+                    placeholder="170"
                     value={metrics.height === 0 ? "" : metrics.height}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -927,7 +927,7 @@ export const OnboardingWizard = ({
                     className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <StepperButton
-                    onStep={() => setMetrics(prev => ({ ...prev, height: Math.min(250, prev.height + 1) }))}
+                    onStep={() => setMetrics(prev => ({ ...prev, height: prev.height === 0 ? 170 : Math.min(250, prev.height + 1) }))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -941,7 +941,7 @@ export const OnboardingWizard = ({
                 </label>
                 <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
                   <StepperButton
-                    onStep={() => handleCurrentWeightChange(String(Math.max(1, (metrics.weight || 0) - 1)))}
+                    onStep={() => setMetrics(prev => ({ ...prev, weight: prev.weight === 0 ? 70 : Math.max(1, prev.weight - 1) }))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Minus className="w-3.5 h-3.5" />
@@ -954,7 +954,7 @@ export const OnboardingWizard = ({
                     className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <StepperButton
-                    onStep={() => handleCurrentWeightChange(String(Math.min(300, (metrics.weight || 70) + 1)))}
+                    onStep={() => setMetrics(prev => ({ ...prev, weight: prev.weight === 0 ? 70 : Math.min(300, prev.weight + 1) }))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
                   >
                     <Plus className="w-3.5 h-3.5" />
