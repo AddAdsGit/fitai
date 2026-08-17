@@ -84,69 +84,7 @@ import { generateShareUrl } from "./utils/shareUtils";
 
 const INITIAL_MEALS: Meal[] = [];
 
-const INITIAL_RECIPES: Recipe[] = [
-  {
-    id: "rec-1",
-    name: "Steamed Idli with Sambar",
-    time: "10 mins",
-    calories: 220,
-    protein: 7,
-    carbs: 44,
-    fats: 1,
-    fiber: 5,
-    tags: ["Vegetarian", "Gluten Free"],
-    description: "Soft, steamed rice-and-lentil cakes served with mixed vegetable sambar.",
-    image: "/images/idli.jpg",
-    ingredients: [
-      "2 pieces Steamed Idli",
-      "1 bowl Vegetable Sambar",
-      "1 tbsp Coconut Chutney",
-    ],
-    instructions:
-      "Steam idli batter. Heat sambar and serve with coconut chutney on the side.",
-  },
-  {
-    id: "rec-2",
-    name: "Crispy Masala Dosa",
-    time: "12 mins",
-    calories: 360,
-    protein: 6,
-    carbs: 54,
-    fats: 12,
-    fiber: 4,
-    tags: ["Vegetarian", "Gluten Free"],
-    description: "Thin, crispy fermented rice crepe stuffed with a spiced potato mash.",
-    image: "/images/dosa.jpg",
-    ingredients: [
-      "1 cup Dosa Batter",
-      "100g Spiced Potato Mash (Alloo Masala)",
-      "1 tbsp Butter or Ghee",
-    ],
-    instructions:
-      "Spread batter thin on hot tawa. Drizzle butter, place potato filling, fold and crisp.",
-  },
-  {
-    id: "rec-3",
-    name: "Spinach & Cheese Omelette",
-    time: "10 mins",
-    calories: 290,
-    protein: 22,
-    carbs: 3,
-    fats: 22,
-    fiber: 2,
-    tags: ["Keto", "Low Carb"],
-    description: "A rich, cheesy omelette folded with fresh butter and sautéed baby spinach.",
-    image: "/images/omelette.jpg",
-    ingredients: [
-      "3 Large Eggs",
-      "1 cup Spinach",
-      "30g Cheddar Cheese",
-      "1 tbsp Butter",
-    ],
-    instructions:
-      "Whisk eggs. Melt butter. Sauté spinach. Add eggs, cook through and fold over melted cheese.",
-  },
-];
+const INITIAL_RECIPES: Recipe[] = [];
 
 // Components and helper utilities extracted to ./components and ./utils
 

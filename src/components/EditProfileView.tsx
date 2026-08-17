@@ -6,6 +6,7 @@ import { DefaultAvatar } from "./DefaultAvatar";
 import { DEFAULT_TRACKING_TAGS } from "./SettingsView";
 import { BloatingIcon } from "./BristolStoolIcons";
 import { StepperButton } from "./StepperButton";
+import { parseAiHealthPrompt } from "../utils/aiGoalSetter";
 
 export const COMMON_TAG_TEMPLATES = [
   { name: "Gluten Free", description: "Apply when meal contains no wheat, barley, rye, or gluten" },
@@ -81,6 +82,83 @@ export const EditProfileView = ({
   const [isNutrientDropdownOpen, setIsNutrientDropdownOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // AI Goal Assistant state
+  const [showAiGoalInput, setShowAiGoalInput] = useState(false);
+  const [aiGoalPrompt, setAiGoalPrompt] = useState("");
+  const [isAiGoalLoading, setIsAiGoalLoading] = useState(false);
+
+  const handleApplyAiGoalInEdit = () => {
+    if (!aiGoalPrompt.trim()) return;
+    setIsAiGoalLoading(true);
+    setTimeout(() => {
+      const res = parseAiHealthPrompt(aiGoalPrompt, {
+        weight: profileData.weight,
+        height: profileData.height,
+        age: profileData.dob ? new Date().getFullYear() - new Date(profileData.dob).getFullYear() : 25,
+        gender: profileData.gender
+      });
+
+      if (res.targetWeight && res.targetWeight > 0) {
+        setProfileData(prev => ({
+          ...prev,
+          weight_goal: res.targetWeight
+        }));
+      }
+      const existingTracked = profileData.tracked_nutrients || [];
+
+      const updatedTracked = FAMOUS_NUTRIENTS_CATALOG.map((item) => {
+        const existing = existingTracked.find((t: any) => t.id === item.id);
+        const isRecommended = res.recommendedNutrientsToEnable.includes(item.id);
+        let targetVal = existing?.target || item.target;
+        if (item.id === "protein") targetVal = res.protein;
+        if (item.id === "carbs") targetVal = res.carbs;
+        if (item.id === "fats") targetVal = res.fats;
+        if (item.id === "fiber") targetVal = res.fiber;
+
+        return {
+          id: item.id,
+          name: item.name,
+          target: targetVal,
+          unit: item.unit,
+          color: item.color,
+          enabled: isRecommended ? true : (existing?.enabled ?? ["protein", "carbs", "fats", "fiber"].includes(item.id)),
+          type: item.category === "Macros" ? "macro" : "micro"
+        };
+      });
+
+      const updatedHealthMemory = Array.from(new Set([
+        ...(profileData.knowledge?.health || []),
+        res.healthMemoryNote
+      ])).filter(Boolean);
+
+      setProfileData(prev => ({
+        ...prev,
+        daily_calories_goal: res.calories,
+        weight_goal: res.targetWeight || prev.weight_goal,
+        goals: {
+          ...prev.goals,
+          dailyCalories: res.calories,
+          weightGoal: res.targetWeight || prev.goals?.weightGoal
+        },
+        macros: {
+          protein: res.protein,
+          carbs: res.carbs,
+          fats: res.fats,
+          fiber: res.fiber,
+        },
+        tracked_nutrients: updatedTracked,
+        knowledge: {
+          ...prev.knowledge,
+          health: updatedHealthMemory,
+        }
+      }));
+
+      setIsAiGoalLoading(false);
+      setShowAiGoalInput(false);
+      setAiGoalPrompt("");
+    }, 350);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
@@ -1050,6 +1128,57 @@ export const EditProfileView = ({
                       </div>
                     );
                   })()}
+
+                  {/* STICKY / BOTTOM DOCKED AI PANEL — Recipe AI Editor Formula */}
+                  <div className="pt-3 border-t border-stone-100">
+                    {showAiGoalInput ? (
+                      <div className="space-y-2.5 animate-fade-in text-left bg-orange-50/60 p-3.5 rounded-2xl border border-orange-200/80">
+                        <div className="flex items-center justify-between text-[10px] font-black uppercase text-orange-950">
+                          <span>AI Health & Calorie Setup</span>
+                          <button type="button" onClick={() => setShowAiGoalInput(false)} className="text-orange-400 hover:text-orange-700 bg-transparent border-none cursor-pointer">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <textarea
+                          rows={3}
+                          placeholder="Describe health conditions or diet goals (e.g. Diabetes, Keto fat loss, Marathon prep)..."
+                          value={aiGoalPrompt}
+                          onChange={(e) => setAiGoalPrompt(e.target.value)}
+                          className="w-full bg-white border border-orange-200/90 focus:border-orange-500 focus:outline-none rounded-xl p-3 text-xs font-bold text-stone-900 placeholder:text-stone-400 resize-y min-h-[76px] max-h-[140px] shadow-inner leading-relaxed"
+                          autoFocus
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAiGoalInput(false);
+                              setAiGoalPrompt("");
+                            }}
+                            className="h-10 rounded-xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-3xs"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleApplyAiGoalInEdit}
+                            disabled={isAiGoalLoading || !aiGoalPrompt.trim()}
+                            className="h-10 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-md shadow-orange-500/25 flex items-center justify-center disabled:opacity-40 border-none"
+                          >
+                            <span>{isAiGoalLoading ? "Calculating..." : "Auto-Set"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowAiGoalInput(true)}
+                        className="w-full h-11 bg-white/80 hover:bg-white text-orange-950 border border-white rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2 font-black text-xs uppercase tracking-wider active:scale-95 shadow-md shadow-orange-100/30"
+                      >
+                        <Sparkles className="w-4 h-4 text-orange-500 shrink-0" />
+                        <span>AI Auto-Set Goals & Health</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 

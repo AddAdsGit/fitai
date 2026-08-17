@@ -25,6 +25,7 @@ info:
        b. Estimate the updated calorie/macro totals based on the change request.
        c. Call PATCH /meals?id=<id> with the updated calorie/macro numbers.
     3. Deleting Logged Meals: If the user requests to delete or remove a logged item, the GPT must call GET /meals to find the ID and invoke DELETE /meals?id=<id>.
+    4. Health Conditions, Injuries & AI Agent Memory: Whenever the user mentions a health condition, injury, food allergy, or preference during conversation (e.g. 'I have Thyroid', 'I injured my knee'), the GPT MUST call PATCH /profile and include the note under knowledge_health or knowledge_notes so it is permanently remembered in the user's AI Agent Memory!
   version: 1.0.0
 servers:
   - url: ${edgeFunctionUrl}
@@ -671,7 +672,7 @@ security:
 `;
 
 export const DEFAULT_TRACKING_TAGS = [
-  { id: 'best_meal', name: 'Best Meal for Me', description: 'Apply when meal is exceptionally nutrient-dense, goal-aligned, or a top-rated saved recipe', enabled: true },
+  { id: 'best_meal', name: 'Best Meal for Me', description: 'Apply when meal is exceptionally nutrient-dense, personalized to your goals, or a favorite saved meal', enabled: true },
   { id: 'homemade', name: 'Homemade', description: 'Apply when meal is cooked at home from scratch', enabled: true },
   { id: 'outside_food', name: 'Outside Food', description: 'Apply when meal is from a restaurant, street vendor, or food delivery', enabled: true },
   { id: 'vegan', name: 'Vegan', description: 'Apply when meal contains no animal products', enabled: true },

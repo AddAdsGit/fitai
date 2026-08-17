@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { X, Camera, Sparkles, Image as ImageIcon, FileText, Share2, Wand2, Check } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
+import { analyzeFoodPhotoWithAI } from "../utils/geminiFoodAnalysis";
 
 export const CameraLogModal = ({
   isOpen,
@@ -75,84 +76,34 @@ export const CameraLogModal = ({
   const handleAnalyzeAndLog = async () => {
     if (!uploadedImage) return;
 
-    const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-    const key = geminiKeyTag.split(":")[1] || "";
-
     setIsProcessing(true);
     setErrorMessage("");
 
     try {
-      let mealData: any = null;
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-      if (!key) {
-        // Dev Mode Failsafe: Provide smart dev mock analysis so local testing works seamlessly on Mac & mobile!
-        const mockMealName = notes.trim() ? notes.trim() : "Scanned Healthy Meal";
-        mealData = {
-          id: `camera_log_${Date.now()}`,
-          name: mockMealName,
-          calories: 450,
-          protein: 32,
-          carbs: 45,
-          fats: 14,
-          fiber: 6,
-          type: "Camera Log",
-          time: timeStr,
-          image: uploadedImage,
-          meal_description: notes.trim() || "AI Photo Recognition Log",
-          tags: ["Photo Log"]
-        };
-      } else {
-        // Production Gemini Multimodal Analysis
-        const base64Data = uploadedImage.split(",")[1];
-        const mimeType = uploadedImage.split(";")[0].split(":")[1] || "image/jpeg";
+      const aiResult = await analyzeFoodPhotoWithAI({
+        imageBase64: uploadedImage,
+        notes,
+        profileData,
+      });
 
-        const promptText = `Analyze this food image. User note: "${notes}". Estimate: meal name, calories (kcal), protein (g), carbs (g), fats (g), fiber (g). Return ONLY valid JSON: {"name":"...","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0}`;
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { text: promptText },
-                    { inline_data: { mime_type: mimeType, data: base64Data } }
-                  ]
-                }
-              ]
-            })
-          }
-        );
-
-        const data = await response.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        
-        if (!jsonMatch) {
-          throw new Error("Could not parse nutrition data from photo. Please try again.");
-        }
-
-        const parsed = JSON.parse(jsonMatch[0]);
-
-        mealData = {
-          id: `camera_log_${Date.now()}`,
-          name: parsed.name || "Scanned Healthy Meal",
-          calories: parseInt(parsed.calories) || 350,
-          protein: parseInt(parsed.protein) || 25,
-          carbs: parseInt(parsed.carbs) || 35,
-          fats: parseInt(parsed.fats) || 12,
-          fiber: parseInt(parsed.fiber) || 5,
-          type: "Camera Log",
-          time: timeStr,
-          image: uploadedImage,
-          meal_description: notes.trim() || "AI Photo Recognition Log",
-          tags: ["Photo Log"]
-        };
-      }
+      const mealData = {
+        id: `camera_log_${Date.now()}`,
+        name: aiResult.name,
+        calories: aiResult.calories,
+        protein: aiResult.protein,
+        carbs: aiResult.carbs,
+        fats: aiResult.fats,
+        fiber: aiResult.fiber,
+        nutrients: aiResult.nutrients,
+        type: "Camera Log",
+        time: timeStr,
+        image: uploadedImage,
+        meal_description: aiResult.meal_description,
+        tags: aiResult.tags,
+      };
 
       // Log meal to app state & set logged result for visual card preview!
       onAddMeal(mealData);

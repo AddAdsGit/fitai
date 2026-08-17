@@ -46,6 +46,7 @@ import {
   FoodFilterState,
 } from "../utils/foodFilter";
 import { AiClarificationModal, PendingAiClarification } from "./AiClarificationModal";
+import { analyzeFoodPhotoWithAI, refineMealWithAI } from "../utils/geminiFoodAnalysis";
 
 export const CameraLogView = ({
   setActiveTab,
@@ -569,128 +570,49 @@ export const CameraLogView = ({
 
     const combinedNotes = getFullCombinedPrompt();
 
-    const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-    const key = geminiKeyTag.split(":")[1] || "";
-
     setIsProcessing(true);
     setErrorMessage("");
 
     try {
-      let mealData: any = null;
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-      const dynamicNutrientValues: Record<string, number> = {};
-      (activeTrackedNutrients || []).forEach((n) => {
-        if (n.id === "protein") dynamicNutrientValues.protein = 32;
-        else if (n.id === "carbs") dynamicNutrientValues.carbs = 45;
-        else if (n.id === "fats") dynamicNutrientValues.fats = 14;
-        else if (n.id === "fiber") dynamicNutrientValues.fiber = 6;
-        else if (n.id === "caffeine") dynamicNutrientValues.caffeine = 95;
-        else if (n.id === "sugar") dynamicNutrientValues.sugar = 8;
-        else if (n.id === "sodium") dynamicNutrientValues.sodium = 380;
-        else dynamicNutrientValues[n.id] = 10;
+      const aiResult = await analyzeFoodPhotoWithAI({
+        imageBase64: targetImage,
+        notes: combinedNotes,
+        trackedNutrients: activeTrackedNutrients,
+        profileData,
       });
 
-      const detectedTags: string[] = ["Photo Log"];
-      const lowerNotes = combinedNotes.toLowerCase();
-      if (lowerNotes.includes("egg") || lowerNotes.includes("chicken") || lowerNotes.includes("protein")) detectedTags.push("High Protein");
-      if (lowerNotes.includes("sourdough") || lowerNotes.includes("bread") || lowerNotes.includes("carb")) detectedTags.push("Low Fat");
-      if (lowerNotes.includes("coffee") || lowerNotes.includes("espresso")) detectedTags.push("Caffeine");
-      if (lowerNotes.includes("keto") || lowerNotes.includes("avocado")) detectedTags.push("Keto");
-      if (detectedTags.length === 1) detectedTags.push("Balanced");
+      const mealData = {
+        id: `camera_log_${Date.now()}`,
+        name: aiResult.name,
+        calories: aiResult.calories,
+        protein: aiResult.protein,
+        carbs: aiResult.carbs,
+        fats: aiResult.fats,
+        fiber: aiResult.fiber,
+        nutrients: aiResult.nutrients,
+        type: "Camera Log",
+        time: timeStr,
+        image: targetImage,
+        meal_description: aiResult.meal_description,
+        tags: aiResult.tags,
+      };
 
-      if (!key) {
-        const mockMealName = combinedNotes.trim() ? combinedNotes.trim() : "Scanned Healthy Meal";
-        mealData = {
-          id: `camera_log_${Date.now()}`,
-          name: mockMealName,
-          calories: 450,
-          protein: dynamicNutrientValues.protein || 32,
-          carbs: dynamicNutrientValues.carbs || 45,
-          fats: dynamicNutrientValues.fats || 14,
-          fiber: dynamicNutrientValues.fiber || 6,
-          nutrients: dynamicNutrientValues,
-          type: "Camera Log",
-          time: timeStr,
-          image: targetImage,
-          meal_description: combinedNotes.trim() || "AI Photo Recognition Log",
-          tags: detectedTags
-        };
-      } else {
-        const base64Data = targetImage.split(",")[1];
-        const mimeType = targetImage.split(";")[0].split(":")[1] || "image/jpeg";
-
-        const nutrientPromptList = (activeTrackedNutrients || [])
-          .map((n) => `"${n.id}": (${n.name} in ${n.unit})`)
-          .join(", ");
-
-        const promptText = `Analyze this image. User notes: "${combinedNotes}". FIRST check if the main subject is edible food or a beverage. If it is NOT food (e.g. pen, stationery, keys, phone, desk, clothing), return JSON: {"isFood": false, "name": "Pen", "confidenceScore": 15}. If it IS food, estimate meal name, confidenceScore (0-100), total calories (kcal), dietary tags (clean text only e.g. ["High Protein"]), and user-tracked nutrients: ${nutrientPromptList}. Return ONLY valid JSON: {"isFood": true, "name":"...", "confidenceScore": 85, "calories":0,"tags":["High Protein"],"nutrients":{"protein":0,"carbs":0,"fats":0,"fiber":0}}`;
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { text: promptText },
-                    { inline_data: { mime_type: mimeType, data: base64Data } }
-                  ]
-                }
-              ]
-            })
-          }
-        );
-
-        const data = await response.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        
-        if (!jsonMatch) {
-          throw new Error("Could not parse nutrition data from photo. Please try again.");
-        }
-
-        const parsed = JSON.parse(jsonMatch[0]);
-        const parsedNutrients = parsed.nutrients || {};
-        const rawTags = Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : detectedTags;
-        
-        const cleanParsedTags = rawTags.map((t: string) => t.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "").trim());
-
-        mealData = {
-          id: `camera_log_${Date.now()}`,
-          name: parsed.name || "Scanned Healthy Meal",
-          calories: parseInt(parsed.calories) || 350,
-          protein: parseInt(parsedNutrients.protein || parsed.protein) || 25,
-          carbs: parseInt(parsedNutrients.carbs || parsed.carbs) || 35,
-          fats: parseInt(parsedNutrients.fats || parsed.fats) || 12,
-          fiber: parseInt(parsedNutrients.fiber || parsed.fiber) || 5,
-          nutrients: parsedNutrients,
-          type: "Camera Log",
-          time: timeStr,
-          image: targetImage,
-          meal_description: combinedNotes.trim() || "AI Photo Recognition Log",
-          tags: cleanParsedTags
-        };
-      }
-
-      // AI Confidence Score Check (Threshold: 90% & Non-Food Guardrail)
-      const isNonFoodDetected = mealData.isFood === false || (mealData.name && (mealData.name.toLowerCase().includes("pen") || mealData.name.toLowerCase().includes("stationery") || mealData.name.toLowerCase().includes("keys") || mealData.name.toLowerCase().includes("phone")));
-
-      const confidence = isNonFoodDetected ? 15 : (mealData.confidenceScore || (combinedNotes.length > 15 ? 92 : 78));
+      const isNonFoodDetected = aiResult.isFood === false;
+      const confidence = isNonFoodDetected ? 15 : (aiResult.confidenceScore || 85);
 
       if ((isNonFoodDetected || confidence < 90) && !hasBeenClarified) {
         setPendingClarification({
           mealData,
           confidenceScore: confidence,
           isNonFood: isNonFoodDetected,
-          detectedObject: mealData.name || "Pen",
+          detectedObject: aiResult.name || "Object",
           image: targetImage,
           question: isNonFoodDetected
-            ? `That looks like a ${mealData.name || "Pen 🖊️"} (non-food item)!`
-            : `Is this "${mealData.name}" prepared with homemade ingredients or restaurant style?`,
+            ? `That looks like a ${aiResult.name} (non-food item)!`
+            : `Is this "${aiResult.name}" prepared with homemade ingredients or restaurant style?`,
           options: isNonFoodDetected
             ? ["Retake Photo", "Search Food Library"]
             : ["Homemade / Healthy Preparation", "Restaurant / Outside Food", "Extra Large Portion"]
@@ -706,7 +628,7 @@ export const CameraLogView = ({
       setEditableDesc(mealData.meal_description);
       setEditableCalories(mealData.calories);
       setEditableTags(mealData.tags || []);
-      setEditableNutrients(mealData.nutrients || dynamicNutrientValues);
+      setEditableNutrients(mealData.nutrients || {});
       setEditableTime(mealData.time || timeStr);
       setRefinePrompt("");
       
@@ -715,7 +637,7 @@ export const CameraLogView = ({
       setFlowStep("preview");
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || "Failed to analyze photo.");
+      setErrorMessage(err.message || "Failed to analyze photo. Please check your Gemini API key in Settings.");
       setIsProcessing(false);
     }
   };
@@ -760,9 +682,6 @@ export const CameraLogView = ({
   const handleRefineWithAI = async () => {
     if (!refinePrompt.trim() && !attachedItem) return;
 
-    const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-    const key = geminiKeyTag.split(":")[1] || "";
-
     setIsRefining(true);
 
     try {
@@ -770,106 +689,51 @@ export const CameraLogView = ({
         ? `Attached reference dish: "${attachedItem.name}". Modification instruction: "${refinePrompt.trim()}"`
         : refinePrompt.trim();
 
-      const nutrientPromptList = (activeTrackedNutrients || [])
-        .map((n) => `"${n.id}": (${n.name} in ${n.unit})`)
-        .join(", ");
-
-      if (!key) {
-        // Smart Local Refinement Engine
-        const currentCal = editableCalories || 450;
-        let adjustedCal = currentCal;
-        const lower = combinedRefinement.toLowerCase();
-        if (lower.includes("half") || lower.includes("1/2")) adjustedCal = Math.round(currentCal * 0.5);
-        else if (lower.includes("double") || lower.includes("twice")) adjustedCal = currentCal * 2;
-        else if (lower.includes("no dressing") || lower.includes("no oil") || lower.includes("without sauce")) adjustedCal = Math.max(100, currentCal - 120);
-        else if (lower.includes("add") || lower.includes("extra") || lower.includes("plus")) adjustedCal = currentCal + 150;
-        else adjustedCal = Math.max(50, Math.round(currentCal * 0.85));
-
-        const ratio = adjustedCal / (currentCal || 1);
-        const newNutrients: Record<string, number> = {};
-        Object.keys(editableNutrients).forEach((k) => {
-          newNutrients[k] = Math.max(0, Math.round((editableNutrients[k] || 0) * ratio));
-        });
-
-        const newName = editableName;
-        const newDesc = `${editableDesc ? editableDesc + " • " : ""}${refinePrompt.trim()}`;
-
-        setEditableCalories(adjustedCal);
-        setEditableNutrients(newNutrients);
-        setEditableDesc(newDesc);
-
-        const updatedMeal = {
-          ...loggedMealResult,
-          name: newName,
-          calories: adjustedCal,
-          nutrients: newNutrients,
-          meal_description: newDesc,
+      const refinedResult = await refineMealWithAI({
+        currentMeal: {
+          name: editableName,
+          calories: editableCalories,
+          meal_description: editableDesc,
+          nutrients: editableNutrients,
           tags: editableTags,
-          time: editableTime || loggedMealResult?.time || "12:00 PM",
-        };
-        setLoggedMealResult(updatedMeal);
-        onAddMeal(updatedMeal);
-        setRefinePrompt("");
-        setAttachedItem(null);
-        setShowAiRefineInput(false);
-        triggerToast("Meal refined with AI! ✨");
-        setIsRefining(false);
-        return;
-      }
+        },
+        refinePrompt: combinedRefinement,
+        trackedNutrients: activeTrackedNutrients,
+        profileData,
+      });
 
-      // Live Gemini 1.5 Flash AI Refinement
-      const promptText = `The user has logged a meal: "${editableName}" with ${editableCalories} kcal, current notes: "${editableDesc}", nutrients: ${JSON.stringify(editableNutrients)}, tags: ${JSON.stringify(editableTags)}. The user now wants to refine this meal with these specific instructions: "${combinedRefinement}". Calculate the new meal name, updated total calories (kcal), new meal description/notes, updated clean dietary tags (e.g. ["High Protein"]), and updated user nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":{"protein":0,"carbs":0,"fats":0,"fiber":0}}`;
+      const updatedName = refinedResult.name || editableName;
+      const updatedCal = refinedResult.calories || editableCalories;
+      const updatedDesc = refinedResult.meal_description || editableDesc;
+      const updatedNutrients = refinedResult.nutrients || editableNutrients;
+      const updatedTags = refinedResult.tags || editableTags;
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }]
-          })
-        }
-      );
+      setEditableName(updatedName);
+      setEditableCalories(updatedCal);
+      setEditableNutrients(updatedNutrients);
+      setEditableDesc(updatedDesc);
+      setEditableTags(updatedTags);
 
-      const data = await response.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      const updatedMeal = {
+        ...loggedMealResult,
+        name: updatedName,
+        calories: updatedCal,
+        nutrients: updatedNutrients,
+        meal_description: updatedDesc,
+        tags: updatedTags,
+        time: editableTime || loggedMealResult?.time || "12:00 PM",
+      };
 
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        const updatedCal = parseInt(parsed.calories) || editableCalories;
-        const updatedNutrients = parsed.nutrients || editableNutrients;
-        const updatedName = parsed.name || editableName;
-        const updatedDesc = parsed.meal_description || `${editableDesc ? editableDesc + " • " : ""}${refinePrompt.trim()}`;
-        const rawTags = Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : editableTags;
-        const cleanTags = rawTags.map((t: string) => t.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "").trim());
-
-        setEditableName(updatedName);
-        setEditableCalories(updatedCal);
-        setEditableNutrients(updatedNutrients);
-        setEditableDesc(updatedDesc);
-        setEditableTags(cleanTags);
-
-        const updatedMeal = {
-          ...loggedMealResult,
-          name: updatedName,
-          calories: updatedCal,
-          nutrients: updatedNutrients,
-          meal_description: updatedDesc,
-          tags: cleanTags,
-          time: editableTime || loggedMealResult?.time || "12:00 PM",
-        };
-        setLoggedMealResult(updatedMeal);
-        onAddMeal(updatedMeal);
-        setRefinePrompt("");
-        setAttachedItem(null);
-        setShowAiRefineInput(false);
-        triggerToast("Meal refined with AI! ✨");
-      }
+      setLoggedMealResult(updatedMeal);
+      onAddMeal(updatedMeal);
+      setRefinePrompt("");
+      setAttachedItem(null);
+      setShowAiRefineInput(false);
+      triggerToast("Meal refined with AI! ✨");
       setIsRefining(false);
     } catch (err: any) {
       console.error(err);
-      triggerToast("Could not refine meal. Please try again.");
+      triggerToast(err.message || "Could not refine meal with AI.");
       setIsRefining(false);
     }
   };

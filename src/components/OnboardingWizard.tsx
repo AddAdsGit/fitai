@@ -8,13 +8,16 @@ import {
   Search,
   X,
   Pencil,
-  Sparkles
+  Sparkles,
+  Check
 } from "lucide-react";
 
 import { DefaultAvatar } from "./DefaultAvatar";
 import { TERMS_AND_CONDITIONS } from "../constants/terms";
+import { DEFAULT_TRACKING_TAGS } from "./SettingsView";
 import { DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
 import { StepperButton } from "./StepperButton";
+import { parseAiHealthPrompt } from "../utils/aiGoalSetter";
 
 interface BodyMetrics {
   name: string;
@@ -33,11 +36,11 @@ const DEFAULT_METRICS: BodyMetrics = {
   name: "",
   avatar: "",
   gender: "Male",
-  age: 28,
-  height: 175,
-  weight: 70,
+  age: 0,
+  height: 0,
+  weight: 0,
   goal: "Maintain Weight",
-  targetWeight: 70,
+  targetWeight: 0,
   activityLevel: "Moderately Active",
   preferences: [],
 };
@@ -70,7 +73,7 @@ export const OnboardingWizard = ({
 }) => {
   const [step, setStep] = useState(1);
   const [metrics, setMetrics] = useState<BodyMetrics>(() => {
-    let initialAge = 28;
+    let initialAge = 0;
     if (profileData?.dob) {
       const birthDate = new Date(profileData.dob);
       if (!isNaN(birthDate.getTime())) {
@@ -80,7 +83,7 @@ export const OnboardingWizard = ({
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
           ageVal--;
         }
-        initialAge = ageVal || 28;
+        initialAge = ageVal > 0 ? ageVal : 0;
       }
     }
     return {
@@ -88,9 +91,9 @@ export const OnboardingWizard = ({
       name: profileData?.name || profileData?.display_name || "",
       avatar: profileData?.imageUrl || profileData?.image_url || "",
       age: initialAge,
-      height: profileData?.height || 175,
-      weight: profileData?.weight || 70,
-      targetWeight: profileData?.weight_goal || profileData?.weight || 70,
+      height: profileData?.height || 0,
+      weight: profileData?.weight || 0,
+      targetWeight: profileData?.weight_goal || profileData?.weight || 0,
     };
   });
 
@@ -100,25 +103,21 @@ export const OnboardingWizard = ({
 
   // Targets state (configured on Step 3)
   const [targets, setTargets] = useState({
-    calories: 2000,
-    protein: 150,
-    carbs: 150,
-    fats: 60,
-    fiber: 30,
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fats: 0,
+    fiber: 0,
   });
 
-  // AI Meal Tracking Tags State (Step 6 - Clean Card Model matching Nutrient Tracker)
-  const [aiTrackingTags, setAiTrackingTags] = useState([
-    { id: "tag_hp", name: "High Protein", description: "Apply when meal has >= 30g protein", enabled: true },
-    { id: "tag_gf", name: "Gluten Free", description: "Apply when meal contains no gluten ingredients", enabled: false },
-    { id: "tag_keto", name: "Keto", description: "Apply when meal has <= 10g net carbs", enabled: false },
-    { id: "tag_if", name: "Intermittent Fasting", description: "Apply during daily eating window", enabled: false },
-    { id: "tag_home", name: "Homemade", description: "Apply for home-cooked meals", enabled: true }
-  ]);
+  // AI Meal Tracking Tags State (Step 6 - Clean Card Model matching Edit Profile)
+  const [aiTrackingTags, setAiTrackingTags] = useState(() => DEFAULT_TRACKING_TAGS);
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [showCustomTagForm, setShowCustomTagForm] = useState(false);
   const [customTagName, setCustomTagName] = useState("");
   const [customTagRule, setCustomTagRule] = useState("");
+  const [tagSearchQuery, setTagSearchQuery] = useState("");
+  const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
 
   // Vitals Selection State (Step 5)
   const [selectedVitals, setSelectedVitals] = useState({
@@ -126,6 +125,7 @@ export const OnboardingWizard = ({
     water: false,
     digestion: false,
     energy: false,
+    bloating: true,
   });
 
   // Tracked Nutrients List (Step 4 - Edit Profile Model)
@@ -135,18 +135,116 @@ export const OnboardingWizard = ({
 
   const [nutrientSearchQuery, setNutrientSearchQuery] = useState("");
   const [isNutrientDropdownOpen, setIsNutrientDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const nutrientDropdownRef = useRef<HTMLDivElement>(null);
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Auto-close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (nutrientDropdownRef.current && !nutrientDropdownRef.current.contains(event.target as Node)) {
         setIsNutrientDropdownOpen(false);
       }
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(event.target as Node)) {
+        setIsTagDropdownOpen(false);
+      }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
+
+  const draftKey = activeProfileId ? `fitai_onboarding_draft_${activeProfileId}` : "fitai_onboarding_draft";
+
+  // Load onboarding draft state on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.step && parsed.step >= 1 && parsed.step <= 6) {
+          setStep(parsed.step);
+        }
+        if (parsed.metrics) setMetrics(prev => ({ ...prev, ...parsed.metrics }));
+        if (parsed.targets) setTargets(prev => ({ ...prev, ...parsed.targets }));
+      }
+    } catch (e) {
+      console.warn("Could not parse onboarding draft:", e);
+    }
+  }, [draftKey]);
+
+  // Persist onboarding draft state on changes
+  useEffect(() => {
+    try {
+      if (step >= 1 && step <= 6) {
+        localStorage.setItem(draftKey, JSON.stringify({ step, metrics, targets }));
+      } else if (step === 7) {
+        localStorage.removeItem(draftKey);
+      }
+    } catch (e) {
+      console.warn("Could not save onboarding draft:", e);
+    }
+  }, [step, metrics, targets, draftKey]);
+
+  // AI Goal Assistant state
+  const [showAiGoalInput, setShowAiGoalInput] = useState(false);
+  const [aiGoalPrompt, setAiGoalPrompt] = useState("");
+  const [lastGeneratedPrompt, setLastGeneratedPrompt] = useState("");
+  const [aiAppliedReason, setAiAppliedReason] = useState("");
+  const [isAiGoalLoading, setIsAiGoalLoading] = useState(false);
+
+  const isPromptGenerated = aiGoalPrompt.trim() !== "" && aiGoalPrompt.trim() === lastGeneratedPrompt.trim();
+
+  const handleApplyAiGoal = () => {
+    if (!aiGoalPrompt.trim() || isPromptGenerated) return;
+    setIsAiGoalLoading(true);
+    setLastGeneratedPrompt(aiGoalPrompt.trim());
+    setTimeout(() => {
+      const res = parseAiHealthPrompt(aiGoalPrompt, metrics);
+      setTargets({
+        calories: res.calories,
+        protein: res.protein,
+        carbs: res.carbs,
+        fats: res.fats,
+        fiber: res.fiber,
+      });
+
+      if (res.targetWeight && res.targetWeight > 0) {
+        setMetrics(prev => ({
+          ...prev,
+          targetWeight: res.targetWeight
+        }));
+      }
+
+      // Update macro targets in trackedNutrientList (only enable new slots if generating directly on Step 4)
+      setTrackedNutrientList(prev => prev.map(n => {
+        const isRecommended = step === 4 && res.recommendedNutrientsToEnable.includes(n.id);
+        let targetVal = n.target;
+        if (n.id === "protein") targetVal = res.protein;
+        if (n.id === "carbs") targetVal = res.carbs;
+        if (n.id === "fats") targetVal = res.fats;
+        if (n.id === "fiber") targetVal = res.fiber;
+        return {
+          ...n,
+          target: targetVal,
+          enabled: isRecommended ? true : n.enabled
+        };
+      }));
+
+      setAiAppliedReason(res.summaryReason);
+
+      if (res.healthMemoryNote) {
+        setMetrics(prev => ({
+          ...prev,
+          preferences: Array.from(new Set([...(prev.preferences || []), res.healthMemoryNote]))
+        }));
+      }
+
+      triggerToast(`✨ ${res.summaryReason}`);
+      setIsAiGoalLoading(false);
+      setShowAiGoalInput(false);
+    }, 350);
+  };
 
   // Step 7 AI Generation Loading animation (Total steps = 7)
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -312,13 +410,38 @@ export const OnboardingWizard = ({
     }
   }, [profileData]);
 
-  // Perform Mifflin-St Jeor calculation (used ONCE for default baseline recommendations)
+  const calculateBmiIdealWeight = (heightCm: number, currentWeight: number, goal: string) => {
+    if (heightCm <= 0) return currentWeight > 0 ? currentWeight : 65;
+    const heightM = heightCm / 100;
+    const bmiIdeal = Math.round(22 * heightM * heightM);
+    
+    if (goal === "Maintain Weight") {
+      return currentWeight > 0 ? currentWeight : bmiIdeal;
+    }
+    if (goal === "Build Muscle") {
+      if (currentWeight > 0) {
+        // If overweight (currentWeight > bmiIdeal + 3), target body recomposition at current weight
+        if (currentWeight > bmiIdeal + 3) {
+          return currentWeight;
+        }
+        return Math.round(currentWeight * 1.03);
+      }
+      return Math.round(bmiIdeal * 1.03);
+    }
+    // Fat Loss:
+    if (currentWeight > 0 && currentWeight > bmiIdeal) {
+      return bmiIdeal;
+    }
+    return currentWeight > 0 ? Math.max(30, Math.round(currentWeight - 4)) : bmiIdeal;
+  };
+
+  // Perform Mifflin-St Jeor calculation (used for dynamic recommendations)
   const calculateRecommendedTargets = (currentMetrics: BodyMetrics) => {
     if (currentMetrics.height <= 0 || currentMetrics.weight <= 0) {
       return { calories: 2000, protein: 150, carbs: 150, fats: 60, fiber: 30 };
     }
 
-    const age = currentMetrics.age;
+    const age = currentMetrics.age > 0 ? currentMetrics.age : 25;
     let bmr = 0;
     
     if (currentMetrics.gender === "Male") {
@@ -327,15 +450,14 @@ export const OnboardingWizard = ({
       bmr = 10 * currentMetrics.weight + 6.25 * currentMetrics.height - 5 * age - 161;
     }
 
-    const multiplier = 1.55;
+    const multiplier = 1.45;
     const tdee = bmr * multiplier;
 
     let targetCalories = Math.round(tdee);
     if (currentMetrics.goal === "Lose Weight") {
-      targetCalories = Math.round(tdee - 450);
-      if (targetCalories < 1200) targetCalories = 1200;
+      targetCalories = Math.max(1200, Math.round(tdee * 0.80)); // 20% deficit
     } else if (currentMetrics.goal === "Build Muscle") {
-      targetCalories = Math.round(tdee + 300);
+      targetCalories = Math.round(tdee * 1.15); // 15% surplus
     }
 
     let proteinMultiplier = 1.8;
@@ -360,10 +482,7 @@ export const OnboardingWizard = ({
     };
   };
 
-  useEffect(() => {
-    const recommended = calculateRecommendedTargets(metrics);
-    setTargets(recommended);
-  }, [metrics.gender, metrics.age, metrics.height, metrics.weight]);
+  // Targets populate dynamically when user selects Primary Goal or runs AI Goal Setter
 
   const handleCurrentWeightChange = (raw: string) => {
     if (raw === "") {
@@ -511,7 +630,7 @@ export const OnboardingWizard = ({
         preferences: updatedPrefs,
         tracking_tags: activeTags,
         knowledge_preferences: metrics.preferences || [],
-        knowledge_health: [],
+        knowledge_health: aiGoalPrompt.trim() ? [aiGoalPrompt.trim()] : [],
         knowledge_notes: [],
         knowledge_patterns: [],
         agent_memory: [],
@@ -577,11 +696,16 @@ export const OnboardingWizard = ({
     (item.name.toLowerCase().includes(nutrientSearchQuery.toLowerCase()) || item.id.toLowerCase().includes(nutrientSearchQuery.toLowerCase()))
   );
 
+  const filteredTagCatalog = DEFAULT_TRACKING_TAGS.filter(item =>
+    !aiTrackingTags.some(t => t.id === item.id && t.enabled) &&
+    (item.name.toLowerCase().includes(tagSearchQuery.toLowerCase()) || item.description.toLowerCase().includes(tagSearchQuery.toLowerCase()))
+  );
+
   return (
-    <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-6 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
+    <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 p-5 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
       
       {/* Sleek Header Progress Bar */}
-      <div className="w-full flex items-center justify-between gap-4 py-2 border-b border-stone-200/50">
+      <div className="w-full flex items-center justify-between gap-4 py-2 border-b border-stone-200/50 shrink-0">
         <button
           onClick={handleBack}
           disabled={step === 1 || step === 7}
@@ -599,7 +723,7 @@ export const OnboardingWizard = ({
       </div>
 
       {/* Steps Content */}
-      <div className="flex-1 flex flex-col justify-center py-4">
+      <div className="flex-1 min-h-0 flex flex-col justify-center py-2 overflow-y-auto pr-0.5 scrollbar-hide">
         
         {/* STEP 1: YOUR PROFILE */}
         {step === 1 && (
@@ -632,8 +756,22 @@ export const OnboardingWizard = ({
               </div>
             </div>
 
+            {/* Signed in Account Email */}
+            <div className="space-y-1 text-left">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Account Email
+              </label>
+              <input
+                type="text"
+                value={profileData?.email || "Signed in account"}
+                readOnly
+                disabled
+                className="w-full bg-stone-100/80 border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-500 cursor-not-allowed shadow-inner"
+              />
+            </div>
+
             {/* Name input */}
-            <div className="space-y-1">
+            <div className="space-y-1 text-left">
               <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
                 What should we call you?
               </label>
@@ -648,13 +786,27 @@ export const OnboardingWizard = ({
               />
             </div>
 
-            {/* Clean Terms Reference Link */}
-            <p className="text-[9px] font-medium text-stone-400 text-center pt-2">
-              By continuing, you agree to FitAI's{" "}
-              <button type="button" onClick={() => setShowTermsModal(true)} className="font-bold text-orange-500 hover:underline cursor-pointer border-none bg-transparent">
-                Terms of Service & Privacy Policy
+            {/* Clean Terms Reference Link & Sign Out */}
+            <div className="text-center pt-2 space-y-1.5">
+              <p className="text-[9px] font-medium text-stone-400">
+                By continuing, you agree to FitAI's{" "}
+                <button type="button" onClick={() => setShowTermsModal(true)} className="font-bold text-orange-500 hover:underline cursor-pointer border-none bg-transparent p-0">
+                  Terms of Service & Privacy Policy
+                </button>
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (supabase?.auth) {
+                    await supabase.auth.signOut();
+                    window.location.reload();
+                  }
+                }}
+                className="text-[10px] font-bold text-stone-400 hover:text-stone-700 underline cursor-pointer bg-transparent border-none p-0 transition-colors block mx-auto"
+              >
+                Log Out / Switch Account
               </button>
-            </p>
+            </div>
           </div>
         )}
 
@@ -785,12 +937,29 @@ export const OnboardingWizard = ({
 
         {/* STEP 3: DAILY GOALS */}
         {step === 3 && (
-          <div className="space-y-5 animate-fadeIn">
+          <div className="space-y-4 animate-fadeIn py-2">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
                 Daily Goals
               </h2>
             </div>
+
+            {/* AI Explanation Sub-badge */}
+            {aiAppliedReason && (
+              <div className="p-3 bg-orange-50/80 border border-orange-200/80 rounded-2xl text-[10.5px] font-bold text-orange-950 flex items-center justify-between gap-2 animate-fadeIn shadow-3xs text-left">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Sparkles className="w-4 h-4 text-orange-500 shrink-0" />
+                  <span className="leading-snug">{aiAppliedReason}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiAppliedReason("")}
+                  className="text-orange-400 hover:text-orange-700 bg-transparent border-none cursor-pointer p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* Primary Goal Selector */}
             <div className="space-y-1.5">
@@ -807,10 +976,23 @@ export const OnboardingWizard = ({
                     key={g.id}
                     type="button"
                     onClick={() => {
-                      const updatedMetrics = { ...metrics, goal: g.id as any };
+                      const targetW = calculateBmiIdealWeight(metrics.height, metrics.weight, g.id);
+                      const updatedMetrics = {
+                        ...metrics,
+                        goal: g.id as any,
+                        targetWeight: targetW
+                      };
                       setMetrics(updatedMetrics);
                       const rec = calculateRecommendedTargets(updatedMetrics);
                       setTargets(rec);
+                      setTrackedNutrientList(prev => prev.map(n => {
+                        let val = n.target;
+                        if (n.id === "protein") val = rec.protein;
+                        if (n.id === "carbs") val = rec.carbs;
+                        if (n.id === "fats") val = rec.fats;
+                        if (n.id === "fiber") val = rec.fiber;
+                        return { ...n, target: val };
+                      }));
                     }}
                     className={`py-3 px-2 rounded-2xl border text-center text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
                       metrics.goal === g.id
@@ -883,16 +1065,62 @@ export const OnboardingWizard = ({
                 </StepperButton>
               </div>
             </div>
+
+            {/* Simple Text Trigger at the end of Step 3 */}
+            <div className="pt-2 border-t border-stone-100">
+              {!showAiGoalInput ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAiGoalInput(true)}
+                  className="w-full text-center text-xs font-bold text-orange-500 hover:text-orange-600 hover:underline cursor-pointer bg-transparent border-none py-1.5 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                  <span>Generate Goals with AI</span>
+                </button>
+              ) : (
+                <div className="space-y-2 animate-fadeIn text-left pt-1">
+                  <textarea
+                    rows={2}
+                    placeholder="Describe health conditions or diet goals (e.g. Thyroid, Diabetes, Keto)..."
+                    value={aiGoalPrompt}
+                    onChange={(e) => setAiGoalPrompt(e.target.value)}
+                    className="w-full bg-white border border-stone-200/90 focus:border-orange-500 focus:outline-none rounded-xl p-2.5 text-xs font-medium text-stone-900 placeholder:text-stone-400 resize-none min-h-[56px] shadow-2xs leading-relaxed"
+                    autoFocus
+                  />
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAiGoalInput(false)}
+                      className="h-10 rounded-xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-3xs"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApplyAiGoal}
+                      disabled={isAiGoalLoading || !aiGoalPrompt.trim() || isPromptGenerated}
+                      className={`h-10 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center border-none ${
+                        isPromptGenerated
+                          ? "bg-stone-200 text-stone-500 cursor-not-allowed shadow-none"
+                          : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white cursor-pointer active:scale-95 shadow-md shadow-orange-500/20 disabled:opacity-40"
+                      }`}
+                    >
+                      <span>{isAiGoalLoading ? "Generating..." : isPromptGenerated ? "Generated ✓" : "Generate"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* STEP 4: NUTRIENTS & MACROS */}
         {step === 4 && (
-          <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
-            <div className="text-center space-y-1">
+          <div className="space-y-3.5 animate-fadeIn py-2 text-left">
+            <div className="text-center space-y-1.5">
               <div className="flex items-center justify-center gap-2">
                 <h2 className="text-xl font-black tracking-tight text-stone-900">
-                  Nutrient Tracking
+                  Dashboard Nutrients
                 </h2>
                 <span className={`text-[9px] font-black font-mono px-2 py-0.5 rounded-full border ${
                   activeNutrientCount >= 8
@@ -902,10 +1130,30 @@ export const OnboardingWizard = ({
                   {activeNutrientCount}/8 Active Slots
                 </span>
               </div>
+              <p className="text-[10px] text-stone-400 font-medium">
+                Choose which macro & micro nutrient cards float on your daily view.
+              </p>
+
+              {/* AI Explanation Sub-badge */}
+              {aiAppliedReason && (
+                <div className="p-3 bg-orange-50/80 border border-orange-200/80 rounded-2xl text-[10.5px] font-bold text-orange-950 flex items-center justify-between gap-2 animate-fadeIn shadow-3xs text-left">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Sparkles className="w-4 h-4 text-orange-500 shrink-0" />
+                    <span className="leading-snug">{aiAppliedReason}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAiAppliedReason("")}
+                    className="text-orange-400 hover:text-orange-700 bg-transparent border-none cursor-pointer p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Search Dropdown Input */}
-            <div ref={dropdownRef} className="relative">
+            <div ref={nutrientDropdownRef} className="relative">
               <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3.5 py-3 shadow-sm focus-within:border-orange-500 transition-all">
                 <Search className="w-4 h-4 text-stone-400 shrink-0" />
                 <input
@@ -1062,12 +1310,57 @@ export const OnboardingWizard = ({
               ))}
             </div>
 
+            {/* Simple Text Trigger at the end of Step 4 */}
+            <div className="pt-2 border-t border-stone-100">
+              {!showAiGoalInput ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAiGoalInput(true)}
+                  className="w-full text-center text-xs font-bold text-orange-500 hover:text-orange-600 hover:underline cursor-pointer bg-transparent border-none py-1.5 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                  <span>Generate Nutrients with AI</span>
+                </button>
+              ) : (
+                <div className="space-y-2 animate-fadeIn text-left pt-1">
+                  <textarea
+                    rows={2}
+                    placeholder="Describe health conditions or diet goals (e.g. Thyroid, Diabetes, Keto)..."
+                    value={aiGoalPrompt}
+                    onChange={(e) => setAiGoalPrompt(e.target.value)}
+                    className="w-full bg-white border border-stone-200/90 focus:border-orange-500 focus:outline-none rounded-xl p-2.5 text-xs font-medium text-stone-900 placeholder:text-stone-400 resize-none min-h-[56px] shadow-2xs leading-relaxed"
+                    autoFocus
+                  />
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowAiGoalInput(false)}
+                      className="h-10 rounded-xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-3xs"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApplyAiGoal}
+                      disabled={isAiGoalLoading || !aiGoalPrompt.trim() || isPromptGenerated}
+                      className={`h-10 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center border-none ${
+                        isPromptGenerated
+                          ? "bg-stone-200 text-stone-500 cursor-not-allowed shadow-none"
+                          : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white cursor-pointer active:scale-95 shadow-md shadow-orange-500/20 disabled:opacity-40"
+                      }`}
+                    >
+                      <span>{isAiGoalLoading ? "Generating..." : isPromptGenerated ? "Generated ✓" : "Generate"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* STEP 5: DAILY VITALS */}
         {step === 5 && (
-          <div className="space-y-5 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1">
+          <div className="space-y-4 animate-fadeIn py-2">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
                 Daily Vitals
@@ -1081,6 +1374,7 @@ export const OnboardingWizard = ({
                 { id: "water", question: "Track Water Intake?", desc: "Daily hydration volume counter", defaultOn: false },
                 { id: "digestion", question: "Track Gut & Digestion?", desc: "Bristol stool spectrum & comfort", defaultOn: false },
                 { id: "energy", question: "Track Daily Energy?", desc: "1 to 5 vitality & mood scale", defaultOn: false },
+                { id: "bloating", question: "Track Stomach Bloating?", desc: "4-level stomach distension & gas tightness", defaultOn: true },
               ].map((v) => {
                 const active = selectedVitals[v.id as keyof typeof selectedVitals];
                 return (
@@ -1116,7 +1410,7 @@ export const OnboardingWizard = ({
 
         {/* STEP 6: AI MEAL TAGS (CLEAN 1-LINE CARD MODEL) */}
         {step === 6 && (
-          <div className="space-y-4 animate-fadeIn overflow-y-auto max-h-[70vh] pr-1 scrollbar-hide py-1 text-left">
+          <div className="space-y-3 animate-fadeIn py-2 text-left">
             <div className="text-center space-y-0.5">
               <h2 className="text-xl font-black tracking-tight text-stone-900">
                 AI Meal Tags
@@ -1133,50 +1427,154 @@ export const OnboardingWizard = ({
               </p>
             </div>
 
-            {/* Custom Tag Add Button */}
-            <div className="flex items-center justify-between">
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                Active AI Meal Tags
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowCustomTagForm(!showCustomTagForm)}
-                className="text-[9px] font-black uppercase text-orange-500 hover:underline border-none bg-transparent cursor-pointer"
-              >
-                {showCustomTagForm ? "Cancel" : "+ Custom Tag"}
-              </button>
+            {/* Search Dropdown Input for AI Meal Tags */}
+            <div ref={tagDropdownRef} className="relative">
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="+ Add Tag (Gluten Free, Halal, Keto...)"
+                  value={tagSearchQuery}
+                  onFocus={() => setIsTagDropdownOpen(true)}
+                  onChange={(e) => {
+                    setTagSearchQuery(e.target.value);
+                    setIsTagDropdownOpen(true);
+                  }}
+                  className="w-full bg-white border border-stone-200/90 rounded-2xl pl-9 pr-8 py-2.5 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-orange-500 shadow-2xs transition-all"
+                />
+                {tagSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTagSearchQuery("");
+                      setIsTagDropdownOpen(false);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 border-none bg-transparent cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Search Dropdown Catalog */}
+              {isTagDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-stone-200 rounded-2xl shadow-xl z-50 max-h-56 overflow-y-auto p-1.5 space-y-1 animate-fadeIn">
+                  {/* Matching Inactive Catalog Tags */}
+                  {filteredTagCatalog.length > 0 ? (
+                    filteredTagCatalog.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setAiTrackingTags(prev => {
+                            const exists = prev.some(t => t.id === item.id);
+                            if (exists) {
+                              return prev.map(t => t.id === item.id ? { ...t, enabled: true } : t);
+                            }
+                            return [...prev, { ...item, enabled: true }];
+                          });
+                          setTagSearchQuery("");
+                          setIsTagDropdownOpen(false);
+                        }}
+                        className="w-full p-2.5 rounded-xl hover:bg-orange-50/60 text-left flex items-center justify-between border-none bg-transparent cursor-pointer transition-colors group"
+                      >
+                        <div>
+                          <div className="text-xs font-black text-stone-900 uppercase group-hover:text-orange-600">
+                            {item.name}
+                          </div>
+                          <div className="text-[10px] font-medium text-stone-400">
+                            {item.description}
+                          </div>
+                        </div>
+                        <Plus className="w-4 h-4 text-orange-500 shrink-0 ml-2" />
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-2.5 text-center text-xs font-medium text-stone-400">
+                      No matching default tags found
+                    </div>
+                  )}
+
+                  {/* + Custom Tag Option */}
+                  <div className="border-t border-stone-100 pt-1 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomTagForm(true);
+                        if (tagSearchQuery.trim()) {
+                          setCustomTagName(tagSearchQuery.trim());
+                        }
+                        setIsTagDropdownOpen(false);
+                      }}
+                      className="w-full p-2.5 rounded-xl hover:bg-orange-50 text-left flex items-center justify-between border-none bg-transparent cursor-pointer transition-colors text-orange-600 font-black text-xs uppercase tracking-wider"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Plus className="w-3.5 h-3.5 shrink-0" />
+                        <span>{tagSearchQuery.trim() ? `Create Custom Tag "${tagSearchQuery.trim()}"` : "Create Custom Tag"}</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Custom Tag Form */}
             {showCustomTagForm && (
-              <div className="bg-stone-50 border border-stone-200 rounded-2xl p-3 space-y-2 animate-fadeIn">
+              <div className="bg-white border border-stone-200/90 rounded-2xl p-3.5 space-y-2.5 animate-fadeIn shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-stone-700 tracking-wider">Create Custom AI Tag</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomTagForm(false)}
+                    className="text-stone-400 hover:text-stone-600 border-none bg-transparent cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <input
                   type="text"
-                  placeholder="Tag Name (e.g. Nut Free)"
+                  placeholder="Tag Name (e.g. Low Sodium)"
                   value={customTagName}
                   onChange={(e) => setCustomTagName(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-bold text-stone-850 focus:outline-none"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-850 focus:outline-none focus:border-orange-500"
                 />
                 <input
                   type="text"
-                  placeholder="AI rule (e.g. Apply when meal contains no nuts)"
+                  placeholder="AI prompt rule (e.g. Apply when meal has under 300mg sodium)"
                   value={customTagRule}
                   onChange={(e) => setCustomTagRule(e.target.value)}
-                  className="w-full bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-medium text-stone-700 focus:outline-none"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-medium text-stone-700 focus:outline-none focus:border-orange-500"
                 />
-                <button
-                  type="button"
-                  onClick={handleCreateCustomTag}
-                  className="w-full bg-orange-500 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl border-none cursor-pointer"
-                >
-                  Add Tag
-                </button>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomTagForm(false)}
+                    className="px-3 py-1.5 rounded-lg bg-stone-100 text-stone-600 text-xs font-bold border-none cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateCustomTag}
+                    disabled={!customTagName.trim()}
+                    className="px-4 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-black uppercase tracking-wider border-none cursor-pointer disabled:opacity-40"
+                  >
+                    Add Tag
+                  </button>
+                </div>
               </div>
             )}
 
+            {/* Active Tag List Header */}
+            <div className="flex items-center justify-between pt-1">
+              <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Active AI Meal Tags ({aiTrackingTags.filter(t => t.enabled).length})
+              </label>
+            </div>
+
             {/* Tag List Cards */}
             <div className="space-y-2.5">
-              {aiTrackingTags.map((t) => {
+              {aiTrackingTags.filter(t => t.enabled).map((t) => {
                 const isEditing = editingTagId === t.id;
                 return (
                   <div
@@ -1204,29 +1602,14 @@ export const OnboardingWizard = ({
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
 
-                        {/* Toggle Switch */}
+                        {/* Vibrant Orange Active Toggle Switch */}
                         <button
                           type="button"
                           onClick={() => toggleAiTag(t.id)}
-                          className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0 ${
-                            t.enabled ? "bg-orange-500" : "bg-stone-300"
-                          }`}
+                          className="w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer border-none shrink-0 bg-orange-500"
+                          title="Deactivate tag"
                         >
-                          <div
-                            className={`bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform ${
-                              t.enabled ? "translate-x-4" : "translate-x-0"
-                            }`}
-                          />
-                        </button>
-
-                        {/* Remove Tag Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTag(t.id)}
-                          className="text-stone-300 hover:text-red-500 border-none bg-transparent cursor-pointer transition-colors p-1"
-                          title="Remove tag"
-                        >
-                          <X className="w-3.5 h-3.5" />
+                          <div className="bg-white w-4 h-4 rounded-full shadow-sm transform transition-transform translate-x-4" />
                         </button>
                       </div>
                     </div>
@@ -1276,21 +1659,21 @@ export const OnboardingWizard = ({
 
       {/* Navigation Footer */}
       {step !== 7 && (
-        <div className="w-full pt-4 border-t border-stone-200/50 flex gap-4">
+        <div className="sticky bottom-0 z-30 pt-6 pb-2 bg-gradient-to-t from-[#FAF9F6] via-[#FAF9F6]/95 to-transparent flex gap-4 shrink-0">
           <button
             type="button"
-            onClick={step === totalSteps ? handleFinish : handleNext}
+            onClick={step === 6 ? () => setStep(7) : handleNext}
             disabled={!isStepValid() || isSubmitting}
             className={`w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer border-none ${
               (!isStepValid() || isSubmitting) ? "opacity-50 cursor-not-allowed shadow-none" : "shadow-lg shadow-orange-100 active:scale-[0.98]"
             }`}
           >
             <span>
-              {step === totalSteps
-                ? "🚀 Launch FitAI"
+              {step === 6
+                ? "Finish Setup"
                 : "Continue"}
             </span>
-            {step < totalSteps && <ArrowRight className="w-3.5 h-3.5" />}
+            {step === 6 ? <Check className="w-3.5 h-3.5" /> : <ArrowRight className="w-3.5 h-3.5" />}
           </button>
         </div>
       )}

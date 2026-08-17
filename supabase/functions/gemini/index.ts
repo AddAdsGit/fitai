@@ -38,7 +38,7 @@ serve(async (req) => {
 
     // 2. Parse request body
     const body = await req.json().catch(() => ({}));
-    const { prompt } = body;
+    const { prompt, image, mimeType } = body;
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Missing prompt parameter in request body" }), {
         status: 400,
@@ -49,11 +49,22 @@ serve(async (req) => {
     // 3. Retrieve Gemini API Key (Priority: Remote Secret -> Central Backup)
     const apiKey = Deno.env.get("GEMINI_API_KEY") || "";
 
-    // 4. Fallback Model Loop
+    const parts: any[] = [{ text: prompt }];
+    if (image) {
+      const cleanBase64 = image.includes(",") ? image.split(",")[1] : image;
+      parts.push({
+        inline_data: {
+          mime_type: mimeType || "image/jpeg",
+          data: cleanBase64,
+        },
+      });
+    }
+
+    // 4. Fallback Model Loop for Multimodal & Text Recognition
     let response = null;
     let lastError = "";
 
-    for (const model of ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-flash-latest"]) {
+    for (const model of ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]) {
       try {
         response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
           method: "POST",
@@ -61,7 +72,7 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
+            contents: [{ parts }]
           })
         });
 

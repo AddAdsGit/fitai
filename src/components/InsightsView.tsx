@@ -17,6 +17,7 @@ import {
   Calendar,
   Flame,
   Wind,
+  Info,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -41,6 +42,7 @@ import {
 import { cn } from "../lib/utils";
 import type { Meal, WeightLog, DailyWellness } from "../types";
 import { normalizeTrackedNutrients } from "../constants/nutrition";
+import { calculateTDEE } from "../utils/metabolism";
 
 type TimeRangeOption = "7D" | "14D" | "30D" | "60D" | "90D" | "CUSTOM";
 
@@ -178,6 +180,7 @@ export const InsightsView = ({
     return new Date().toISOString().split("T")[0];
   });
   const [showCustomPicker, setShowCustomPicker] = useState<boolean>(false);
+  const [showTdeeInfoModal, setShowTdeeInfoModal] = useState<boolean>(false);
   const [nutrientSlide, setNutrientSlide] = useState<number>(0);
 
   const localFormatDateStr = (date: Date) => {
@@ -341,6 +344,11 @@ export const InsightsView = ({
   }, [activeLoggedChartData, loggedDaysCount]);
 
   const hasAnyData = loggedDaysCount > 0;
+
+  // High-Accuracy Dynamic TDEE Calculation
+  const tdeeStats = useMemo(() => {
+    return calculateTDEE(mealsState, weightLogs, dateRangeBounds, profileData);
+  }, [mealsState, weightLogs, dateRangeBounds, profileData]);
 
   // Real Wellness Data Map by Date
   const wellnessByDate = useMemo(() => {
@@ -820,6 +828,108 @@ export const InsightsView = ({
           </div>
         )}
       </div>
+
+      {/* Hyper-Accurate Metabolism (TDEE) Card */}
+      {profileData?.agent_config?.trackWeight !== false && (
+        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-1 flex items-center gap-1.5">
+                <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500 shrink-0" />
+                <span>Daily Metabolism (TDEE)</span>
+              </div>
+              <div className="text-3xl font-black text-orange-950">
+                {tdeeStats.tdee.toLocaleString()}{" "}
+                <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                  kcal/day avg
+                </span>
+              </div>
+              <div className="text-[10px] font-medium text-orange-900/50 mt-1">
+                (based on {tdeeStats.foodLogsCount} food logs &amp; {tdeeStats.weightLogsCount} weight logs)
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                if (triggerToast) triggerToast("🔥 Metabolism report copied!");
+              }}
+              title="Share Metabolism Report"
+              className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Accuracy & Quality Status Pill */}
+          {tdeeStats.isRealAI ? (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center gap-2">
+                <span className="bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  True AI TDEE
+                </span>
+                <span className="text-[10px] text-orange-900/50 font-medium">
+                  High Accuracy (Energy Balance Model)
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center gap-2">
+                <span className="bg-amber-500/10 text-amber-700 border border-amber-500/20 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                  Estimated Baseline
+                </span>
+              </div>
+              <p className="text-xs text-orange-950/60 font-medium leading-relaxed">
+                Requires at least <span className="font-bold text-orange-950">4 food days</span> &amp; <span className="font-bold text-orange-950">4 weight logs</span> in this timeframe to unlock True AI TDEE.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="space-y-1 bg-black/5 rounded-2xl p-2.5 border border-white/40">
+                  <div className="flex justify-between text-[9px] font-black text-orange-950/50 uppercase tracking-wider">
+                    <span>Food Logs</span>
+                    <span>{tdeeStats.loggedDays} / 4 Days</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden border border-white/40">
+                    <div
+                      className="h-full bg-orange-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, (tdeeStats.loggedDays / 4) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1 bg-black/5 rounded-2xl p-2.5 border border-white/40">
+                  <div className="flex justify-between text-[9px] font-black text-orange-950/50 uppercase tracking-wider">
+                    <span>Weight Logs</span>
+                    <span>{tdeeStats.weightLogsCount} / 4 Logs</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden border border-white/40">
+                    <div
+                      className="h-full bg-orange-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, (tdeeStats.weightLogsCount / 4) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Standard Scientific Disclaimer + Formula Info Button */}
+          <div className="pt-2 border-t border-black/5 flex items-start justify-between gap-2">
+            <p className="text-[9px] text-orange-900/40 font-medium leading-normal italic flex-1">
+              * Disclaimer: TDEE is an estimated daily calorie burn based on energy balance equations. Accuracy requires consistent daily food &amp; weight tracking.
+            </p>
+            <button
+              onClick={() => setShowTdeeInfoModal(true)}
+              className="p-1 rounded-full hover:bg-orange-100 text-orange-600 transition-colors shrink-0 cursor-pointer"
+              title="View full TDEE calculation formula"
+            >
+              <Info className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Simplified Weight Progress Card */}
       {profileData?.agent_config?.trackWeight !== false && (
@@ -1567,6 +1677,81 @@ export const InsightsView = ({
                 className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-black rounded-2xl shadow-lg shadow-orange-500/25 active:scale-95 transition-all cursor-pointer border-none"
               >
                 Apply Custom Range
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* TDEE FORMULA & SCIENCE MODAL (PORTAL TO BODY) */}
+      {showTdeeInfoModal &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
+            <div
+              className="fixed inset-0"
+              onClick={() => setShowTdeeInfoModal(false)}
+            />
+            <div className="bg-white/95 backdrop-blur-md rounded-[32px] p-6 shadow-2xl border border-white/80 max-w-md w-full max-h-[85vh] overflow-y-auto space-y-4 font-sans relative z-10">
+              <div className="flex justify-between items-center pb-2 border-b border-black/5">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-orange-500 fill-orange-500 shrink-0" />
+                  <h3 className="text-base font-black text-orange-950">
+                    TDEE Calculation Science
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowTdeeInfoModal(false)}
+                  className="w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center text-orange-950/60 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs text-orange-950/80 leading-relaxed">
+                <div>
+                  <div className="font-extrabold text-orange-950 mb-1 flex items-center gap-1">
+                    <span>1. Basal Metabolic Rate (BMR)</span>
+                  </div>
+                  <p className="text-[11px] text-orange-900/70">
+                    Your resting burn is calculated using the established Mifflin-St Jeor formula based on your age, height, weight, and gender.
+                  </p>
+                </div>
+
+                <div>
+                  <div className="font-extrabold text-orange-950 mb-1">
+                    2. Weight Change Calorie Impact
+                  </div>
+                  <p className="text-[11px] text-orange-900/70">
+                    1 kg of body tissue equals ~7,700 kcal. FitAI measures your weight trend change over the selected days to find your daily calorie impact:
+                  </p>
+                  <div className="bg-orange-50/60 border border-orange-100 rounded-xl p-2.5 mt-1 font-mono text-[10px] text-orange-900 font-bold">
+                    Calorie Impact = (Weight Delta kg × 7,700) ÷ Days
+                  </div>
+                </div>
+
+                <div>
+                  <div className="font-extrabold text-orange-950 mb-1">
+                    3. True AI TDEE Formula
+                  </div>
+                  <p className="text-[11px] text-orange-900/70">
+                    Combining your average logged intake with your weight trend delta reveals your actual real-world metabolism:
+                  </p>
+                  <div className="bg-orange-50/60 border border-orange-100 rounded-xl p-2.5 mt-1 font-mono text-[10px] text-orange-900 font-bold">
+                    Real TDEE = Avg Daily Intake - Calorie Impact
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 text-amber-900 text-[11px]">
+                  <span className="font-extrabold block mb-0.5">⚠️ Tracking Consistency Warning:</span>
+                  If you miss logging meals or scale weight for multiple days, your calculated TDEE will lose precision. Consistent daily tracking unlocks maximum accuracy!
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowTdeeInfoModal(false)}
+                className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black rounded-2xl shadow-lg shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border-none mt-2"
+              >
+                Got It
               </button>
             </div>
           </div>,
