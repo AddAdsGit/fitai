@@ -7,14 +7,33 @@
 
 @layer base {
   html {
+    width: 100%;
+    min-width: 0;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    font-size: 16px;
     -webkit-text-size-adjust: 100% !important;
     text-size-adjust: 100% !important;
     touch-action: manipulation;
   }
+
   body {
+    width: 100%;
+    min-width: 0;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    font-size: 16px;
     @apply bg-[#FAF7F2] text-orange-950 font-sans;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    width: 100%;
+    min-width: 0;
+    min-height: 100dvh;
   }
 }
 
