@@ -204,8 +204,6 @@ export const OnboardingWizard = ({
     try {
       if (step >= 1 && step <= 6) {
         localStorage.setItem(draftKey, JSON.stringify({ step, metrics, targets }));
-      } else if (step === 7) {
-        localStorage.removeItem(draftKey);
       }
     } catch (e) {
       console.warn("Could not save onboarding draft:", e);
@@ -706,11 +704,15 @@ export const OnboardingWizard = ({
     setIsSubmitting(true);
     try {
       const completedState = await saveProfileData();
+      try {
+        localStorage.removeItem(draftKey);
+      } catch (_) {}
       onComplete(completedState);
       triggerToast("✨ Welcome to FitAI! Setup complete.");
     } catch (err: any) {
       console.error(err);
-      triggerToast(err.message || "❌ Failed to save onboarding targets");
+      triggerToast(err.message || "❌ Failed to save onboarding targets. Please try again!");
+      setStep(6);
     } finally {
       setIsSubmitting(false);
     }
@@ -1688,6 +1690,17 @@ export const OnboardingWizard = ({
                 style={{ width: `${generationProgress}%` }}
               />
             </div>
+
+            {generationProgress >= 90 && (
+              <button
+                type="button"
+                onClick={handleFinish}
+                disabled={isSubmitting}
+                className="mt-4 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-orange-100 transition-all cursor-pointer border-none animate-fadeIn"
+              >
+                {isSubmitting ? "Saving Protocol..." : "Enter FitAI Dashboard →"}
+              </button>
+            )}
           </div>
         )}
 
