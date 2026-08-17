@@ -32,6 +32,7 @@ export function CalendarStrip({
 }: CalendarStripProps) {
   const activeItemRef = useRef<HTMLButtonElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const hasInitialCentered = useRef(false);
   const [shouldAutoCenter, setShouldAutoCenter] = useState(false);
 
   const handleShiftToToday = () => {
@@ -39,6 +40,25 @@ export function CalendarStrip({
     recenterDaysList(todayStr);
     setShouldAutoCenter(true);
   };
+
+  useEffect(() => {
+    // On refresh/reload, selectedDate may be restored before/after daysList is built.
+    // Center the restored date once, without changing normal date-selection behavior.
+    if (!hasInitialCentered.current && activeItemRef.current) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (activeItemRef.current) {
+            activeItemRef.current.scrollIntoView({
+              behavior: "auto",
+              inline: "center",
+              block: "nearest",
+            });
+            hasInitialCentered.current = true;
+          }
+        });
+      });
+    }
+  }, [selectedDate, daysList]);
 
   useEffect(() => {
     if (shouldAutoCenter) {
