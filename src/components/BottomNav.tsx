@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Home, User, Plus } from "lucide-react";
 import { motion } from "motion/react";
@@ -62,12 +62,31 @@ export function BottomNav({
   todayStr,
   handleLogMealClick,
 }: BottomNavProps) {
-  if (activeTab === "oauth-consent") return null;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (activeTab === "oauth-consent" || !mounted) return null;
 
   const nav = (
     <nav
       id="bottom-nav"
-      className="fixed bottom-6 left-6 right-6 max-w-[calc(448px-3rem)] mx-auto z-50"
+      className="fixed z-[2147483647]"
+      style={{
+        left: "24px",
+        right: "24px",
+        bottom: "24px",
+        width: "auto",
+        maxWidth: "400px",
+        marginLeft: "auto",
+        marginRight: "auto",
+        position: "fixed",
+        transform: "none",
+        zoom: 1,
+        isolation: "isolate",
+      }}
     >
       <div
         id="nav-container"
@@ -118,8 +137,5 @@ export function BottomNav({
     </nav>
   );
 
-  // The dashboard root is transformed on narrow Samsung viewports. A fixed
-  // descendant of a transformed ancestor is no longer fixed to the browser
-  // viewport, so portal the nav directly to <body> to keep it viewport-fixed.
   return createPortal(nav, document.body);
 }
