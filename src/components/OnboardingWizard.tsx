@@ -907,7 +907,7 @@ export const OnboardingWizard = ({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                  Height (cm)
+                  Height
                 </label>
                 <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
                   <StepperButton
@@ -916,16 +916,19 @@ export const OnboardingWizard = ({
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </StepperButton>
-                  <input
-                    type="number"
-                    placeholder="170"
-                    value={metrics.height === 0 ? "" : metrics.height}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setMetrics(prev => ({ ...prev, height: val === "" ? 0 : parseInt(val) || 0 }));
-                    }}
-                    className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
+                  <div className="flex-1 flex items-center justify-center gap-0.5">
+                    <input
+                      type="number"
+                      placeholder="170"
+                      value={metrics.height === 0 ? "" : metrics.height}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setMetrics(prev => ({ ...prev, height: val === "" ? 0 : parseInt(val) || 0 }));
+                      }}
+                      className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-[10px] font-bold text-stone-400">cm</span>
+                  </div>
                   <StepperButton
                     onStep={() => setMetrics(prev => ({ ...prev, height: prev.height === 0 ? 170 : Math.min(250, prev.height + 1) }))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
@@ -937,7 +940,7 @@ export const OnboardingWizard = ({
 
               <div className="space-y-1.5">
                 <label className="text-[9px] font-black text-stone-400 uppercase tracking-widest block px-1">
-                  Weight (kg)
+                  Weight
                 </label>
                 <div className="flex items-center bg-white border border-stone-200 rounded-2xl px-2 py-1 shadow-sm">
                   <StepperButton
@@ -946,13 +949,16 @@ export const OnboardingWizard = ({
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </StepperButton>
-                  <input
-                    type="number"
-                    placeholder="70"
-                    value={metrics.weight === 0 ? "" : metrics.weight}
-                    onChange={(e) => handleCurrentWeightChange(e.target.value)}
-                    className="flex-1 bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
+                  <div className="flex-1 flex items-center justify-center gap-0.5">
+                    <input
+                      type="number"
+                      placeholder="70"
+                      value={metrics.weight === 0 ? "" : metrics.weight}
+                      onChange={(e) => handleCurrentWeightChange(e.target.value)}
+                      className="bg-transparent border-none text-center text-xs font-bold text-stone-700 focus:outline-none w-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-[10px] font-bold text-stone-400">kg</span>
+                  </div>
                   <StepperButton
                     onStep={() => setMetrics(prev => ({ ...prev, weight: prev.weight === 0 ? 70 : Math.min(300, prev.weight + 1) }))}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-50 cursor-pointer border-none"
