@@ -673,11 +673,25 @@ export const OnboardingWizard = ({
       throw error;
     }
 
+    if (metrics.weight > 0 && activeProfileId) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      await supabase.from('weight_logs').upsert({
+        profile_id: activeProfileId,
+        date: todayStr,
+        weight: metrics.weight
+      }, { onConflict: 'profile_id,date' }).catch((err: any) => console.error("Error logging initial onboarding weight:", err));
+    }
+
     return {
       name: metrics.name.trim(),
+      username: userHandle,
+      email: userEmail || metrics.email,
       imageUrl: metrics.avatar || null,
       height: metrics.height,
       weight: metrics.weight,
+      weight_goal: metrics.targetWeight,
+      daily_calories_goal: targets.calories,
+      protein_goal: targets.protein,
       dob: `${new Date().getFullYear() - metrics.age}-01-01`,
       gender: metrics.gender,
       description: silentBio,

@@ -1071,12 +1071,12 @@ export default function App() {
           }
 
           // Resolve latest logged weight from history
-          let latestWeight = profile.weight;
+          let latestWeight = profile.weight || 0;
           if (weightLogsRes && !weightLogsRes.error && weightLogsRes.data) {
             setWeightLogs(weightLogsRes.data);
             if (weightLogsRes.data.length > 0) {
               const sorted = [...weightLogsRes.data].sort((a, b) => a.date.localeCompare(b.date));
-              latestWeight = sorted[sorted.length - 1].weight;
+              latestWeight = sorted[sorted.length - 1].weight || profile.weight || 0;
             }
           }
 
@@ -1088,6 +1088,7 @@ export default function App() {
             description: profile.description || "",
             height: profile.height || 0,
             weight: latestWeight || profile.weight || 0,
+            weight_goal: profile.weight_goal || profile.weight || 0,
             dob: profile.dob || "",
             gender: profile.gender || "Male",
             knowledge: {
