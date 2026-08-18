@@ -188,7 +188,7 @@ Return ONLY a valid JSON object in this format:
 
   // 2. Direct Call to Google Gemini Flash models with robust fallback & clear error messages
   if (!responseData && key) {
-    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const candidateModels = ["gemini-2.5-flash", "gemini-1.5-flash"];
     for (const modelName of candidateModels) {
       try {
         const res = await fetch(

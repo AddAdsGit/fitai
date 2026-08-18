@@ -14,23 +14,10 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Verify Authentication via Supabase JWT
+    // 1. Verify Authorization header is present
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Missing or invalid Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const token = authHeader.substring(7).trim();
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized. Invalid user session." }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -46,12 +33,12 @@ serve(async (req) => {
       });
     }
 
-    // 3. Retrieve Gemini API Key (Priority: Remote Secret -> Central Backup)
+    // 3. Retrieve Gemini API Key
     const apiKey = Deno.env.get("GEMINI_API_KEY") || "";
     if (!apiKey) {
       return new Response(
         JSON.stringify({
-          error: "GEMINI_API_KEY secret is not set in Supabase Edge Function environment. Please set GEMINI_API_KEY in Supabase Dashboard or enter a custom Gemini API key in App Settings.",
+          error: "GEMINI_API_KEY secret is not set in Supabase Edge Function environment. Please enter a custom Gemini API key in App Settings.",
         }),
         {
           status: 400,
@@ -71,11 +58,11 @@ serve(async (req) => {
       });
     }
 
-    // 4. Priority Fallback Model Loop for Multimodal & Text Recognition
+    // 4. Direct Call to Google's stable gemini-2.5-flash model with JSON config
     let response = null;
     let lastError = "";
 
-    for (const model of ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]) {
+    for (const model of ["gemini-2.5-flash", "gemini-1.5-flash"]) {
       try {
         response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
           method: "POST",
@@ -83,7 +70,12 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            contents: [{ parts }]
+            contents: [{ parts }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 300,
+              responseMimeType: "application/json"
+            }
           })
         });
 
