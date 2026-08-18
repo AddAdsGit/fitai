@@ -37,7 +37,7 @@ import type { TrackedNutrient } from "../types";
 import { PastFoodCard, PastFoodItem } from "./PastFoodCard";
 import { StepperButton } from "./StepperButton";
 import { TimePickerModal } from "./TimePickerModal";
-import { formatDisplayTime } from "../utils/helpers";
+import { formatDisplayTime, compressImageBase64 } from "../utils/helpers";
 import { FoodFilterBar } from "./FoodFilterBar";
 import {
   filterAndSortFoods,
@@ -577,8 +577,10 @@ export const CameraLogView = ({
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+      const compressedImage = await compressImageBase64(targetImage, 600, 0.65);
+
       const aiResult = await analyzeFoodPhotoWithAI({
-        imageBase64: targetImage,
+        imageBase64: compressedImage,
         notes: combinedNotes,
         trackedNutrients: activeTrackedNutrients,
         profileData,
@@ -595,7 +597,7 @@ export const CameraLogView = ({
         nutrients: aiResult.nutrients,
         type: "Camera Log",
         time: timeStr,
-        image: targetImage,
+        image: compressedImage,
         meal_description: aiResult.meal_description,
         tags: aiResult.tags,
       };
@@ -836,19 +838,11 @@ export const CameraLogView = ({
             </div>
           )}
 
-          {/* High-End Gourmet Analyzing Spinner Overlay */}
+          {/* FitAI Simple Transparent Spinner Overlay */}
           {isProcessing && (
-            <div className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center text-white space-y-4 animate-fade-in">
-              <div className="w-16 h-16 rounded-3xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center animate-pulse">
-                <Sparkles className="w-8 h-8 text-orange-400 animate-spin" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-black tracking-tight text-white font-sans">
-                  Analyzing Dish & Nutrition...
-                </h3>
-                <p className="text-xs font-medium text-stone-400">
-                  Calculating calories, macros, and tags...
-                </p>
+            <div className="absolute inset-0 z-50 bg-black/30 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center animate-fade-in font-sans pointer-events-none">
+              <div className="w-12 h-12 rounded-2xl bg-black/60 border border-white/20 backdrop-blur-md flex items-center justify-center text-orange-500 shadow-2xl">
+                <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />
               </div>
             </div>
           )}

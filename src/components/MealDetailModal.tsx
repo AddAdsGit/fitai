@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { normalizeTrackedNutrients, DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
-import { hasNoGeneratedImage, getMealEmoji, formatDisplayTime } from "../utils/helpers";
+import { hasNoGeneratedImage, getMealEmoji, formatDisplayTime, formatNutrientValue } from "../utils/helpers";
 import { getUserActiveAiTags } from "../utils/foodFilter";
 import type { Meal, TrackedNutrient, Profile, Recipe } from "../types";
 
@@ -291,7 +291,7 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
                           {n.name}
                         </span>
                         <div className="bg-white border border-stone-200/80 rounded-xl px-2 py-1 text-center shadow-inner">
-                          <span className="text-xs font-black text-stone-900">{val} {n.unit || "g"}</span>
+                          <span className="text-xs font-black text-stone-900">{formatNutrientValue(val)} {n.unit || "g"}</span>
                         </div>
                       </div>
                     );

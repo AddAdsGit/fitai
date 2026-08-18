@@ -13,11 +13,26 @@ This document records the user's specific design, UI/UX, behavioral, and perform
   * Energetic Orange Accent: `#F97316` (`bg-orange-500`)
   * Espresso Text: `#431407` (`text-orange-950`)
   * Standard 4 Macro Colors: Orange (Protein), Light Blue (Carbs), Yellow (Fats), Green (Fiber).
-* **Stacked Buttons over Shared-Width**: Prefer vertically stacked full-width buttons (`w-full`) over squeezed side-by-side buttons to guarantee readability, easy touch targets, and visual balance.
+* **Visual Color Perception Rule ("I can see colors, can't read em")**: The user relies on distinct, high-contrast visual colors rather than reading fine text. Macro colors (Protein = Orange, Carbs = Cyan, Fats = Yellow, Fiber = Green) must be distinct and scannable at a glance, while keeping text labels ultra-short and clutter-free.
+* **Adaptive Button Architecture**: Use vertically stacked full-width buttons (`w-full`) for forms and settings, and single transformational CTAs for AI prompt flows based on the situation.
 * **Simple Generic Naming Wins**: NEVER use wordy, fancy, or odd titles (e.g. avoid *"Track macros and micro nutrients by AI"* or *"Track your health measurements"*). ALWAYS use simple, 100% direct generic names that make instant sense without user confusion (e.g. *"Nutrients"*, *"Daily Vitals"*, *"Your Weight"*).
 * **Editor & Popup Layout Rule (Natural Image Header + Sticky CTA Footer)**:
   * **Image Header (Non-Sticky)**: Image previews must sit at the top of the scroll container so they scroll up naturally. They should NEVER stay pinned at top consuming vertical viewport space.
   * **CTA Action Footer (Sticky)**: Primary save/log buttons stay docked at `sticky bottom-0` in a thin frosted bar for instant 1-tap submission from anywhere in the form.
+* **Mobile Real-Estate & Anti-Containerization Rule**:
+  * Mobile screen width is precious. NEVER waste horizontal real estate by nesting heavy side paddings (e.g. `px-6` + `p-5` + `p-4`).
+  * Use lightweight edge padding (`px-2.5 sm:px-4`) and responsive card padding (`p-3.5 sm:p-5`) so input controls and text have maximum room to breathe.
+* **No Redundant Category Badges in List Rows**:
+  * Do NOT add cluttering category tags or extra pill badges (e.g. `[Macro]`) inside list rows when the section context is already clear. Keep list items clean and 1-line.
+* **Smart Nutrient Decimal Formatting Rule**:
+  * **Calories**: Display as whole integers (e.g. `450 kcal`).
+  * **Macros & Micro-Nutrients**: Use `formatNutrientValue`. Whole numbers render clean as integers (`30g`), while decimal amounts render to 1 decimal place (`0.8g`, `2.4mcg`, `32.5g`) so micro-nutrients never round down to zero.
+* **Health Sync AI-Only Rule**:
+  * Do NOT add health sync widgets or extra burn metrics onto the main UI dashboard.
+  * Keep Health Sync data strictly for background ChatGPT AI context and simple settings toggles, keeping the main UI 100% minimal and focused purely on AI meal logging.
+* **Database & Payload Optimization Rules**:
+  * **Client-Side Image Compression**: Always compress food photos with `compressImageBase64` (max 800px width, 0.75 quality) before saving to Supabase to prevent transferring multi-megabyte base64 strings.
+  * **Query Row Limits**: Always append `.limit(150)` on `meals` startup and subscription queries so database sync executes sub-second (< 0.2s).
 
 ---
 

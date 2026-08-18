@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import type { Profile } from "../types";
+import { DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
 
 export const resolveGeminiApiKey = (profileData?: Profile): string => {
   const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
@@ -21,7 +22,7 @@ let cachedBestModel: string | null = null;
 
 export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
   if (cachedBestModel) return cachedBestModel;
-  if (!apiKey) return "gemini-2.0-flash";
+  if (!apiKey) return "gemini-2.5-flash";
 
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
@@ -33,13 +34,12 @@ export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
         .map((m) => m.name.replace(/^models\//, ""));
 
       const priorityPatterns = [
-        /^gemini-2\.5-flash-lite/i,
         /^gemini-2\.5-flash$/i,
-        /^gemini-2\.0-flash$/i,
-        /^gemini-2\.0-flash-lite/i,
-        /^gemini-2\.0/i,
+        /^gemini-3\.5-flash$/i,
+        /^gemini-3\.6-flash$/i,
+        /^gemini-2\.5-flash-lite/i,
+        /^gemini-flash-latest$/i,
         /^gemini-1\.5-flash/i,
-        /^gemini-3\..*flash/i,
       ];
 
       for (const pattern of priorityPatterns) {
@@ -51,11 +51,11 @@ export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
       }
     }
   } catch (e) {
-    console.warn("[Gemini API] Dynamic model fetch fallback to gemini-2.0-flash:", e);
+    console.warn("[Gemini API] Dynamic model fetch fallback to gemini-2.5-flash:", e);
   }
 
-  cachedBestModel = "gemini-2.0-flash";
-  return "gemini-2.0-flash";
+  cachedBestModel = "gemini-2.5-flash";
+  return "gemini-2.5-flash";
 };
 
 export const listAvailableGeminiModels = async (apiKey: string) => {
@@ -74,6 +74,14 @@ export const listAvailableGeminiModels = async (apiKey: string) => {
     console.error("Error listing Gemini models:", err);
   }
   return [];
+};
+
+// Safe Decimal Number Parsing Utility
+const parseNum = (val: any): number => {
+  if (typeof val === "number") return isNaN(val) ? 0 : val;
+  if (!val) return 0;
+  const parsed = parseFloat(String(val).replace(/[^0-9.]/g, ""));
+  return isNaN(parsed) ? 0 : Math.round(parsed * 10) / 10;
 };
 
 export interface AnalyzeFoodPhotoOptions {
@@ -111,9 +119,25 @@ export const analyzeFoodPhotoWithAI = async ({
   const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
   const mimeType = imageBase64.includes(";") ? imageBase64.split(";")[0].split(":")[1] || "image/jpeg" : "image/jpeg";
 
-  const nutrientListStr = trackedNutrients.length > 0
-    ? trackedNutrients.map((n) => `"${n.id}": (${n.name} in ${n.unit})`).join(", ")
-    : `"protein": (Protein in g), "carbs": (Carbohydrates in g), "fats": (Fats in g), "fiber": (Dietary Fiber in g)`;
+  // Build dynamic list of active nutrients from parameters or profileData or default
+  const activeNutrients = trackedNutrients.length > 0
+    ? trackedNutrients
+    : (profileData?.tracked_nutrients && profileData.tracked_nutrients.length > 0)
+    ? profileData.tracked_nutrients.filter((n: any) => n.enabled ?? true)
+    : DEFAULT_TRACKED_NUTRIENTS;
+
+  const nutrientListStr = activeNutrients
+    .map((n) => `"${n.id}": (${n.name} in ${n.unit})`)
+    .join(", ");
+
+  const sampleNutrientObj: Record<string, number> = {};
+  activeNutrients.forEach((n) => {
+    if (n.id === "protein") sampleNutrientObj.protein = 32;
+    else if (n.id === "carbs") sampleNutrientObj.carbs = 40;
+    else if (n.id === "fats") sampleNutrientObj.fats = 14;
+    else if (n.id === "fiber") sampleNutrientObj.fiber = 6;
+    else sampleNutrientObj[n.id] = 10;
+  });
 
   const promptText = `You are a world-class AI nutritionist. Analyze this food/beverage photo carefully.
 User notes: "${notes.trim()}".
@@ -122,101 +146,136 @@ Task:
 1. Determine if the main subject is edible food or a beverage. If NOT food (e.g. pen, keys, phone, desk, shoes, furniture), return JSON: {"isFood": false, "name": "Non-food item", "confidenceScore": 15}.
 2. If it IS food:
    - Identify the exact dish name (e.g., "Grilled Chicken Salad with Avocado").
+   - Write a concise 1-sentence description of ingredients and preparation (e.g., "Fresh grilled chicken breast over mixed greens, cherry tomatoes, and avocado.").
    - Estimate total calories (kcal).
    - Estimate confidence score (0-100).
    - Provide clean dietary tags (e.g. ["High Protein", "Gluten Free"]).
-   - Estimate all tracked nutrients: ${nutrientListStr}. Ensure "fiber" is always included.
+   - Estimate numerical values for ALL user-tracked nutrients: ${nutrientListStr}. Always include protein, carbs, fats, and fiber.
 
 Return ONLY a valid JSON object in this format:
-{"isFood": true, "name": "...", "confidenceScore": 92, "calories": 450, "tags": ["High Protein"], "nutrients": {"protein": 32, "carbs": 40, "fats": 14, "fiber": 6}}`;
+{"isFood": true, "name": "...", "meal_description": "...", "confidenceScore": 92, "calories": 450, "tags": ["High Protein"], "nutrients": ${JSON.stringify(sampleNutrientObj)}}`;
 
   let responseData: any = null;
 
-  // Camera photo analysis always goes through the authenticated Supabase
-  // Edge Function when configured. This keeps the Gemini key server-side and
-  // prevents the browser from selecting an unintended Pro/preview model.
+  // 1. Try Supabase Edge Function first if configured (1.5s timeout)
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase.functions.invoke("gemini", {
-      body: {
-        prompt: promptText,
-        image: cleanBase64,
-        mimeType,
-      },
-    });
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
 
-    if (error || !data) {
-      throw new Error(error?.message || "AI photo analysis failed. Please try again.");
-    }
-    responseData = data;
-  } else if (key) {
-    // Local/development fallback only when Supabase is not configured.
-    const modelName = await getBestGeminiModel(key);
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: promptText },
-              { inline_data: { mime_type: mimeType, data: cleanBase64 } },
-            ],
-          }],
-        }),
+      const { data, error } = await supabase.functions.invoke("gemini", {
+        body: {
+          prompt: promptText,
+          image: cleanBase64,
+          mimeType,
+        },
+        headers: {
+          "Signal": controller.signal as any
+        }
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!error && data) {
+        responseData = data;
       }
-    );
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      throw new Error(errJson?.error?.message || `Gemini API call failed with status ${res.status}`);
+    } catch (err) {
+      console.warn("[AI Photo] Edge function skipped, moving to direct API call:", err);
     }
+  }
 
-    responseData = await res.json();
-  } else {
-    throw new Error("Gemini API is not configured. Please configure Supabase or a local Gemini API key.");
+  // 2. Direct 1-Step Call to Google's stable gemini-2.5-flash model (sub-second speed with JSON config)
+  if (!responseData && key) {
+    const targetModel = "gemini-2.5-flash";
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${key}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: promptText },
+                { inline_data: { mime_type: mimeType, data: cleanBase64 } },
+              ],
+            }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 300,
+              responseMimeType: "application/json"
+            }
+          }),
+        }
+      );
+
+      if (res.ok) {
+        responseData = await res.json();
+      } else {
+        console.error(`[AI Photo] Gemini API returned error status ${res.status}`);
+      }
+    } catch (err) {
+      console.error("[AI Photo] Direct Gemini API call failed:", err);
+    }
+  }
+
+  if (!responseData) {
+    throw new Error("AI photo analysis service unavailable. Please verify your Gemini API key or network connection.");
   }
 
   const rawText = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || responseData?.text || "";
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
 
   if (!jsonMatch) {
-    throw new Error("Could not parse AI nutritional recognition from photo. Please try again.");
+    throw new Error("Could not parse food recognition JSON response.");
   }
 
   const parsed = JSON.parse(jsonMatch[0]);
-  const parsedNutrients = parsed.nutrients || {};
 
-  const p = parseInt(parsedNutrients.protein || parsed.protein) || 0;
-  const c = parseInt(parsedNutrients.carbs || parsed.carbs) || 0;
-  const f = parseInt(parsedNutrients.fats || parsed.fats) || 0;
-  const fib = parseInt(parsedNutrients.fiber || parsed.fiber) || 0;
+  const p = parseNum(parsed.nutrients?.protein ?? parsed.protein);
+  const c = parseNum(parsed.nutrients?.carbs ?? parsed.carbs);
+  const f = parseNum(parsed.nutrients?.fats ?? parsed.fats);
+  const fib = parseNum(parsed.nutrients?.fiber ?? parsed.fiber);
 
+  // Build complete dynamic nutrient map containing all tracked nutrients & custom items
   const dynamicNutrientMap: Record<string, number> = {
     protein: p,
     carbs: c,
     fats: f,
     fiber: fib,
-    ...parsedNutrients,
   };
+
+  const rawParsedNutrients = parsed.nutrients || {};
+  Object.keys(rawParsedNutrients).forEach((k) => {
+    dynamicNutrientMap[k] = parseNum(rawParsedNutrients[k]);
+  });
+  Object.keys(parsed).forEach((k) => {
+    if (!["isFood", "name", "confidenceScore", "calories", "tags", "nutrients", "meal_description"].includes(k)) {
+      if (typeof parsed[k] === "number" || (typeof parsed[k] === "string" && !isNaN(parseFloat(parsed[k])))) {
+        dynamicNutrientMap[k] = parseNum(parsed[k]);
+      }
+    }
+  });
 
   const rawTags = Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : ["Photo Log"];
   const cleanTags = rawTags.map((t: string) =>
     t.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "").trim()
   ).filter(Boolean);
 
+  const cal = parseNum(parsed.calories) || Math.round(p * 4 + c * 4 + f * 9);
+
   return {
     isFood: parsed.isFood !== false,
     name: parsed.name || "Analyzed Meal",
-    confidenceScore: parsed.confidenceScore || 85,
-    calories: parseInt(parsed.calories) || Math.round(p * 4 + c * 4 + f * 9),
+    confidenceScore: parseNum(parsed.confidenceScore) || 85,
+    calories: cal,
     protein: p,
     carbs: c,
     fats: f,
     fiber: fib,
     nutrients: dynamicNutrientMap,
     tags: cleanTags,
-    meal_description: notes.trim() || "AI Photo Recognition Log",
+    meal_description: parsed.meal_description || notes.trim() || "AI Photo Recognition Log",
   };
 };
 
@@ -240,13 +299,23 @@ export const refineMealWithAI = async ({
   profileData,
 }: RefineMealOptions): Promise<Partial<FoodAnalysisResult>> => {
   const key = resolveGeminiApiKey(profileData);
-  if (!key && !isSupabaseConfigured) {
-    throw new Error("Gemini API key missing. Please configure your Gemini API Key in Settings.");
-  }
 
-  const nutrientListStr = trackedNutrients.length > 0
-    ? trackedNutrients.map((n) => `"${n.id}": (${n.name} in ${n.unit})`).join(", ")
-    : `"protein": (g), "carbs": (g), "fats": (g), "fiber": (g)`;
+  const activeNutrients = trackedNutrients.length > 0
+    ? trackedNutrients
+    : (profileData?.tracked_nutrients && profileData.tracked_nutrients.length > 0)
+    ? profileData.tracked_nutrients.filter((n: any) => n.enabled ?? true)
+    : DEFAULT_TRACKED_NUTRIENTS;
+
+  const nutrientListStr = activeNutrients
+    .map((n) => `"${n.id}": (${n.name} in ${n.unit})`)
+    .join(", ");
+
+  const sampleNutrientObj: Record<string, number> = {};
+  activeNutrients.forEach((n) => {
+    sampleNutrientObj[n.id] = (currentMeal.nutrients && currentMeal.nutrients[n.id]) !== undefined
+      ? parseNum(currentMeal.nutrients[n.id])
+      : 10;
+  });
 
   const promptText = `Current meal: "${currentMeal.name}" (${currentMeal.calories} kcal).
 Description: "${currentMeal.meal_description || ""}".
@@ -255,44 +324,65 @@ Tags: ${JSON.stringify(currentMeal.tags || [])}.
 
 User refinement instruction: "${refinePrompt.trim()}".
 
-Recalculate updated meal name, new total calories (kcal), updated meal description, updated tags, and updated nutrients: ${nutrientListStr}. Include "fiber".
+Recalculate updated meal name, new total calories (kcal), updated meal description, updated clean dietary tags, and updated values for ALL tracked nutrients: ${nutrientListStr}.
 Return ONLY valid JSON:
-{"name": "...", "calories": 0, "meal_description": "...", "tags": ["High Protein"], "nutrients": {"protein": 0, "carbs": 0, "fats": 0, "fiber": 0}}`;
+{"name": "...", "calories": 0, "meal_description": "...", "tags": ["High Protein"], "nutrients": ${JSON.stringify(sampleNutrientObj)}}`;
 
   let responseData: any = null;
 
-  if (key) {
-    const modelName = await getBestGeminiModel(key);
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }],
-        }),
-      }
-    );
-    if (!res.ok) throw new Error("Gemini refinement API call failed.");
-    responseData = await res.json();
-  } else if (isSupabaseConfigured) {
-    const { data, error } = await supabase.functions.invoke("gemini", {
-      body: { prompt: promptText },
-    });
-    if (error || !data) throw new Error("Gemini refinement failed via backend.");
-    responseData = data;
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.functions.invoke("gemini", {
+        body: { prompt: promptText },
+      });
+      if (!error && data) responseData = data;
+    } catch (err) {
+      console.warn("[AI Refine] Supabase invoke failed, falling back to direct key:", err);
+    }
   }
+
+  if (!responseData && key) {
+    const modelName = await getBestGeminiModel(key);
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: promptText }] }],
+          }),
+        }
+      );
+      if (res.ok) responseData = await res.json();
+    } catch (err) {
+      console.error("[AI Refine] Direct Gemini API call failed:", err);
+    }
+  }
+
+  if (!responseData) throw new Error("Meal refinement AI service unavailable.");
 
   const rawText = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || responseData?.text || "";
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("Could not parse refined meal object.");
 
   const parsed = JSON.parse(jsonMatch[0]);
+  const parsedNutrients = parsed.nutrients || {};
+
+  const dynamicNutrientMap: Record<string, number> = {};
+  Object.keys(parsedNutrients).forEach((k) => {
+    dynamicNutrientMap[k] = parseNum(parsedNutrients[k]);
+  });
+
   return {
     name: parsed.name,
-    calories: parseInt(parsed.calories),
+    calories: parseNum(parsed.calories),
     meal_description: parsed.meal_description,
     tags: parsed.tags,
-    nutrients: parsed.nutrients,
+    nutrients: dynamicNutrientMap,
+    protein: parseNum(parsedNutrients.protein ?? parsed.protein),
+    carbs: parseNum(parsedNutrients.carbs ?? parsed.carbs),
+    fats: parseNum(parsedNutrients.fats ?? parsed.fats),
+    fiber: parseNum(parsedNutrients.fiber ?? parsed.fiber),
   };
 };

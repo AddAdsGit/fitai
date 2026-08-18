@@ -554,6 +554,10 @@ export const ManualLogModal = ({
       ? `Attached meal: ${attachedItem.name}. User notes: ${aiInstruction.trim()}`
       : aiInstruction.trim();
 
+    const nutrientPromptList = (activeTrackedNutrients || [])
+      .map((n) => `"${n.id}": (${n.name} in ${n.unit})`)
+      .join(", ");
+
     setIsProcessing(true);
     setErrorMessage("");
 
@@ -583,9 +587,12 @@ export const ManualLogModal = ({
         const mimeType = uploadedImage.substring(5, uploadedImage.indexOf(";base64"));
         const base64Data = uploadedImage.substring(commaIndex + 1);
         
-        const imagePrompt = `Analyze the food plate in this image. User notes & attached item: "${fullInstruction}". Estimate meal name, total calories, protein, carbs, fats, fiber, description. Return ONLY valid JSON: {"name":"...","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0,"description":"..."}`;
+        const sampleNutrientObj: Record<string, number> = {};
+        activeTrackedNutrients.forEach((n) => { sampleNutrientObj[n.id] = 10; });
+
+        const imagePrompt = `Analyze the food plate in this image. User notes & attached item: "${fullInstruction}". Estimate meal name, total calories (kcal), description, clean dietary tags, and values for ALL user-tracked nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
         
-        const modelName = await getBestGeminiModel(key);
+        const modelName = "gemini-2.5-flash";
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -597,7 +604,12 @@ export const ManualLogModal = ({
                   { inlineData: { mimeType: mimeType, data: base64Data } }
                 ]
               }
-            ]
+            ],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 300,
+              responseMimeType: "application/json"
+            }
           })
         });
 
@@ -605,29 +617,48 @@ export const ManualLogModal = ({
         rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
         const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+        const parsedNutrients = parsed.nutrients || {};
+
+        const parseVal = (val: any) => {
+          if (typeof val === "number") return isNaN(val) ? 0 : val;
+          if (!val) return 0;
+          const p = parseFloat(String(val).replace(/[^0-9.]/g, ""));
+          return isNaN(p) ? 0 : Math.round(p * 10) / 10;
+        };
+
+        const pVal = parseVal(parsedNutrients.protein ?? parsed.protein);
+        const cVal = parseVal(parsedNutrients.carbs ?? parsed.carbs);
+        const fVal = parseVal(parsedNutrients.fats ?? parsed.fats);
+        const fibVal = parseVal(parsedNutrients.fiber ?? parsed.fiber);
+
+        const dynamicNutrientMap: Record<string, number> = {
+          protein: pVal,
+          carbs: cVal,
+          fats: fVal,
+          fiber: fibVal,
+          ...parsedNutrients,
+        };
 
         calculatedMeal = {
           id: mealToEdit?.id || `meal_${Date.now()}`,
           name: parsed.name || attachedItem?.name || aiInstruction.trim() || "Custom Meal Log",
-          calories: parseInt(parsed.calories) || 350,
-          protein: parseInt(parsed.protein) || 20,
-          carbs: parseInt(parsed.carbs) || 40,
-          fats: parseInt(parsed.fats) || 12,
-          fiber: parseInt(parsed.fiber) || 5,
-          nutrients: {
-            protein: parseInt(parsed.protein) || 20,
-            carbs: parseInt(parsed.carbs) || 40,
-            fats: parseInt(parsed.fats) || 12,
-            fiber: parseInt(parsed.fiber) || 5,
-          },
+          calories: parseVal(parsed.calories) || Math.round(pVal * 4 + cVal * 4 + fVal * 9),
+          protein: pVal,
+          carbs: cVal,
+          fats: fVal,
+          fiber: fibVal,
+          nutrients: dynamicNutrientMap,
           type: mealToEdit?.type || "AI Meal Log",
           time: time.trim(),
           image: finalImage,
           meal_description: parsed.description || aiInstruction.trim(),
-          tags: selectedTags.length > 0 ? selectedTags : ["AI Log"]
+          tags: selectedTags.length > 0 ? selectedTags : (parsed.tags || ["AI Log"])
         };
       } else {
-        const prompt = `Calculate nutrition for: "${fullInstruction}". Return ONLY raw JSON: {"name":"...","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0,"description":"..."}`;
+        const sampleNutrientObj: Record<string, number> = {};
+        activeTrackedNutrients.forEach((n) => { sampleNutrientObj[n.id] = 10; });
+
+        const prompt = `Calculate nutrition for: "${fullInstruction}". Provide values for ALL tracked nutrients: ${nutrientPromptList}. Return ONLY raw JSON: {"name":"...","calories":0,"description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
         
         if (isSupabaseConfigured) {
           const { data } = await supabase.functions.invoke("gemini", { body: { prompt } });
@@ -642,21 +673,37 @@ export const ManualLogModal = ({
         }
 
         const result = cleaned ? JSON.parse(cleaned) : {};
+        const resultNutrients = result.nutrients || {};
+
+        const parseVal = (val: any) => {
+          if (typeof val === "number") return isNaN(val) ? 0 : val;
+          if (!val) return 0;
+          const p = parseFloat(String(val).replace(/[^0-9.]/g, ""));
+          return isNaN(p) ? 0 : Math.round(p * 10) / 10;
+        };
+
+        const pVal = parseVal(resultNutrients.protein ?? result.protein);
+        const cVal = parseVal(resultNutrients.carbs ?? result.carbs);
+        const fVal = parseVal(resultNutrients.fats ?? result.fats);
+        const fibVal = parseVal(resultNutrients.fiber ?? result.fiber);
+
+        const dynamicNutrientMap: Record<string, number> = {
+          protein: pVal,
+          carbs: cVal,
+          fats: fVal,
+          fiber: fibVal,
+          ...resultNutrients,
+        };
         
         calculatedMeal = {
           id: mealToEdit?.id || `meal_${Date.now()}`,
           name: result.name || attachedItem?.name || aiInstruction.trim() || "Custom Meal Log",
-          calories: parseInt(result.calories) || 350,
-          protein: parseInt(result.protein) || 20,
-          carbs: parseInt(result.carbs) || 40,
-          fats: parseInt(result.fats) || 12,
-          fiber: parseInt(result.fiber) || 5,
-          nutrients: {
-            protein: parseInt(result.protein) || 20,
-            carbs: parseInt(result.carbs) || 40,
-            fats: parseInt(result.fats) || 12,
-            fiber: parseInt(result.fiber) || 5,
-          },
+          calories: parseVal(result.calories) || Math.round(pVal * 4 + cVal * 4 + fVal * 9),
+          protein: pVal,
+          carbs: cVal,
+          fats: fVal,
+          fiber: fibVal,
+          nutrients: dynamicNutrientMap,
           type: mealToEdit?.type || "AI Meal Log",
           time: time.trim(),
           image: finalImage,
@@ -812,16 +859,28 @@ export const ManualLogModal = ({
       }
 
       // Live Gemini 1.5 Flash AI Refinement
-      const promptText = `The user has logged a meal: "${name}" with ${currentCal} kcal, current notes: "${mealDescription}", nutrients: ${JSON.stringify(editableNutrients)}, tags: ${JSON.stringify(selectedTags)}. The user now wants to refine this meal with these specific instructions: "${combinedRefinement}". Calculate the new meal name, updated total calories (kcal), new meal description/notes, updated clean dietary tags (e.g. ["High Protein"]), and updated user nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":{"protein":0,"carbs":0,"fats":0,"fiber":0}}`;
+      const sampleNutrientObj: Record<string, number> = {};
+      activeTrackedNutrients.forEach((n) => {
+        sampleNutrientObj[n.id] = (editableNutrients && editableNutrients[n.id]) !== undefined
+          ? (typeof editableNutrients[n.id] === "number" ? editableNutrients[n.id] : parseFloat(String(editableNutrients[n.id])) || 0)
+          : 10;
+      });
 
-      const modelName = await getBestGeminiModel(key);
+      const promptText = `The user has logged a meal: "${name}" with ${currentCal} kcal, current notes: "${mealDescription}", nutrients: ${JSON.stringify(editableNutrients)}, tags: ${JSON.stringify(selectedTags)}. The user now wants to refine this meal with these specific instructions: "${combinedRefinement}". Calculate the new meal name, updated total calories (kcal), new meal description/notes, updated clean dietary tags (e.g. ["High Protein"]), and updated values for ALL user nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
+
+      const modelName = "gemini-2.5-flash";
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }]
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 300,
+              responseMimeType: "application/json"
+            }
           })
         }
       );
@@ -832,8 +891,21 @@ export const ManualLogModal = ({
 
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        const updatedCal = parseInt(parsed.calories) || currentCal;
-        const updatedNutrients = parsed.nutrients || editableNutrients;
+        const parseVal = (val: any) => {
+          if (typeof val === "number") return isNaN(val) ? 0 : val;
+          if (!val) return 0;
+          const p = parseFloat(String(val).replace(/[^0-9.]/g, ""));
+          return isNaN(p) ? 0 : Math.round(p * 10) / 10;
+        };
+
+        const updatedCal = parseVal(parsed.calories) || currentCal;
+        const rawParsedNutrients = parsed.nutrients || {};
+        const updatedNutrients: Record<string, number> = { ...editableNutrients };
+        
+        Object.keys(rawParsedNutrients).forEach((k) => {
+          updatedNutrients[k] = parseVal(rawParsedNutrients[k]);
+        });
+
         const updatedName = parsed.name || name;
         const updatedDesc = parsed.meal_description || `${mealDescription ? mealDescription + " • " : ""}${refinePrompt.trim()}`;
         const rawTags = Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : selectedTags;
@@ -850,10 +922,10 @@ export const ManualLogModal = ({
           id: loggedMealResult?.id || mealToEdit?.id || `meal_${Date.now()}`,
           name: updatedName,
           calories: updatedCal,
-          protein: updatedNutrients.protein || 0,
-          carbs: updatedNutrients.carbs || 0,
-          fats: updatedNutrients.fats || 0,
-          fiber: updatedNutrients.fiber || 0,
+          protein: parseVal(updatedNutrients.protein),
+          carbs: parseVal(updatedNutrients.carbs),
+          fats: parseVal(updatedNutrients.fats),
+          fiber: parseVal(updatedNutrients.fiber),
           nutrients: updatedNutrients,
           meal_description: updatedDesc,
           tags: cleanTags,

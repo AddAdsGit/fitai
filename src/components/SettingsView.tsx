@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
-import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw, Sliders, Heart, Mic, ShieldCheck, AlertTriangle, FileText } from "lucide-react";
+import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw, Sliders, Heart, Mic, ShieldCheck, AlertTriangle, FileText, Activity, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProUpgradeModal } from "./ProUpgradeModal";
 import { ChatGPTIcon } from "./ChatGPTIcon";
+import { performHealthSync, requestHealthPermissions, clearHealthSyncLogs, type SyncLogEntry } from "../services/healthSyncService";
 import { PrivacyPolicyModal } from "./PrivacyPolicyModal";
 import { DEFAULT_CUSTOM_GPT_URL, TELEGRAM_BOT_URL } from "../constants/app";
 
@@ -702,7 +703,7 @@ export const SettingsView = ({
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "logging" | "gemini" | "floating_widget" | null>(null);
+  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "logging" | "gemini" | "floating_widget" | "health_sync" | null>(null);
 
   const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gpt-action`;
@@ -945,6 +946,281 @@ export const SettingsView = ({
             Save Connection Settings
           </button>
         </motion.div>
+    );
+  }
+
+  if (activeSubView === "health_sync") {
+    const isGfitOn = (profileData.preferences || []).some((p: string) => p === "health_sync_gfit:true");
+    const isAfitOn = (profileData.preferences || []).some((p: string) => p === "health_sync_afit:true");
+    const [isSyncing, setIsSyncing] = useState(false);
+    const logs: SyncLogEntry[] = profileData.health_sync_logs || [];
+    const lastSyncedAt = profileData.health_sync_last_synced_at || null;
+
+    const toggleGfit = async () => {
+      const filtered = (profileData.preferences || []).filter((p: string) => !p.startsWith("health_sync_gfit:"));
+      const nextVal = !isGfitOn;
+      filtered.push(`health_sync_gfit:${nextVal}`);
+      setProfileData({ ...profileData, preferences: filtered });
+      if (nextVal) {
+        triggerToast("Requesting Google Fit permissions...");
+        const perm = await requestHealthPermissions("google");
+        if (perm.success) {
+          triggerToast("Google Fit Sync Enabled");
+          performHealthSync(session, profileData, setProfileData, "google");
+        } else {
+          triggerToast(perm.message);
+        }
+      } else {
+        triggerToast("Disabled Google Fit Sync");
+      }
+    };
+
+    const toggleAfit = async () => {
+      const filtered = (profileData.preferences || []).filter((p: string) => !p.startsWith("health_sync_afit:"));
+      const nextVal = !isAfitOn;
+      filtered.push(`health_sync_afit:${nextVal}`);
+      setProfileData({ ...profileData, preferences: filtered });
+      if (nextVal) {
+        triggerToast("Requesting Apple Health permissions...");
+        const perm = await requestHealthPermissions("apple");
+        if (perm.success) {
+          triggerToast("Apple Health Sync Enabled");
+          performHealthSync(session, profileData, setProfileData, "apple");
+        } else {
+          triggerToast(perm.message);
+        }
+      } else {
+        triggerToast("Disabled Apple Health Sync");
+      }
+    };
+
+    const handleSyncNow = async () => {
+      if (!isGfitOn && !isAfitOn) {
+        triggerToast("Please enable Apple Health or Google Fit first");
+        return;
+      }
+      setIsSyncing(true);
+      try {
+        if (isAfitOn) {
+          await performHealthSync(session, profileData, setProfileData, "apple");
+        }
+        if (isGfitOn) {
+          await performHealthSync(session, profileData, setProfileData, "google");
+        }
+        triggerToast("Health data synced successfully");
+      } catch (err) {
+        console.error(err);
+        triggerToast("Sync completed with issues. Check log below.");
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
+    const handleClearLogs = async () => {
+      await clearHealthSyncLogs(session, profileData, setProfileData);
+      triggerToast("Sync logs cleared");
+    };
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        className="px-2.5 sm:px-4 mt-6 relative z-10 space-y-4 pb-32 font-sans text-left"
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveSubView(null)}
+            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div>
+            <h2 className="text-xl font-black text-[#1a1a1a]">Health Sync</h2>
+            <p className="text-[10px] font-semibold text-stone-400">Native HealthKit & Google Fit Integration</p>
+          </div>
+        </div>
+
+        {/* Platform Overview Banner */}
+        <div className="bg-orange-50/60 border border-orange-100/80 rounded-[28px] p-4 space-y-2 text-left">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-orange-500" />
+              <span className="text-xs font-black uppercase text-orange-950 tracking-wider">
+                Smartwatch & App Integration
+              </span>
+            </div>
+            {lastSyncedAt && (
+              <span className="text-[9px] font-mono font-bold text-orange-800/70 bg-orange-100/60 px-2 py-0.5 rounded-full">
+                Synced {new Date(lastSyncedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+          </div>
+          <p className="text-xs font-medium text-orange-900/70 leading-relaxed">
+            Sync active calories burned, daily steps, and weight logs automatically to Supabase for AI conversation context.
+          </p>
+        </div>
+
+        {/* Google Fit / Health Connect Card */}
+        <div className="bg-white p-4 rounded-[28px] border border-stone-150 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-600 shrink-0 font-black text-xs font-mono">
+                GFit
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-stone-900">Google Fit & Health Connect</h4>
+                <p className="text-[10px] font-semibold text-stone-400">Android, Noise, Boat, Samsung, Amazfit, Fitbit</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleGfit}
+              className={cn(
+                "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
+                isGfitOn ? "bg-orange-500 justify-end" : "bg-stone-200 justify-start"
+              )}
+            >
+              <motion.div layout className="w-4.5 h-4.5 rounded-full bg-white shadow-sm" />
+            </button>
+          </div>
+
+          {isGfitOn && (
+            <div className="p-3 bg-stone-50/80 rounded-2xl border border-stone-100 space-y-1 text-left">
+              <div className="flex items-center justify-between text-xs font-bold text-stone-800">
+                <span>Google Fit Integration Active</span>
+                <span className="text-[9px] font-mono text-emerald-600 font-extrabold uppercase bg-emerald-50 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Connected
+                </span>
+              </div>
+              <p className="text-[10px] text-stone-400 font-medium">Background sync for active burn calories, steps, and weight logs.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Apple Health Card */}
+        <div className="bg-white p-4 rounded-[28px] border border-stone-150 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500 shrink-0 font-black text-xs font-mono">
+                AFit
+              </div>
+              <div>
+                <h4 className="text-xs font-black text-stone-900">Apple Health (HealthKit)</h4>
+                <p className="text-[10px] font-semibold text-stone-400">Apple Watch, iPhone Health, Connected iOS Apps</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleAfit}
+              className={cn(
+                "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
+                isAfitOn ? "bg-orange-500 justify-end" : "bg-stone-200 justify-start"
+              )}
+            >
+              <motion.div layout className="w-4.5 h-4.5 rounded-full bg-white shadow-sm" />
+            </button>
+          </div>
+
+          {isAfitOn && (
+            <div className="p-3 bg-stone-50/80 rounded-2xl border border-stone-100 space-y-1 text-left">
+              <div className="flex items-center justify-between text-xs font-bold text-stone-800">
+                <span>HealthKit Integration Active</span>
+                <span className="text-[9px] font-mono text-emerald-600 font-extrabold uppercase bg-emerald-50 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> Connected
+                </span>
+              </div>
+              <p className="text-[10px] text-stone-400 font-medium">Background sync for active burn calories, steps, and weight logs.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Action Connect & Sync Button */}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={handleSyncNow}
+            disabled={isSyncing}
+            className={cn(
+              "w-full py-3.5 px-4 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-[0.99] text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all duration-200",
+              isSyncing && "opacity-80 cursor-not-allowed"
+            )}
+          >
+            <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
+            <span>{isSyncing ? "Syncing Health Data..." : "Connect & Sync Now"}</span>
+          </button>
+        </div>
+
+        {/* Sync & Error Logs Showcase */}
+        <div className="bg-white p-4 rounded-[28px] border border-stone-150 shadow-2xs space-y-3 text-left">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-stone-600" />
+              <h4 className="text-xs font-black text-stone-900 uppercase tracking-wider">Sync & Error Logs</h4>
+              {logs.length > 0 && (
+                <span className="text-[9px] font-mono font-bold bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded-md">
+                  {logs.length}
+                </span>
+              )}
+            </div>
+
+            {logs.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearLogs}
+                className="text-[10px] font-bold text-stone-400 hover:text-rose-500 flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-3 h-3" /> Clear
+              </button>
+            )}
+          </div>
+
+          {logs.length === 0 ? (
+            <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100 text-center">
+              <p className="text-[11px] font-medium text-stone-400">No sync logs recorded yet. Tap "Connect & Sync Now" to run initial sync.</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="p-3 rounded-2xl border bg-stone-50/70 border-stone-100 space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      {log.status === "success" ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      ) : log.status === "warning" ? (
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      )}
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-stone-700 font-mono">
+                        {log.provider === "apple" ? "Apple Health" : "Google Fit"}
+                      </span>
+                    </div>
+
+                    <span className="text-[9px] font-medium text-stone-400 font-mono">
+                      {new Date(log.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] font-medium text-stone-700 leading-snug">{log.message}</p>
+
+                  {log.details?.errorText && (
+                    <p className="text-[10px] font-mono text-rose-600 bg-rose-50 p-1.5 rounded-lg break-words">
+                      {log.details.errorText}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </motion.div>
     );
   }
 
@@ -1971,7 +2247,7 @@ export const SettingsView = ({
             {/* Google Gemini API */}
             <div
               onClick={() => setActiveSubView("gemini")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] rounded-b-[18px] transition-colors cursor-pointer group border-t border-stone-50"
+              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group border-t border-stone-50"
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-550 shrink-0">
@@ -1989,6 +2265,32 @@ export const SettingsView = ({
                   <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
                 ) : (
                   <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Off</span>
+                )}
+                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+
+            {/* Health Sync (Apple Health & Google Fit) */}
+            <div
+              onClick={() => setActiveSubView("health_sync")}
+              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] rounded-b-[18px] transition-colors cursor-pointer group border-t border-stone-50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-550 shrink-0">
+                  <Activity className="w-4 h-4 text-orange-550" />
+                </div>
+                <div>
+                  <div className="font-bold text-[#1a1a1a] text-xs">Health Sync</div>
+                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
+                    Apple Health & Google Fit (Smartwatches, Noise, Boat, Samsung)
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
+                {(profileData.preferences || []).some((p: string) => p.startsWith("health_sync_")) ? (
+                  <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
+                ) : (
+                  <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Configure</span>
                 )}
                 <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>

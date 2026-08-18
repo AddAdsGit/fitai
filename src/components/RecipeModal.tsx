@@ -20,7 +20,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import type { Recipe, TrackedNutrient } from "../types";
-import { hasNoGeneratedImage } from "../utils/helpers";
+import { hasNoGeneratedImage, formatNutrientValue } from "../utils/helpers";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { getBestGeminiModel } from "../utils/geminiFoodAnalysis";
 import { DEFAULT_TRACKED_NUTRIENTS, normalizeTrackedNutrients } from "../constants/nutrition";
@@ -163,12 +163,17 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       const prompt = `Create a gourmet healthy recipe based on: "${aiPrompt}". Return ONLY valid JSON format: {"name":"...","time":"...","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0,"description":"...","ingredients":["..."],"instructions":"..."}`;
 
       if (key) {
-        const modelName = await getBestGeminiModel(key);
+        const modelName = "gemini-2.5-flash";
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 500,
+              responseMimeType: "application/json"
+            }
           })
         });
         const data = await response.json();
@@ -500,7 +505,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
                             {n.name}
                           </span>
                           <div className="bg-white border border-stone-200/80 rounded-xl px-2 py-1 text-center shadow-inner">
-                            <span className="text-xs font-black text-stone-900">{val} {n.unit}</span>
+                            <span className="text-xs font-black text-stone-900">{formatNutrientValue(val)} {n.unit}</span>
                           </div>
                         </div>
                       );

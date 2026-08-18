@@ -271,9 +271,9 @@ export const EditProfileView = ({
       transition={{ duration: 0.3 }}
       className="mt-4 relative z-10 pb-32"
     >
-      <div className="px-6 space-y-6 max-w-[448px] mx-auto">
+      <div className="px-2.5 sm:px-4 space-y-4 max-w-md mx-auto">
         {/* Minimalist Back Navigation */}
-        <div className="flex items-center justify-between bg-white px-4 py-3.5 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02]">
+        <div className="flex items-center justify-between bg-white px-3.5 py-3 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02]">
           <button
             onClick={() => setActiveTab("profile")}
             className="flex items-center gap-1.5 text-stone-500 hover:text-stone-850 transition-colors cursor-pointer border-none bg-transparent active:scale-95"
@@ -286,9 +286,9 @@ export const EditProfileView = ({
           </span>
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* Card 1: Personal Profile & Biometrics */}
-          <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4">
+          <div className="bg-white p-3.5 sm:p-5 rounded-[28px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-3.5">
             <div className="flex items-center gap-2 pb-2 border-b border-stone-50">
               <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
                 <User className="w-4 h-4" />
@@ -377,7 +377,7 @@ export const EditProfileView = ({
             </div>
 
             {/* Age Individual Row */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2 shadow-2xs">
+            <div className="bg-stone-50 p-3 sm:p-4 rounded-2xl border border-stone-100 space-y-2 shadow-2xs">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Age</span>
                 <span className="text-[9px] font-black text-stone-400 uppercase">Yrs Old</span>
@@ -419,7 +419,7 @@ export const EditProfileView = ({
             </div>
 
             {/* Height Individual Row */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2 shadow-2xs">
+            <div className="bg-stone-50 p-3 sm:p-4 rounded-2xl border border-stone-100 space-y-2 shadow-2xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Ruler className="w-4 h-4 text-orange-500" />
@@ -453,7 +453,7 @@ export const EditProfileView = ({
             </div>
 
             {/* Current Weight Individual Row */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2 shadow-2xs">
+            <div className="bg-stone-50 p-3 sm:p-4 rounded-2xl border border-stone-100 space-y-2 shadow-2xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Scale className="w-4 h-4 text-orange-500" />
@@ -519,7 +519,7 @@ export const EditProfileView = ({
             </div>
 
             {/* Target Weight Goal */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
+            <div className="bg-stone-50 p-3 sm:p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Target Weight</span>
                 <span className="text-[9px] font-black text-stone-400 uppercase">kg</span>
@@ -558,7 +558,7 @@ export const EditProfileView = ({
             </div>
 
             {/* Daily Calories Target */}
-            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
+            <div className="bg-stone-50 p-3 sm:p-4 rounded-2xl border border-stone-100 space-y-2.5 shadow-2xs">
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-black uppercase text-stone-500 tracking-wider">Daily Calorie Target</span>
                 <span className="text-[9px] font-black text-stone-400 uppercase">kcal</span>
@@ -598,7 +598,7 @@ export const EditProfileView = ({
           </div>
 
           {/* Card 4: Daily Vitals Trackers (Separate Dedicated Section) */}
-          <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
+          <div className="bg-white p-3.5 sm:p-5 rounded-[28px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
             <div className="flex items-center gap-2 pb-2 border-b border-stone-50">
               <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
                 <Activity className="w-4 h-4" />
@@ -776,7 +776,7 @@ export const EditProfileView = ({
 
 
           {/* Card: Nutrient Tracking (Dedicated Section) */}
-          <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
+          <div className="bg-white p-3.5 sm:p-5 rounded-[28px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
             <div className="flex items-center justify-between pb-2 border-b border-stone-50">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">
@@ -1036,11 +1036,6 @@ export const EditProfileView = ({
                                   style={{ backgroundColor: item.color || "#F97316" }}
                                 />
                                 <span className="text-xs font-black text-stone-850 truncate">{item.name}</span>
-                                {["protein", "carbs", "fats", "fiber"].includes(item.id) && (
-                                  <span className="text-[8.5px] font-extrabold uppercase text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-md border border-orange-100/50 shrink-0">
-                                    Macro
-                                  </span>
-                                )}
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
@@ -1183,7 +1178,7 @@ export const EditProfileView = ({
               </div>
 
         {/* Card 5: AI Meal Tags */}
-          <div className="bg-white p-5 rounded-3xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
+          <div className="bg-white p-3.5 sm:p-5 rounded-[28px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-black/[0.02] space-y-4 text-left">
             <div className="flex items-center justify-between pb-2 border-b border-stone-50">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600">

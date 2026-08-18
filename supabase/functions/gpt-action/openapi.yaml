@@ -509,6 +509,15 @@ paths:
                   water_intake:
                     type: integer
                     description: Water consumed so far in ml
+                  active_calories_burned:
+                    type: integer
+                    description: Active calories burned automatically synced from Apple Health or Google Fit
+                  steps:
+                    type: integer
+                    description: Daily steps automatically synced from Apple Health or Google Fit
+                  health_sync_last_synced_at:
+                    type: string
+                    description: Timestamp of last successful native health sync (ISO format)
                   stool_type:
                     type: integer
                     description: Bristol stool scale type (1-7), if logged
@@ -558,6 +567,12 @@ paths:
                 notes:
                   type: string
                   description: The text content of the daily wellness or health note.
+                active_calories_burned:
+                  type: integer
+                  description: Active calories burned from smartwatch or health app
+                steps:
+                  type: integer
+                  description: Daily step count from health app
                 water_intake:
                   type: integer
                   description: Total water consumed in ml for the day (absolute value)

@@ -842,6 +842,9 @@ serve(async (req) => {
           date: queryDate,
           notes: record ? record.notes : "",
           water_intake: record ? record.water_intake : 0,
+          active_calories_burned: record ? record.active_calories_burned || 0 : 0,
+          steps: record ? record.steps || 0 : 0,
+          health_sync_last_synced_at: record ? record.health_sync_last_synced_at || null : null,
           stool_type: record ? record.stool_type : null,
           stool_size: record ? record.stool_size : null,
           energy_level: record ? record.energy_level : null,
@@ -870,6 +873,9 @@ serve(async (req) => {
         // stored values (previously an omitted `notes` wiped the day's notes).
         const fields: Record<string, unknown> = {};
         if (body.notes !== undefined) fields.notes = body.notes;
+        if (body.active_calories_burned !== undefined) fields.active_calories_burned = parseInt(body.active_calories_burned) || 0;
+        if (body.steps !== undefined) fields.steps = parseInt(body.steps) || 0;
+        if (body.health_sync_last_synced_at !== undefined) fields.health_sync_last_synced_at = body.health_sync_last_synced_at;
         if (body.water_add !== undefined) {
           const addAmount = parseInt(body.water_add) || 0;
           const currentWater = (existing && existing.water_intake) || 0;
@@ -905,7 +911,7 @@ serve(async (req) => {
         if (body.bloating_log_time !== undefined && body.bloating_level === undefined) fields.bloating_log_time = body.bloating_log_time;
 
         if (Object.keys(fields).length === 0) {
-          return new Response(JSON.stringify({ error: "No valid fields provided. Allowed: notes, water_intake, water_add, stool_type, stool_size, energy_level, bloating_level, water_log_time, stool_log_time, energy_log_time, bloating_log_time" }), {
+          return new Response(JSON.stringify({ error: "No valid fields provided. Allowed: notes, active_calories_burned, steps, water_intake, water_add, stool_type, stool_size, energy_level, bloating_level, water_log_time, stool_log_time, energy_log_time, bloating_log_time" }), {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });

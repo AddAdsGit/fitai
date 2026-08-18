@@ -80,7 +80,7 @@ import { DailyProgressSection } from "./components/DailyProgressSection";
 
 // Import types & helpers
 import type { Meal, Recipe, DailyWellness, WeightLog } from "./types";
-import { hasNoGeneratedImage, formatDateStr, getMealEmoji } from "./utils/helpers";
+import { hasNoGeneratedImage, formatDateStr, getMealEmoji, compressImageBase64 } from "./utils/helpers";
 import { generateShareUrl } from "./utils/shareUtils";
 
 
@@ -1030,6 +1030,20 @@ export default function App() {
     }
   }, [activeTab]);
 
+  // Auto background health sync on app load if Health Sync is enabled
+  useEffect(() => {
+    if (!activeProfileId || !profileData.preferences) return;
+    const isGfitOn = (profileData.preferences || []).some((p: string) => p === "health_sync_gfit:true");
+    const isAfitOn = (profileData.preferences || []).some((p: string) => p === "health_sync_afit:true");
+
+    if (isAfitOn || isGfitOn) {
+      import("./services/healthSyncService").then(({ performHealthSync }) => {
+        if (isAfitOn) performHealthSync(session, profileDataRef.current, setProfileData, "apple");
+        if (isGfitOn) performHealthSync(session, profileDataRef.current, setProfileData, "google");
+      });
+    }
+  }, [activeProfileId]);
+
   useEffect(() => {
     if (!isSupabaseConfigured || !activeProfileId) return;
 
@@ -1039,7 +1053,7 @@ export default function App() {
         const [profileRes, recipesRes, mealsRes, wellnessRes, weightLogsRes] = await Promise.all([
           supabase.from('profiles').select('*').eq('id', activeProfileId).single(),
           supabase.from('recipes').select('*').eq('profile_id', activeProfileId).order('name', { ascending: true }),
-          supabase.from('meals').select('*').eq('profile_id', activeProfileId).order('created_at', { ascending: false }),
+          supabase.from('meals').select('*').eq('profile_id', activeProfileId).order('created_at', { ascending: false }).limit(150),
           supabase.from('daily_wellness').select('*').eq('profile_id', activeProfileId),
           supabase.from('weight_logs').select('*').eq('profile_id', activeProfileId).order('date', { ascending: true })
         ]);
@@ -1339,7 +1353,8 @@ export default function App() {
             .from('meals')
             .select('*')
             .eq('profile_id', activeProfileId)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(150);
           if (!error && data) {
             const mappedMeals: Meal[] = data.map((m) => {
               const nut = m.nutrients || {};
@@ -1805,7 +1820,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     
     let finalImage = "";
     if (newMealOrRecipe.image && !hasNoGeneratedImage(newMealOrRecipe.image)) {
-      finalImage = newMealOrRecipe.image;
+      finalImage = await compressImageBase64(newMealOrRecipe.image);
     } else {
       const cleanName = newMealOrRecipe.name.trim();
       let southIndianContext = "";

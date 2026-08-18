@@ -43,8 +43,20 @@ import { cn } from "../lib/utils";
 import type { Meal, WeightLog, DailyWellness } from "../types";
 import { normalizeTrackedNutrients } from "../constants/nutrition";
 import { calculateTDEE } from "../utils/metabolism";
+import { formatNutrientValue } from "../utils/helpers";
 
 type TimeRangeOption = "7D" | "14D" | "30D" | "60D" | "90D" | "CUSTOM";
+
+export interface ProgressBarProps {
+  key?: string;
+  value: number;
+  max?: number;
+  label: string;
+  color: string;
+  percentage?: string;
+  index?: number;
+  unit?: string;
+}
 
 const ProgressBar = ({
   value,
@@ -54,24 +66,15 @@ const ProgressBar = ({
   percentage,
   index = 0,
   unit = "",
-}: {
-  key?: string;
-  value: number;
-  max?: number;
-  label: string;
-  color: string;
-  percentage?: string;
-  index?: number;
-  unit?: string;
-}) => (
+}: ProgressBarProps) => (
   <div className="space-y-1.5 min-w-0 font-sans">
     <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-[0.05em] gap-1 min-w-0">
       <span className="text-orange-950/70 truncate">{label}</span>
       {max ? (
         <span style={{ color }} className="whitespace-nowrap shrink-0 font-mono font-bold">
-          {value}
+          {formatNutrientValue(value)}
           <span className="text-orange-900/40 text-[9px] ml-0.5">
-            / {max}
+            / {formatNutrientValue(max)}
             {unit}
           </span>
         </span>

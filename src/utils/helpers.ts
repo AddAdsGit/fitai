@@ -169,3 +169,44 @@ export const formatDisplayTime = (timeStr?: string): string => {
   }
   return s;
 };
+
+// Utility: Format a nutrient value cleanly. Whole integers display as integers (e.g. 25), while decimals display to 1 decimal place (e.g. 0.8, 12.5).
+export const formatNutrientValue = (val?: number | string | null): string => {
+  if (val === null || val === undefined) return "0";
+  const num = typeof val === "number" ? val : parseFloat(String(val).replace(/[^0-9.]/g, ""));
+  if (isNaN(num) || num === 0) return "0";
+  if (Number.isInteger(num)) return String(num);
+  const rounded = Math.round(num * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+};
+
+// Utility: Compress heavy Base64 food photo strings on client-side before storing to DB (max 800px width, 0.75 quality)
+export const compressImageBase64 = (base64Str: string, maxWidth = 800, quality = 0.75): Promise<string> => {
+  return new Promise((resolve) => {
+    if (!base64Str || !base64Str.startsWith("data:image")) {
+      return resolve(base64Str || "");
+    }
+    if (base64Str.length < 200000) {
+      return resolve(base64Str);
+    }
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(base64Str);
+      ctx.drawImage(img, 0, 0, width, height);
+      const compressed = canvas.toDataURL("image/jpeg", quality);
+      resolve(compressed);
+    };
+    img.onerror = () => resolve(base64Str);
+  });
+};
