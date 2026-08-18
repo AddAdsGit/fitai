@@ -95,3 +95,7 @@ D. THE BUSY PROFESSIONAL & HIGH PERFORMER (Zero Friction & Vitality)
 17. FULL EDIT & DELETE CONTROL
     - What It Does: Update or remove any past log via conversation.
     - Command Example: "Change my lunch carbs to 50g" or "Delete the snack I logged at 3 PM."
+
+18. HANDS-FREE VOICE CONVERSATION MODE (Continuous Voice Logging)
+    - What It Does: Speak naturally in ChatGPT Voice Mode while walking, driving, or cooking. Whatever you say (meals, water, weight, vitals, allergies), FitAI immediately executes background database calls and replies with a short 1-sentence audio confirmation so you never have to read your screen.
+    - Command Example: "Hey, I just had a chicken bowl and 500ml water, and I weighed 70kg this morning." -> FitAI logs all three instantly and confirms over audio!

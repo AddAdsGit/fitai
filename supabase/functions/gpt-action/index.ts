@@ -565,6 +565,12 @@ serve(async (req) => {
     const createMealShareUrl = async (meal: any, profileId?: string): Promise<string | null> => {
       try {
         const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://fitpush.vercel.app";
+        
+        // Ensure image is resolved (supports HTTP URLs, base64 data URIs, and Unsplash fallback)
+        const resolvedImg = (meal.image && typeof meal.image === "string" && (meal.image.startsWith("http") || meal.image.startsWith("data:image")))
+          ? meal.image
+          : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
+
         const payload = {
           n: meal.name || "Meal",
           c: Number(meal.calories || 0),
@@ -572,7 +578,7 @@ serve(async (req) => {
           cb: Number(meal.nutrients?.carbs ?? meal.carbs ?? 0),
           f: Number(meal.nutrients?.fats ?? meal.fats ?? 0),
           fb: Number(meal.nutrients?.fiber ?? meal.fiber ?? 0),
-          img: (meal.image && meal.image.startsWith("http")) ? meal.image : undefined,
+          img: resolvedImg,
           t: meal.time || undefined,
           d: meal.meal_description || undefined,
         };

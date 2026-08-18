@@ -658,9 +658,34 @@ export const ManualLogModal = ({
         const sampleNutrientObj: Record<string, number> = {};
         activeTrackedNutrients.forEach((n) => { sampleNutrientObj[n.id] = 10; });
 
-        const prompt = `Calculate nutrition for: "${fullInstruction}". Provide values for ALL tracked nutrients: ${nutrientPromptList}. Return ONLY raw JSON: {"name":"...","calories":0,"description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
-        
-        if (isSupabaseConfigured) {
+        const prompt = `Calculate nutrition for: "${fullInstruction}". Estimate dish name, total calories (kcal), 1-sentence meal_description, clean dietary tags (e.g. ["High Protein"]), and numerical values for ALL user-tracked nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
+
+        // 1. Try user's Gemini API key directly for sub-second execution
+        if (key) {
+          try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.2,
+                  maxOutputTokens: 300,
+                  responseMimeType: "application/json"
+                }
+              })
+            });
+            if (response.ok) {
+              const data = await response.json();
+              rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            }
+          } catch (e) {
+            console.warn("[ManualLogModal] Direct key call failed, falling back to Supabase:", e);
+          }
+        }
+
+        // 2. Fallback to Supabase Edge Function if key wasn't set or direct call failed
+        if (!rawText && isSupabaseConfigured) {
           const { data } = await supabase.functions.invoke("gemini", { body: { prompt } });
           if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
             rawText = data.candidates[0].content.parts[0].text;
@@ -707,8 +732,8 @@ export const ManualLogModal = ({
           type: mealToEdit?.type || "AI Meal Log",
           time: time.trim(),
           image: finalImage,
-          meal_description: result.description || aiInstruction.trim(),
-          tags: selectedTags.length > 0 ? selectedTags : ["AI Log"]
+          meal_description: result.meal_description || result.description || aiInstruction.trim(),
+          tags: selectedTags.length > 0 ? selectedTags : (result.tags || ["AI Log"])
         };
       }
 
