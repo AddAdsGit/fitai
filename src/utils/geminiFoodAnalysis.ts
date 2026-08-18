@@ -184,43 +184,60 @@ Return ONLY a valid JSON object in this format:
     }
   }
 
-  // 2. Direct 1-Step Call to Google's stable gemini-2.5-flash model (sub-second speed with JSON config)
-  if (!responseData && key) {
-    const targetModel = "gemini-2.5-flash";
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${key}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: promptText },
-                { inline_data: { mime_type: mimeType, data: cleanBase64 } },
-              ],
-            }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 300,
-              responseMimeType: "application/json"
-            }
-          }),
-        }
-      );
+  let lastApiErrorMessage = "";
 
-      if (res.ok) {
-        responseData = await res.json();
-      } else {
-        console.error(`[AI Photo] Gemini API returned error status ${res.status}`);
+  // 2. Direct Call to Google Gemini Flash models with robust fallback & clear error messages
+  if (!responseData && key) {
+    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    for (const modelName of candidateModels) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: promptText },
+                  { inline_data: { mime_type: mimeType, data: cleanBase64 } },
+                ],
+              }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 300,
+                responseMimeType: "application/json"
+              }
+            }),
+          }
+        );
+
+        if (res.ok) {
+          responseData = await res.json();
+          break;
+        } else {
+          const errData = await res.json().catch(() => null);
+          lastApiErrorMessage = errData?.error?.message || `HTTP ${res.status}`;
+          console.warn(`[AI Photo] ${modelName} returned ${res.status}: ${lastApiErrorMessage}`);
+          if (res.status === 400 || res.status === 403) {
+            break;
+          }
+        }
+      } catch (err: any) {
+        lastApiErrorMessage = err?.message || "Network error";
+        console.error(`[AI Photo] Fetch error for ${modelName}:`, err);
       }
-    } catch (err) {
-      console.error("[AI Photo] Direct Gemini API call failed:", err);
     }
   }
 
   if (!responseData) {
-    throw new Error("AI photo analysis service unavailable. Please verify your Gemini API key or network connection.");
+    if (lastApiErrorMessage) {
+      throw new Error(`Gemini API Error: ${lastApiErrorMessage}. Please check your key in Settings.`);
+    }
+    if (!key) {
+      throw new Error("No Gemini API key found. Please enter your API key in Settings -> Google Gemini API.");
+    }
+    throw new Error("AI photo analysis service unavailable. Please verify your network connection or API key.");
   }
 
   const rawText = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || responseData?.text || "";
