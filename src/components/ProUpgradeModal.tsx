@@ -1,9 +1,11 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { ChevronRight, BarChart2, Brain, Target, Bot } from "lucide-react";
 import { motion } from "motion/react";
 
-export const ProUpgradeModal = ({ onClose }: { onClose: () => void }) => (
-  <div className="fixed inset-0 z-[200] flex flex-col pointer-events-none">
+export const ProUpgradeModal = ({ onClose }: { onClose: () => void }) =>
+  createPortal(
+    <div className="fixed inset-0 z-[9999] flex flex-col pointer-events-none">
     {/* Backdrop */}
     <motion.div
       initial={{ opacity: 0 }}
@@ -111,5 +113,6 @@ export const ProUpgradeModal = ({ onClose }: { onClose: () => void }) => (
         </div>
       </div>
     </motion.div>
-  </div>
+  </div>,
+  document.body
 );

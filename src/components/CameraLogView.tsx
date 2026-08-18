@@ -1055,95 +1055,97 @@ export const CameraLogView = ({
 
         {flowStep === "preview" && loggedMealResult && (
           <div className="flex-1 flex flex-col justify-between relative min-h-0 w-full text-left font-sans overflow-hidden bg-[#FAF7F2]">
-            {/* Full-Bleed Top Hero Cover Image Header */}
-            <div className="relative w-full h-60 shrink-0 overflow-hidden shadow-md group bg-stone-900">
-              <img
-                src={loggedMealResult.image || uploadedImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80"}
-                alt={editableName || "Meal Photo"}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-              
-              {/* Gourmet Dark Ambient Gradient Overlay (Ensures 100% legibility on light images) */}
-              <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/45 to-black/20 pointer-events-none" />
+            {/* Scrollable Container (Image Header scrolls up naturally, CTA stays sticky at bottom) */}
+            <div className="flex-1 overflow-y-auto min-h-0 text-left font-sans">
+              {/* Full-Bleed Top Hero Cover Image Header */}
+              <div className="relative w-full h-60 shrink-0 overflow-hidden shadow-md group bg-stone-900">
+                <img
+                  src={loggedMealResult.image || uploadedImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80"}
+                  alt={editableName || "Meal Photo"}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                
+                {/* Gourmet Dark Ambient Gradient Overlay (Ensures 100% legibility on light images) */}
+                <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/45 to-black/20 pointer-events-none" />
 
-              {/* Top Controls: Back Button & Camera Upload (Left) + Share Icon & Close Icon (Right) */}
-              <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleExitToDashboard}
-                    className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
-                    title="Back to Dashboard"
-                  >
-                    <ArrowLeft className="w-4 h-4 text-white" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => changePhotoInputRef.current?.click()}
-                    className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
-                    title="Change / Upload Photo"
-                  >
-                    <Camera className="w-4 h-4 text-white" />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {onShareMeal && (
+                {/* Top Controls: Back Button & Camera Upload (Left) + Share Icon & Close Icon (Right) */}
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        const currentMealObj = {
-                          ...loggedMealResult,
-                          name: editableName,
-                          meal_description: editableDesc,
-                          calories: editableCalories,
-                          time: editableTime || loggedMealResult.time || "12:00 PM",
-                          tags: editableTags,
-                          nutrients: editableNutrients,
-                        };
-                        onShareMeal(currentMealObj);
-                      }}
-                      className="h-8 px-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border border-orange-400/40"
-                      title="Share Meal Card"
+                      onClick={handleExitToDashboard}
+                      className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
+                      title="Back to Dashboard"
                     >
-                      <Share2 className="w-3.5 h-3.5 text-white" />
-                      <span>Share</span>
+                      <ArrowLeft className="w-4 h-4 text-white" />
                     </button>
-                  )}
-                </div>
-              </div>
 
-              {/* Bottom Image Overlay: Single Frosted Pill + Hero Title + Clean Grey Metadata */}
-              <div className="absolute bottom-4 left-4 right-4 z-10 text-left space-y-1.5">
-                {/* Green Confirmation Frosted Pill (High contrast dark frosted capsule with emerald text) */}
-                <div>
-                  <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-emerald-400/60 px-3 py-1 rounded-full shadow-md">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400/80 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
-                      Logged Successfully
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => changePhotoInputRef.current?.click()}
+                      className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
+                      title="Change / Upload Photo"
+                    >
+                      <Camera className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {onShareMeal && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentMealObj = {
+                            ...loggedMealResult,
+                            name: editableName,
+                            meal_description: editableDesc,
+                            calories: editableCalories,
+                            time: editableTime || loggedMealResult.time || "12:00 PM",
+                            tags: editableTags,
+                            nutrients: editableNutrients,
+                          };
+                          onShareMeal(currentMealObj);
+                        }}
+                        className="h-8 px-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border border-orange-400/40"
+                        title="Share Meal Card"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-white" />
+                        <span>Share</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Full Width Meal Title */}
-                <h3 className="text-xl sm:text-2xl font-black tracking-tight drop-shadow-md truncate font-sans leading-tight text-white">
-                  {editableName || "Gourmet Meal Log"}
-                </h3>
+                {/* Bottom Image Overlay: Single Frosted Pill + Hero Title + Clean Grey Metadata */}
+                <div className="absolute bottom-4 left-4 right-4 z-10 text-left space-y-1.5">
+                  {/* Green Confirmation Frosted Pill (High contrast dark frosted capsule with emerald text) */}
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-emerald-400/60 px-3 py-1 rounded-full shadow-md">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400/80 shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                        Logged Successfully
+                      </span>
+                    </div>
+                  </div>
 
-                {/* Clean Grey Text Metadata Line (Below Title) */}
-                <div className="flex items-center gap-1.5 text-stone-300 text-[11px] font-bold tracking-wide drop-shadow-sm">
-                  <span className="text-orange-400 font-extrabold">{editableCalories || 0} KCAL</span>
-                  <span className="text-stone-400 select-none">•</span>
-                  <span>{formatDisplayTime(editableTime || loggedMealResult?.time)}</span>
-                  <span className="text-stone-400 select-none">•</span>
-                  <span>{new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  {/* Full Width Meal Title */}
+                  <h3 className="text-xl sm:text-2xl font-black tracking-tight drop-shadow-md truncate font-sans leading-tight text-white">
+                    {editableName || "Gourmet Meal Log"}
+                  </h3>
+
+                  {/* Clean Grey Text Metadata Line (Below Title) */}
+                  <div className="flex items-center gap-1.5 text-stone-300 text-[11px] font-bold tracking-wide drop-shadow-sm">
+                    <span className="text-orange-400 font-extrabold">{editableCalories || 0} KCAL</span>
+                    <span className="text-stone-400 select-none">•</span>
+                    <span>{formatDisplayTime(editableTime || loggedMealResult?.time)}</span>
+                    <span className="text-stone-400 select-none">•</span>
+                    <span>{new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Scrollable Body: Live Direct Editing Fields */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-0 text-left">
+              {/* Scrollable Body: Live Direct Editing Fields */}
+              <div className="p-5 space-y-4 text-left">
               {/* Row 1: Key Stats Banner (Logged Time Picker & Calories Stepper) */}
               <div className="grid grid-cols-2 gap-2.5">
                 {/* Logged Time Picker Card (Entire Card Clickable to trigger custom TimePickerModal) */}
@@ -1316,6 +1318,7 @@ export const CameraLogView = ({
                 </div>
               </div>
             </div>
+          </div>
 
             {/* BOTTOM ACTION SECTION: GENERATE WITH AI & DONE / SAVE BUTTONS */}
             <div className="p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 w-full font-sans space-y-2.5">

@@ -99,7 +99,7 @@ export function BottomNav({
         maxWidth: `${400 / viewportScale}px`,
         transform: `translateX(-50%) scale(${viewportScale})`,
         transformOrigin: "bottom center",
-        zIndex: 2147483647,
+        zIndex: 600,
         isolation: "isolate",
       }}
     >

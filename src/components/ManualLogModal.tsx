@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Utensils,
   X,
@@ -928,8 +929,8 @@ export const ManualLogModal = ({
     };
   };
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center font-sans" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center font-sans" onClick={onClose}>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -1928,6 +1929,7 @@ export const ManualLogModal = ({
         }}
         onClose={() => setIsClarificationModalOpen(false)}
       />
-    </div>
+    </div>,
+    document.body
   );
 };

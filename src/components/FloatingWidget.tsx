@@ -82,7 +82,7 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
         height: "48px",
         transform: `scale(${viewportScale})`,
         transformOrigin: "bottom right",
-        zIndex: 2147483646,
+        zIndex: 500,
         isolation: "isolate",
       }}
     >

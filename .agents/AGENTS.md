@@ -46,4 +46,8 @@ This file defines critical rules that all AI developers and code-generation suba
 ## 7. Git Push Directive (User Permission Rule)
 * **Rule:** NEVER run `git push` or push changes to GitHub automatically. ONLY execute `git push` when the user explicitly asks or mentions to push to GitHub in their prompt.
 
+## 8. Explicit User Preferences & Orchestration Memory
+* **Reference File**: Read `.agents/USER_PREFERENCES.md` for exact user design preferences (radical minimalism, no emotes/emojis, restrained colors, stacked buttons over shared width, transformational input space-reuse mechanics, lightweight models for API calls, subagent orchestration strategy).
+
+
 

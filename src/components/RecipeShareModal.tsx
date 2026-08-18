@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { X, Copy, Download, Share2, Flame, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
 import { SharedItemPayload, generateShareUrl, compressRecipe } from "../utils/shareUtils";
@@ -237,13 +238,13 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
     getOrCreateShortLink();
   }, [payload]);
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       onClick={onClose}
-      className="fixed inset-0 bg-orange-950/30 backdrop-blur-md z-[300] flex items-center justify-center p-6 font-sans text-orange-950 cursor-pointer"
+      className="fixed inset-0 bg-orange-950/30 backdrop-blur-md z-[9999] flex items-center justify-center p-6 font-sans text-orange-950 cursor-pointer"
     >
       <motion.div
         initial={{ scale: 0.95, y: 15 }}
@@ -347,6 +348,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };

@@ -146,82 +146,84 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
             onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-md bg-[#FAF7F2] rounded-t-[36px] overflow-hidden flex flex-col max-h-[92vh] shadow-2xl z-10 border-t border-white/20 text-left font-sans"
           >
-            {/* Hero Image / Banner (Bleeds to top border with zero white frame) */}
-            <div className="h-56 sm:h-60 w-full relative shrink-0 bg-stone-900 overflow-hidden group">
-              {meal.image && !hasNoGeneratedImage(meal.image) ? (
-                <img
-                  src={meal.image}
-                  className="w-full h-full object-cover"
-                  alt={meal.name || "Meal"}
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-stone-850 via-stone-900 to-stone-950 flex items-center justify-center text-5xl select-none">
-                  {getMealEmoji(meal.name || "", meal.type)}
-                </div>
-              )}
+            {/* Scrollable Container (Image Header scrolls up naturally, CTA stays sticky at bottom) */}
+            <div className="flex-1 overflow-y-auto min-h-0 text-left font-sans">
+              {/* Hero Image / Banner (Bleeds to top border with zero white frame) */}
+              <div className="h-56 sm:h-60 w-full relative shrink-0 bg-stone-900 overflow-hidden group">
+                {meal.image && !hasNoGeneratedImage(meal.image) ? (
+                  <img
+                    src={meal.image}
+                    className="w-full h-full object-cover"
+                    alt={meal.name || "Meal"}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-stone-850 via-stone-900 to-stone-950 flex items-center justify-center text-5xl select-none">
+                    {getMealEmoji(meal.name || "", meal.type)}
+                  </div>
+                )}
 
-              {/* Gourmet Dark Ambient Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/45 to-black/20 pointer-events-none" />
+                {/* Gourmet Dark Ambient Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-stone-950/90 via-stone-950/45 to-black/20 pointer-events-none" />
 
-              {/* Top Controls: Minimalist Back Button (Left) & Vibrant Orange Share Button (Right) */}
-              <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-20">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
-                    title="Back"
-                  >
-                    <ArrowLeft className="w-4 h-4 text-white" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  {onShareMeal && (
+                {/* Top Controls: Minimalist Back Button (Left) & Vibrant Orange Share Button (Right) */}
+                <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-20">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        onShareMeal(meal);
-                      }}
-                      className="h-8 px-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border border-orange-400/40"
-                      title="Share meal card"
+                      onClick={onClose}
+                      className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
+                      title="Back"
                     >
-                      <Share2 className="w-3.5 h-3.5 text-white" />
-                      <span>Share</span>
+                      <ArrowLeft className="w-4 h-4 text-white" />
                     </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Bottom Image Overlay: Symmetrical Frosted Pill + Full-Width Title + Clean Grey Metadata */}
-              <div className="absolute bottom-4 left-4 right-4 z-10 text-left space-y-1.5">
-                {/* Log Count Frosted Pill */}
-                <div>
-                  <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-orange-400/50 px-3 py-1 rounded-full shadow-md">
-                    <span className="w-2 h-2 rounded-full bg-orange-400 shadow-xs shadow-orange-400/80 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-orange-300">
-                      Logged {logCount} time{logCount === 1 ? "" : "s"}
-                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {onShareMeal && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onShareMeal(meal);
+                        }}
+                        className="h-8 px-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border border-orange-400/40"
+                        title="Share meal card"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-white" />
+                        <span>Share</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Full Width Meal Title */}
-                <h3 className="text-xl sm:text-2xl font-black tracking-tight drop-shadow-md truncate font-sans leading-tight text-white">
-                  {meal.name || "Meal Log"}
-                </h3>
+                {/* Bottom Image Overlay: Symmetrical Frosted Pill + Full-Width Title + Clean Grey Metadata */}
+                <div className="absolute bottom-4 left-4 right-4 z-10 text-left space-y-1.5">
+                  {/* Log Count Frosted Pill */}
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-orange-400/50 px-3 py-1 rounded-full shadow-md">
+                      <span className="w-2 h-2 rounded-full bg-orange-400 shadow-xs shadow-orange-400/80 shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-orange-300">
+                        Logged {logCount} time{logCount === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  </div>
 
-                {/* Clean Grey Text Metadata Line (Below Title) */}
-                <div className="flex items-center gap-1.5 text-stone-300 text-[11px] font-bold tracking-wide drop-shadow-sm">
-                  <span className="text-orange-400 font-extrabold">{meal.calories || 0} KCAL</span>
-                  <span className="text-stone-400 select-none">•</span>
-                  <span>{formatDisplayTime(meal.time)}</span>
-                  <span className="text-stone-400 select-none">•</span>
-                  <span>{displayDate}</span>
+                  {/* Full Width Meal Title */}
+                  <h3 className="text-xl sm:text-2xl font-black tracking-tight drop-shadow-md truncate font-sans leading-tight text-white">
+                    {meal.name || "Meal Log"}
+                  </h3>
+
+                  {/* Clean Grey Text Metadata Line (Below Title) */}
+                  <div className="flex items-center gap-1.5 text-stone-300 text-[11px] font-bold tracking-wide drop-shadow-sm">
+                    <span className="text-orange-400 font-extrabold">{meal.calories || 0} KCAL</span>
+                    <span className="text-stone-400 select-none">•</span>
+                    <span>{formatDisplayTime(meal.time)}</span>
+                    <span className="text-stone-400 select-none">•</span>
+                    <span>{displayDate}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Scrollable Details Content (Matching RecipeModal & ManualLogModal Layout) */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 min-h-0 text-left font-sans">
+              {/* Scrollable Details Content Body */}
+              <div className="p-5 space-y-4 text-left">
               {/* 1. Quick Stats Banner (Logged Time & Total Energy) */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5">
@@ -353,6 +355,7 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
                 </div>
               )}
             </div>
+          </div>
 
             {/* STICKY BOTTOM ACTIONS BAR: 2 White Buttons (Top) + 1 Orange Primary Button (Bottom) */}
             <div className="sticky bottom-0 p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 w-full font-sans space-y-2.5 z-20">

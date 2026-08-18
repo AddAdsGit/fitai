@@ -22,8 +22,8 @@ export function DailyProgressSection({
 
   return (
     <div className="px-6 mt-4 relative z-10">
-      {/* Circular Progress for Calories */}
-      <div className="relative w-full aspect-square max-w-[280px] mx-auto flex items-center justify-center my-4">
+      {/* Circular Progress for Calories (-10% Refined Size) */}
+      <div className="relative w-full aspect-square max-w-[250px] mx-auto flex items-center justify-center my-3">
         <svg
           className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-xl"
           viewBox="0 0 240 240"
@@ -55,12 +55,12 @@ export function DailyProgressSection({
             transition={{ duration: 1.5, ease: "easeOut" }}
           />
         </svg>
-        <div className="text-center z-10 bg-white/40 backdrop-blur-md w-40 h-40 rounded-full flex flex-col items-center justify-center shadow-inner border border-white/50">
-          <div className="text-5xl font-black mb-1 text-orange-950 px-2 truncate selection:bg-orange-500 select-none">
+        <div className="text-center z-10 bg-white/40 backdrop-blur-md w-36 h-36 rounded-full flex flex-col items-center justify-center shadow-inner border border-white/50">
+          <div className="text-4xl font-black mb-1 text-orange-950 px-2 truncate selection:bg-orange-500 select-none">
             {totalCalories.toLocaleString()}
           </div>
-          <div className="h-1.5 w-8 bg-orange-500 rounded-full mb-1" />
-          <div className="text-orange-900/50 font-black tracking-[0.1em] text-[10px] uppercase">
+          <div className="h-1.5 w-7 bg-orange-500 rounded-full mb-1" />
+          <div className="text-orange-900/50 font-black tracking-[0.1em] text-[9.5px] uppercase">
             / {((profileData as any).goals?.dailyCalories || profileData.daily_calories_goal || 2000).toLocaleString()} KCAL
           </div>
         </div>

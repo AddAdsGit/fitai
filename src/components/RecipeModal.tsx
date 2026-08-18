@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
   Utensils,
   Camera,
@@ -283,13 +284,13 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
 
   const activeImage = image || recipe.image || FALLBACK_RECIPE_IMAGE;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-stone-950/40 backdrop-blur-md z-[100] flex items-end justify-center font-sans"
+        className="fixed inset-0 bg-stone-950/40 backdrop-blur-md z-[9999] flex items-end justify-center font-sans"
       >
         {/* Sliding Bottom Sheet Panel */}
         <motion.div
@@ -299,115 +300,117 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           transition={{ type: "spring", damping: 26, stiffness: 240 }}
           onClick={(e) => e.stopPropagation()}
           className="relative w-full max-w-md bg-[#FAF7F2] rounded-t-[36px] overflow-hidden flex flex-col max-h-[92vh] shadow-2xl z-10 border-t border-white/20 text-left font-sans"
-        >
-          {/* Full-Bleed Hero Cover Image Header (Bleeds to top border with zero white frame) */}
-          <div className="relative w-full h-56 sm:h-60 shrink-0 overflow-hidden shadow-md group bg-stone-900">
-            {!hasNoGeneratedImage(activeImage) ? (
-              <img
-                src={activeImage}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                alt={name || recipe.name}
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-stone-850 to-stone-950 flex items-center justify-center">
-                <Utensils className="w-12 h-12 text-white opacity-20" />
-              </div>
-            )}
+          >
+            {/* Scrollable Container (Image Header scrolls up naturally, CTA stays sticky at bottom) */}
+            <div className="flex-1 overflow-y-auto min-h-0 text-left font-sans">
+              {/* Full-Bleed Hero Cover Image Header (Bleeds to top border with zero white frame) */}
+              <div className="relative w-full h-56 sm:h-60 shrink-0 overflow-hidden shadow-md group bg-stone-900">
+                {!hasNoGeneratedImage(activeImage) ? (
+                  <img
+                    src={activeImage}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    alt={name || recipe.name}
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-stone-850 to-stone-950 flex items-center justify-center">
+                    <Utensils className="w-12 h-12 text-white opacity-20" />
+                  </div>
+                )}
 
-            {/* Dark Ambient Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-t from-stone-950/85 via-stone-950/30 to-black/20 pointer-events-none" />
+                {/* Dark Ambient Gradient */}
+                <div className="absolute inset-0 bg-gradient-to-t from-stone-950/85 via-stone-950/30 to-black/20 pointer-events-none" />
 
-            {/* Top Controls: Back (Left) + Camera (Edit Mode Only) + Circular Share (Right) */}
-            <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isEditing) {
-                      if (isNewRecipe) {
-                        onClose();
-                      } else {
-                        setIsEditing(false);
-                      }
-                    } else {
-                      onClose();
-                    }
-                  }}
-                  className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
-                  title="Back"
-                >
-                  <ArrowLeft className="w-4 h-4 text-white" />
-                </button>
-
-                {isEditing && (
-                  <label className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md" title="Change / Upload Photo">
-                    <Camera className="w-4 h-4 text-white" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setImage(reader.result as string);
-                            if (!isEditing) setIsEditing(true);
-                          };
-                          reader.readAsDataURL(file);
+                {/* Top Controls: Back (Left) + Camera (Edit Mode Only) + Circular Share (Right) */}
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isEditing) {
+                          if (isNewRecipe) {
+                            onClose();
+                          } else {
+                            setIsEditing(false);
+                          }
+                        } else {
+                          onClose();
                         }
                       }}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-              </div>
+                      className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
+                      title="Back"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-white" />
+                    </button>
 
-              <div className="flex items-center gap-2">
-                {!isNewRecipe && onShareRecipe && (
-                  <button
-                    type="button"
-                    onClick={() => onShareRecipe(recipe)}
-                    className="h-8 px-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border border-orange-400/40"
-                    title="Share recipe card"
-                  >
-                    <Share2 className="w-3.5 h-3.5 text-white" />
-                    <span>Share</span>
-                  </button>
-                )}
-              </div>
-            </div>
+                    {isEditing && (
+                      <label className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md" title="Change / Upload Photo">
+                        <Camera className="w-4 h-4 text-white" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setImage(reader.result as string);
+                                if (!isEditing) setIsEditing(true);
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
 
-            {/* Bottom Image Overlay: Single Frosted Pill + Hero Title + Clean Grey Metadata */}
-            <div className="absolute bottom-4 left-4 right-4 z-10 text-left space-y-1.5">
-              {/* Recipe Log Count Frosted Pill (High contrast dark frosted capsule) */}
-              {!isNewRecipe && (
-                <div>
-                  <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-orange-400/50 px-3 py-1 rounded-full shadow-md">
-                    <span className="w-2 h-2 rounded-full bg-orange-400 shadow-xs shadow-orange-400/80 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-orange-300">
-                      Logged {recipe.log_count || 1} time{(recipe.log_count || 1) === 1 ? "" : "s"}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    {!isNewRecipe && onShareRecipe && (
+                      <button
+                        type="button"
+                        onClick={() => onShareRecipe(recipe)}
+                        className="h-8 px-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border border-orange-400/40"
+                        title="Share recipe card"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-white" />
+                        <span>Share</span>
+                      </button>
+                    )}
                   </div>
                 </div>
-              )}
 
-              {/* Full Width Recipe Title */}
-              <h3 className="text-xl sm:text-2xl font-black tracking-tight drop-shadow-md truncate font-sans leading-tight text-white">
-                {isEditing ? name || "Unnamed Recipe" : recipe.name}
-              </h3>
+                {/* Bottom Image Overlay: Single Frosted Pill + Hero Title + Clean Grey Metadata */}
+                <div className="absolute bottom-4 left-4 right-4 z-10 text-left space-y-1.5">
+                  {/* Recipe Log Count Frosted Pill (High contrast dark frosted capsule) */}
+                  {!isNewRecipe && (
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-orange-400/50 px-3 py-1 rounded-full shadow-md">
+                        <span className="w-2 h-2 rounded-full bg-orange-400 shadow-xs shadow-orange-400/80 shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-wider text-orange-300">
+                          Logged {recipe.log_count || 1} time{(recipe.log_count || 1) === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
-              {/* Clean Grey Text Metadata Line (Below Title) */}
-              <div className="flex items-center gap-1.5 text-stone-300 text-[11px] font-bold tracking-wide drop-shadow-sm">
-                <span className="text-orange-400 font-extrabold">{isEditing ? calories || "0" : recipe.calories || "0"} KCAL</span>
-                <span className="text-stone-400 select-none">•</span>
-                <span>{isEditing ? time || "15 mins" : recipe.time || "15 mins"}</span>
+                  {/* Full Width Recipe Title */}
+                  <h3 className="text-xl sm:text-2xl font-black tracking-tight drop-shadow-md truncate font-sans leading-tight text-white">
+                    {isEditing ? name || "Unnamed Recipe" : recipe.name}
+                  </h3>
+
+                  {/* Clean Grey Text Metadata Line (Below Title) */}
+                  <div className="flex items-center gap-1.5 text-stone-300 text-[11px] font-bold tracking-wide drop-shadow-sm">
+                    <span className="text-orange-400 font-extrabold">{isEditing ? calories || "0" : recipe.calories || "0"} KCAL</span>
+                    <span className="text-stone-400 select-none">•</span>
+                    <span>{isEditing ? time || "15 mins" : recipe.time || "15 mins"}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Scrollable Modal Body */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4 text-left min-h-0">
+              {/* Scrollable Modal Body Content */}
+              <div className="p-5 space-y-4 text-left">
             {!isEditing ? (
               /* VIEW MODE: Section Order -> Quick Stats, Description, Ingredients, Instructions, Nutrients, Tags */
               <div className="space-y-4 text-left font-sans">
@@ -804,6 +807,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
               </div>
             )}
           </div>
+        </div>
 
           {/* Bottom Sticky Action Footer Bar */}
           <div className="sticky bottom-0 p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 font-sans space-y-2.5 z-20">
@@ -899,6 +903,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
