@@ -1,0 +1,5 @@
+# Ignore Supabase Edge Functions (deployed separately on Supabase)
+supabase/
+.agents/
+android/
+ios/

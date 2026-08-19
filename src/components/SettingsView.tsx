@@ -742,6 +742,7 @@ export const SettingsView = ({
   const [newReminderTime, setNewReminderTime] = useState("");
   const [userTimezone, setUserTimezone] = useState(profileData.timezone || "UTC");
   const [isTestingTg, setIsTestingTg] = useState(false);
+  const [isHealthSyncing, setIsHealthSyncing] = useState(false);
 
   // --- Gemini API States ---
   const initialGeminiKey = useMemo(() => {
@@ -952,7 +953,6 @@ export const SettingsView = ({
   if (activeSubView === "health_sync") {
     const isGfitOn = (profileData.preferences || []).some((p: string) => p === "health_sync_gfit:true");
     const isAfitOn = (profileData.preferences || []).some((p: string) => p === "health_sync_afit:true");
-    const [isSyncing, setIsSyncing] = useState(false);
     const logs: SyncLogEntry[] = profileData.health_sync_logs || [];
     const lastSyncedAt = profileData.health_sync_last_synced_at || null;
 
@@ -999,7 +999,7 @@ export const SettingsView = ({
         triggerToast("Please enable Apple Health or Google Fit first");
         return;
       }
-      setIsSyncing(true);
+      setIsHealthSyncing(true);
       try {
         if (isAfitOn) {
           await performHealthSync(session, profileData, setProfileData, "apple");
@@ -1012,7 +1012,7 @@ export const SettingsView = ({
         console.error(err);
         triggerToast("Sync completed with issues. Check log below.");
       } finally {
-        setIsSyncing(false);
+        setIsHealthSyncing(false);
       }
     };
 
@@ -1143,14 +1143,14 @@ export const SettingsView = ({
           <button
             type="button"
             onClick={handleSyncNow}
-            disabled={isSyncing}
+            disabled={isHealthSyncing}
             className={cn(
               "w-full py-3.5 px-4 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-[0.99] text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all duration-200",
-              isSyncing && "opacity-80 cursor-not-allowed"
+              isHealthSyncing && "opacity-80 cursor-not-allowed"
             )}
           >
-            <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
-            <span>{isSyncing ? "Syncing Health Data..." : "Connect & Sync Now"}</span>
+            <RefreshCw className={cn("w-4 h-4", isHealthSyncing && "animate-spin")} />
+            <span>{isHealthSyncing ? "Syncing Health Data..." : "Connect & Sync Now"}</span>
           </button>
         </div>
 

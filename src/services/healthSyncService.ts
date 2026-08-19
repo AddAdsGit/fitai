@@ -269,11 +269,12 @@ export const performHealthSync = async (
     }
 
     // Upsert into daily_wellness table in Supabase
-    if (session?.user?.id) {
+    const userId = session?.user?.id || profileData?.id || localStorage.getItem("fitai_active_profile_id");
+    if (userId) {
       const { data: existingWellness } = await supabase
         .from("daily_wellness")
         .select("id")
-        .eq("profile_id", session.user.id)
+        .eq("profile_id", userId)
         .eq("date", dateStr)
         .maybeSingle();
 
@@ -288,7 +289,7 @@ export const performHealthSync = async (
           .eq("id", existingWellness.id);
       } else {
         await supabase.from("daily_wellness").insert({
-          profile_id: session.user.id,
+          profile_id: userId,
           date: dateStr,
           notes: "",
           active_calories_burned: metrics.activeCalories,
@@ -301,7 +302,7 @@ export const performHealthSync = async (
       if (metrics.weight && metrics.weight > 0) {
         await supabase.from("weight_logs").upsert(
           {
-            profile_id: session.user.id,
+            profile_id: userId,
             date: dateStr,
             weight: metrics.weight,
             log_time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
@@ -309,7 +310,7 @@ export const performHealthSync = async (
           { onConflict: "profile_id,date" }
         );
         // Also update current weight on profile
-        await supabase.from("profiles").update({ weight: metrics.weight }).eq("id", session.user.id);
+        await supabase.from("profiles").update({ weight: metrics.weight }).eq("id", userId);
       }
     }
 
@@ -362,14 +363,15 @@ export const appendHealthSyncLog = async (
     health_sync_last_synced_at: newLog.status === "success" ? newLog.timestamp : profileData?.health_sync_last_synced_at,
   });
 
-  if (session?.user?.id) {
+  const userId = session?.user?.id || profileData?.id || localStorage.getItem("fitai_active_profile_id");
+  if (userId) {
     try {
       await supabase
         .from("profiles")
         .update({
           health_sync_logs: updatedLogs,
         })
-        .eq("id", session.user.id);
+        .eq("id", userId);
     } catch (e) {
       console.warn("Failed to persist health sync log to Supabase:", e);
     }
@@ -389,12 +391,13 @@ export const clearHealthSyncLogs = async (
     health_sync_logs: [],
   });
 
-  if (session?.user?.id) {
+  const userId = session?.user?.id || profileData?.id || localStorage.getItem("fitai_active_profile_id");
+  if (userId) {
     try {
       await supabase
         .from("profiles")
         .update({ health_sync_logs: [] })
-        .eq("id", session.user.id);
+        .eq("id", userId);
     } catch (e) {
       console.warn("Failed to clear health sync logs in Supabase:", e);
     }
