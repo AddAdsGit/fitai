@@ -8,6 +8,7 @@ import {
   Minus,
   Plus,
   Check,
+  Loader2,
   X,
   List,
   Edit2,
@@ -188,6 +189,7 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
   const [localDraftBloating, setLocalDraftBloating] = useState<number | null>(null);
   const [localDraftBloatingTime, setLocalDraftBloatingTime] = useState<string>("");
   const [localIsBloatingSliding, setLocalIsBloatingSliding] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<"weight" | "water" | "digestion" | "energy" | "bloating" | null>(null);
 
   // Auto-open input controls for single active vital (e.g. Weight, Water, Digestion, Energy, Bloating)
   useEffect(() => {
@@ -594,20 +596,37 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
 
                     {/* Right: Log Button */}
                     <button
+                      disabled={isSaving === "weight"}
                       onClick={async () => {
-                        await handleLogWeight(
-                          currentWeight,
-                          selectedDate,
-                          activeWeightTime
-                        );
-                        setDraftWeight(null);
-                        setDraftWeightTime("");
-                        setIsEditingWeight(false);
+                        if (isSaving) return;
+                        setIsSaving("weight");
+                        try {
+                          await Promise.all([
+                            handleLogWeight(
+                              currentWeight,
+                              selectedDate,
+                              activeWeightTime
+                            ),
+                            new Promise((resolve) => setTimeout(resolve, 550)),
+                          ]);
+                          if (typeof navigator !== "undefined" && navigator.vibrate) {
+                            navigator.vibrate(15);
+                          }
+                          setDraftWeight(null);
+                          setDraftWeightTime("");
+                          setIsEditingWeight(false);
+                        } finally {
+                          setIsSaving(null);
+                        }
                       }}
-                      className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                      className="w-12 h-12 bg-orange-500 hover:bg-orange-600 disabled:opacity-85 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer disabled:cursor-not-allowed shrink-0 border-none shadow-sm active:scale-95"
                       title="Save Weight"
                     >
-                      <Check className="w-5 h-5 text-white" />
+                      {isSaving === "weight" ? (
+                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      ) : (
+                        <Check className="w-5 h-5 text-white" />
+                      )}
                     </button>
 
                     {/* Cancel Edit Button if Editing */}
@@ -704,19 +723,36 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
 
                     {/* Right: Solid Orange Checkmark Button */}
                     <button
+                      disabled={isSaving === "water"}
                       onClick={async () => {
-                        await handleLogWater(
-                          currentWaterIncrement,
-                          selectedDate,
-                          activeWaterTime
-                        );
-                        setDraftWater(null);
-                        setDraftWaterTime("");
+                        if (isSaving) return;
+                        setIsSaving("water");
+                        try {
+                          await Promise.all([
+                            handleLogWater(
+                              currentWaterIncrement,
+                              selectedDate,
+                              activeWaterTime
+                            ),
+                            new Promise((resolve) => setTimeout(resolve, 550)),
+                          ]);
+                          if (typeof navigator !== "undefined" && navigator.vibrate) {
+                            navigator.vibrate(15);
+                          }
+                          setDraftWater(null);
+                          setDraftWaterTime("");
+                        } finally {
+                          setIsSaving(null);
+                        }
                       }}
-                      className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                      className="w-12 h-12 bg-orange-500 hover:bg-orange-600 disabled:opacity-85 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer disabled:cursor-not-allowed shrink-0 border-none shadow-sm active:scale-95"
                       title="Log Water"
                     >
-                      <Check className="w-5 h-5 text-white" />
+                      {isSaving === "water" ? (
+                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      ) : (
+                        <Check className="w-5 h-5 text-white" />
+                      )}
                     </button>
                   </div>
 
@@ -796,20 +832,37 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                   >
                     {/* FRONT: Log Button */}
                     <button
+                      disabled={isSaving === "digestion"}
                       onClick={async () => {
-                        await handleLogDigestion(
-                          activeType,
-                          null,
-                          selectedDate,
-                          activeStoolTime
-                        );
-                        setDraftStoolType(null);
-                        setDraftStoolTime("");
+                        if (isSaving) return;
+                        setIsSaving("digestion");
+                        try {
+                          await Promise.all([
+                            handleLogDigestion(
+                              activeType,
+                              null,
+                              selectedDate,
+                              activeStoolTime
+                            ),
+                            new Promise((resolve) => setTimeout(resolve, 550)),
+                          ]);
+                          if (typeof navigator !== "undefined" && navigator.vibrate) {
+                            navigator.vibrate(15);
+                          }
+                          setDraftStoolType(null);
+                          setDraftStoolTime("");
+                        } finally {
+                          setIsSaving(null);
+                        }
                       }}
-                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 disabled:opacity-85 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer disabled:cursor-not-allowed active:scale-95 transition-all"
                       title="Log Digestion"
                     >
-                      <Check className="w-5 h-5 text-white" />
+                      {isSaving === "digestion" ? (
+                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      ) : (
+                        <Check className="w-5 h-5 text-white" />
+                      )}
                     </button>
 
                     {/* BACK: Brown Bristol Stool SVG */}
@@ -905,19 +958,36 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                   >
                     {/* FRONT: Log Button */}
                     <button
+                      disabled={isSaving === "energy"}
                       onClick={async () => {
-                        await handleLogEnergy(
-                          currentEnergy,
-                          selectedDate,
-                          activeEnergyTime
-                        );
-                        setDraftEnergy(null);
-                        setDraftEnergyTime("");
+                        if (isSaving) return;
+                        setIsSaving("energy");
+                        try {
+                          await Promise.all([
+                            handleLogEnergy(
+                              currentEnergy,
+                              selectedDate,
+                              activeEnergyTime
+                            ),
+                            new Promise((resolve) => setTimeout(resolve, 550)),
+                          ]);
+                          if (typeof navigator !== "undefined" && navigator.vibrate) {
+                            navigator.vibrate(15);
+                          }
+                          setDraftEnergy(null);
+                          setDraftEnergyTime("");
+                        } finally {
+                          setIsSaving(null);
+                        }
                       }}
-                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 disabled:opacity-85 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer disabled:cursor-not-allowed active:scale-95 transition-all"
                       title="Log Energy"
                     >
-                      <Check className="w-5 h-5 text-white" />
+                      {isSaving === "energy" ? (
+                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      ) : (
+                        <Check className="w-5 h-5 text-white" />
+                      )}
                     </button>
 
                     {/* BACK: Energy Emoji Badge */}
@@ -1015,19 +1085,36 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
                   >
                     {/* FRONT: Log Button */}
                     <button
+                      disabled={isSaving === "bloating"}
                       onClick={async () => {
-                        await handleLogBloating(
-                          currentBloating,
-                          selectedDate,
-                          activeBloatingTime
-                        );
-                        setLocalDraftBloating(null);
-                        setLocalDraftBloatingTime("");
+                        if (isSaving) return;
+                        setIsSaving("bloating");
+                        try {
+                          await Promise.all([
+                            handleLogBloating(
+                              currentBloating,
+                              selectedDate,
+                              activeBloatingTime
+                            ),
+                            new Promise((resolve) => setTimeout(resolve, 550)),
+                          ]);
+                          if (typeof navigator !== "undefined" && navigator.vibrate) {
+                            navigator.vibrate(15);
+                          }
+                          setLocalDraftBloating(null);
+                          setLocalDraftBloatingTime("");
+                        } finally {
+                          setIsSaving(null);
+                        }
                       }}
-                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 disabled:opacity-85 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer disabled:cursor-not-allowed active:scale-95 transition-all"
                       title="Log Bloating"
                     >
-                      <Check className="w-5 h-5 text-white" />
+                      {isSaving === "bloating" ? (
+                        <Loader2 className="w-5 h-5 text-white animate-spin" />
+                      ) : (
+                        <Check className="w-5 h-5 text-white" />
+                      )}
                     </button>
 
                     {/* BACK: Bloating Stomach Swelling Icon */}

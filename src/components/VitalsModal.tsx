@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Scale, Droplet, Zap, Heart, Check, Plus, Minus, Clock, Activity, Trash2 } from "lucide-react";
+import { X, Scale, Droplet, Zap, Heart, Check, Loader2, Plus, Minus, Clock, Activity, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import type { Profile, DailyWellness, WeightLog, BloatingLogItem } from "../types";
@@ -95,6 +95,7 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
   const [isEnergySliding, setIsEnergySliding] = useState(false);
   const [isBloatingSliding, setIsBloatingSliding] = useState(false);
   const [showLogHistory, setShowLogHistory] = useState(false);
+  const [isSaving, setIsSaving] = useState<"weight" | "water" | "digestion" | "energy" | "bloating" | null>(null);
 
   // Sync draft states whenever dailyNotes, weightLogs, or selectedDate updates
   React.useEffect(() => {
@@ -314,16 +315,32 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
 
                         {/* Save Button */}
                         <button
+                          disabled={isSaving === "weight"}
                           onClick={async () => {
+                            if (isSaving) return;
                             const val = parseFloat(draftWeight);
-                            if (!isNaN(val) && val > 0) {
-                              await handleLogWeight(val, selectedDate, weightTime);
+                            if (isNaN(val) || val <= 0) return;
+                            setIsSaving("weight");
+                            try {
+                              await Promise.all([
+                                handleLogWeight(val, selectedDate, weightTime),
+                                new Promise((resolve) => setTimeout(resolve, 550)),
+                              ]);
+                              if (typeof navigator !== "undefined" && navigator.vibrate) {
+                                navigator.vibrate(15);
+                              }
+                            } finally {
+                              setIsSaving(null);
                             }
                           }}
-                          className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                          className="w-12 h-12 bg-orange-500 hover:bg-orange-600 disabled:opacity-85 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer disabled:cursor-not-allowed shrink-0 border-none shadow-sm active:scale-95"
                           title="Log Weight"
                         >
-                          <Check className="w-5 h-5 text-white" />
+                          {isSaving === "weight" ? (
+                            <Loader2 className="w-5 h-5 text-white animate-spin" />
+                          ) : (
+                            <Check className="w-5 h-5 text-white" />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -393,18 +410,32 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
 
                       {/* Save Button */}
                       <button
+                        disabled={isSaving === "water"}
                         onClick={async () => {
+                          if (isSaving) return;
+                          setIsSaving("water");
                           const amountToAdd = draftWater > 0 ? draftWater : 250;
-                          await handleLogWater(amountToAdd, selectedDate, waterTime);
-                          setDraftWater(250);
-                          if (typeof navigator !== "undefined" && navigator.vibrate) {
-                            navigator.vibrate(12);
+                          try {
+                            await Promise.all([
+                              handleLogWater(amountToAdd, selectedDate, waterTime),
+                              new Promise((resolve) => setTimeout(resolve, 550)),
+                            ]);
+                            setDraftWater(250);
+                            if (typeof navigator !== "undefined" && navigator.vibrate) {
+                              navigator.vibrate(15);
+                            }
+                          } finally {
+                            setIsSaving(null);
                           }
                         }}
-                        className="w-12 h-12 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer shrink-0 border-none shadow-sm active:scale-95"
+                        className="w-12 h-12 bg-orange-500 hover:bg-orange-600 disabled:opacity-85 text-white rounded-2xl flex items-center justify-center transition-all cursor-pointer disabled:cursor-not-allowed shrink-0 border-none shadow-sm active:scale-95"
                         title="Add Water Drink"
                       >
-                        <Check className="w-5 h-5 text-white" />
+                        {isSaving === "water" ? (
+                          <Loader2 className="w-5 h-5 text-white animate-spin" />
+                        ) : (
+                          <Check className="w-5 h-5 text-white" />
+                        )}
                       </button>
                     </div>
 
@@ -473,14 +504,31 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                         ) : (
                           <button
                             type="button"
+                            disabled={isSaving === "digestion"}
                             onClick={async () => {
-                              await handleLogDigestion(activeStoolVal, null, selectedDate, stoolTime);
-                              setDraftStoolType(null);
+                              if (isSaving) return;
+                              setIsSaving("digestion");
+                              try {
+                                await Promise.all([
+                                  handleLogDigestion(activeStoolVal, null, selectedDate, stoolTime),
+                                  new Promise((resolve) => setTimeout(resolve, 550)),
+                                ]);
+                                setDraftStoolType(null);
+                                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                                  navigator.vibrate(15);
+                                }
+                              } finally {
+                                setIsSaving(null);
+                              }
                             }}
-                            className="w-full h-full bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all text-white"
+                            className="w-full h-full bg-[#F97316] hover:bg-orange-600 disabled:opacity-85 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer disabled:cursor-not-allowed active:scale-95 transition-all text-white"
                             title="Log Digestion"
                           >
-                            <Check className="w-5 h-5 text-white" />
+                            {isSaving === "digestion" ? (
+                              <Loader2 className="w-5 h-5 text-white animate-spin" />
+                            ) : (
+                              <Check className="w-5 h-5 text-white" />
+                            )}
                           </button>
                         )}
                       </div>
@@ -554,14 +602,31 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                         ) : (
                           <button
                             type="button"
+                            disabled={isSaving === "energy"}
                             onClick={async () => {
-                              await handleLogEnergy(activeEnergyVal, selectedDate, energyTime);
-                              setDraftEnergyLevel(null);
+                              if (isSaving) return;
+                              setIsSaving("energy");
+                              try {
+                                await Promise.all([
+                                  handleLogEnergy(activeEnergyVal, selectedDate, energyTime),
+                                  new Promise((resolve) => setTimeout(resolve, 550)),
+                                ]);
+                                setDraftEnergyLevel(null);
+                                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                                  navigator.vibrate(15);
+                                }
+                              } finally {
+                                setIsSaving(null);
+                              }
                             }}
-                            className="w-full h-full bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all text-white"
+                            className="w-full h-full bg-[#F97316] hover:bg-orange-600 disabled:opacity-85 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer disabled:cursor-not-allowed active:scale-95 transition-all text-white"
                             title="Log Energy"
                           >
-                            <Check className="w-5 h-5 text-white" />
+                            {isSaving === "energy" ? (
+                              <Loader2 className="w-5 h-5 text-white animate-spin" />
+                            ) : (
+                              <Check className="w-5 h-5 text-white" />
+                            )}
                           </button>
                         )}
                       </div>
@@ -629,14 +694,31 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                         ) : (
                           <button
                             type="button"
+                            disabled={isSaving === "bloating"}
                             onClick={async () => {
-                              await handleLogBloating(activeBloatingVal, selectedDate, bloatingTime);
-                              setDraftBloatingLevel(null);
+                              if (isSaving) return;
+                              setIsSaving("bloating");
+                              try {
+                                await Promise.all([
+                                  handleLogBloating(activeBloatingVal, selectedDate, bloatingTime),
+                                  new Promise((resolve) => setTimeout(resolve, 550)),
+                                ]);
+                                setDraftBloatingLevel(null);
+                                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                                  navigator.vibrate(15);
+                                }
+                              } finally {
+                                setIsSaving(null);
+                              }
                             }}
-                            className="w-full h-full bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all text-white"
+                            className="w-full h-full bg-[#F97316] hover:bg-orange-600 disabled:opacity-85 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer disabled:cursor-not-allowed active:scale-95 transition-all text-white"
                             title="Log Bloating"
                           >
-                            <Check className="w-5 h-5 text-white" />
+                            {isSaving === "bloating" ? (
+                              <Loader2 className="w-5 h-5 text-white animate-spin" />
+                            ) : (
+                              <Check className="w-5 h-5 text-white" />
+                            )}
                           </button>
                         )}
                       </div>
