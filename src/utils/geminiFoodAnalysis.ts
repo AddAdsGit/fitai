@@ -34,9 +34,8 @@ export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
         .map((m) => m.name.replace(/^models\//, ""));
 
       const priorityPatterns = [
-        /^gemini-3\.7-flash$/i,
         /^gemini-3\.6-flash$/i,
-        /^gemini-3\.5-flash-lite/i,
+        /^gemini-3\.7-flash$/i,
       ];
 
       for (const pattern of priorityPatterns) {
@@ -210,7 +209,7 @@ Return ONLY a valid JSON object in this format:
 
   // 2. Direct Call to Google Gemini Flash models with robust fallback if custom key provided
   if (!responseData && key) {
-    const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash"];
+    const candidateModels = ["gemini-3.6-flash", "gemini-3.7-flash"];
     for (const modelName of candidateModels) {
       try {
         const parts: any[] = [{ text: promptText }];
@@ -452,7 +451,7 @@ Return ONLY valid JSON:
   }
 
   if (!responseData && key) {
-    const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash"];
+    const candidateModels = ["gemini-3.6-flash", "gemini-3.7-flash"];
     for (const modelName of candidateModels) {
       try {
         const res = await fetch(

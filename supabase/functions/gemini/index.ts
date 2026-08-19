@@ -107,7 +107,7 @@ serve(async (req) => {
     let lastError = "";
 
     for (const apiKey of orderedKeys) {
-      for (const model of ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
+      for (const model of ["gemini-3.6-flash", "gemini-3.7-flash"]) {
         try {
           response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
             method: "POST",

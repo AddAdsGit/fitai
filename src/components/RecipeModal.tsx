@@ -176,7 +176,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       }
 
       if (!rawText && key) {
-        for (const modelName of ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.0-flash-lite"]) {
+        for (const modelName of ["gemini-3.6-flash", "gemini-3.7-flash"]) {
           try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
               method: "POST",
