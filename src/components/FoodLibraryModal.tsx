@@ -8,9 +8,11 @@ import {
   Plus,
   Edit2,
   AtSign,
+  Wand2,
 } from "lucide-react";
 import { PastFoodCard, PastFoodItem } from "./PastFoodCard";
 import { FoodFilterBar } from "./FoodFilterBar";
+import { PortionStepper } from "./PortionStepper";
 import {
   filterAndSortFoods,
   getUserActiveAiTags,
@@ -25,6 +27,7 @@ export interface FoodLibraryModalProps {
   onClose: () => void;
   onAddMeal: (meal: any) => void;
   onModifyMeal?: (item: PastFoodItem) => void;
+  onCombineWithAi?: (items: PastFoodItem[]) => void;
   recipesState?: Recipe[];
   mealsState?: Meal[];
   profileData?: Profile;
@@ -37,6 +40,7 @@ export const FoodLibraryModal: React.FC<FoodLibraryModalProps> = ({
   onClose,
   onAddMeal,
   onModifyMeal,
+  onCombineWithAi,
   recipesState = [],
   mealsState = [],
   profileData,
@@ -45,12 +49,15 @@ export const FoodLibraryModal: React.FC<FoodLibraryModalProps> = ({
 }) => {
   const [foodFilters, setFoodFilters] = useState<FoodFilterState>(INITIAL_FOOD_FILTER_STATE);
   const [selectedDrawerItems, setSelectedDrawerItems] = useState<PastFoodItem[]>([]);
+  const [portionMultiplier, setPortionMultiplier] = useState(1);
 
   const toggleDrawerItemSelect = (item: PastFoodItem) => {
     setSelectedDrawerItems((prev) => {
       const exists = prev.some((i) => i.name.toLowerCase() === item.name.toLowerCase());
       if (exists) {
-        return prev.filter((i) => i.name.toLowerCase() !== item.name.toLowerCase());
+        const next = prev.filter((i) => i.name.toLowerCase() !== item.name.toLowerCase());
+        if (next.length === 0) setPortionMultiplier(1);
+        return next;
       }
       return [...prev, item];
     });
@@ -58,32 +65,76 @@ export const FoodLibraryModal: React.FC<FoodLibraryModalProps> = ({
 
   const handleQuickLogSelectedItems = () => {
     if (selectedDrawerItems.length === 0) return;
+    const mult = portionMultiplier > 0 ? portionMultiplier : 1;
+
     selectedDrawerItems.forEach((item) => {
+      const scaledNutrients: Record<string, number> = {};
+      if (item.nutrients) {
+        Object.entries(item.nutrients).forEach(([k, v]) => {
+          scaledNutrients[k] = Math.round((Number(v) || 0) * mult);
+        });
+      }
+
       onAddMeal({
         name: item.name,
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fats: item.fats,
-        fiber: item.fiber,
+        recipe_id: item.recipe_id || item.id,
+        calories: Math.round(item.calories * mult),
+        protein: Math.round(item.protein * mult),
+        carbs: Math.round(item.carbs * mult),
+        fats: Math.round(item.fats * mult),
+        fiber: Math.round((item.fiber || 0) * mult),
         image: item.image,
         tags: item.tags,
-        nutrients: item.nutrients,
-        meal_description: item.meal_description,
+        nutrients: Object.keys(scaledNutrients).length > 0 ? scaledNutrients : undefined,
+        meal_description: mult !== 1 ? `${item.meal_description ? item.meal_description + " • " : ""}${mult}x portion` : item.meal_description,
         isAiGenerated: true,
       });
     });
+
     triggerToast(`Added ${selectedDrawerItems.length} item${selectedDrawerItems.length === 1 ? "" : "s"} to log!`);
     setSelectedDrawerItems([]);
+    setPortionMultiplier(1);
     onClose();
   };
 
   const handleModifySelectedItems = () => {
     if (selectedDrawerItems.length === 0) return;
-    if (onModifyMeal) {
-      onModifyMeal(selectedDrawerItems[0]);
+
+    if (selectedDrawerItems.length === 1) {
+      const item = selectedDrawerItems[0];
+      const mult = portionMultiplier > 0 ? portionMultiplier : 1;
+      const scaledNutrients: Record<string, number> = {};
+      if (item.nutrients) {
+        Object.entries(item.nutrients).forEach(([k, v]) => {
+          scaledNutrients[k] = Math.round((Number(v) || 0) * mult);
+        });
+      }
+
+      const scaledItem: PastFoodItem = {
+        ...item,
+        id: item.id,
+        recipe_id: item.recipe_id || item.id,
+        calories: Math.round(item.calories * mult),
+        protein: Math.round(item.protein * mult),
+        carbs: Math.round(item.carbs * mult),
+        fats: Math.round(item.fats * mult),
+        fiber: Math.round((item.fiber || 0) * mult),
+        nutrients: Object.keys(scaledNutrients).length > 0 ? scaledNutrients : item.nutrients,
+      };
+
+      if (onModifyMeal) {
+        onModifyMeal(scaledItem);
+      }
+    } else {
+      if (onCombineWithAi) {
+        onCombineWithAi(selectedDrawerItems);
+      } else if (onModifyMeal) {
+        onModifyMeal(selectedDrawerItems[0]);
+      }
     }
+
     setSelectedDrawerItems([]);
+    setPortionMultiplier(1);
     onClose();
   };
 
@@ -106,6 +157,8 @@ export const FoodLibraryModal: React.FC<FoodLibraryModalProps> = ({
     if (foodFilters.showRecipes !== false) {
       (recipesState || []).forEach((r) => {
         items.push({
+          id: r.id,
+          recipe_id: r.id,
           name: r.name,
           calories: r.calories,
           protein: r.protein,
@@ -297,7 +350,16 @@ export const FoodLibraryModal: React.FC<FoodLibraryModalProps> = ({
           {/* STICKY BOTTOM DUAL CTA BAR FOR MULTI-SELECT & QUICK LOG */}
           <div className="shrink-0 p-4 pt-2.5 border-t border-black/[0.04] bg-[#FAF7F2]">
             {selectedDrawerItems.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
+                {/* Portion Stepper for Selected Items */}
+                <div className="bg-white/90 border border-stone-200/90 rounded-2xl p-2 shadow-3xs">
+                  <PortionStepper
+                    value={portionMultiplier}
+                    onChange={setPortionMultiplier}
+                    label={selectedDrawerItems.length === 1 ? `Portion (${selectedDrawerItems[0].name})` : `Portion Multiplier`}
+                  />
+                </div>
+
                 {/* Primary CTA: Quick Add */}
                 <button
                   type="button"
@@ -305,18 +367,36 @@ export const FoodLibraryModal: React.FC<FoodLibraryModalProps> = ({
                   className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-md shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all font-sans"
                 >
                   <Plus className="w-4 h-4 text-white stroke-[3]" />
-                  <span>Quick Add ({selectedDrawerItems.length})</span>
+                  <span>
+                    Quick Add ({selectedDrawerItems.length})
+                    {selectedDrawerItems.length === 1 && (
+                      <span className="opacity-90 font-bold ml-1">
+                        • {Math.round(selectedDrawerItems[0].calories * (portionMultiplier > 0 ? portionMultiplier : 1))} kcal
+                      </span>
+                    )}
+                  </span>
                 </button>
 
-                {/* Secondary CTA: Modify & Add */}
-                <button
-                  type="button"
-                  onClick={handleModifySelectedItems}
-                  className="w-full py-3 bg-white/90 hover:bg-stone-100 border border-stone-300/80 text-orange-950 font-black text-xs uppercase tracking-wider rounded-2xl shadow-3xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all font-sans"
-                >
-                  <Edit2 className="w-3.5 h-3.5 text-orange-500" />
-                  <span>Modify & Add ({selectedDrawerItems.length})</span>
-                </button>
+                {/* Secondary CTA: Modify & Add (1) OR Combine with AI (2+) */}
+                {selectedDrawerItems.length === 1 ? (
+                  <button
+                    type="button"
+                    onClick={handleModifySelectedItems}
+                    className="w-full py-3 bg-white/90 hover:bg-stone-100 border border-stone-300/80 text-orange-950 font-black text-xs uppercase tracking-wider rounded-2xl shadow-3xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all font-sans"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 text-orange-500" />
+                    <span>Modify & Add (1)</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleModifySelectedItems}
+                    className="w-full py-3 bg-white/90 hover:bg-stone-100 border border-stone-300/80 text-orange-950 font-black text-xs uppercase tracking-wider rounded-2xl shadow-3xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all font-sans"
+                  >
+                    <Wand2 className="w-3.5 h-3.5 text-orange-500" />
+                    <span>Combine & Edit with AI ({selectedDrawerItems.length})</span>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="w-full py-3.5 bg-stone-200/40 border border-stone-300/40 rounded-2xl text-[11px] font-bold text-stone-400 uppercase tracking-wider text-center flex items-center justify-center gap-2 cursor-not-allowed select-none font-sans">
