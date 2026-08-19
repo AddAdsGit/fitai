@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import {
   BookOpen, BarChart2, Target, Search, Filter, X, Utensils,
   Plus, Minus, Sparkles, Check, Info, Scale, Ruler, Database, Camera,
-  User, Smile, ChevronDown, Wand2, Clock, Flame, Calendar
+  User, Smile, ChevronDown, Wand2, Clock, Flame, Calendar, Settings
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -428,7 +428,11 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
     >
       <div className="px-6 space-y-6">
         <div className="flex gap-6 items-center px-1 pt-2">
-          <div className="relative w-24 h-24 rounded-full border-[3px] border-orange-500 p-1 overflow-hidden shrink-0">
+          <div 
+            onClick={() => setActiveTab("highlights")}
+            className="relative w-24 h-24 rounded-full border-[3px] border-orange-500 p-1 overflow-hidden shrink-0 cursor-pointer active:scale-95 transition-all"
+            title="Tap to view your Story Highlights"
+          >
             {profileData.imageUrl ? (
               <img
                 src={profileData.imageUrl}
@@ -483,26 +487,44 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
           <div className="flex items-center gap-2">
             <div className="font-bold text-[#1a1a1a]">{profileData.name || "FitAI Member"}</div>
           </div>
-          <div className="text-[13px] text-orange-950/70 font-medium leading-relaxed relative">
-            <span className={cn(!showFullDesc && "line-clamp-2")}>
-              {profileData.description || "Optimizing health, nutrition, and daily performance with FitAI."}
-            </span>
-            {profileData.description && profileData.description.length > 80 && !showFullDesc && (
-              <span
-                onClick={() => setShowFullDesc(true)}
-                className="text-orange-500 font-bold cursor-pointer hover:underline absolute bottom-0 right-0 bg-gradient-to-l from-[#FAF9F6] via-[#FAF9F6] to-transparent pl-8"
-              >
-                ...more
-              </span>
-            )}
-            {showFullDesc && (
-              <span
-                onClick={() => setShowFullDesc(false)}
-                className="text-orange-500 font-bold cursor-pointer hover:underline ml-1 block mt-1"
-              >
-                less
-              </span>
-            )}
+          <div className="text-[13px] text-orange-950/70 font-medium leading-relaxed">
+            {(() => {
+              const bioText = profileData.description || "Optimizing health, nutrition, and daily performance with FitAI.";
+              const isLong = bioText.length > 90;
+
+              if (!isLong) {
+                return <span>{bioText}</span>;
+              }
+
+              if (!showFullDesc) {
+                return (
+                  <span>
+                    {bioText.slice(0, 85).trim()}
+                    <span>... </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowFullDesc(true)}
+                      className="text-orange-500 font-bold hover:underline cursor-pointer inline p-0 m-0 border-0 bg-transparent"
+                    >
+                      more
+                    </button>
+                  </span>
+                );
+              }
+
+              return (
+                <span>
+                  {bioText}{" "}
+                  <button
+                    type="button"
+                    onClick={() => setShowFullDesc(false)}
+                    className="text-orange-500 font-bold hover:underline cursor-pointer inline p-0 m-0 border-0 bg-transparent"
+                  >
+                    less
+                  </button>
+                </span>
+              );
+            })()}
           </div>
         </div>
 

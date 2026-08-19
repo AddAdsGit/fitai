@@ -48,6 +48,7 @@ import { ManualLogModal } from "./components/ManualLogModal";
 import { CameraLogModal } from "./components/CameraLogModal";
 import { CameraLogView } from "./components/CameraLogView";
 import { ProfileView } from "./components/ProfileView";
+import { HighlightsLibraryView } from "./components/HighlightsLibraryView";
 import { EditProfileView } from "./components/EditProfileView";
 import { SettingsView, DEFAULT_TRACKING_TAGS } from "./components/SettingsView";
 import { OAuthConsentView } from "./components/OAuthConsentView";
@@ -72,6 +73,7 @@ import { ConsumptionSection } from "./components/ConsumptionSection";
 import { BottomNav } from "./components/BottomNav";
 import { GoalConfigPopup } from "./components/GoalConfigPopup";
 import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
+import { registerServiceWorker, checkAndTriggerScheduledReminders } from "./services/notificationService";
 import { Header } from "./components/Header";
 import { CalendarStrip } from "./components/CalendarStrip";
 import { AuthScreen } from "./components/AuthScreen";
@@ -494,6 +496,20 @@ export default function App() {
     };
   }, []);
 
+  // --- Push Notifications & Background Service Worker Registration ---
+  useEffect(() => {
+    registerServiceWorker();
+  }, []);
+
+  // Check and fire scheduled meal reminders every 30 seconds
+  useEffect(() => {
+    checkAndTriggerScheduledReminders(profileData);
+    const reminderInterval = setInterval(() => {
+      checkAndTriggerScheduledReminders(profileData);
+    }, 30000);
+    return () => clearInterval(reminderInterval);
+  }, [profileData]);
+
   // --- Android & Mobile Chrome Hardware / Gesture Back Button Interceptor ---
   const backHandlerStateRef = useRef({
     activeTab,
@@ -604,7 +620,11 @@ export default function App() {
         return;
       }
 
-      // 2. Tab Navigation: Return to profile from edit-profile, or return to home
+      // 2. Tab Navigation: Return to profile from highlights / edit-profile, or return to home
+      if (s.activeTab === "highlights") {
+        setActiveTab("profile");
+        return;
+      }
       if (s.activeTab === "edit-profile") {
         setActiveTab("profile");
         return;
@@ -3712,6 +3732,31 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             onEditMeal={handleEditMeal}
             onShareMeal={(meal) => setShareItemPopup({ type: "meal", item: meal })}
             onDeleteMeal={handleDeleteMeal}
+          />
+        )}
+        {activeTab === "highlights" && (
+          <HighlightsLibraryView
+            key="highlights-tab"
+            profileData={profileData}
+            mealsState={mealsState}
+            recipes={recipes}
+            currentStreak={currentStreak}
+            weightLogs={weightLogs}
+            setActiveTab={setActiveTab}
+            onShareDay={(dateStr, variationId) => {
+              const dayMeals = mealsState.filter((m) => m.date === dateStr);
+              setShareItemPopup({
+                type: "day",
+                item: {
+                  date: dateStr,
+                  meals: dayMeals,
+                  variationId: variationId || "chrono",
+                },
+              });
+            }}
+            onShareMeal={(meal) => setShareItemPopup({ type: "meal", item: meal })}
+            onShareRecipe={(recipe) => handleShareRecipe(recipe)}
+            triggerToast={(msg) => setToastMessage(msg)}
           />
         )}
         {activeTab === "edit-profile" && (

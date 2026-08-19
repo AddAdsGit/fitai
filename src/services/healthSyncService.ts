@@ -38,13 +38,13 @@ export const getPlatformName = (): "ios" | "android" | "web" => {
 // Check if Apple Health can be used
 export const isAppleHealthSupported = (): boolean => {
   const platform = getPlatformName();
-  return platform === "ios" || platform === "web";
+  return platform === "ios";
 };
 
 // Check if Google Fit / Health Connect can be used
 export const isGoogleFitSupported = (): boolean => {
   const platform = getPlatformName();
-  return platform === "android" || platform === "web";
+  return platform === "android";
 };
 
 /**
@@ -57,8 +57,8 @@ export const requestHealthPermissions = async (
 
   if (platform === "web") {
     return {
-      success: true,
-      message: `${provider === "apple" ? "Apple Health" : "Google Fit"} connected in Web Mode (Simulated permissions active).`,
+      success: false,
+      message: `${provider === "apple" ? "Apple Health" : "Google Fit"} requires running inside the native mobile app on iOS or Android.`,
     };
   }
 
@@ -112,11 +112,10 @@ export const fetchHealthMetrics = async (
   const dateStr = targetDateStr || new Date().toISOString().split("T")[0];
 
   if (platform === "web") {
-    // Return simulated metrics on web mode for instant feedback
     return {
-      activeCalories: 450,
-      steps: 8420,
-      weight: 72.5,
+      activeCalories: 0,
+      steps: 0,
+      error: "Web browser cannot access device sensors. Run on iOS (HealthKit) or Android (Health Connect) to sync live smartwatch data.",
     };
   }
 
@@ -251,6 +250,23 @@ export const performHealthSync = async (
 ): Promise<{ success: boolean; message: string; logEntry: SyncLogEntry }> => {
   const timestamp = new Date().toISOString();
   const dateStr = new Date().toISOString().split("T")[0];
+  const platform = getPlatformName();
+
+  if (platform === "web") {
+    const providerName = provider === "apple" ? "Apple Health" : "Google Fit";
+    const logEntry: SyncLogEntry = {
+      id: crypto.randomUUID(),
+      timestamp,
+      provider,
+      status: "warning",
+      message: `Web browser detected — ${providerName} sensors are only accessible when running inside the native iOS / Android app.`,
+      details: {
+        errorText: "Web browsers cannot access encrypted device health stores.",
+      },
+    };
+    await appendHealthSyncLog(session, profileData, setProfileData, logEntry);
+    return { success: false, message: logEntry.message, logEntry };
+  }
 
   try {
     const metrics = await fetchHealthMetrics(provider, dateStr);

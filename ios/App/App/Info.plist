@@ -45,5 +45,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>FitAI needs access to read your active energy burned, steps, and weight to sync your fitness progress with your AI nutrition companion.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>FitAI needs access to record your body weight logs in Apple Health.</string>
 </dict>
 </plist>

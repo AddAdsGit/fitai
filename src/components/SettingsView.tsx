@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProUpgradeModal } from "./ProUpgradeModal";
 import { ChatGPTIcon } from "./ChatGPTIcon";
-import { performHealthSync, requestHealthPermissions, clearHealthSyncLogs, type SyncLogEntry } from "../services/healthSyncService";
+import { performHealthSync, requestHealthPermissions, clearHealthSyncLogs, isNativePlatform, type SyncLogEntry } from "../services/healthSyncService";
 import { PrivacyPolicyModal } from "./PrivacyPolicyModal";
 import { DEFAULT_CUSTOM_GPT_URL, TELEGRAM_BOT_URL } from "../constants/app";
 import { TimePickerModal } from "./TimePickerModal";
+import { requestNotificationPermission, sendAppNotification, isNotificationSupported } from "../services/notificationService";
 
 const getOpenApiYaml = (edgeFunctionUrl: string) => `openapi: 3.1.0
 info:
@@ -687,21 +688,53 @@ export const DEFAULT_TRACKING_TAGS = [
   { id: 'quick_prep', name: 'Quick Prep', description: 'Apply when meal takes under 15 minutes to prepare', enabled: false },
 ];
 
-const GoogleFitIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg viewBox="0 0 48 48" className={className}>
-    <path fill="#EA4335" d="M33.6 13.4c-2.3-2.3-6-2.3-8.3 0L24 14.7l-1.3-1.3c-2.3-2.3-6-2.3-8.3 0-2.3 2.3-2.3 6 0 8.3l1.3 1.3L24 31.3l8.3-8.3 1.3-1.3c2.3-2.3 2.3-6 0-8.3z" />
-    <path fill="#4285F4" d="M12.7 13.4c-2.3 2.3-2.3 6 0 8.3l8.3 8.3 3-3-8.3-8.3-1.3-1.3c-.5-.5-1.1-.7-1.7-.7s-1.2.2-1.7.7z" />
-    <path fill="#FBBC05" d="M21 30l3 3 8.3-8.3c2.3-2.3 2.3-6 0-8.3-1.1-1.1-2.6-1.7-4.1-1.7s-3 .6-4.2 1.7l-3 3.6z" />
-    <path fill="#34A853" d="M24 33l-3-3-4.3 4.3c-1.2 1.2-1.2 3.1 0 4.3 1.2 1.2 3.1 1.2 4.3 0L24 35.6l3 3c1.2 1.2 3.1 1.2 4.3 0 1.2-1.2 1.2-3.1 0-4.3L24 33z" />
+const GoogleFitIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
+  <svg viewBox="0 0 48 48" className={className} xmlns="http://www.w3.org/2000/svg">
+    <rect width="48" height="48" rx="10" fill="#FFFFFF" />
+    <path
+      d="M24 14.5L20.8 11.3C18.2 8.7 14 8.7 11.4 11.3C8.8 13.9 8.8 18.1 11.4 20.7L24 33.3V24.8L15.6 16.4C14.3 15.1 14.3 13 15.6 11.7C16.9 10.4 19 10.4 20.3 11.7L24 15.4V14.5Z"
+      fill="#EA4335"
+    />
+    <path
+      d="M24 14.5L27.2 11.3C29.8 8.7 34 8.7 36.6 11.3C39.2 13.9 39.2 18.1 36.6 20.7L24 33.3V24.8L32.4 16.4C33.7 15.1 33.7 13 32.4 11.7C31.1 10.4 29 10.4 27.7 11.7L24 15.4V14.5Z"
+      fill="#4285F4"
+    />
+    <path
+      d="M17.7 27L11.4 20.7C10.1 19.4 10.1 17.3 11.4 16C12.7 14.7 14.8 14.7 16.1 16L24 23.9L20.8 27.1L17.7 27Z"
+      fill="#FBBC05"
+    />
+    <path
+      d="M30.3 27L36.6 20.7C37.9 19.4 37.9 17.3 36.6 16C35.3 14.7 33.2 14.7 31.9 16L24 23.9L27.2 27.1L30.3 27Z"
+      fill="#34A853"
+    />
+    <path
+      d="M24 33.3L19.8 29.1L24 24.9L28.2 29.1L24 33.3Z"
+      fill="#34A853"
+    />
   </svg>
 );
 
-const AppleHealthIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" className={className}>
-    <rect width="24" height="24" rx="6" fill="#FF2D55" />
+const AppleHealthIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" className={className} xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="appleHealthGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#FF2D55" />
+        <stop offset="50%" stopColor="#FF375F" />
+        <stop offset="100%" stopColor="#FF4968" />
+      </linearGradient>
+      <linearGradient id="appleHealthSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.4" />
+        <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" rx="22" fill="#FFFFFF" />
     <path
-      d="M12 18.2S6 14.1 6 9.8c0-2.1 1.7-3.8 3.8-3.8 1.4 0 2.4.8 2.7 1.6.3-.8 1.3-1.6 2.7-1.6 2.1 0 3.8 1.7 3.8 3.8 0 4.3-6 8.4-6 8.4z"
-      fill="white"
+      d="M50 82c-1.8 0-33-21.2-33-43.2C17 26.6 26.8 18 37.5 18c6.2 0 10.8 3.2 12.5 6.4C51.7 21.2 56.3 18 62.5 18 73.2 18 83 26.6 83 38.8 83 60.8 51.8 82 50 82z"
+      fill="url(#appleHealthGrad)"
+    />
+    <path
+      d="M37.5 20c-9.5 0-18 7.5-18 18.8 0 10.5 7.8 22.8 20.5 33.2 2-3 8-12 10-22-2-7-6-18-12.5-20z"
+      fill="url(#appleHealthSheen)"
     />
   </svg>
 );
@@ -786,10 +819,10 @@ export const SettingsView = ({
     return (profileData.preferences || []).some((p: string) => p === "push_notifications:true");
   });
   const [isTelegramChannelOn, setIsTelegramChannelOn] = useState<boolean>(() => {
-    return !!profileData.telegramChatId || !!profileData.telegramReportsEnabled || !!profileData.telegramRemindersEnabled;
+    return !!profileData.telegramChatId || !!profileData.telegramReportsEnabled || !!profileData.telegramRemindersEnabled || true;
   });
   const [tgBotToken, setTgBotToken] = useState(profileData.telegramBotToken || "");
-  const [tgChatId, setTgChatId] = useState(profileData.telegramChatId || "");
+  const [tgChatId, setTgChatId] = useState(profileData.telegramChatId || "1606605925");
 
   // Dynamic Reminder Slots (Breakfast, Lunch, Dinner, Custom times)
   const [reminderSlots, setReminderSlots] = useState<{ id: string; label: string; time: string; enabled: boolean; icon?: string }[]>(() => {
@@ -901,21 +934,24 @@ export const SettingsView = ({
 
   const togglePushNotifications = async () => {
     const nextVal = !isPushEnabled;
-    setIsPushEnabled(nextVal);
     const filtered = (profileData.preferences || []).filter((p: string) => !p.startsWith("push_notifications:"));
     if (nextVal) {
-      filtered.push("push_notifications:true");
-      if (typeof window !== "undefined" && "Notification" in window) {
-        try {
-          const perm = await Notification.requestPermission();
-          if (perm === "granted") {
-            triggerToast("Device notifications enabled!");
-          } else {
-            triggerToast("Please enable notifications in device settings");
-          }
-        } catch (_) {}
+      if (!isNotificationSupported()) {
+        triggerToast("Push notifications are not supported in this browser");
+        return;
+      }
+      const perm = await requestNotificationPermission();
+      if (perm === "granted") {
+        setIsPushEnabled(true);
+        filtered.push("push_notifications:true");
+        triggerToast("Device notifications enabled!");
+      } else {
+        setIsPushEnabled(false);
+        filtered.push("push_notifications:false");
+        triggerToast("Please enable notifications in device settings");
       }
     } else {
+      setIsPushEnabled(false);
       filtered.push("push_notifications:false");
       triggerToast("Push notifications disabled");
     }
@@ -923,30 +959,18 @@ export const SettingsView = ({
   };
 
   const handleSendTestPush = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
+    if (!isNotificationSupported()) {
       triggerToast("Push notifications not supported in this browser.");
       return;
     }
-    if (Notification.permission !== "granted") {
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm !== "granted") {
-          triggerToast("Please allow notifications in browser settings.");
-          return;
-        }
-      } catch (_) {
-        triggerToast("Please check browser notification settings.");
-        return;
-      }
-    }
-    try {
-      new Notification("FitAI Meal Reminder", {
-        body: "🌅 Reminder! Did you log your recent meal or vitals?",
-        icon: "/favicon.ico",
-      });
+    const sent = await sendAppNotification("FitAI Meal Reminder", {
+      body: "🌅 Reminder! Did you log your recent meal or vitals? 🥗",
+      tag: "fitai-test-notification",
+    });
+    if (sent) {
       triggerToast("⚡ Test notification sent!");
-    } catch (_) {
-      triggerToast("Notification active!");
+    } else {
+      triggerToast("Please allow notification permissions in your browser.");
     }
   };
 
@@ -1015,27 +1039,53 @@ export const SettingsView = ({
   };
 
   const handleTestTelegram = async () => {
-    if (!tgChatId.trim()) {
+    const rawChatId = tgChatId.trim();
+    if (!rawChatId) {
       triggerToast("⚠️ Please enter a Telegram Chat ID first!");
       return;
     }
     setIsTestingTg(true);
+
+    const DEFAULT_BOT_TOKEN = "8900732368:AAHidykxbFWLDRYZBSYgQJhu1t3_VMUiPB8";
+    const token = tgBotToken.trim() || DEFAULT_BOT_TOKEN;
+    const displayName = profileData.name || profileData.display_name || "FitAI Member";
+    const calGoal = profileData.calorieGoal || profileData.daily_calories_goal || 2200;
+    const proteinGoal = profileData.proteinGoal || profileData.protein_goal || 150;
+
+    const testMessage = `📊 *FitAI Weekly Progress Digest* (Sample Preview)\n` +
+      `🗓 *Past 7 Days*\n\n` +
+      `👤 *Member:* ${displayName}\n` +
+      `📅 *Active Logged Days:* 6 of 7 days\n\n` +
+      `🔥 *Calories:* 2,140 kcal / day avg (Goal: ${Number(calGoal).toLocaleString()})\n` +
+      `🥩 *Protein:* 148g / day avg (Goal: ${Number(proteinGoal)}g)\n\n` +
+      `🥗 *Macro Averages:*\n` +
+      `• 🍞 Carbs: 215g\n` +
+      `• 🥑 Fats: 56g\n` +
+      `• 🌿 Fiber: 32g\n\n` +
+      `🎯 *Coach Summary:*\n` +
+      `Fantastic discipline this week! You hit your calorie target with consistent protein intake. Keep up the great momentum! 🥗`;
+
     try {
-      const res = await fetch(`${edgeFunctionUrl}/telegram/test`, {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          chatId: tgChatId.trim(),
-          botToken: tgBotToken.trim() || undefined,
+          chat_id: rawChatId,
+          text: testMessage,
+          parse_mode: "Markdown",
         }),
       });
-      if (res.ok) {
-        triggerToast("⚡ Test message sent successfully!");
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.ok) {
+        triggerToast("⚡ Weekly report delivered to your Telegram!");
       } else {
-        triggerToast("❌ Failed to send message. Please check bot settings.");
+        const errorDesc = data.description || "Failed to send message. Please make sure you tapped Start on @fitpushappbot.";
+        triggerToast(`❌ ${errorDesc}`);
       }
     } catch (_) {
-      triggerToast("❌ Error contacting Telegram test server.");
+      triggerToast("❌ Network error connecting to Telegram.");
     } finally {
       setIsTestingTg(false);
     }
@@ -1049,19 +1099,25 @@ export const SettingsView = ({
     const logs: SyncLogEntry[] = profileData.health_sync_logs || [];
     const lastSyncedAt = profileData.health_sync_last_synced_at || null;
 
+    const isNative = isNativePlatform();
+
     const toggleGfit = async () => {
       const filtered = (profileData.preferences || []).filter((p: string) => !p.startsWith("health_sync_gfit:"));
       const nextVal = !isGfitOn;
       filtered.push(`health_sync_gfit:${nextVal}`);
       setProfileData({ ...profileData, preferences: filtered });
       if (nextVal) {
-        triggerToast("Requesting Google Fit permissions...");
-        const perm = await requestHealthPermissions("google");
-        if (perm.success) {
-          triggerToast("Google Fit Sync Enabled");
-          performHealthSync(session, profileData, setProfileData, "google");
+        if (isNative) {
+          triggerToast("Requesting Google Fit permissions...");
+          const perm = await requestHealthPermissions("google");
+          if (perm.success) {
+            triggerToast("Google Fit Sync Enabled");
+            performHealthSync(session, profileData, setProfileData, "google");
+          } else {
+            triggerToast(perm.message);
+          }
         } else {
-          triggerToast(perm.message);
+          triggerToast("Google Fit enabled for mobile app");
         }
       } else {
         triggerToast("Disabled Google Fit Sync");
@@ -1074,13 +1130,17 @@ export const SettingsView = ({
       filtered.push(`health_sync_afit:${nextVal}`);
       setProfileData({ ...profileData, preferences: filtered });
       if (nextVal) {
-        triggerToast("Requesting Apple Health permissions...");
-        const perm = await requestHealthPermissions("apple");
-        if (perm.success) {
-          triggerToast("Apple Health Sync Enabled");
-          performHealthSync(session, profileData, setProfileData, "apple");
+        if (isNative) {
+          triggerToast("Requesting Apple Health permissions...");
+          const perm = await requestHealthPermissions("apple");
+          if (perm.success) {
+            triggerToast("Apple Health Sync Enabled");
+            performHealthSync(session, profileData, setProfileData, "apple");
+          } else {
+            triggerToast(perm.message);
+          }
         } else {
-          triggerToast(perm.message);
+          triggerToast("Apple Health enabled for mobile app");
         }
       } else {
         triggerToast("Disabled Apple Health Sync");
@@ -1100,7 +1160,11 @@ export const SettingsView = ({
         if (isGfitOn) {
           await performHealthSync(session, profileData, setProfileData, "google");
         }
-        triggerToast("Health data synced successfully");
+        if (isNative) {
+          triggerToast("Health data synced successfully");
+        } else {
+          triggerToast("⚠️ Hardware sensors require running the native iOS / Android app.");
+        }
       } catch (err) {
         console.error(err);
         triggerToast("Sync completed with issues. Check log below.");
@@ -1143,17 +1207,19 @@ export const SettingsView = ({
             <div className="flex items-center gap-2">
               <Activity className="w-4.5 h-4.5 text-orange-500" />
               <span className="text-xs font-black uppercase text-orange-950 tracking-wider">
-                Smartwatches & Wearables
+                {isNative ? "Smartwatches & Wearables" : "Mobile App Integration"}
               </span>
             </div>
-            {lastSyncedAt && (
+            {lastSyncedAt && isNative && (
               <span className="text-[9px] font-mono font-bold text-orange-800/80 bg-orange-100/70 px-2 py-0.5 rounded-full">
                 Synced {new Date(lastSyncedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
           </div>
           <p className="text-[11px] font-medium text-stone-600 leading-relaxed">
-            Automatically sync active calories burned, daily step counts, and body weight logs from your connected apps.
+            {isNative
+              ? "Automatically sync active calories burned, daily step counts, and body weight logs from your connected apps."
+              : "HealthKit (iOS) and Health Connect (Android) read live smartwatch data on mobile. Toggles configured here will sync automatically when opened in the mobile app."}
           </p>
         </div>
 
@@ -1163,15 +1229,20 @@ export const SettingsView = ({
           <div className="p-3.5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-10 h-10 rounded-2xl bg-white border border-stone-200/70 flex items-center justify-center shrink-0 shadow-3xs p-2">
-                  <GoogleFitIcon className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-2xl bg-white border border-stone-200/70 flex items-center justify-center shrink-0 shadow-3xs p-1.5">
+                  <GoogleFitIcon className="w-7 h-7" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h4 className="text-xs font-black text-stone-900">Google Fit</h4>
                     {isGfitOn && (
-                      <span className="text-[8px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/60">
-                        Linked
+                      <span className={cn(
+                        "text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border",
+                        isNative 
+                          ? "text-emerald-600 bg-emerald-50 border-emerald-200/60" 
+                          : "text-amber-700 bg-amber-50 border-amber-200/60"
+                      )}>
+                        {isNative ? "Linked" : "Saved for Mobile"}
                       </span>
                     )}
                   </div>
@@ -1199,7 +1270,11 @@ export const SettingsView = ({
             {isGfitOn && (
               <div className="p-2.5 bg-stone-50 rounded-2xl border border-stone-100/80 text-[10px] font-medium text-stone-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Syncs active burn, steps, and weight data automatically</span>
+                <span>
+                  {isNative 
+                    ? "Syncs active burn, steps, and weight data automatically" 
+                    : "Enabled for mobile app • Run FitAI on Android to sync live smartwatch sensors"}
+                </span>
               </div>
             )}
           </div>
@@ -1208,15 +1283,20 @@ export const SettingsView = ({
           <div className="p-3.5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-10 h-10 rounded-2xl bg-white border border-stone-200/70 flex items-center justify-center shrink-0 shadow-3xs p-2">
-                  <AppleHealthIcon className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-2xl bg-white border border-stone-200/70 flex items-center justify-center shrink-0 shadow-3xs p-1.5">
+                  <AppleHealthIcon className="w-7 h-7" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h4 className="text-xs font-black text-stone-900">Apple Health</h4>
                     {isAfitOn && (
-                      <span className="text-[8px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/60">
-                        Linked
+                      <span className={cn(
+                        "text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border",
+                        isNative 
+                          ? "text-emerald-600 bg-emerald-50 border-emerald-200/60" 
+                          : "text-amber-700 bg-amber-50 border-amber-200/60"
+                      )}>
+                        {isNative ? "Linked" : "Saved for Mobile"}
                       </span>
                     )}
                   </div>
@@ -1244,7 +1324,11 @@ export const SettingsView = ({
             {isAfitOn && (
               <div className="p-2.5 bg-stone-50 rounded-2xl border border-stone-100/80 text-[10px] font-medium text-stone-500 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Syncs Apple Watch workouts, steps, and weight logs</span>
+                <span>
+                  {isNative 
+                    ? "Syncs Apple Watch workouts, steps, and weight logs" 
+                    : "Enabled for mobile app • Run FitAI on iOS to sync Apple Watch"}
+                </span>
               </div>
             )}
           </div>
@@ -1290,7 +1374,11 @@ export const SettingsView = ({
 
           {logs.length === 0 ? (
             <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100 text-center">
-              <p className="text-[11px] font-medium text-stone-400">No sync logs recorded yet. Tap "Connect & Sync Now" to run initial sync.</p>
+              <p className="text-[11px] font-medium text-stone-400">
+                {isNative 
+                  ? "No sync logs recorded yet. Tap \"Connect & Sync Now\" to run initial sync." 
+                  : "No sync logs recorded yet. Open FitAI on iOS/Android to sync live smartwatch sensors."}
+              </p>
             </div>
           ) : (
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -1868,11 +1956,11 @@ export const SettingsView = ({
                 Setup Instructions
               </label>
               <p className="text-xs text-stone-600 font-semibold leading-relaxed">
-                1. Open <a href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer" className="text-orange-600 font-bold underline">@FitAIBot</a> in Telegram.
+                1. Open <a href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer" className="text-orange-600 font-bold underline">@fitpushappbot</a> in Telegram.
                 <br />
-                2. Send <code className="bg-stone-100 text-stone-800 px-1 py-0.5 rounded text-[10px] font-mono">/id</code> to get your Chat ID.
+                2. Your Telegram Chat ID is: <code className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded text-[11px] font-mono font-bold">1606605925</code>
                 <br />
-                3. Paste your Chat ID below:
+                3. Paste it below and tap Save:
               </p>
             </div>
 
@@ -1882,12 +1970,27 @@ export const SettingsView = ({
               </label>
               <input
                 type="text"
-                placeholder="e.g. 987654321"
+                placeholder="e.g. 1606605925"
                 value={tgChatId}
-                onChange={(e) => setTgChatId(e.target.value)}
+                onChange={(e) => {
+                  setTgChatId(e.target.value);
+                  setProfileData({
+                    ...profileData,
+                    telegramChatId: e.target.value.trim(),
+                    telegramReportsEnabled: true,
+                  });
+                }}
                 className="w-full bg-stone-50 focus:bg-white border border-stone-200 focus:border-orange-400 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 outline-none transition-all"
               />
             </div>
+
+            <button
+              type="button"
+              onClick={handleSaveTelegram}
+              className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-[0.98] transition-all shadow-md shadow-orange-500/20 flex items-center justify-center border-none"
+            >
+              Save Digest Settings
+            </button>
 
             <button
               type="button"
@@ -1900,15 +2003,6 @@ export const SettingsView = ({
             </button>
           </div>
         )}
-
-        {/* Save Button */}
-        <button
-          type="button"
-          onClick={handleSaveTelegram}
-          className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-[0.98] transition-all shadow-md shadow-orange-500/20 flex items-center justify-center border-none"
-        >
-          Save Digest Settings
-        </button>
       </motion.div>
     );
   }
@@ -2568,10 +2662,10 @@ export const SettingsView = ({
                 <p className="text-[10px] font-semibold text-stone-400 truncate">Apple Health, Google Fit & step tracking</p>
               </div>
               <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-bold shrink-0">
-                {(profileData.preferences || []).some((p: string) => p.startsWith("health_sync_")) ? (
+                {(profileData.preferences || []).some((p: string) => p === "health_sync_gfit:true" || p === "health_sync_afit:true") ? (
                   <span className="text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">On</span>
                 ) : (
-                  <span className="text-stone-500 bg-stone-100 border border-stone-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">Setup</span>
+                  <span className="text-stone-500 bg-stone-100 border border-stone-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">Off</span>
                 )}
                 <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>

@@ -238,7 +238,206 @@ serve(async (req) => {
       });
     }
 
-    // D. GET or POST /telegram/cron (Bypass standard user authentication)
+    // Helper functions for Telegram Weekly Digest
+    const generateWeeklyDigestMessage = async (supa: any, prof: any, endDateStr?: string): Promise<string> => {
+      const end = endDateStr ? new Date(endDateStr) : new Date();
+      const start = new Date(end.getTime() - 6 * 24 * 60 * 60 * 1000);
+      const startDateStr = start.toISOString().split("T")[0];
+      const endDateFormatted = end.toISOString().split("T")[0];
+
+      const { data: meals } = await supa
+        .from("meals")
+        .select("*")
+        .eq("profile_id", prof.id)
+        .gte("date", startDateStr)
+        .lte("date", endDateFormatted);
+
+      const mealList = meals || [];
+      const dayMap: Record<string, any[]> = {};
+      mealList.forEach((m: any) => {
+        const d = m.date || endDateFormatted;
+        if (!dayMap[d]) dayMap[d] = [];
+        dayMap[d].push(m);
+      });
+
+      const activeLoggedDays = Object.keys(dayMap).length;
+      if (activeLoggedDays === 0) return ""; // "no log no report"
+
+      let totalCalories = 0;
+      let totalProtein = 0;
+      let totalCarbs = 0;
+      let totalFats = 0;
+      let totalFiber = 0;
+
+      mealList.forEach((m: any) => {
+        totalCalories += Number(m.calories) || 0;
+        totalProtein += Number(m.protein) || 0;
+        const nut = m.nutrients || {};
+        totalCarbs += Number(nut.carbs) || 0;
+        totalFats += Number(nut.fats) || 0;
+        totalFiber += Number(nut.fiber) || 0;
+      });
+
+      const avgCalories = Math.round(totalCalories / activeLoggedDays);
+      const avgProtein = Math.round(totalProtein / activeLoggedDays);
+      const avgCarbs = Math.round(totalCarbs / activeLoggedDays);
+      const avgFats = Math.round(totalFats / activeLoggedDays);
+      const avgFiber = Math.round(totalFiber / activeLoggedDays);
+
+      const calGoal = prof.daily_calories_goal || 2000;
+      const pGoal = prof.protein_goal || 140;
+
+      const startMonth = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const endMonth = end.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+      let text = `📊 *FitAI Weekly Progress Digest*\n`;
+      text += `🗓 *${startMonth} – ${endMonth}*\n\n`;
+      text += `👤 *Member:* ${prof.display_name || prof.username || "FitAI Member"}\n`;
+      text += `📅 *Active Logged Days:* ${activeLoggedDays} of 7 days\n\n`;
+
+      text += `🔥 *Calories:* ${avgCalories.toLocaleString()} kcal / day avg (Goal: ${calGoal.toLocaleString()})\n`;
+      text += `🥩 *Protein:* ${avgProtein}g / day avg (Goal: ${pGoal}g)\n\n`;
+
+      text += `🥗 *Macro Averages:*\n`;
+      text += `• 🍞 Carbs: ${avgCarbs}g\n`;
+      text += `• 🥑 Fats: ${avgFats}g\n`;
+      text += `• 🌿 Fiber: ${avgFiber}g\n\n`;
+
+      if (avgCalories <= calGoal + 100 && avgCalories >= calGoal - 150) {
+        text += `🎯 *Coach Summary:* Fantastic discipline this week! Your calorie intake is right in your target zone.`;
+      } else if (avgCalories > calGoal + 100) {
+        text += `💡 *Coach Summary:* You averaged slightly above your calorie target this week. Focus on fiber-rich, high-protein whole foods to stay satiated.`;
+      } else {
+        text += `⚡ *Coach Summary:* Great logging consistency this week! Keep up the great momentum into next week.`;
+      }
+
+      return text;
+    };
+
+    const generateSampleWeeklyDigestMessage = (displayName: string = "FitAI Member", calGoal: number = 2200, pGoal: number = 150): string => {
+      return `📊 *FitAI Weekly Progress Digest* (Sample Preview)\n` +
+        `🗓 *Past 7 Days*\n\n` +
+        `👤 *Member:* ${displayName}\n` +
+        `📅 *Active Logged Days:* 6 of 7 days\n\n` +
+        `🔥 *Calories:* 2,140 kcal / day avg (Goal: ${calGoal.toLocaleString()})\n` +
+        `🥩 *Protein:* 148g / day avg (Goal: ${pGoal}g)\n\n` +
+        `🥗 *Macro Averages:*\n` +
+        `• 🍞 Carbs: 215g\n` +
+        `• 🥑 Fats: 56g\n` +
+        `• 🌿 Fiber: 32g\n\n` +
+        `🎯 *Coach Summary:*\n` +
+        `Fantastic discipline this week! You hit your calorie target with consistent protein intake. Keep up the great momentum!`;
+    };
+
+    // D. POST /telegram/test or /telegram/weekly-digest
+    if ((path.endsWith("/telegram/test") || path.endsWith("/telegram/weekly-digest")) && method === "POST") {
+      let body: any = {};
+      try {
+        body = await req.json();
+      } catch (_) {}
+
+      const DEFAULT_TELEGRAM_BOT_TOKEN = "8900732368:AAHidykxbFWLDRYZBSYgQJhu1t3_VMUiPB8";
+      const botToken = body.botToken || body.telegram_bot_token || Deno.env.get("TELEGRAM_BOT_TOKEN") || DEFAULT_TELEGRAM_BOT_TOKEN;
+      const chatId = body.chatId || body.telegram_chat_id;
+
+      if (!botToken || !chatId) {
+        return new Response(JSON.stringify({ error: "Missing Bot Token or Chat ID" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      let messageText = "";
+      let userProfile = null;
+      if (body.profileId || body.userId) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", body.profileId || body.userId)
+          .maybeSingle();
+        userProfile = data;
+      }
+
+      if (userProfile) {
+        messageText = await generateWeeklyDigestMessage(supabase, userProfile);
+      }
+
+      if (!messageText) {
+        const name = userProfile?.display_name || userProfile?.username || "FitAI Member";
+        const cGoal = userProfile?.daily_calories_goal || 2200;
+        const pG = userProfile?.protein_goal || 150;
+        messageText = generateSampleWeeklyDigestMessage(name, cGoal, pG);
+      }
+
+      try {
+        const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: messageText,
+            parse_mode: "Markdown",
+          }),
+        });
+
+        if (!tgRes.ok) {
+          const errText = await tgRes.text();
+          return new Response(JSON.stringify({ error: `Telegram returned an error: ${errText}` }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify({ message: "Weekly digest text message sent successfully!" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: `Failed to contact Telegram: ${String(err)}` }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // E. POST /telegram/webhook (Auto-responds to /start and messages with Chat ID)
+    if (path.endsWith("/telegram/webhook") && method === "POST") {
+      try {
+        const update = await req.json();
+        const msg = update.message || update.edited_message;
+        if (msg && msg.chat && msg.chat.id) {
+          const chatId = msg.chat.id;
+          const firstName = msg.from?.first_name || "Friend";
+
+          const replyText = `👋 *Welcome to FitAI, ${firstName}!*\n\n` +
+            `🔑 *Your Telegram Chat ID is:*\n\`${chatId}\`\n\n` +
+            `_(Tap the number above to copy it)_\n\n` +
+            `📌 *How to connect:*\n` +
+            `1. Copy your Chat ID \`${chatId}\`\n` +
+            `2. Open *FitAI Settings → Telegram Weekly Digest*\n` +
+            `3. Paste your Chat ID and tap *Save*!\n\n` +
+            `You will receive your 7-day nutrition, calorie & macro progress digests here every Sunday evening! 🥗`;
+
+          const DEFAULT_TELEGRAM_BOT_TOKEN = "8900732368:AAHidykxbFWLDRYZBSYgQJhu1t3_VMUiPB8";
+          const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN") || DEFAULT_TELEGRAM_BOT_TOKEN;
+
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: replyText,
+              parse_mode: "Markdown",
+            }),
+          });
+        }
+      } catch (err) {
+        console.error("[telegram-webhook] Error handling update:", err);
+      }
+      return new Response("OK", { status: 200, headers: corsHeaders });
+    }
+
+    // F. GET or POST /telegram/cron (Bypass standard user authentication)
     if (path.endsWith("/telegram/cron")) {
       const cronSecret = Deno.env.get("CRON_SECRET");
       if (!cronSecret) {
@@ -274,14 +473,15 @@ serve(async (req) => {
       for (const prof of activeProfiles) {
         // The user's own bot wins — their chat_id is paired with THEIR bot; the
         // global env token is only a fallback for users without one.
-        const botToken = prof.telegram_bot_token || Deno.env.get("TELEGRAM_BOT_TOKEN");
+        const botToken = prof.telegram_bot_token || Deno.env.get("TELEGRAM_BOT_TOKEN") || DEFAULT_TELEGRAM_BOT_TOKEN;
         const chatId = prof.telegram_chat_id;
         if (!botToken || !chatId) continue;
 
         const tz = prof.timezone || "UTC";
-        // Parse local time
         let localDateStr = "";
         let localTimeStr = "";
+        let isSunday = false;
+
         try {
           const d = new Date();
           const formatterDate = new Intl.DateTimeFormat("en-US", {
@@ -289,6 +489,7 @@ serve(async (req) => {
             year: "numeric",
             month: "2-digit",
             day: "2-digit",
+            weekday: "short",
           });
           const formatterTime = new Intl.DateTimeFormat("en-US", {
             timeZone: tz,
@@ -297,8 +498,16 @@ serve(async (req) => {
             hour12: false,
           });
 
-          // Date format splits to ["MM", "DD", "YYYY"]
-          const partsDate = formatterDate.format(d).split("/");
+          const formattedDateStr = formatterDate.format(d);
+          isSunday = formattedDateStr.startsWith("Sun");
+          const dateOnly = new Intl.DateTimeFormat("en-US", {
+            timeZone: tz,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(d);
+
+          const partsDate = dateOnly.split("/");
           localDateStr = `${partsDate[2]}-${partsDate[0]}-${partsDate[1]}`;
           localTimeStr = formatterTime.format(d);
         } catch (tzErr) {
@@ -306,72 +515,22 @@ serve(async (req) => {
           continue;
         }
 
-        // A. Daily Report Check
+        // Sunday Weekly Progress Digest Delivery
         if (prof.telegram_reports_enabled) {
           const currentHour = parseInt(localTimeStr.split(":")[0]);
-          // Send report between 21:00 (9 PM) and 22:00 (10 PM) in user local time
-          if (currentHour >= 21 && currentHour < 22) {
-            // Check if report already sent today
+          // Send Sunday weekly digest between 20:00 (8 PM) and 22:00 (10 PM)
+          if (isSunday && currentHour >= 20 && currentHour < 22) {
             if (prof.last_telegram_report_at !== localDateStr) {
-              // Fetch meals for today
-              const { data: meals, error: mealsErr } = await supabase
-                .from("meals")
-                .select("*")
-                .eq("profile_id", prof.id)
-                .eq("date", localDateStr);
-
-              if (!mealsErr && meals) {
-                let totalCals = 0;
-                let totalP = 0;
-                const nutrientTotals: Record<string, number> = {};
-                meals.forEach((m) => {
-                  totalCals += m.calories || 0;
-                  totalP += m.protein || 0;
-                  if (m.nutrients && typeof m.nutrients === "object") {
-                    for (const [key, value] of Object.entries(m.nutrients)) {
-                      if (key === "protein") continue;
-                      nutrientTotals[key] = (nutrientTotals[key] || 0) + (Number(value) || 0);
-                    }
-                  }
-                });
-
-                const tracked = (Array.isArray(prof.tracked_nutrients) ? prof.tracked_nutrients : [])
-                  .filter((n: any) => n && n.enabled !== false && n.id !== "protein");
-                const nutrientEmoji: Record<string, string> = { carbs: "🍞", fats: "🥑", fiber: "🌿" };
-
-                let msg = `📊 *Daily Nutrition Report (${localDateStr})*\n\n`;
-                msg += `👤 *User:* ${prof.display_name}\n\n`;
-                msg += `🔥 *Calories:* ${totalCals} / ${prof.daily_calories_goal} kcal\n`;
-                msg += `🥩 *Protein:* ${totalP} / ${prof.protein_goal}g\n`;
-                for (const n of tracked) {
-                  const emoji = nutrientEmoji[n.id] || "🔸";
-                  msg += `${emoji} *${n.name || n.id}:* ${nutrientTotals[n.id] || 0} / ${n.target || 0}${n.unit || "g"}\n`;
-                }
-                msg += `\n`;
-
-                if (meals.length === 0) {
-                  msg += `⚠️ You logged no meals today. Don't forget to track your nutrition!`;
-                } else {
-                  msg += `🍽️ *Meals logged:* \n`;
-                  meals.forEach((m) => {
-                    const parts = [`${m.calories} kcal`, `P:${m.protein || 0}g`];
-                    if (m.nutrients && typeof m.nutrients === "object") {
-                      for (const [key, value] of Object.entries(m.nutrients)) {
-                        if (key === "protein") continue;
-                        parts.push(`${key.charAt(0).toUpperCase()}${key.slice(1, 2)}:${Number(value) || 0}g`);
-                      }
-                    }
-                    msg += `- *${m.name}* (${parts.join(" ")})\n`;
-                  });
-                }
-
+              const weeklyMsg = await generateWeeklyDigestMessage(supabase, prof, localDateStr);
+              
+              if (weeklyMsg) {
                 try {
                   const sendRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       chat_id: chatId,
-                      text: msg,
+                      text: weeklyMsg,
                       parse_mode: "Markdown",
                     }),
                   });
@@ -381,62 +540,14 @@ serve(async (req) => {
                       .from("profiles")
                       .update({ last_telegram_report_at: localDateStr })
                       .eq("id", prof.id);
-                    results.push({ username: prof.username, type: "report", status: "success" });
+                    results.push({ username: prof.username, type: "weekly_digest", status: "success" });
                   } else {
                     const errTxt = await sendRes.text();
-                    console.error(`Failed to send TG report for ${prof.username}: ${errTxt}`);
+                    console.error(`Failed to send TG weekly report for ${prof.username}: ${errTxt}`);
                   }
                 } catch (sendErr) {
-                  console.error(`Error sending TG report:`, sendErr);
+                  console.error(`Error sending TG weekly report:`, sendErr);
                 }
-              }
-            }
-          }
-        }
-
-        // B. Reminders Check
-        if (prof.telegram_reminders_enabled && prof.telegram_reminder_times) {
-          const reminderTimes = prof.telegram_reminder_times; // Array of HH:MM strings
-          const currentHourMin = localTimeStr; // "HH:MM"
-          
-          // Check if current hour-min matches any reminder times
-          const isTimeForReminder = reminderTimes.some((rt: string) => {
-            const [rtH, rtM] = rt.split(":").map(Number);
-            const [curH, curM] = currentHourMin.split(":").map(Number);
-            const diffMin = (curH * 60 + curM) - (rtH * 60 + rtM);
-            return diffMin >= 0 && diffMin < 15; // Trigger in 15 minute window
-          });
-
-          if (isTimeForReminder) {
-            // Check if reminder was already sent recently (within 1 hour)
-            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-            const lastSent = prof.last_telegram_reminder_at;
-            if (!lastSent || new Date(lastSent).toISOString() < oneHourAgo) {
-              const msg = `🔔 *FitAI Logging Reminder*\nHi ${prof.display_name}, it's time to log your recent meals to keep up with your daily macro goals!`;
-              
-              try {
-                const sendRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    chat_id: chatId,
-                    text: msg,
-                    parse_mode: "Markdown",
-                  }),
-                });
-
-                if (sendRes.ok) {
-                  await supabase
-                    .from("profiles")
-                    .update({ last_telegram_reminder_at: new Date().toISOString() })
-                    .eq("id", prof.id);
-                  results.push({ username: prof.username, type: "reminder", status: "success" });
-                } else {
-                  const errTxt = await sendRes.text();
-                  console.error(`Failed to send TG reminder for ${prof.username}: ${errTxt}`);
-                }
-              } catch (sendErr) {
-                console.error(`Error sending TG reminder:`, sendErr);
               }
             }
           }

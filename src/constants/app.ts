@@ -5,7 +5,7 @@
 export const DEFAULT_CUSTOM_GPT_URL =
   "https://chatgpt.com/g/g-6a4f69a8803c8191b29bc51494b65b1c-fitai";
 
-export const TELEGRAM_BOT_URL = "https://t.me/FitAILoggerBot";
+export const TELEGRAM_BOT_URL = "https://t.me/fitpushappbot";
 
 // Daily water goal in ml. If this ever becomes user-configurable it moves to
 // profiles (DB) and this constant becomes the fallback only.

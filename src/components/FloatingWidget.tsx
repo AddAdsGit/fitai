@@ -26,45 +26,26 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
   actionType = "gpt",
   onExecuteAction,
 }) => {
-  const [viewportScale, setViewportScale] = useState(1);
-
-  useEffect(() => {
-    // Samsung display zoom reduces the CSS viewport while increasing the
-    // physical size of each CSS pixel. Counter-scale this viewport-owned layer.
-    const updateViewportScale = () => {
-      const width = Math.max(1, window.innerWidth);
-      setViewportScale(Math.min(1, Math.max(0.75, width / 412)));
-    };
-
-    updateViewportScale();
-    window.addEventListener("resize", updateViewportScale);
-    window.visualViewport?.addEventListener("resize", updateViewportScale);
-    return () => {
-      window.removeEventListener("resize", updateViewportScale);
-      window.visualViewport?.removeEventListener("resize", updateViewportScale);
-    };
-  }, []);
-
   if (!isVisible) return null;
 
   const renderIcon = () => {
     switch (actionType) {
       case "ai_logger":
-        return <Sparkles className="w-5.5 h-5.5 text-white" />;
+        return <Sparkles className="w-5 h-5 text-white stroke-[2.2]" />;
       case "quick_log":
-        return <Search className="w-5.5 h-5.5 text-white" />;
+        return <Search className="w-5 h-5 text-white stroke-[2.2]" />;
       case "detailed_log":
       case "manual":
-        return <Edit2 className="w-5.5 h-5.5 text-white" />;
+        return <Edit2 className="w-5 h-5 text-white stroke-[2.2]" />;
       case "camera":
-        return <Camera className="w-5.5 h-5.5 text-white" />;
+        return <Camera className="w-5 h-5 text-white stroke-[2.2]" />;
       case "vitals":
-        return <Heart className="w-5.5 h-5.5 text-white fill-white" />;
+        return <Heart className="w-5 h-5 text-white fill-white stroke-[2.2]" />;
       case "voice":
-        return <Mic className="w-5.5 h-5.5 text-white" />;
+        return <Mic className="w-5 h-5 text-white stroke-[2.2]" />;
       case "gpt":
       default:
-        return <ChatGPTIcon className="w-5.5 h-5.5 text-white" />;
+        return <ChatGPTIcon className="w-5 h-5 text-white" />;
     }
   };
 
@@ -92,27 +73,18 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
   const widget = (
     <div
       id="floating-widget-viewport-layer"
-      style={{
-        position: "fixed",
-        right: `${20 * viewportScale}px`,
-        bottom: `${112 * viewportScale}px`,
-        width: "48px",
-        height: "48px",
-        transform: `scale(${viewportScale})`,
-        transformOrigin: "bottom right",
-        zIndex: 500,
-        isolation: "isolate",
-      }}
+      className="fixed z-[500] pointer-events-auto right-4 sm:right-auto sm:left-1/2 sm:translate-x-[156px] bottom-[calc(76px+env(safe-area-inset-bottom,12px))] sm:bottom-[88px] w-12 h-12"
     >
       <motion.button
-        initial={{ scale: 0, opacity: 0, y: 20 }}
+        initial={{ scale: 0, opacity: 0, y: 16 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0, opacity: 0, y: 20 }}
+        exit={{ scale: 0, opacity: 0, y: 16 }}
+        transition={{ type: "spring", stiffness: 400, damping: 28 }}
         whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.95 }}
+        whileTap={{ scale: 0.92 }}
         onClick={() => onExecuteAction(actionType)}
         className={cn(
-          "w-full h-full rounded-full flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 border-none cursor-pointer transition-all active:scale-95 select-none"
+          "w-full h-full rounded-full flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/30 border border-white/30 cursor-pointer transition-all active:scale-95 select-none ring-2 ring-orange-500/10"
         )}
         title={getLabel()}
       >
