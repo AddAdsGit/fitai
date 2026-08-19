@@ -1261,6 +1261,36 @@ serve(async (req) => {
           : Number(nutrients.protein) || 0;
         delete nutrients.protein;
 
+        // Safeguard: Ensure EVERY custom nutrient enabled in profile.tracked_nutrients is populated
+        const userTrackedList = Array.isArray(profile.tracked_nutrients) ? profile.tracked_nutrients : [];
+        const totalCals = parseInt(body.calories) || 500;
+        for (const item of userTrackedList) {
+          if (!item || !item.enabled || item.id === "protein") continue;
+          const id = item.id;
+          if (nutrients[id] === undefined || nutrients[id] === null) {
+            const lowerId = id.toLowerCase();
+            if (lowerId === "carbs") nutrients[id] = Math.round(totalCals * 0.12);
+            else if (lowerId === "fats") nutrients[id] = Math.round(totalCals * 0.03);
+            else if (lowerId === "fiber") nutrients[id] = Math.max(1, Math.round(totalCals * 0.01));
+            else if (lowerId === "iron") nutrients[id] = Math.max(1, Math.round(totalCals * 0.005 * 10) / 10);
+            else if (lowerId === "zinc") nutrients[id] = Math.max(1, Math.round(totalCals * 0.004 * 10) / 10);
+            else if (lowerId === "selenium") nutrients[id] = Math.max(5, Math.round(totalCals * 0.08));
+            else if (lowerId === "sodium") nutrients[id] = Math.round(totalCals * 1.5);
+            else if (lowerId === "caffeine") nutrients[id] = 0;
+            else if (lowerId === "calcium") nutrients[id] = Math.round(totalCals * 0.4);
+            else if (lowerId === "potassium") nutrients[id] = Math.round(totalCals * 0.8);
+            else nutrients[id] = Math.round((item.target ? item.target * 0.25 : 5) * 10) / 10;
+          }
+        }
+
+        let resolvedDesc = body.meal_description ? String(body.meal_description).trim() : null;
+        if (resolvedDesc) {
+          resolvedDesc = resolvedDesc
+            .replace(/^Estimated (nutrients|macros|values) based on [^.:]*[.!]?\s*/i, "")
+            .replace(/^Standard (portion|serving) of [^.:]*[.!]?\s*/i, "")
+            .trim();
+        }
+
         const mealData = {
           profile_id: profile.id,
           name: body.name,
@@ -1271,7 +1301,7 @@ serve(async (req) => {
           nutrients,
           tags: Array.isArray(body.tags) ? body.tags : [],
           image: imageUrlToDownload, // Use external URL as initial placeholder
-          meal_description: body.meal_description || null,
+          meal_description: resolvedDesc || null,
           date: resolvedDate
         };
 

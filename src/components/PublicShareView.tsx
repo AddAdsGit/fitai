@@ -202,7 +202,43 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
     );
   }
 
-  const hasImage = !!payload.img && !hasNoGeneratedImage(payload.img);
+  const getSharecardPhotoFallback = (name: string): string => {
+    const lower = (name || "").toLowerCase().trim();
+    if (lower.includes("rice") || lower.includes("biryani") || lower.includes("fried rice") || lower.includes("pulao")) {
+      return "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=800&auto=format&fit=crop&q=80";
+    }
+    if (lower.includes("chicken") || lower.includes("poultry") || lower.includes("wings")) {
+      return "https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=800&auto=format&fit=crop&q=80";
+    }
+    if (lower.includes("salad") || lower.includes("greens") || lower.includes("bowl")) {
+      return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80";
+    }
+    if (lower.includes("pizza") || lower.includes("slice")) {
+      return "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80";
+    }
+    if (lower.includes("burger") || lower.includes("slider")) {
+      return "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80";
+    }
+    if (lower.includes("coffee") || lower.includes("latte") || lower.includes("espresso")) {
+      return "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80";
+    }
+    if (lower.includes("egg") || lower.includes("omelette") || lower.includes("scramble")) {
+      return "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=80";
+    }
+    if (lower.includes("toast") || lower.includes("bread") || lower.includes("avocado")) {
+      return "https://images.unsplash.com/photo-1588137378633-dea1336ce1e2?w=800&auto=format&fit=crop&q=80";
+    }
+    if (lower.includes("shake") || lower.includes("smoothie") || lower.includes("protein")) {
+      return "https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=800&auto=format&fit=crop&q=80";
+    }
+    return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
+  };
+
+  const displayImage = (payload && payload.img && !hasNoGeneratedImage(payload.img))
+    ? payload.img
+    : (payload ? getSharecardPhotoFallback(payload.n) : "");
+
+  const hasImage = !!displayImage;
 
   return (
     <main className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 pb-24 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
@@ -227,23 +263,10 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
           <section className="px-6 py-8 flex flex-col items-center gap-6 bg-gradient-to-b from-orange-50/20 to-transparent">
             {/* Infographic Preview Card (High Fidelity full bleed style matching dashboard) */}
             <div
-              style={hasImage ? { backgroundImage: `url(${payload.img})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
-              className={cn(
-                "w-full aspect-square rounded-[32px] p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden border transition-colors duration-300",
-                hasImage 
-                  ? "bg-stone-900 text-stone-100 border-stone-850" 
-                  : "bg-[#F4F3EF] text-stone-850 border-stone-200/50"
-              )}
+              style={{ backgroundImage: `url(${displayImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+              className="w-full aspect-square rounded-[32px] p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden border border-stone-850 bg-stone-900 text-stone-100 transition-colors duration-300"
             >
-              {hasImage ? (
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 z-0 pointer-events-none" />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-                  <span className="text-[120px] opacity-[0.12] filter drop-shadow-sm">
-                    {getMealEmoji(payload.n)}
-                  </span>
-                </div>
-              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 z-0 pointer-events-none" />
               
               <div className="flex justify-between items-center z-10">
                 <div className="flex items-center gap-1.5">

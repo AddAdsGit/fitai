@@ -684,9 +684,8 @@ export const ManualLogModal = ({
           }
         }
 
-        // 2. Fallback to Supabase Edge Function if key wasn't set or direct call failed
         if (!rawText && isSupabaseConfigured) {
-          const { data } = await supabase.functions.invoke("gemini", { body: { prompt } });
+          const { data } = await supabase.functions.invoke("gemini", { body: { prompt, userApiKey: key || undefined } });
           if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
             rawText = data.candidates[0].content.parts[0].text;
           }

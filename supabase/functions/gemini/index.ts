@@ -25,7 +25,7 @@ serve(async (req) => {
 
     // 2. Parse request body
     const body = await req.json().catch(() => ({}));
-    const { prompt, image, mimeType } = body;
+    const { prompt, image, mimeType, userApiKey } = body;
     if (!prompt) {
       return new Response(JSON.stringify({ error: "Missing prompt parameter in request body" }), {
         status: 400,
@@ -33,8 +33,10 @@ serve(async (req) => {
       });
     }
 
-    // 3. Retrieve Gemini API Key
-    const apiKey = Deno.env.get("GEMINI_API_KEY") || "";
+    // 3. Retrieve Gemini API Key (Priority: Custom user key -> Remote GEMINI_API_KEY Secret)
+    const apiKey = (userApiKey && typeof userApiKey === "string" && userApiKey.trim())
+      ? userApiKey.trim()
+      : (Deno.env.get("GEMINI_API_KEY") || "");
     if (!apiKey) {
       return new Response(
         JSON.stringify({

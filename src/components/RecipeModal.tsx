@@ -179,7 +179,7 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
         const data = await response.json();
         rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       } else if (isSupabaseConfigured) {
-        const { data } = await supabase.functions.invoke("gemini", { body: { prompt } });
+        const { data } = await supabase.functions.invoke("gemini", { body: { prompt, userApiKey: key || undefined } });
         if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
           rawText = data.candidates[0].content.parts[0].text;
         }

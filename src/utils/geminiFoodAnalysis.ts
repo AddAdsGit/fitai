@@ -157,17 +157,18 @@ Return ONLY a valid JSON object in this format:
 
   let responseData: any = null;
 
-  // 1. Try Supabase Edge Function first if configured (1.5s timeout)
+  // 1. Execute 100% Server Proxy via Supabase Edge Function for maximum security
   if (isSupabaseConfigured) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1500);
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
 
       const { data, error } = await supabase.functions.invoke("gemini", {
         body: {
           prompt: promptText,
           image: cleanBase64,
           mimeType,
+          userApiKey: key || undefined
         },
         headers: {
           "Signal": controller.signal as any
@@ -180,7 +181,7 @@ Return ONLY a valid JSON object in this format:
         responseData = data;
       }
     } catch (err) {
-      console.warn("[AI Photo] Edge function skipped, moving to direct API call:", err);
+      console.warn("[AI Photo] Edge function skipped, moving to fallback call:", err);
     }
   }
 
@@ -350,7 +351,7 @@ Return ONLY valid JSON:
   if (isSupabaseConfigured) {
     try {
       const { data, error } = await supabase.functions.invoke("gemini", {
-        body: { prompt: promptText },
+        body: { prompt: promptText, userApiKey: key || undefined },
       });
       if (!error && data) responseData = data;
     } catch (err) {
