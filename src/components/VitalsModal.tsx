@@ -445,31 +445,25 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                         />
                       </div>
 
-                      {/* 3D Action Box */}
-                      <div className="w-12 h-12 [perspective:1000px] shrink-0">
-                        <div
-                          className={cn(
-                            "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
-                            isStoolSliding ? "[transform:rotateY(180deg)]" : ""
-                          )}
-                        >
-                          {/* FRONT: Log Button */}
+                      {/* Action Box: Shows live icon during slider interaction, clean check button when idle */}
+                      <div className="w-12 h-12 shrink-0 relative select-none">
+                        {isStoolSliding ? (
+                          <div className="w-full h-full bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs animate-fade-in">
+                            <BristolStoolIcon type={activeStoolVal} className="w-7 h-7" />
+                          </div>
+                        ) : (
                           <button
+                            type="button"
                             onClick={async () => {
                               await handleLogDigestion(activeStoolVal, null, selectedDate, stoolTime);
                               setDraftStoolType(null);
                             }}
-                            className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                            className="w-full h-full bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all text-white"
                             title="Log Digestion"
                           >
                             <Check className="w-5 h-5 text-white" />
                           </button>
-
-                          {/* BACK: Stool SVG */}
-                          <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs">
-                            <BristolStoolIcon type={activeStoolVal} className="w-7 h-7" />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
 
@@ -526,28 +520,10 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                         />
                       </div>
 
-                      {/* 3D Action Box */}
-                      <div className="w-12 h-12 [perspective:1000px] shrink-0">
-                        <div
-                          className={cn(
-                            "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
-                            isEnergySliding ? "[transform:rotateY(180deg)]" : ""
-                          )}
-                        >
-                          {/* FRONT: Log Button */}
-                          <button
-                            onClick={async () => {
-                              await handleLogEnergy(activeEnergyVal, selectedDate, energyTime);
-                              setDraftEnergyLevel(null);
-                            }}
-                            className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
-                            title="Log Energy"
-                          >
-                            <Check className="w-5 h-5 text-white" />
-                          </button>
-
-                          {/* BACK: Energy Emoji Badge matching dashboard 1-to-1 */}
-                          <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs text-lg select-none">
+                      {/* Action Box: Shows energy emoji during sliding, clean check button when idle */}
+                      <div className="w-12 h-12 shrink-0 relative select-none">
+                        {isEnergySliding ? (
+                          <div className="w-full h-full bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs text-lg">
                             {(() => {
                               if (activeEnergyVal === 1) return "😴";
                               if (activeEnergyVal === 2) return "🥱";
@@ -556,7 +532,19 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                               return "🚀";
                             })()}
                           </div>
-                        </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await handleLogEnergy(activeEnergyVal, selectedDate, energyTime);
+                              setDraftEnergyLevel(null);
+                            }}
+                            className="w-full h-full bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all text-white"
+                            title="Log Energy"
+                          >
+                            <Check className="w-5 h-5 text-white" />
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -613,31 +601,25 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
                         />
                       </div>
 
-                      {/* 3D Action Box */}
-                      <div className="w-12 h-12 [perspective:1000px] shrink-0">
-                        <div
-                          className={cn(
-                            "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
-                            isBloatingSliding ? "[transform:rotateY(180deg)]" : ""
-                          )}
-                        >
-                          {/* FRONT: Log Button */}
+                      {/* Action Box: Shows BloatingStomachIcon during sliding, clean check button when idle */}
+                      <div className="w-12 h-12 shrink-0 relative select-none">
+                        {isBloatingSliding ? (
+                          <div className="w-full h-full bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs animate-fade-in">
+                            <BloatingStomachIcon level={activeBloatingVal} className="w-7 h-7" />
+                          </div>
+                        ) : (
                           <button
+                            type="button"
                             onClick={async () => {
                               await handleLogBloating(activeBloatingVal, selectedDate, bloatingTime);
                               setDraftBloatingLevel(null);
                             }}
-                            className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
+                            className="w-full h-full bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all text-white"
                             title="Log Bloating"
                           >
                             <Check className="w-5 h-5 text-white" />
                           </button>
-
-                          {/* BACK: Bloating Stomach Swelling Icon */}
-                          <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs">
-                            <BloatingStomachIcon level={activeBloatingVal} className="w-7 h-7" />
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
 

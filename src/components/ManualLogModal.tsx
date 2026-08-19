@@ -939,7 +939,7 @@ export const ManualLogModal = ({
 
     const manualMeal: Meal = {
       id: mealToEdit?.id || `meal_${Date.now()}`,
-      date: (mealToEdit as any)?.date || new Date().toISOString().split("T")[0],
+      date: mealToEdit?.date || new Date().toISOString().split("T")[0],
       name: finalName,
       calories: calVal,
       protein: finalNutrientMap.protein || (attachedItem ? attachedItem.protein : 0),

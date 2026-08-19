@@ -144,70 +144,49 @@ export const BloatingIcon: React.FC<{ className?: string }> = ({ className = "w-
   </svg>
 );
 
-export const BloatingStomachIcon: React.FC<{ level: number; className?: string }> = ({ level, className = "w-8 h-8" }) => {
+export const BloatingStomachIcon: React.FC<{ level: number; className?: string }> = ({ level, className = "w-7 h-7" }) => {
   switch (level) {
     case 1:
-      // Level 1: Flat, Calm & Comfortable (Emerald Green)
+      // Level 1: Flat & Comfortable (Slim waist outline + relaxed green check)
       return (
-        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-          <circle cx="32" cy="32" r="28" fill="#ECFDF5" />
-          {/* Ribs to Hip Silhouette */}
-          <path d="M22 14C22 14 21 24 22 32C23 40 22 50 22 50" stroke="#059669" strokeWidth="3.5" strokeLinecap="round" />
-          <path d="M42 14C42 14 43 24 42 32C41 40 42 50 42 50" stroke="#059669" strokeWidth="3.5" strokeLinecap="round" />
-          {/* Flat Abdomen Contour */}
-          <path d="M26 22C26 22 32 23 38 22" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
-          <path d="M25 32C25 32 32 33 39 32" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" />
-          <circle cx="32" cy="36" r="2.5" fill="#059669" />
-          {/* Sparkle Comfort Check */}
-          <path d="M38 16L41 19L47 13" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+          <path d="M16 10 C16 18, 14 26, 17 38 M32 10 C32 18, 34 26, 31 38" stroke="#10B981" strokeWidth="3.5" strokeLinecap="round" opacity="0.4" />
+          <path d="M17 24 Q 24 25, 31 24" stroke="#10B981" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="24" cy="24" r="5" fill="#34D399" opacity="0.3" />
+          <path d="M22 24L23.5 25.5L26 23" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
+
     case 2:
-      // Level 2: Mild Tightness (Amber Yellow)
+      // Level 2: Mild Bloating (Slightly rounded tummy curve + amber glow)
       return (
-        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-          <circle cx="32" cy="32" r="28" fill="#FEF3C7" />
-          {/* Slight Swell Silhouette */}
-          <path d="M21 14C21 14 18 24 19 33C20 42 22 50 22 50" stroke="#D97706" strokeWidth="3.5" strokeLinecap="round" />
-          <path d="M43 14C43 14 46 24 45 33C44 42 42 50 42 50" stroke="#D97706" strokeWidth="3.5" strokeLinecap="round" />
-          {/* Mild Stomach Curve */}
-          <path d="M23 28C23 28 32 35 41 28" stroke="#F59E0B" strokeWidth="3" strokeLinecap="round" />
-          <circle cx="32" cy="37" r="3" fill="#D97706" />
-          <path d="M27 23C30 25 34 25 37 23" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+          <path d="M15 10 C15 18, 13 26, 16 38 M33 10 C33 18, 35 26, 32 38" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" opacity="0.3" />
+          <path d="M16 20 Q 24 29, 32 20" stroke="#F59E0B" strokeWidth="3.5" strokeLinecap="round" />
+          <circle cx="24" cy="25" r="7" fill="#FBBF24" opacity="0.25" />
         </svg>
       );
+
     case 3:
-      // Level 3: Moderate Distension (Energetic Orange)
+      // Level 3: Moderate Bloating (Noticeable rounded stomach expansion + orange glow)
       return (
-        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-          <circle cx="32" cy="32" r="28" fill="#FFEDD5" />
-          {/* Puffed Balloon Silhouette */}
-          <path d="M21 14C21 14 14 25 16 36C18 45 22 50 22 50" stroke="#EA580C" strokeWidth="3.5" strokeLinecap="round" />
-          <path d="M43 14C43 14 50 25 48 36C46 45 42 50 42 50" stroke="#EA580C" strokeWidth="3.5" strokeLinecap="round" />
-          {/* Moderate Swollen Belly Fill */}
-          <ellipse cx="32" cy="34" rx="12" ry="10" fill="#F97316" fillOpacity="0.25" stroke="#F97316" strokeWidth="2.5" />
-          <circle cx="32" cy="36" r="3" fill="#EA580C" />
-          {/* Pressure Arcs */}
-          <path d="M12 34C9 34 8 32 8 30" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M52 34C55 34 56 32 56 30" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" />
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+          <path d="M14 10 C14 18, 12 26, 15 38 M34 10 C34 18, 36 26, 33 38" stroke="#F97316" strokeWidth="3.5" strokeLinecap="round" opacity="0.3" />
+          <path d="M15 18 Q 24 35, 33 18" stroke="#F97316" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="24" cy="26" r="10" fill="#FB923C" opacity="0.3" />
+          <path d="M21 26H27" stroke="#EA580C" strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
+
     case 4:
     default:
-      // Level 4: Severe Tightness & Bloating (Coral Red)
+      // Level 4: Severe Bloating (Full balloon belly expansion + red tension marks)
       return (
-        <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-          <circle cx="32" cy="32" r="28" fill="#FEE2E2" />
-          {/* Full Tight Balloon Silhouette */}
-          <path d="M21 14C21 14 11 25 13 38C15 47 22 50 22 50" stroke="#DC2626" strokeWidth="4" strokeLinecap="round" />
-          <path d="M43 14C43 14 53 25 51 38C49 47 42 50 42 50" stroke="#DC2626" strokeWidth="4" strokeLinecap="round" />
-          {/* Severe Full Swelling Fill */}
-          <ellipse cx="32" cy="34" rx="16" ry="12" fill="#EF4444" fillOpacity="0.35" stroke="#EF4444" strokeWidth="3" />
-          <circle cx="32" cy="36" r="3.5" fill="#B91C1C" />
-          {/* Intense Pressure Rings */}
-          <path d="M10 26C7 28 6 34 9 38" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M54 26C57 28 58 34 55 38" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M26 18C30 16 34 16 38 18" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" opacity="0.8" />
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+          <circle cx="24" cy="24" r="14" fill="#FCA5A5" opacity="0.3" />
+          <circle cx="24" cy="24" r="12" stroke="#EF4444" strokeWidth="3.5" strokeDasharray="3 3" />
+          <path d="M14 16 Q 24 38, 34 16" stroke="#EF4444" strokeWidth="4" strokeLinecap="round" />
+          <path d="M20 22L28 26M28 22L20 26" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
         </svg>
       );
   }
