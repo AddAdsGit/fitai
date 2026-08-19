@@ -172,22 +172,14 @@ Return ONLY a valid JSON object in this format:
   // 1. Execute 100% Server Proxy via Supabase Edge Function for maximum security
   if (isSupabaseConfigured) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-
       const { data, error } = await supabase.functions.invoke("gemini", {
         body: {
           prompt: promptText,
           image: cleanBase64,
           mimeType,
           userApiKey: key || undefined
-        },
-        headers: {
-          "Signal": controller.signal as any
         }
       });
-
-      clearTimeout(timeoutId);
 
       if (!error && data && !data.error) {
         const checkParts = data?.candidates?.[0]?.content?.parts || [];
@@ -209,7 +201,7 @@ Return ONLY a valid JSON object in this format:
 
   // 2. Direct Call to Google Gemini Flash models with robust fallback if custom key provided
   if (!responseData && key) {
-    const candidateModels = ["gemini-3.6-flash", "gemini-3.7-flash"];
+    const candidateModels = ["gemini-3.7-flash", "gemini-3.6-flash"];
     for (const modelName of candidateModels) {
       try {
         const parts: any[] = [{ text: promptText }];
@@ -217,15 +209,11 @@ Return ONLY a valid JSON object in this format:
           parts.push({ inline_data: { mime_type: mimeType, data: cleanBase64.trim() } });
         }
 
-        const modelController = new AbortController();
-        const modelTimeout = setTimeout(() => modelController.abort(), 3500);
-
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            signal: modelController.signal,
             body: JSON.stringify({
               contents: [{ parts }],
               generationConfig: {
@@ -235,8 +223,6 @@ Return ONLY a valid JSON object in this format:
             }),
           }
         );
-
-        clearTimeout(modelTimeout);
 
         if (res.ok) {
           responseData = await res.json();
@@ -451,7 +437,7 @@ Return ONLY valid JSON:
   }
 
   if (!responseData && key) {
-    const candidateModels = ["gemini-3.6-flash", "gemini-3.7-flash"];
+    const candidateModels = ["gemini-3.7-flash", "gemini-3.6-flash"];
     for (const modelName of candidateModels) {
       try {
         const res = await fetch(
