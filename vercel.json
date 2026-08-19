@@ -17,8 +17,12 @@
   ],
   "rewrites": [
     {
-      "source": "/api/((?!telegram).*)",
-      "destination": "https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action/$1"
+      "source": "/api/telegram",
+      "destination": "/api/telegram"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://twrjigbbgioqdpwvkblo.supabase.co/functions/v1/gpt-action/:path*"
     },
     {
       "source": "/login",
