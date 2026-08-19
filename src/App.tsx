@@ -494,6 +494,133 @@ export default function App() {
     };
   }, []);
 
+  // --- Android & Mobile Chrome Hardware / Gesture Back Button Interceptor ---
+  const backHandlerStateRef = useRef({
+    activeTab,
+    isCameraFullScreen,
+    isFoodLibraryModalOpen,
+    isVitalsModalOpen,
+    selectedRecipePopup,
+    shareItemPopup,
+    activeGoalConfigPopup,
+    mealPendingDelete,
+    isDatePickerOpen,
+    isTimePickerOpen,
+    isCameraModalOpen,
+  });
+
+  useEffect(() => {
+    backHandlerStateRef.current = {
+      activeTab,
+      isCameraFullScreen,
+      isFoodLibraryModalOpen,
+      isVitalsModalOpen,
+      selectedRecipePopup,
+      shareItemPopup,
+      activeGoalConfigPopup,
+      mealPendingDelete,
+      isDatePickerOpen,
+      isTimePickerOpen,
+      isCameraModalOpen,
+    };
+  }, [
+    activeTab,
+    isCameraFullScreen,
+    isFoodLibraryModalOpen,
+    isVitalsModalOpen,
+    selectedRecipePopup,
+    shareItemPopup,
+    activeGoalConfigPopup,
+    mealPendingDelete,
+    isDatePickerOpen,
+    isTimePickerOpen,
+    isCameraModalOpen,
+  ]);
+
+  const isAppInNonRootState =
+    activeTab !== "home" ||
+    isCameraFullScreen ||
+    isFoodLibraryModalOpen ||
+    isVitalsModalOpen ||
+    !!selectedRecipePopup ||
+    !!shareItemPopup ||
+    !!activeGoalConfigPopup ||
+    !!mealPendingDelete ||
+    isDatePickerOpen ||
+    isTimePickerOpen ||
+    isCameraModalOpen;
+
+  useEffect(() => {
+    if (isAppInNonRootState) {
+      if (!window.history.state?.fitaiAppNav) {
+        window.history.pushState({ fitaiAppNav: true }, "");
+      }
+    }
+  }, [isAppInNonRootState]);
+
+  useEffect(() => {
+    const handlePopStateNavigation = () => {
+      const s = backHandlerStateRef.current;
+
+      // 1. Highest Priority: Close topmost active modal/sheet
+      if (s.mealPendingDelete) {
+        setMealPendingDelete(null);
+        return;
+      }
+      if (s.shareItemPopup) {
+        setShareItemPopup(null);
+        return;
+      }
+      if (s.activeGoalConfigPopup) {
+        setActiveGoalConfigPopup(null);
+        return;
+      }
+      if (s.isDatePickerOpen) {
+        setIsDatePickerOpen(false);
+        return;
+      }
+      if (s.isTimePickerOpen) {
+        setIsTimePickerOpen(false);
+        return;
+      }
+      if (s.selectedRecipePopup) {
+        setSelectedRecipePopup(null);
+        return;
+      }
+      if (s.isFoodLibraryModalOpen) {
+        setIsFoodLibraryModalOpen(false);
+        return;
+      }
+      if (s.isVitalsModalOpen) {
+        setIsVitalsModalOpen(false);
+        return;
+      }
+      if (s.isCameraFullScreen) {
+        setIsCameraFullScreen(false);
+        return;
+      }
+      if (s.isCameraModalOpen) {
+        setIsCameraModalOpen(false);
+        return;
+      }
+
+      // 2. Tab Navigation: Return to profile from edit-profile, or return to home
+      if (s.activeTab === "edit-profile") {
+        setActiveTab("profile");
+        return;
+      }
+      if (s.activeTab && s.activeTab !== "home") {
+        setActiveTab("home");
+        return;
+      }
+    };
+
+    window.addEventListener("popstate", handlePopStateNavigation);
+    return () => {
+      window.removeEventListener("popstate", handlePopStateNavigation);
+    };
+  }, []);
+
   const navigateTo = (path: string) => {
     if (window.location.pathname !== path) {
       window.history.pushState(null, "", path);

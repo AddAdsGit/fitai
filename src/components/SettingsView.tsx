@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw, Sliders, Heart, Mic, ShieldCheck, AlertTriangle, FileText, Activity, RefreshCw, CheckCircle2, XCircle, Clock, Sunrise, Sun, Moon, Droplets, BarChart3, VolumeX, Zap, Apple, Pill, Coffee, Utensils, Bug, BookOpen, HelpCircle, LogOut, User, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -729,6 +729,29 @@ export const SettingsView = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "telegram" | "logging" | "floating_widget" | "health_sync" | null>(null);
+
+  // Android / Mobile browser popstate handler for Settings subviews & modals
+  useEffect(() => {
+    if (activeSubView !== null || showPrivacyModal || showDeleteConfirm) {
+      if (!window.history.state?.fitaiSettingsSub) {
+        window.history.pushState({ fitaiSettingsSub: true }, "");
+      }
+    }
+  }, [activeSubView, showPrivacyModal, showDeleteConfirm]);
+
+  useEffect(() => {
+    const handleSubPopState = () => {
+      if (showDeleteConfirm) {
+        setShowDeleteConfirm(false);
+      } else if (showPrivacyModal) {
+        setShowPrivacyModal(false);
+      } else if (activeSubView !== null) {
+        setActiveSubView(null);
+      }
+    };
+    window.addEventListener("popstate", handleSubPopState);
+    return () => window.removeEventListener("popstate", handleSubPopState);
+  }, [activeSubView, showPrivacyModal, showDeleteConfirm]);
 
   const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gpt-action`;
@@ -2373,14 +2396,26 @@ export const SettingsView = ({
         transition={{ duration: 0.3 }}
         className="px-4 sm:px-6 pt-6 sm:pt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
       >
-        {/* Header Title */}
-        <div className="space-y-0.5 text-left">
-          <span className="text-[10px] font-black tracking-widest text-orange-600 uppercase">
-            Preferences & Tools
-          </span>
-          <h2 className="text-3xl font-black tracking-tight text-stone-950">
-            Settings
-          </h2>
+        {/* Header Title with Back Button */}
+        <div className="flex items-center gap-3">
+          {setActiveTab && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("home")}
+              className="w-9 h-9 rounded-2xl bg-white/80 hover:bg-white text-stone-600 flex items-center justify-center transition-all cursor-pointer border border-stone-200/70 shadow-3xs active:scale-95 shrink-0"
+              title="Back to Dashboard"
+            >
+              <ArrowLeft className="w-4 h-4 text-stone-700" />
+            </button>
+          )}
+          <div className="space-y-0.5 text-left">
+            <span className="text-[10px] font-black tracking-widest text-orange-600 uppercase">
+              Preferences & Tools
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-stone-950">
+              Settings
+            </h2>
+          </div>
         </div>
 
         {/* 1. Account & Goals Preview Card */}
