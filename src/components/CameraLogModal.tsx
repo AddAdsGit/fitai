@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Camera, Sparkles, Image as ImageIcon, FileText, Share2, Wand2, Check } from "lucide-react";
+import { X, Camera, Sparkles, Image as ImageIcon, FileText, Share2, Wand2, Check, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { analyzeFoodPhotoWithAI } from "../utils/geminiFoodAnalysis";
+import { compressImageBase64 } from "../utils/helpers";
 
 export const CameraLogModal = ({
   isOpen,
@@ -83,9 +84,12 @@ export const CameraLogModal = ({
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+      const compressed = await compressImageBase64(uploadedImage, 800, 0.78);
+
       const aiResult = await analyzeFoodPhotoWithAI({
-        imageBase64: uploadedImage,
+        imageBase64: compressed,
         notes,
+        trackedNutrients: profileData?.tracked_nutrients,
         profileData,
       });
 
@@ -298,27 +302,51 @@ export const CameraLogModal = ({
                 </button>
               )}
 
-              {/* Shutter Control Row */}
+              {/* Shutter / Confirmation Control Row */}
               <div className="flex items-center justify-between w-full px-4 sm:px-6 py-1">
-                {/* Left Side: 52px Gallery Icon Button */}
-                <button
-                  type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  className="w-13 h-13 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 shadow-lg flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
-                  title="Open Photo Gallery"
-                >
-                  <ImageIcon className="w-5.5 h-5.5 text-white" />
-                </button>
+                {flowStep === "confirm" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUploadedImage(null);
+                      setFlowStep("capture");
+                    }}
+                    className="w-13 h-13 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 shadow-lg flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
+                    title="Retake Photo"
+                  >
+                    <RotateCcw className="w-5.5 h-5.5 text-white" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="w-13 h-13 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 shadow-lg flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
+                    title="Open Photo Gallery"
+                  >
+                    <ImageIcon className="w-5.5 h-5.5 text-white" />
+                  </button>
+                )}
 
-                {/* Middle: 76px Prominent FitAI Orange Shutter Button */}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-19 h-19 rounded-full bg-orange-500 hover:bg-orange-600 border-4 border-white shadow-2xl shadow-orange-500/50 flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
-                  title="Take Photo"
-                >
-                  <Camera className="w-7 h-7 text-white" />
-                </button>
+                {flowStep === "confirm" ? (
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeAndLog}
+                    disabled={isProcessing}
+                    className="w-19 h-19 rounded-full bg-orange-500 hover:bg-orange-600 border-4 border-white shadow-2xl shadow-orange-500/50 flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0 disabled:opacity-50"
+                    title="Analyze & Log Photo"
+                  >
+                    <Check className="w-8 h-8 stroke-[3] text-white" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-19 h-19 rounded-full bg-orange-500 hover:bg-orange-600 border-4 border-white shadow-2xl shadow-orange-500/50 flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
+                    title="Take Photo"
+                  >
+                    <Camera className="w-7 h-7 text-white" />
+                  </button>
+                )}
 
                 {/* Right Side: 52px Notes Icon Button */}
                 <button

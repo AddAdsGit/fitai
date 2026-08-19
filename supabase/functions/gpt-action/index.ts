@@ -562,14 +562,70 @@ serve(async (req) => {
       return tagCounts;
     };
 
+    const getSharecardPhotoFallback = (name: string): string => {
+      const lower = (name || "").toLowerCase().trim();
+      if (lower.includes("fry") || lower.includes("fries") || lower.includes("french fry") || lower.includes("french fries") || lower.includes("potato") || lower.includes("wedge") || lower.includes("chip")) {
+        return "https://images.unsplash.com/photo-1576107232684-1279f390859f?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("rice") || lower.includes("biryani") || lower.includes("fried rice") || lower.includes("pulao") || lower.includes("risotto")) {
+        return "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("chicken") || lower.includes("poultry") || lower.includes("wing") || lower.includes("nugget")) {
+        return "https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("burger") || lower.includes("slider") || lower.includes("cheeseburger")) {
+        return "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("pizza") || lower.includes("slice") || lower.includes("calzone")) {
+        return "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("pasta") || lower.includes("spaghetti") || lower.includes("noodle") || lower.includes("ramen") || lower.includes("macaroni") || lower.includes("lasagna")) {
+        return "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("dosa") || lower.includes("idli") || lower.includes("sambar") || lower.includes("paneer") || lower.includes("curry") || lower.includes("naan") || lower.includes("roti") || lower.includes("thali") || lower.includes("dal")) {
+        return "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("steak") || lower.includes("beef") || lower.includes("meat") || lower.includes("pork") || lower.includes("brisket")) {
+        return "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("taco") || lower.includes("burrito") || lower.includes("wrap") || lower.includes("nacho") || lower.includes("quesadilla")) {
+        return "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("fish") || lower.includes("seafood") || lower.includes("salmon") || lower.includes("sushi") || lower.includes("tuna") || lower.includes("shrimp")) {
+        return "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("salad") || lower.includes("greens") || lower.includes("bowl")) {
+        return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("egg") || lower.includes("omelette") || lower.includes("scramble")) {
+        return "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("pancake") || lower.includes("waffle") || lower.includes("oat") || lower.includes("cereal") || lower.includes("porridge")) {
+        return "https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("toast") || lower.includes("sandwich") || lower.includes("avocado") || lower.includes("bread")) {
+        return "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("coffee") || lower.includes("latte") || lower.includes("espresso") || lower.includes("cappuccino") || lower.includes("tea") || lower.includes("chai")) {
+        return "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("shake") || lower.includes("smoothie") || lower.includes("protein") || lower.includes("juice") || lower.includes("drink")) {
+        return "https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=800&auto=format&fit=crop&q=80";
+      }
+      if (lower.includes("cake") || lower.includes("cookie") || lower.includes("dessert") || lower.includes("sweet") || lower.includes("chocolate") || lower.includes("ice cream") || lower.includes("donut")) {
+        return "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80";
+      }
+      return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
+    };
+
     const createMealShareUrl = async (meal: any, profileId?: string): Promise<string | null> => {
       try {
         const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://fitpush.vercel.app";
         
-        // Ensure image is resolved (supports HTTP URLs, base64 data URIs, and Unsplash fallback)
+        // Pass image if present (real user photo or AI image); leave undefined for clean Warm Cream icon card fallback
         const resolvedImg = (meal.image && typeof meal.image === "string" && (meal.image.startsWith("http") || meal.image.startsWith("data:image")))
           ? meal.image
-          : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
+          : undefined;
 
         const payload = {
           n: meal.name || "Meal",
@@ -1153,12 +1209,15 @@ serve(async (req) => {
             console.log(`[image-refinement] Generating styled AI fallback [${styleKey}] for text log: ${imageUrlToDownload}`);
           } else {
             const cleanName = body.name.trim();
+            const cleanDesc = body.meal_description ? String(body.meal_description).trim() : "";
+            const fullDetail = cleanDesc ? `${cleanName}, containing ${cleanDesc}` : cleanName;
+
             let southIndianContext = "";
-            const lowerName = cleanName.toLowerCase();
+            const lowerName = fullDetail.toLowerCase();
             if (lowerName.includes("dosa") || lowerName.includes("idli") || lowerName.includes("sambar") || lowerName.includes("chutney") || lowerName.includes("vada") || lowerName.includes("uttapam")) {
               southIndianContext = " Plated on a traditional green banana leaf, accompanied by small individual metal bowls of sambar and coconut/peanut chutney.";
             }
-            const prompt = `gourmet professional food photography of ${cleanName}.${southIndianContext} Crisp food separation with distinct ingredients clearly visible and neatly arranged. High detail textures, photorealistic, macro culinary shot, top-down view, clean bright studio lighting, sharp focus, volumetric depth, no blending or bleeding between food elements.`;
+            const prompt = `gourmet professional food photography of ${fullDetail}.${southIndianContext} Crisp food separation with distinct ingredients, side dips, sauces, and accompanying beverages clearly visible and neatly arranged. High detail textures, photorealistic culinary shot, top-down view, clean bright studio lighting, sharp focus, volumetric depth.`;
             
             // Extract Gemini API key from preferences array
             const geminiKeyTag = (profile.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";

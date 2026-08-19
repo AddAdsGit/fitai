@@ -7,6 +7,7 @@ import { ChatGPTIcon } from "./ChatGPTIcon";
 import { performHealthSync, requestHealthPermissions, clearHealthSyncLogs, type SyncLogEntry } from "../services/healthSyncService";
 import { PrivacyPolicyModal } from "./PrivacyPolicyModal";
 import { DEFAULT_CUSTOM_GPT_URL, TELEGRAM_BOT_URL } from "../constants/app";
+import { listAvailableGeminiModels } from "../utils/geminiFoodAnalysis";
 
 const getOpenApiYaml = (edgeFunctionUrl: string) => `openapi: 3.1.0
 info:
@@ -751,6 +752,29 @@ export const SettingsView = ({
   }, [profileData.preferences]);
 
   const [geminiKey, setGeminiKey] = useState(initialGeminiKey);
+  const [availableModels, setAvailableModels] = useState<Array<{ name: string; displayName: string; description?: string }>>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+
+  const handleFetchGeminiModels = async () => {
+    if (!geminiKey.trim()) {
+      triggerToast("⚠️ Please enter your Gemini API Key first!");
+      return;
+    }
+    setIsFetchingModels(true);
+    try {
+      const models = await listAvailableGeminiModels(geminiKey.trim());
+      if (models && models.length > 0) {
+        setAvailableModels(models);
+        triggerToast(`✨ Fetched ${models.length} live models from Google API!`);
+      } else {
+        triggerToast("⚠️ No models returned. Please verify your API Key.");
+      }
+    } catch (_) {
+      triggerToast("❌ Error fetching models.");
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
 
   const handleSaveGemini = () => {
     const filteredPrefs = (profileData.preferences || []).filter((p: string) => !p.startsWith("gemini_api_key:"));
@@ -919,13 +943,24 @@ export const SettingsView = ({
             <label className="block text-[10px] font-black text-stone-400 uppercase tracking-wider mb-2">
               Gemini API Key
             </label>
-            <input
-              type="password"
-              placeholder="AIzaSy..."
-              value={geminiKey}
-              onChange={(e) => setGeminiKey(e.target.value)}
-              className="w-full bg-white border border-stone-200 rounded-[18px] px-4 py-3.5 text-xs font-bold text-[#1a1a1a] shadow-xs outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 transition-all placeholder:text-stone-300"
-            />
+            <div className="flex gap-2">
+              <input
+                type="password"
+                placeholder="AIzaSy..."
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+                className="flex-1 bg-white border border-stone-200 rounded-[18px] px-4 py-3.5 text-xs font-bold text-[#1a1a1a] shadow-xs outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 transition-all placeholder:text-stone-300"
+              />
+              <button
+                type="button"
+                onClick={handleFetchGeminiModels}
+                disabled={isFetchingModels || !geminiKey.trim()}
+                className="px-4 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-[11px] font-black uppercase tracking-wider rounded-[18px] transition-all cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
+              >
+                {isFetchingModels ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                <span>Fetch Models</span>
+              </button>
+            </div>
             <p className="text-[9.5px] text-stone-500 font-bold leading-relaxed mt-2.5 font-sans">
               ⏱️ <strong>1 min setup for unmatched quality.</strong> Get your free key from{" "}
               <a
@@ -938,14 +973,35 @@ export const SettingsView = ({
               </a>.
             </p>
           </div>
+
+          {availableModels.length > 0 && (
+            <div className="space-y-2 pt-2 text-left animate-fade-in">
+              <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
+                Official Available Models ({availableModels.length}):
+              </span>
+              <div className="max-h-60 overflow-y-auto space-y-1.5 p-2 bg-stone-50 rounded-2xl border border-stone-200">
+                {availableModels.map((m) => (
+                  <div key={m.name} className="p-2.5 rounded-xl bg-white border border-stone-200 flex items-center justify-between gap-2 shadow-2xs">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-black text-stone-900 block truncate">{m.displayName || m.name}</span>
+                      <span className="text-[9.5px] font-bold text-orange-600 block">{m.name}</span>
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                      ✓ Supported
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-          <button
-            onClick={handleSaveGemini}
-            className="w-full bg-stone-900 text-white hover:bg-stone-850 text-xs font-black uppercase tracking-wider py-4 rounded-[18px] transition-all active:scale-98 shadow-sm cursor-pointer"
-          >
-            Save Connection Settings
-          </button>
+        <button
+          onClick={handleSaveGemini}
+          className="w-full bg-stone-900 text-white hover:bg-stone-850 text-xs font-black uppercase tracking-wider py-4 rounded-[18px] transition-all active:scale-98 shadow-sm cursor-pointer"
+        >
+          Save Connection Settings
+        </button>
         </motion.div>
     );
   }

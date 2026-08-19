@@ -17,6 +17,7 @@ import {
   Edit2,
   Pencil,
   Check,
+  RotateCcw,
   X,
   Square,
   RectangleVertical,
@@ -29,6 +30,7 @@ import {
   Flame,
   Wand2,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
@@ -54,6 +56,7 @@ export const CameraLogView = ({
   mealsState,
   recipesState,
   onAddMeal,
+  onDeleteMeal,
   triggerToast,
   onShareMeal,
   initialNotes,
@@ -63,6 +66,7 @@ export const CameraLogView = ({
   mealsState?: any[];
   recipesState?: any[];
   onAddMeal: (meal: any) => void;
+  onDeleteMeal?: (meal: any) => void;
   triggerToast: (msg: string) => void;
   onShareMeal?: (meal: any) => void;
   initialNotes?: string;
@@ -448,6 +452,18 @@ export const CameraLogView = ({
     setActiveTab("home");
   };
 
+  const handleDeleteLoggedMeal = () => {
+    stopCameraHardware();
+    if (loggedMealResult) {
+      if (onDeleteMeal) {
+        onDeleteMeal(loggedMealResult);
+      } else {
+        triggerToast("🗑️ Logged meal deleted");
+      }
+    }
+    setActiveTab("home");
+  };
+
   useEffect(() => {
     let isCancelled = false;
 
@@ -516,7 +532,7 @@ export const CameraLogView = ({
       stopCameraHardware();
       const newImg = reader.result as string;
       setUploadedImage(newImg);
-      handleAnalyzeAndLog(newImg);
+      setFlowStep("confirm");
     };
     reader.readAsDataURL(file);
   };
@@ -546,7 +562,7 @@ export const CameraLogView = ({
         const dataUrl = canvas.toDataURL("image/jpeg");
         stopCameraHardware();
         setUploadedImage(dataUrl);
-        handleAnalyzeAndLog(dataUrl);
+        setFlowStep("confirm");
         return;
       }
     }
@@ -577,7 +593,7 @@ export const CameraLogView = ({
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-      const compressedImage = await compressImageBase64(targetImage, 600, 0.65);
+      const compressedImage = await compressImageBase64(targetImage, 800, 0.78);
 
       const aiResult = await analyzeFoodPhotoWithAI({
         imageBase64: compressedImage,
@@ -603,21 +619,17 @@ export const CameraLogView = ({
       };
 
       const isNonFoodDetected = aiResult.isFood === false;
-      const confidence = isNonFoodDetected ? 15 : (aiResult.confidenceScore || 85);
+      const confidence = isNonFoodDetected ? 15 : (aiResult.confidenceScore || 92);
 
-      if ((isNonFoodDetected || confidence < 90) && !hasBeenClarified) {
+      if (isNonFoodDetected && !hasBeenClarified) {
         setPendingClarification({
           mealData,
           confidenceScore: confidence,
-          isNonFood: isNonFoodDetected,
-          detectedObject: aiResult.name || "Object",
+          isNonFood: true,
+          detectedObject: aiResult.name || "Non-food item",
           image: targetImage,
-          question: isNonFoodDetected
-            ? `That looks like a ${aiResult.name} (non-food item)!`
-            : `Is this "${aiResult.name}" prepared with homemade ingredients or restaurant style?`,
-          options: isNonFoodDetected
-            ? ["Retake Photo", "Search Food Library"]
-            : ["Homemade / Healthy Preparation", "Restaurant / Outside Food", "Extra Large Portion"]
+          question: `That looks like a ${aiResult.name || "non-food item"}!`,
+          options: ["Retake Photo", "Search Food Library"]
         });
         setIsClarificationModalOpen(true);
         setIsProcessing(false);
@@ -639,7 +651,7 @@ export const CameraLogView = ({
       setFlowStep("preview");
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || "Failed to analyze photo. Please check your Gemini API key in Settings.");
+      setErrorMessage(err.message || "Failed to analyze photo. Please try again.");
       setIsProcessing(false);
     }
   };
@@ -810,20 +822,27 @@ export const CameraLogView = ({
         className="hidden"
       />
 
-      {/* 100% EDGE-TO-EDGE FULL-BLEED LIVE CAMERA BACKGROUND (CAPTURE STEP) */}
-      {flowStep === "capture" && (
-        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto" onClick={handleCaptureFromWebcam}>
-          {cameraStream ? (
+      {/* 100% EDGE-TO-EDGE FULL-BLEED BACKGROUND (CAPTURE OR CONFIRM STEP) */}
+      {(flowStep === "capture" || flowStep === "confirm") && (
+        <div className="absolute inset-0 w-full h-full overflow-hidden bg-black z-0 pointer-events-auto">
+          {uploadedImage ? (
+            <img
+              src={uploadedImage}
+              alt="Captured Meal Preview"
+              className="w-full h-full object-cover min-w-full min-h-full animate-fade-in"
+            />
+          ) : cameraStream ? (
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-cover min-w-full min-h-full"
+              onClick={handleCaptureFromWebcam}
+              className="w-full h-full object-cover min-w-full min-h-full cursor-pointer"
             />
           ) : null}
 
-          {showGridTarget && (
+          {showGridTarget && flowStep === "capture" && (
             <div
               className={cn(
                 "absolute inset-0 flex items-center justify-center pointer-events-none z-20 transition-all duration-300",
@@ -840,10 +859,13 @@ export const CameraLogView = ({
 
           {/* FitAI Simple Transparent Spinner Overlay */}
           {isProcessing && (
-            <div className="absolute inset-0 z-50 bg-black/30 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center animate-fade-in font-sans pointer-events-none">
-              <div className="w-12 h-12 rounded-2xl bg-black/60 border border-white/20 backdrop-blur-md flex items-center justify-center text-orange-500 shadow-2xl">
-                <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />
+            <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center animate-fade-in font-sans pointer-events-none">
+              <div className="w-14 h-14 rounded-2xl bg-stone-950/80 border border-white/20 backdrop-blur-md flex items-center justify-center text-orange-500 shadow-2xl mb-2">
+                <Loader2 className="w-7 h-7 text-orange-500 animate-spin" />
               </div>
+              <span className="text-xs font-black uppercase tracking-wider text-white bg-black/80 px-4 py-1.5 rounded-full border border-white/20">
+                Analyzing Photo...
+              </span>
             </div>
           )}
         </div>
@@ -896,7 +918,7 @@ export const CameraLogView = ({
           </div>
         )}
 
-        {flowStep === "capture" && (
+        {(flowStep === "capture" || flowStep === "confirm") && (
           <div className="absolute bottom-4 left-3 right-3 z-30 flex flex-col items-center gap-2.5 pointer-events-auto">
             {/* FULL-WIDTH FROSTED GLASS ATTACHED MEAL BAR */}
             {attachedItem && (
@@ -926,7 +948,7 @@ export const CameraLogView = ({
             {/* HEADER ROW WITH SLEEK [@ TAG MEAL] BUTTON */}
             <div className="w-full flex items-center justify-between px-1.5 pt-0.5">
               <span className="text-[9.5px] font-black uppercase text-stone-300 tracking-wider font-sans">
-                Notes & Details (Optional)
+                {flowStep === "confirm" ? "Photo Preview — Tap ✓ to Analyze" : "Notes & Details (Optional)"}
               </span>
               <button
                 type="button"
@@ -1008,26 +1030,52 @@ export const CameraLogView = ({
               </AnimatePresence>
             </div>
 
-            {/* Viewfinder Controls Row (Symmetrical 3-Button Action Bar) */}
+            {/* Viewfinder / Confirmation Controls Row */}
             <div className="flex items-center justify-between w-full px-6 py-1">
-              <button
-                type="button"
-                onClick={() => galleryInputRef.current?.click()}
-                className="w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-md border border-white/20 shadow-md flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
-                title="Open Photo Gallery"
-              >
-                <ImageIcon className="w-5.5 h-5.5 text-white" />
-              </button>
+              {flowStep === "confirm" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadedImage(null);
+                    setFlowStep("capture");
+                  }}
+                  className="w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 backdrop-blur-md border border-white/20 shadow-md flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
+                  title="Retake Photo"
+                >
+                  <RotateCcw className="w-5.5 h-5.5 text-white" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="w-12 h-12 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-md border border-white/20 shadow-md flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0"
+                  title="Open Photo Gallery"
+                >
+                  <ImageIcon className="w-5.5 h-5.5 text-white" />
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={handleCaptureFromWebcam}
-                disabled={isProcessing}
-                className="w-16 h-16 rounded-full bg-orange-500 hover:bg-orange-600 border-4 border-white shadow-xl flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0 disabled:opacity-50"
-                title="Take Photo"
-              >
-                <Camera className="w-7 h-7 text-white" />
-              </button>
+              {flowStep === "confirm" ? (
+                <button
+                  type="button"
+                  onClick={() => handleAnalyzeAndLog()}
+                  disabled={isProcessing}
+                  className="w-16 h-16 rounded-full bg-orange-500 hover:bg-orange-600 border-4 border-white shadow-xl shadow-orange-500/40 flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0 disabled:opacity-50"
+                  title="Analyze & Log Photo"
+                >
+                  <Check className="w-8 h-8 stroke-[3] text-white" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCaptureFromWebcam}
+                  disabled={isProcessing}
+                  className="w-16 h-16 rounded-full bg-orange-500 hover:bg-orange-600 border-4 border-white shadow-xl flex items-center justify-center text-white active:scale-90 transition-transform cursor-pointer shrink-0 disabled:opacity-50"
+                  title="Take Photo"
+                >
+                  <Camera className="w-7 h-7 text-white" />
+                </button>
+              )}
 
               <button
                 type="button"
@@ -1100,11 +1148,10 @@ export const CameraLogView = ({
                           };
                           onShareMeal(currentMealObj);
                         }}
-                        className="h-8 px-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border border-orange-400/40"
+                        className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
                         title="Share Meal Card"
                       >
-                        <Share2 className="w-3.5 h-3.5 text-white" />
-                        <span>Share</span>
+                        <Share2 className="w-4 h-4 text-white" />
                       </button>
                     )}
                   </div>
@@ -1117,7 +1164,7 @@ export const CameraLogView = ({
                     <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-emerald-400/60 px-3 py-1 rounded-full shadow-md">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400/80 shrink-0" />
                       <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
-                        Logged Successfully
+                        Added Successfully • Log Count: 1
                       </span>
                     </div>
                   </div>
@@ -1311,6 +1358,21 @@ export const CameraLogView = ({
                   })}
                 </div>
               </div>
+
+              {/* Row 6: Minimalist Delete Option (Inside scrollable page end below tags) */}
+              {onDeleteMeal && (
+                <div className="pt-4 pb-2 flex justify-center border-t border-stone-200/50">
+                  <button
+                    type="button"
+                    onClick={handleDeleteLoggedMeal}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-400 hover:text-red-500 transition-colors cursor-pointer py-1.5 px-3 rounded-xl hover:bg-red-50/50 active:scale-95"
+                    title="Delete this meal log entry"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Meal Entry</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

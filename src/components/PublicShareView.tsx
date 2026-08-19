@@ -204,41 +204,80 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
 
   const getSharecardPhotoFallback = (name: string): string => {
     const lower = (name || "").toLowerCase().trim();
-    if (lower.includes("rice") || lower.includes("biryani") || lower.includes("fried rice") || lower.includes("pulao")) {
+    
+    // 1. French Fries / Potato / Wedges / Chips
+    if (lower.includes("fry") || lower.includes("fries") || lower.includes("french fry") || lower.includes("french fries") || lower.includes("potato") || lower.includes("wedge") || lower.includes("chip")) {
+      return "https://images.unsplash.com/photo-1576107232684-1279f390859f?w=800&auto=format&fit=crop&q=80";
+    }
+    // 2. Rice / Biryani / Fried Rice / Pulao
+    if (lower.includes("rice") || lower.includes("biryani") || lower.includes("fried rice") || lower.includes("pulao") || lower.includes("risotto")) {
       return "https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=800&auto=format&fit=crop&q=80";
     }
-    if (lower.includes("chicken") || lower.includes("poultry") || lower.includes("wings")) {
+    // 3. Chicken / Poultry / Wings / Nuggets
+    if (lower.includes("chicken") || lower.includes("poultry") || lower.includes("wing") || lower.includes("nugget")) {
       return "https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=800&auto=format&fit=crop&q=80";
     }
+    // 4. Burger / Slider
+    if (lower.includes("burger") || lower.includes("slider") || lower.includes("cheeseburger")) {
+      return "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80";
+    }
+    // 5. Pizza / Calzone / Slice
+    if (lower.includes("pizza") || lower.includes("slice") || lower.includes("calzone")) {
+      return "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80";
+    }
+    // 6. Pasta / Spaghetti / Noodles / Ramen / Macaroni
+    if (lower.includes("pasta") || lower.includes("spaghetti") || lower.includes("noodle") || lower.includes("ramen") || lower.includes("macaroni") || lower.includes("lasagna")) {
+      return "https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop&q=80";
+    }
+    // 7. Indian / Dosa / Idli / Sambar / Chutney / Paneer / Curry / Naan / Roti
+    if (lower.includes("dosa") || lower.includes("idli") || lower.includes("sambar") || lower.includes("paneer") || lower.includes("curry") || lower.includes("naan") || lower.includes("roti") || lower.includes("thali") || lower.includes("dal")) {
+      return "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=800&auto=format&fit=crop&q=80";
+    }
+    // 8. Steak / Beef / Pork / Meat
+    if (lower.includes("steak") || lower.includes("beef") || lower.includes("meat") || lower.includes("pork") || lower.includes("brisket")) {
+      return "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80";
+    }
+    // 9. Tacos / Burrito / Wrap / Nachos / Quesadilla
+    if (lower.includes("taco") || lower.includes("burrito") || lower.includes("wrap") || lower.includes("nacho") || lower.includes("quesadilla")) {
+      return "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&auto=format&fit=crop&q=80";
+    }
+    // 10. Fish / Seafood / Salmon / Sushi / Tuna
+    if (lower.includes("fish") || lower.includes("seafood") || lower.includes("salmon") || lower.includes("sushi") || lower.includes("tuna") || lower.includes("shrimp")) {
+      return "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=800&auto=format&fit=crop&q=80";
+    }
+    // 11. Salad / Greens / Bowl
     if (lower.includes("salad") || lower.includes("greens") || lower.includes("bowl")) {
       return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop&q=80";
     }
-    if (lower.includes("pizza") || lower.includes("slice")) {
-      return "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80";
-    }
-    if (lower.includes("burger") || lower.includes("slider")) {
-      return "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop&q=80";
-    }
-    if (lower.includes("coffee") || lower.includes("latte") || lower.includes("espresso")) {
-      return "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80";
-    }
+    // 12. Eggs / Omelette / Scramble
     if (lower.includes("egg") || lower.includes("omelette") || lower.includes("scramble")) {
       return "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop&q=80";
     }
-    if (lower.includes("toast") || lower.includes("bread") || lower.includes("avocado")) {
-      return "https://images.unsplash.com/photo-1588137378633-dea1336ce1e2?w=800&auto=format&fit=crop&q=80";
+    // 13. Pancakes / Waffles / Oats / Porridge
+    if (lower.includes("pancake") || lower.includes("waffle") || lower.includes("oat") || lower.includes("cereal") || lower.includes("porridge")) {
+      return "https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=800&auto=format&fit=crop&q=80";
     }
-    if (lower.includes("shake") || lower.includes("smoothie") || lower.includes("protein")) {
+    // 14. Toast / Sandwich / Avocado Toast
+    if (lower.includes("toast") || lower.includes("sandwich") || lower.includes("avocado") || lower.includes("bread")) {
+      return "https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=800&auto=format&fit=crop&q=80";
+    }
+    // 15. Coffee / Latte / Espresso / Tea
+    if (lower.includes("coffee") || lower.includes("latte") || lower.includes("espresso") || lower.includes("cappuccino") || lower.includes("tea") || lower.includes("chai")) {
+      return "https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80";
+    }
+    // 16. Shake / Smoothie / Juice / Drink
+    if (lower.includes("shake") || lower.includes("smoothie") || lower.includes("protein") || lower.includes("juice") || lower.includes("drink")) {
       return "https://images.unsplash.com/photo-1553530666-ba11a7da3888?w=800&auto=format&fit=crop&q=80";
     }
+    // 17. Cake / Cookie / Dessert / Sweet / Chocolate / Ice Cream
+    if (lower.includes("cake") || lower.includes("cookie") || lower.includes("dessert") || lower.includes("sweet") || lower.includes("chocolate") || lower.includes("ice cream") || lower.includes("donut")) {
+      return "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop&q=80";
+    }
+
     return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop&q=80";
   };
 
-  const displayImage = (payload && payload.img && !hasNoGeneratedImage(payload.img))
-    ? payload.img
-    : (payload ? getSharecardPhotoFallback(payload.n) : "");
-
-  const hasImage = !!displayImage;
+  const hasImage = !!payload.img && !hasNoGeneratedImage(payload.img);
 
   return (
     <main className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans selection:bg-orange-100 pb-24 max-w-md mx-auto relative shadow-2xl overflow-x-hidden flex flex-col justify-between">
@@ -263,10 +302,23 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
           <section className="px-6 py-8 flex flex-col items-center gap-6 bg-gradient-to-b from-orange-50/20 to-transparent">
             {/* Infographic Preview Card (High Fidelity full bleed style matching dashboard) */}
             <div
-              style={{ backgroundImage: `url(${displayImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-              className="w-full aspect-square rounded-[32px] p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden border border-stone-850 bg-stone-900 text-stone-100 transition-colors duration-300"
+              style={hasImage ? { backgroundImage: `url(${payload.img})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+              className={cn(
+                "w-full aspect-square rounded-[32px] p-8 flex flex-col justify-between shadow-2xl relative overflow-hidden border transition-colors duration-300",
+                hasImage 
+                  ? "bg-stone-900 text-stone-100 border-stone-850" 
+                  : "bg-[#F4F3EF] text-stone-850 border-stone-200/50"
+              )}
             >
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 z-0 pointer-events-none" />
+              {hasImage ? (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/30 z-0 pointer-events-none" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+                  <span className="text-[120px] opacity-[0.12] filter drop-shadow-sm">
+                    {getMealEmoji(payload.n)}
+                  </span>
+                </div>
+              )}
               
               <div className="flex justify-between items-center z-10">
                 <div className="flex items-center gap-1.5">

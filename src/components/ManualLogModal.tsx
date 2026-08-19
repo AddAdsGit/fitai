@@ -19,6 +19,7 @@ import {
   Sparkles,
   Pencil,
   Check,
+  CheckCircle2,
   Trash2,
   Wand2,
   Loader2,
@@ -26,9 +27,9 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import type { Meal, TrackedNutrient } from "../types";
-import { hasNoGeneratedImage, formatDisplayTime } from "../utils/helpers";
+import { hasNoGeneratedImage, formatDisplayTime, compressImageBase64 } from "../utils/helpers";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
-import { getBestGeminiModel, resolveGeminiApiKey } from "../utils/geminiFoodAnalysis";
+import { getBestGeminiModel, resolveGeminiApiKey, analyzeFoodPhotoWithAI, refineMealWithAI } from "../utils/geminiFoodAnalysis";
 import { TimePickerModal } from "./TimePickerModal";
 import { PastFoodCard, PastFoodItem } from "./PastFoodCard";
 import { DEFAULT_TRACKED_NUTRIENTS, normalizeTrackedNutrients } from "../constants/nutrition";
@@ -41,6 +42,7 @@ import {
   FoodFilterState,
 } from "../utils/foodFilter";
 import { AiClarificationModal, PendingAiClarification } from "./AiClarificationModal";
+import { PortionStepper } from "./PortionStepper";
 
 export const ManualLogModal = ({
   onClose,
@@ -160,6 +162,7 @@ export const ManualLogModal = ({
   const [refinePrompt, setRefinePrompt] = useState("");
   const [isRefining, setIsRefining] = useState(false);
   const [showAiRefineInput, setShowAiRefineInput] = useState(false);
+  const [showPortionAdjuster, setShowPortionAdjuster] = useState(false);
   const [imageUrl, setImageUrl] = useState(mealToEdit?.image || "");
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -227,6 +230,38 @@ export const ManualLogModal = ({
     });
     return initialMap;
   });
+
+  // Portion Multiplier State (Default 1x)
+  const [portionMultiplier, setPortionMultiplier] = useState(1);
+  const [baseNutrientData, setBaseNutrientData] = useState<{
+    calories: number;
+    nutrients: Record<string, number>;
+  } | null>(null);
+
+  const handlePortionChange = (newMultiplier: number) => {
+    setPortionMultiplier(newMultiplier);
+    if (newMultiplier <= 0) return;
+
+    const base = baseNutrientData || {
+      calories: parseInt(calories, 10) || 0,
+      nutrients: { ...editableNutrients },
+    };
+
+    if (!baseNutrientData) {
+      setBaseNutrientData(base);
+    }
+
+    const scaledCal = Math.round(base.calories * newMultiplier);
+    setCalories(String(scaledCal));
+
+    const scaledNutrients: Record<string, number> = {};
+    activeTrackedNutrients.forEach((n) => {
+      const baseVal = base.nutrients[n.id] ?? (editableNutrients[n.id] || 0);
+      scaledNutrients[n.id] = Math.round(baseVal * newMultiplier);
+    });
+
+    setEditableNutrients(scaledNutrients);
+  };
 
   // Dynamic Context Guidance Engine
   const contextGuidance = useMemo(() => {
@@ -304,6 +339,11 @@ export const ManualLogModal = ({
         else initialMap[n.id] = (mealToEdit as any).nutrients?.[n.id] || 0;
       });
       setEditableNutrients(initialMap);
+      setPortionMultiplier(1);
+      setBaseNutrientData({
+        calories: mealToEdit.calories || 0,
+        nutrients: initialMap,
+      });
     }
   }, [mealToEdit]);
 
@@ -547,141 +587,64 @@ export const ManualLogModal = ({
   const handleGenerateAndLogWithAi = async () => {
     if (!aiInstruction.trim() && !uploadedImage && !attachedItem) return;
 
-    const key = resolveGeminiApiKey(profileData);
-
     const fullInstruction = attachedItem 
       ? `Attached meal: ${attachedItem.name}. User notes: ${aiInstruction.trim()}`
       : aiInstruction.trim();
-
-    const nutrientPromptList = (activeTrackedNutrients || [])
-      .map((n) => `"${n.id}": (${n.name} in ${n.unit})`)
-      .join(", ");
 
     setIsProcessing(true);
     setErrorMessage("");
 
     try {
-      let responseData: any = null;
-      const finalImage = imageUrl || uploadedImage || attachedItem?.image || FALLBACK_FOOD_IMAGE;
-
-      const sampleNutrientObj: Record<string, number> = {};
-      activeTrackedNutrients.forEach((n) => { sampleNutrientObj[n.id] = 10; });
-
-      const promptText = uploadedImage
-        ? `Analyze the food plate in this image. User notes & attached item: "${fullInstruction}". Estimate meal name, total calories (kcal), 1-sentence meal_description, clean dietary tags (e.g. ["High Protein"]), and numerical values for ALL user-tracked nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`
-        : `Calculate nutrition for: "${fullInstruction}". Estimate dish name, total calories (kcal), 1-sentence meal_description, clean dietary tags (e.g. ["High Protein"]), and numerical values for ALL user-tracked nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
-
-      let cleanBase64 = "";
-      let mimeType = "image/jpeg";
-      if (uploadedImage) {
-        const commaIndex = uploadedImage.indexOf(",");
-        mimeType = uploadedImage.substring(5, uploadedImage.indexOf(";base64")) || "image/jpeg";
-        cleanBase64 = uploadedImage.substring(commaIndex + 1);
-      }
-
-      // 1. Try Supabase Edge Function first (100% Server Proxy Execution)
-      if (isSupabaseConfigured) {
+      // Compress uploaded image if provided (800px max dimension @ 0.78 quality to preserve micro-details)
+      let compressedImage = uploadedImage;
+      if (uploadedImage && uploadedImage.startsWith("data:image")) {
         try {
-          const { data, error } = await supabase.functions.invoke("gemini", {
-            body: {
-              prompt: promptText,
-              image: cleanBase64 || undefined,
-              mimeType: cleanBase64 ? mimeType : undefined,
-              userApiKey: key || undefined,
-            }
-          });
-          if (!error && data) {
-            responseData = data;
-          }
-        } catch (err) {
-          console.warn("[ManualLogModal] Edge function call failed, falling back to direct key:", err);
-        }
+          compressedImage = await compressImageBase64(uploadedImage, 800, 0.78);
+        } catch (_) {}
       }
 
-      // 2. Fallback to direct client key call if Edge Function wasn't available
-      if (!responseData && key) {
-        const parts: any[] = [{ text: promptText }];
-        if (cleanBase64) {
-          parts.push({ inlineData: { mimeType, data: cleanBase64 } });
-        }
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 300,
-              responseMimeType: "application/json"
-            }
-          })
-        });
-        if (response.ok) {
-          responseData = await response.json();
-        }
-      }
+      // Call central AI analysis engine (routes via Supabase Edge function with backend Gemini key rotation)
+      const aiResult = await analyzeFoodPhotoWithAI({
+        imageBase64: compressedImage || "",
+        notes: fullInstruction,
+        trackedNutrients: activeTrackedNutrients,
+        profileData,
+      });
 
-      const rawText = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || responseData?.text || "";
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
-      const parsedNutrients = parsed.nutrients || {};
-
-      const parseVal = (val: any) => {
-        if (typeof val === "number") return isNaN(val) ? 0 : val;
-        if (!val) return 0;
-        const p = parseFloat(String(val).replace(/[^0-9.]/g, ""));
-        return isNaN(p) ? 0 : Math.round(p * 10) / 10;
-      };
-
-      const pVal = parseVal(parsedNutrients.protein ?? parsed.protein);
-      const cVal = parseVal(parsedNutrients.carbs ?? parsed.carbs);
-      const fVal = parseVal(parsedNutrients.fats ?? parsed.fats);
-      const fibVal = parseVal(parsedNutrients.fiber ?? parsed.fiber);
-
-      const dynamicNutrientMap: Record<string, number> = {
-        protein: pVal,
-        carbs: cVal,
-        fats: fVal,
-        fiber: fibVal,
-        ...parsedNutrients,
-      };
+      const finalImage = imageUrl || compressedImage || attachedItem?.image || "";
 
       const calculatedMeal = {
         id: mealToEdit?.id || `meal_${Date.now()}`,
-        name: parsed.name || attachedItem?.name || aiInstruction.trim() || "Custom Meal Log",
-        calories: parseVal(parsed.calories) || Math.round(pVal * 4 + cVal * 4 + fVal * 9),
-        protein: pVal,
-        carbs: cVal,
-        fats: fVal,
-        fiber: fibVal,
-        nutrients: dynamicNutrientMap,
+        name: aiResult.name || attachedItem?.name || aiInstruction.trim() || "Custom Meal Log",
+        calories: aiResult.calories || 350,
+        protein: aiResult.protein || 0,
+        carbs: aiResult.carbs || 0,
+        fats: aiResult.fats || 0,
+        fiber: aiResult.fiber || 0,
+        nutrients: aiResult.nutrients,
         type: mealToEdit?.type || (uploadedImage ? "AI Photo Log" : "AI Meal Log"),
-        time: time.trim(),
+        time: time.trim() || "12:00 PM",
         image: finalImage,
-        meal_description: parsed.meal_description || parsed.description || aiInstruction.trim(),
-        tags: selectedTags.length > 0 ? selectedTags : (parsed.tags || ["AI Log"]),
-        isFood: parsed.isFood !== false,
-        confidenceScore: parseVal(parsed.confidenceScore) || 92
+        meal_description: aiResult.meal_description || aiInstruction.trim(),
+        tags: selectedTags.length > 0 ? selectedTags : (aiResult.tags || ["AI Log"]),
+        isFood: aiResult.isFood !== false,
+        confidenceScore: aiResult.confidenceScore || 92
       };
 
-      // AI Confidence Score Check (Threshold: 90% & Non-Food Guardrail)
+      // AI Confidence Score Check (Non-Food Guardrail)
       const isNonFoodDetected = calculatedMeal.isFood === false || (calculatedMeal.name && (calculatedMeal.name.toLowerCase().includes("pen") || calculatedMeal.name.toLowerCase().includes("stationery") || calculatedMeal.name.toLowerCase().includes("keys") || calculatedMeal.name.toLowerCase().includes("phone")));
 
-      const confidence = isNonFoodDetected ? 15 : (calculatedMeal.confidenceScore || (aiInstruction.length > 15 ? 92 : 78));
+      const confidence = isNonFoodDetected ? 15 : (calculatedMeal.confidenceScore || 92);
 
-      if ((isNonFoodDetected || confidence < 90) && !hasBeenClarified) {
+      if (isNonFoodDetected && !hasBeenClarified) {
         setPendingClarification({
           mealData: calculatedMeal,
           confidenceScore: confidence,
-          isNonFood: isNonFoodDetected,
-          detectedObject: calculatedMeal.name || "Pen",
+          isNonFood: true,
+          detectedObject: calculatedMeal.name || "Non-food item",
           image: calculatedMeal.image || uploadedImage || imageUrl,
-          question: isNonFoodDetected
-            ? `That looks like a ${calculatedMeal.name || "Pen 🖊️"} (non-food item)!`
-            : `Is this "${calculatedMeal.name}" prepared with homemade ingredients or restaurant style?`,
-          options: isNonFoodDetected
-            ? ["Retake Photo", "Search Food Library"]
-            : ["Homemade / Healthy Preparation", "Restaurant / Outside Food", "Extra Large Portion"]
+          question: `That looks like a ${calculatedMeal.name || "non-food item"}!`,
+          options: ["Retake Photo", "Search Food Library"]
         });
         setIsClarificationModalOpen(true);
         setIsProcessing(false);
@@ -697,12 +660,17 @@ export const ManualLogModal = ({
       setEditableNutrients(calculatedMeal.nutrients);
       setSelectedTags(calculatedMeal.tags);
       setImageUrl(calculatedMeal.image);
+      setPortionMultiplier(1);
+      setBaseNutrientData({
+        calories: calculatedMeal.calories || 0,
+        nutrients: calculatedMeal.nutrients || {},
+      });
       
       setIsProcessing(false);
       setModalStep("preview");
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || "Failed to analyze instruction");
+      setErrorMessage(err.message || "Failed to analyze instruction with AI.");
       setIsProcessing(false);
     }
   };
@@ -723,6 +691,11 @@ export const ManualLogModal = ({
     if (meal.image) setImageUrl(meal.image);
     if (meal.tags) setSelectedTags(meal.tags);
     if (meal.nutrients) setEditableNutrients(meal.nutrients);
+    setPortionMultiplier(1);
+    setBaseNutrientData({
+      calories: meal.calories || 350,
+      nutrients: meal.nutrients || {},
+    });
     setModalStep("preview");
   };
 
@@ -739,14 +712,16 @@ export const ManualLogModal = ({
     if (meal.image) setImageUrl(meal.image);
     if (meal.tags) setSelectedTags(meal.tags);
     if (meal.nutrients) setEditableNutrients(meal.nutrients);
+    setPortionMultiplier(1);
+    setBaseNutrientData({
+      calories: meal.calories || 350,
+      nutrients: meal.nutrients || {},
+    });
     setModalStep("preview");
   };
 
   const handleRefineWithAI = async () => {
     if (!refinePrompt.trim() && !attachedItem) return;
-
-    const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-    const key = geminiKeyTag.split(":")[1] || "";
 
     setIsRefining(true);
 
@@ -755,146 +730,66 @@ export const ManualLogModal = ({
         ? `Attached reference dish: "${attachedItem.name}". Modification instruction: "${refinePrompt.trim()}"`
         : refinePrompt.trim();
 
-      const nutrientPromptList = (activeTrackedNutrients || [])
-        .map((n) => `"${n.id}": (${n.name} in ${n.unit})`)
-        .join(", ");
+      const baseCal = baseNutrientData?.calories || parseInt(calories, 10) || 350;
+      const baseNut = baseNutrientData?.nutrients || editableNutrients;
 
-      const currentCal = parseInt(calories, 10) || 350;
-
-      if (!key) {
-        // Smart Local Refinement Engine
-        let adjustedCal = currentCal;
-        const lower = combinedRefinement.toLowerCase();
-        if (lower.includes("half") || lower.includes("1/2")) adjustedCal = Math.round(currentCal * 0.5);
-        else if (lower.includes("double") || lower.includes("twice")) adjustedCal = currentCal * 2;
-        else if (lower.includes("no dressing") || lower.includes("no oil") || lower.includes("without sauce")) adjustedCal = Math.max(100, currentCal - 120);
-        else if (lower.includes("add") || lower.includes("extra") || lower.includes("plus")) adjustedCal = currentCal + 150;
-        else adjustedCal = Math.max(50, Math.round(currentCal * 0.85));
-
-        const ratio = adjustedCal / (currentCal || 1);
-        const newNutrients: Record<string, number> = {};
-        Object.keys(editableNutrients).forEach((k) => {
-          newNutrients[k] = Math.max(0, Math.round((editableNutrients[k] || 0) * ratio));
-        });
-
-        const newName = name.trim() || "Meal Log";
-        const newDesc = `${mealDescription ? mealDescription + " • " : ""}${refinePrompt.trim()}`;
-
-        setCalories(String(adjustedCal));
-        setEditableNutrients(newNutrients);
-        setMealDescription(newDesc);
-
-        const updatedMeal = {
-          ...(loggedMealResult || mealToEdit || {}),
-          id: loggedMealResult?.id || mealToEdit?.id || `meal_${Date.now()}`,
-          name: newName,
-          calories: adjustedCal,
-          protein: newNutrients.protein || 0,
-          carbs: newNutrients.carbs || 0,
-          fats: newNutrients.fats || 0,
-          fiber: newNutrients.fiber || 0,
-          nutrients: newNutrients,
-          meal_description: newDesc,
+      const refinedResult = await refineMealWithAI({
+        currentMeal: {
+          name,
+          calories: baseCal,
+          meal_description: mealDescription,
+          nutrients: baseNut,
           tags: selectedTags,
-          time: time || "12:00 PM",
-          image: imageUrl || uploadedImage || attachedItem?.image || FALLBACK_FOOD_IMAGE,
-          type: mealToEdit?.type || "Meal Log",
-        };
-
-        setLoggedMealResult(updatedMeal);
-        onAddMeal(updatedMeal);
-        setRefinePrompt("");
-        setAttachedItem(null);
-        setShowAiRefineInput(false);
-        setIsRefining(false);
-        return;
-      }
-
-      // Live Gemini 1.5 Flash AI Refinement
-      const sampleNutrientObj: Record<string, number> = {};
-      activeTrackedNutrients.forEach((n) => {
-        sampleNutrientObj[n.id] = (editableNutrients && editableNutrients[n.id]) !== undefined
-          ? (typeof editableNutrients[n.id] === "number" ? editableNutrients[n.id] : parseFloat(String(editableNutrients[n.id])) || 0)
-          : 10;
+        },
+        refinePrompt: combinedRefinement,
+        trackedNutrients: activeTrackedNutrients,
+        profileData,
       });
 
-      const promptText = `The user has logged a meal: "${name}" with ${currentCal} kcal, current notes: "${mealDescription}", nutrients: ${JSON.stringify(editableNutrients)}, tags: ${JSON.stringify(selectedTags)}. The user now wants to refine this meal with these specific instructions: "${combinedRefinement}". Calculate the new meal name, updated total calories (kcal), new meal description/notes, updated clean dietary tags (e.g. ["High Protein"]), and updated values for ALL user nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
+      const newBaseCal = refinedResult.calories || baseCal;
+      const newBaseNutrients = refinedResult.nutrients || baseNut;
+      const updatedName = refinedResult.name || name;
+      const updatedDesc = refinedResult.meal_description || `${mealDescription ? mealDescription + " • " : ""}${refinePrompt.trim()}`;
+      const cleanTags = refinedResult.tags && refinedResult.tags.length > 0 ? refinedResult.tags : selectedTags;
 
-      const modelName = "gemini-2.5-flash";
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 300,
-              responseMimeType: "application/json"
-            }
-          })
-        }
-      );
+      // Preserve new 1x Base
+      setBaseNutrientData({
+        calories: newBaseCal,
+        nutrients: newBaseNutrients,
+      });
+      setPortionMultiplier(1);
 
-      const data = await response.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      setName(updatedName);
+      setCalories(String(newBaseCal));
+      setEditableNutrients(newBaseNutrients);
+      setMealDescription(updatedDesc);
+      setSelectedTags(cleanTags);
 
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        const parseVal = (val: any) => {
-          if (typeof val === "number") return isNaN(val) ? 0 : val;
-          if (!val) return 0;
-          const p = parseFloat(String(val).replace(/[^0-9.]/g, ""));
-          return isNaN(p) ? 0 : Math.round(p * 10) / 10;
-        };
+      const updatedMeal = {
+        ...(loggedMealResult || mealToEdit || {}),
+        id: loggedMealResult?.id || mealToEdit?.id || `meal_${Date.now()}`,
+        name: updatedName,
+        calories: newBaseCal,
+        protein: newBaseNutrients.protein || 0,
+        carbs: newBaseNutrients.carbs || 0,
+        fats: newBaseNutrients.fats || 0,
+        fiber: newBaseNutrients.fiber || 0,
+        nutrients: newBaseNutrients,
+        meal_description: updatedDesc,
+        tags: cleanTags,
+        time: time || "12:00 PM",
+        image: imageUrl || uploadedImage || attachedItem?.image || FALLBACK_FOOD_IMAGE,
+        type: mealToEdit?.type || "AI Meal Log",
+      };
 
-        const updatedCal = parseVal(parsed.calories) || currentCal;
-        const rawParsedNutrients = parsed.nutrients || {};
-        const updatedNutrients: Record<string, number> = { ...editableNutrients };
-        
-        Object.keys(rawParsedNutrients).forEach((k) => {
-          updatedNutrients[k] = parseVal(rawParsedNutrients[k]);
-        });
-
-        const updatedName = parsed.name || name;
-        const updatedDesc = parsed.meal_description || `${mealDescription ? mealDescription + " • " : ""}${refinePrompt.trim()}`;
-        const rawTags = Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : selectedTags;
-        const cleanTags = rawTags.map((t: string) => t.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "").trim());
-
-        setName(updatedName);
-        setCalories(String(updatedCal));
-        setEditableNutrients(updatedNutrients);
-        setMealDescription(updatedDesc);
-        setSelectedTags(cleanTags);
-
-        const updatedMeal = {
-          ...(loggedMealResult || mealToEdit || {}),
-          id: loggedMealResult?.id || mealToEdit?.id || `meal_${Date.now()}`,
-          name: updatedName,
-          calories: updatedCal,
-          protein: parseVal(updatedNutrients.protein),
-          carbs: parseVal(updatedNutrients.carbs),
-          fats: parseVal(updatedNutrients.fats),
-          fiber: parseVal(updatedNutrients.fiber),
-          nutrients: updatedNutrients,
-          meal_description: updatedDesc,
-          tags: cleanTags,
-          time: time || "12:00 PM",
-          image: imageUrl || uploadedImage || attachedItem?.image || FALLBACK_FOOD_IMAGE,
-          type: mealToEdit?.type || "Meal Log",
-        };
-
-        setLoggedMealResult(updatedMeal);
-        onAddMeal(updatedMeal);
-        setRefinePrompt("");
-        setAttachedItem(null);
-        setShowAiRefineInput(false);
-      }
+      setLoggedMealResult(updatedMeal);
+      onAddMeal(updatedMeal);
+      setRefinePrompt("");
+      setAttachedItem(null);
+      setShowAiRefineInput(false);
       setIsRefining(false);
     } catch (err: any) {
-      console.error(err);
+      console.error("AI Refine error:", err);
       setIsRefining(false);
     }
   };
@@ -904,7 +799,14 @@ export const ManualLogModal = ({
     const finalName = name.trim() || attachedItem?.name || "Manual Meal Log";
     if (!finalName) return;
 
-    const finalImage = imageUrl || uploadedImage || attachedItem?.image || FALLBACK_FOOD_IMAGE;
+    let finalImage = imageUrl || uploadedImage || attachedItem?.image || "";
+    if (!finalImage || finalImage.includes("photo-1546069901-ba9599a7e63c")) {
+      const cleanDesc = mealDescription.trim();
+      const fullDetail = cleanDesc ? `${finalName}, containing ${cleanDesc}` : finalName;
+      const prompt = `gourmet professional food photography of ${fullDetail}. Crisp food separation with distinct ingredients, side dips, sauces, and accompanying beverages clearly visible and neatly arranged. High detail textures, photorealistic culinary shot, top-down view, clean bright studio lighting.`;
+      const seed = Math.floor(Math.random() * 1000000);
+      finalImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=600&nologo=true&seed=${seed}&model=flux`;
+    }
 
     // Safeguard: Ensure EVERY active tracked nutrient in user's profile is populated
     const finalNutrientMap: Record<string, number> = { ...editableNutrients };
@@ -1162,6 +1064,12 @@ export const ManualLogModal = ({
 
             {/* Scrollable Main Content */}
             <div className="flex-1 overflow-y-auto pr-0.5 space-y-3 text-left min-h-0">
+              {errorMessage && (
+                <div className="bg-red-500/10 border border-red-500/30 text-red-600 text-xs font-bold p-3 rounded-2xl text-center shadow-xs shrink-0">
+                  {errorMessage}
+                </div>
+              )}
+
               {logMode === "ai" ? (
                 /* MODE 1: AI ASSISTANT LOGGER */
                 <div className="space-y-3">
@@ -1629,11 +1537,10 @@ export const ManualLogModal = ({
                         onAddMeal(currentMealObj);
                         onShareMeal(currentMealObj);
                       }}
-                      className="h-8 px-3.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border border-orange-400/40"
+                      className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer active:scale-90 shadow-md"
                       title="Share meal card"
                     >
-                      <Share2 className="w-3.5 h-3.5 text-white" />
-                      <span>Share</span>
+                      <Share2 className="w-4 h-4 text-white" />
                     </button>
                   )}
                 </div>
@@ -1643,10 +1550,10 @@ export const ManualLogModal = ({
               <div className="absolute bottom-4 left-4 right-4 z-10 text-left space-y-1.5">
                 {/* Meal / Recipe Log Count Frosted Pill (High contrast dark frosted capsule) */}
                 <div>
-                  <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-orange-400/50 px-3 py-1 rounded-full shadow-md">
-                    <span className="w-2 h-2 rounded-full bg-orange-400 shadow-xs shadow-orange-400/80 shrink-0" />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-orange-300">
-                      Logged {matchedRecipe?.log_count || mealLogCount || 1} time{(matchedRecipe?.log_count || mealLogCount || 1) === 1 ? "" : "s"}
+                  <div className="inline-flex items-center gap-1.5 bg-black/65 backdrop-blur-md border border-emerald-400/60 px-3 py-1 rounded-full shadow-md">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-xs shadow-emerald-400/80 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                      Added Successfully • Log Count: {matchedRecipe?.log_count || mealLogCount || 1}
                     </span>
                   </div>
                 </div>
@@ -1849,23 +1756,30 @@ export const ManualLogModal = ({
                 </div>
               </div>
 
-              {/* Row 6: Minimalist Delete Option for existing meal */}
-              {isEditing && onDeleteMeal && (
-                <div className="pt-3 pb-1 flex justify-center border-t border-stone-200/50">
+              {/* Row 6: Minimalist Delete Option (Inside scrollable page end below tags) */}
+              {onDeleteMeal && (
+                <div className="pt-4 pb-2 flex justify-center border-t border-stone-200/50">
                   {!showDeleteConfirm ? (
                     <button
                       type="button"
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="text-[10px] font-bold text-stone-400 hover:text-red-500 uppercase tracking-widest cursor-pointer transition-colors bg-transparent border-none py-1 active:scale-95"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-400 hover:text-red-500 transition-colors cursor-pointer py-1.5 px-3 rounded-xl hover:bg-red-50/50 active:scale-95"
                     >
-                      Delete Meal Log
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Meal Entry</span>
                     </button>
                   ) : (
                     <div className="flex items-center gap-3 bg-red-50/90 border border-red-200/80 px-3.5 py-1.5 rounded-full animate-fade-in shadow-3xs">
-                      <span className="text-[10.5px] font-bold text-red-950">Delete meal log?</span>
+                      <span className="text-[10.5px] font-bold text-red-950">Delete meal entry?</span>
                       <button
                         type="button"
-                        onClick={handleConfirmDelete}
+                        onClick={() => {
+                          const mealToDelete = loggedMealResult || getCurrentMealData();
+                          if (mealToDelete && onDeleteMeal) {
+                            onDeleteMeal(mealToDelete);
+                          }
+                          onClose();
+                        }}
                         className="text-[10px] font-black uppercase tracking-wider text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-full cursor-pointer transition-all active:scale-95 border-none"
                       >
                         Confirm
@@ -1886,7 +1800,7 @@ export const ManualLogModal = ({
             {/* STICKY BOTTOM ACTIONS BAR */}
             <div className="p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 w-full font-sans space-y-2.5">
               {showAiRefineInput ? (
-                /* STICKY BOTTOM DOCKED AI PANEL */
+                /* MODE 1: STICKY BOTTOM DOCKED AI PANEL */
                 <div className="space-y-2.5 animate-fade-in text-left">
                   <textarea
                     rows={3}
@@ -1928,30 +1842,162 @@ export const ManualLogModal = ({
                   </div>
                 </div>
               ) : (
-                /* Row 1: White AI Button */
-                <button
-                  type="button"
-                  onClick={() => setShowAiRefineInput(true)}
-                  className="w-full h-11 rounded-2xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-3xs"
-                >
-                  <Wand2 className="w-3.5 h-3.5 text-orange-500" />
-                  <span>Edit with AI Assist</span>
-                </button>
-              )}
+                /* 2-ROW COMPACT ACTIONS BAR: Shared 50/50 when 1x, or Unified Extended Pill when != 1x */
+                <div className="space-y-2.5">
+                  {portionMultiplier === 1 ? (
+                    /* STATE A: 50 / 50 Split (Portion Stepper + AI Assist) */
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {/* Left 50%: Portion Stepper Pill */}
+                      <div className="h-11 bg-white border border-stone-200/90 rounded-2xl px-2 py-1 flex items-center justify-between shadow-3xs transition-all">
+                        <StepperButton
+                          onStep={() => handlePortionChange(Math.max(0.25, parseFloat((portionMultiplier - 0.25).toFixed(2))))}
+                          disabled={portionMultiplier <= 0.25}
+                          className="w-7 h-7 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90 transition-all border-none bg-transparent"
+                          title="Decrease portion (-0.25x)"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </StepperButton>
 
-              {/* Row 2: Full-Width Signature Orange Save Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  const currentMealObj = getCurrentMealData();
-                  onAddMeal(currentMealObj);
-                  onClose();
-                }}
-                className="w-full h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-orange-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border-none"
-              >
-                <Check className="w-4 h-4 text-white stroke-[3]" />
-                <span>{isEditing ? "Save Meal Log" : "Log Meal (1-Tap)"}</span>
-              </button>
+                        <div className="flex items-center justify-center gap-0.5 min-w-0">
+                          <input
+                            type="number"
+                            step="0.25"
+                            min="0.25"
+                            max="10"
+                            value={portionMultiplier === 0 ? "" : portionMultiplier}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val)) {
+                                handlePortionChange(val);
+                              } else if (e.target.value === "") {
+                                setPortionMultiplier(0);
+                              }
+                            }}
+                            onBlur={() => {
+                              if (portionMultiplier <= 0 || isNaN(portionMultiplier)) {
+                                handlePortionChange(1);
+                              }
+                            }}
+                            className="bg-transparent border-none text-center text-xs font-black text-stone-900 focus:outline-none w-10 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <span className="text-[11px] font-bold text-stone-400 select-none">x</span>
+                        </div>
+
+                        <StepperButton
+                          onStep={() => handlePortionChange(parseFloat((portionMultiplier + 0.25).toFixed(2)))}
+                          disabled={portionMultiplier >= 10}
+                          className="w-7 h-7 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90 transition-all border-none bg-transparent"
+                          title="Increase portion (+0.25x)"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </StepperButton>
+                      </div>
+
+                      {/* Right 50%: AI Assist Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowAiRefineInput(true)}
+                        className="h-11 rounded-2xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-3xs font-sans"
+                      >
+                        <Wand2 className="w-3.5 h-3.5 text-orange-500" />
+                        <span>AI Assist</span>
+                      </button>
+                    </div>
+                  ) : (
+                    /* STATE B: Unified Full-Width Extended Pill with Design 3 (Controls pinned Left + Clean Calories & Diff on Right) */
+                    <div className="h-11 bg-white border border-stone-200/90 rounded-2xl px-2 py-1 flex items-center justify-between shadow-3xs transition-all w-full font-sans">
+                      {/* Left Side: Controls pinned at exact same width / position */}
+                      <div className="w-[46%] sm:w-[45%] flex items-center justify-between shrink-0 pr-1.5 border-r border-stone-200/60">
+                        <StepperButton
+                          onStep={() => handlePortionChange(Math.max(0.25, parseFloat((portionMultiplier - 0.25).toFixed(2))))}
+                          disabled={portionMultiplier <= 0.25}
+                          className="w-7 h-7 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90 transition-all border-none bg-transparent"
+                          title="Decrease portion (-0.25x)"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </StepperButton>
+
+                        <div className="flex items-center justify-center gap-0.5 min-w-0">
+                          <input
+                            type="number"
+                            step="0.25"
+                            min="0.25"
+                            max="10"
+                            value={portionMultiplier === 0 ? "" : portionMultiplier}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val)) {
+                                handlePortionChange(val);
+                              } else if (e.target.value === "") {
+                                setPortionMultiplier(0);
+                              }
+                            }}
+                            onBlur={() => {
+                              if (portionMultiplier <= 0 || isNaN(portionMultiplier)) {
+                                handlePortionChange(1);
+                              }
+                            }}
+                            className="bg-transparent border-none text-center text-xs font-black text-stone-900 focus:outline-none w-10 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <span className="text-[11px] font-bold text-stone-400 select-none">x</span>
+                        </div>
+
+                        <StepperButton
+                          onStep={() => handlePortionChange(parseFloat((portionMultiplier + 0.25).toFixed(2)))}
+                          disabled={portionMultiplier >= 10}
+                          className="w-7 h-7 rounded-xl flex items-center justify-center text-stone-400 hover:text-stone-700 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-90 transition-all border-none bg-transparent"
+                          title="Increase portion (+0.25x)"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </StepperButton>
+                      </div>
+
+                      {/* Right Side: Design 3 - Clean Calories with (+diff) and Circular Reset Button */}
+                      <div className="flex-1 min-w-0 pl-2.5 flex items-center justify-between">
+                        <div className="flex items-baseline gap-1 min-w-0 truncate">
+                          <span className="text-xs font-black text-orange-950 truncate">
+                            {calories} <span className="text-[10px] font-bold text-orange-900/60 lowercase">kcal</span>
+                          </span>
+                          {baseNutrientData && baseNutrientData.calories > 0 && (parseInt(calories, 10) || 0) !== baseNutrientData.calories && (
+                            <span className={cn(
+                              "text-[10px] font-bold shrink-0",
+                              (parseInt(calories, 10) || 0) > baseNutrientData.calories
+                                ? "text-orange-600"
+                                : "text-stone-400"
+                            )}>
+                              ({(parseInt(calories, 10) || 0) > baseNutrientData.calories ? "+" : ""}
+                              {(parseInt(calories, 10) || 0) - baseNutrientData.calories})
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handlePortionChange(1)}
+                          className="w-6 h-6 rounded-full bg-stone-100 hover:bg-orange-50 text-stone-400 hover:text-orange-600 flex items-center justify-center transition-all cursor-pointer border border-stone-200/40 active:scale-90 shrink-0 ml-1.5"
+                          title="Reset portion to 1.00x"
+                        >
+                          <X className="w-3 h-3 stroke-[2.5]" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 2: Signature Orange Save Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentMealObj = getCurrentMealData();
+                      onAddMeal(currentMealObj);
+                      onClose();
+                    }}
+                    className="w-full h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider cursor-pointer shadow-lg shadow-orange-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 border-none"
+                  >
+                    <Check className="w-4 h-4 text-white stroke-[3]" />
+                    <span>Done & Log Meal</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -22,7 +22,7 @@ let cachedBestModel: string | null = null;
 
 export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
   if (cachedBestModel) return cachedBestModel;
-  if (!apiKey) return "gemini-2.5-flash";
+  if (!apiKey) return "gemini-3.6-flash";
 
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
@@ -34,12 +34,9 @@ export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
         .map((m) => m.name.replace(/^models\//, ""));
 
       const priorityPatterns = [
-        /^gemini-2\.5-flash$/i,
-        /^gemini-3\.5-flash$/i,
+        /^gemini-3\.7-flash$/i,
         /^gemini-3\.6-flash$/i,
-        /^gemini-2\.5-flash-lite/i,
-        /^gemini-flash-latest$/i,
-        /^gemini-1\.5-flash/i,
+        /^gemini-3\.5-flash-lite/i,
       ];
 
       for (const pattern of priorityPatterns) {
@@ -51,11 +48,11 @@ export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
       }
     }
   } catch (e) {
-    console.warn("[Gemini API] Dynamic model fetch fallback to gemini-2.5-flash:", e);
+    console.warn("[Gemini API] Dynamic model fetch fallback to gemini-3.6-flash:", e);
   }
 
-  cachedBestModel = "gemini-2.5-flash";
-  return "gemini-2.5-flash";
+  cachedBestModel = "gemini-3.6-flash";
+  return "gemini-3.6-flash";
 };
 
 export const listAvailableGeminiModels = async (apiKey: string) => {
@@ -85,7 +82,7 @@ const parseNum = (val: any): number => {
 };
 
 export interface AnalyzeFoodPhotoOptions {
-  imageBase64: string;
+  imageBase64?: string;
   notes?: string;
   trackedNutrients?: Array<{ id: string; name: string; unit: string }>;
   profileData?: Profile;
@@ -106,18 +103,18 @@ export interface FoodAnalysisResult {
 }
 
 export const analyzeFoodPhotoWithAI = async ({
-  imageBase64,
+  imageBase64 = "",
   notes = "",
   trackedNutrients = [],
   profileData,
 }: AnalyzeFoodPhotoOptions): Promise<FoodAnalysisResult> => {
-  if (!imageBase64) {
-    throw new Error("No photo provided for AI recognition.");
+  if (!imageBase64 && !notes.trim()) {
+    throw new Error("Please provide a photo or text instruction for AI analysis.");
   }
 
   const key = resolveGeminiApiKey(profileData);
-  const cleanBase64 = imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
-  const mimeType = imageBase64.includes(";") ? imageBase64.split(";")[0].split(":")[1] || "image/jpeg" : "image/jpeg";
+  const cleanBase64 = imageBase64 && imageBase64.includes(",") ? imageBase64.split(",")[1] : imageBase64;
+  const mimeType = imageBase64 && imageBase64.includes(";") ? imageBase64.split(";")[0].split(":")[1] || "image/jpeg" : "image/jpeg";
 
   // Build dynamic list of active nutrients from parameters or profileData or default
   const activeNutrients = trackedNutrients.length > 0
@@ -139,29 +136,45 @@ export const analyzeFoodPhotoWithAI = async ({
     else sampleNutrientObj[n.id] = 10;
   });
 
-  const promptText = `You are a world-class AI nutritionist. Analyze this food/beverage photo carefully.
+  const promptText = cleanBase64
+    ? `You are a world-class AI nutritionist. Analyze this food/beverage photo carefully.
 User notes: "${notes.trim()}".
 
 Task:
 1. Determine if the main subject is edible food or a beverage. If NOT food (e.g. pen, keys, phone, desk, shoes, furniture), return JSON: {"isFood": false, "name": "Non-food item", "confidenceScore": 15}.
 2. If it IS food:
    - Identify the exact dish name (e.g., "Grilled Chicken Salad with Avocado").
-    - Write a concise 1-2 sentence description detailing key ingredients, sauces, and cooking style/calorie density (e.g. "Made with fresh grilled chicken over mixed greens, cherry tomatoes & olive oil dressing. High-protein, low-carb meal."). NEVER use dry generic text like "AI Photo Recognition Log" or "Estimated nutrients based on...".
-    - Estimate total calories (kcal).
-    - Estimate confidence score (0-100).
-    - Provide clean dietary tags (e.g. ["High Protein", "Gluten Free"]).
-    - Estimate numerical values for ALL user-tracked nutrients: ${nutrientListStr}. Always include protein, carbs, fats, and fiber.
+   - Write a concise 1-2 sentence description detailing key ingredients, sauces, and cooking style/calorie density.
+   - Estimate total calories (kcal).
+   - Estimate confidence score (0-100).
+   - Provide clean dietary tags (e.g. ["High Protein", "Gluten Free"]).
+   - Estimate numerical values for ALL user-tracked nutrients: ${nutrientListStr}. Always include protein, carbs, fats, and fiber.
 
 Return ONLY a valid JSON object in this format:
-{"isFood": true, "name": "...", "meal_description": "...", "confidenceScore": 92, "calories": 450, "tags": ["High Protein"], "nutrients": ${JSON.stringify(sampleNutrientObj)}}`;
+{"isFood": true, "name": "...", "meal_description": "...", "confidenceScore": 92, "calories": 450, "tags": ["High Protein"], "nutrients": ${JSON.stringify(sampleNutrientObj)}}`
+    : `You are a world-class AI nutritionist. Calculate accurate nutrition for this text instruction: "${notes.trim()}".
+
+Task:
+1. Determine if the instruction describes edible food or a beverage. If NOT food, return JSON: {"isFood": false, "name": "Non-food item", "confidenceScore": 15}.
+2. If it IS food:
+   - Identify the exact dish name (e.g., "Scrambled Eggs with Sourdough Toast").
+   - Write a concise 1-2 sentence description detailing ingredients, cooking method, and portion size.
+   - Estimate total calories (kcal).
+   - Estimate confidence score (0-100).
+   - Provide clean dietary tags (e.g. ["High Protein", "Quick Meal"]).
+   - Estimate numerical values for ALL user-tracked nutrients: ${nutrientListStr}. Always include protein, carbs, fats, and fiber.
+
+Return ONLY a valid JSON object in this format:
+{"isFood": true, "name": "...", "meal_description": "...", "confidenceScore": 95, "calories": 420, "tags": ["High Protein"], "nutrients": ${JSON.stringify(sampleNutrientObj)}}`;
 
   let responseData: any = null;
+  let lastApiErrorMessage = "";
 
   // 1. Execute 100% Server Proxy via Supabase Edge Function for maximum security
   if (isSupabaseConfigured) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
 
       const { data, error } = await supabase.functions.invoke("gemini", {
         body: {
@@ -177,41 +190,54 @@ Return ONLY a valid JSON object in this format:
 
       clearTimeout(timeoutId);
 
-      if (!error && data) {
-        responseData = data;
+      if (!error && data && !data.error) {
+        const checkParts = data?.candidates?.[0]?.content?.parts || [];
+        const checkText = checkParts.map((p: any) => p.text || "").join("\n") || data?.text || "";
+        if (checkText.includes("{") || checkText.includes("calories")) {
+          responseData = data;
+        } else if (data.error) {
+          lastApiErrorMessage = data.error;
+        }
+      } else if (error || data?.error) {
+        lastApiErrorMessage = error?.message || data?.error || "Edge function error";
+        console.warn("[AI Photo] Supabase Edge Function returned error:", lastApiErrorMessage);
       }
-    } catch (err) {
-      console.warn("[AI Photo] Edge function skipped, moving to fallback call:", err);
+    } catch (err: any) {
+      lastApiErrorMessage = err?.message || "Network error";
+      console.warn("[AI Photo] Edge function invocation error:", err);
     }
   }
 
-  let lastApiErrorMessage = "";
-
-  // 2. Direct Call to Google Gemini Flash models with robust fallback & clear error messages
+  // 2. Direct Call to Google Gemini Flash models with robust fallback if custom key provided
   if (!responseData && key) {
-    const candidateModels = ["gemini-2.5-flash", "gemini-1.5-flash"];
+    const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash"];
     for (const modelName of candidateModels) {
       try {
+        const parts: any[] = [{ text: promptText }];
+        if (cleanBase64 && cleanBase64.trim().length > 20) {
+          parts.push({ inline_data: { mime_type: mimeType, data: cleanBase64.trim() } });
+        }
+
+        const modelController = new AbortController();
+        const modelTimeout = setTimeout(() => modelController.abort(), 3500);
+
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: modelController.signal,
             body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: promptText },
-                  { inline_data: { mime_type: mimeType, data: cleanBase64 } },
-                ],
-              }],
+              contents: [{ parts }],
               generationConfig: {
-                temperature: 0.2,
-                maxOutputTokens: 300,
+                temperature: 0.1,
                 responseMimeType: "application/json"
               }
             }),
           }
         );
+
+        clearTimeout(modelTimeout);
 
         if (res.ok) {
           responseData = await res.json();
@@ -233,22 +259,59 @@ Return ONLY a valid JSON object in this format:
 
   if (!responseData) {
     if (lastApiErrorMessage) {
-      throw new Error(`Gemini API Error: ${lastApiErrorMessage}. Please check your key in Settings.`);
+      throw new Error(`AI Service Error: ${lastApiErrorMessage}`);
     }
-    if (!key) {
-      throw new Error("No Gemini API key found. Please enter your API key in Settings -> Google Gemini API.");
-    }
-    throw new Error("AI photo analysis service unavailable. Please verify your network connection or API key.");
+    throw new Error("AI photo analysis service is temporarily unavailable. Please try again.");
   }
 
-  const rawText = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || responseData?.text || "";
+  const parts = responseData?.candidates?.[0]?.content?.parts || [];
+  let rawText = parts.map((part: any) => part.text || "").join("\n") || responseData?.text || "";
+
+  if (rawText.includes("```")) {
+    rawText = rawText.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+  }
+
+  let parsed: any = null;
   const jsonMatch = rawText.match(/\{[\s\S]*\}/);
 
-  if (!jsonMatch) {
-    throw new Error("Could not parse food recognition JSON response.");
+  if (jsonMatch) {
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (_) {
+      // Fall through to regex extraction
+    }
   }
 
-  const parsed = JSON.parse(jsonMatch[0]);
+  if (!parsed || typeof parsed !== "object") {
+    // Robust field-level regex extraction fallback
+    const extractStr = (keyName: string, defVal: string) => {
+      const m = rawText.match(new RegExp(`"${keyName}"\\s*:\\s*"([^"]+)"`, "i"));
+      return m ? m[1] : defVal;
+    };
+    const extractNum = (keyName: string, defVal: number) => {
+      const m = rawText.match(new RegExp(`"${keyName}"\\s*:\\s*([0-9.]+)`, "i"));
+      return m ? parseFloat(m[1]) : defVal;
+    };
+
+    parsed = {
+      name: extractStr("name", "Custom Meal Log"),
+      calories: extractNum("calories", 350),
+      protein: extractNum("protein", 20),
+      carbs: extractNum("carbs", 30),
+      fats: extractNum("fats", 10),
+      fiber: extractNum("fiber", 5),
+      confidenceScore: extractNum("confidenceScore", 92),
+      isFood: true,
+      meal_description: extractStr("meal_description", "Meal log analyzed by AI"),
+      tags: ["AI Log"],
+      nutrients: {
+        protein: extractNum("protein", 20),
+        carbs: extractNum("carbs", 30),
+        fats: extractNum("fats", 10),
+        fiber: extractNum("fiber", 5),
+      }
+    };
+  }
 
   const p = parseNum(parsed.nutrients?.protein ?? parsed.protein);
   const c = parseNum(parsed.nutrients?.carbs ?? parsed.carbs);
@@ -389,31 +452,53 @@ Return ONLY valid JSON:
   }
 
   if (!responseData && key) {
-    const modelName = await getBestGeminiModel(key);
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-          }),
+    const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash"];
+    for (const modelName of candidateModels) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptText }] }],
+              generationConfig: {
+                temperature: 0.1,
+                responseMimeType: "application/json"
+              }
+            }),
+          }
+        );
+        if (res.ok) {
+          responseData = await res.json();
+          break;
         }
-      );
-      if (res.ok) responseData = await res.json();
-    } catch (err) {
-      console.error("[AI Refine] Direct Gemini API call failed:", err);
+      } catch (err) {
+        console.error("[AI Refine] Direct Gemini API call failed:", err);
+      }
     }
   }
 
   if (!responseData) throw new Error("Meal refinement AI service unavailable.");
 
-  const rawText = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || responseData?.text || "";
-  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Could not parse refined meal object.");
+  const parts = responseData?.candidates?.[0]?.content?.parts || [];
+  let rawText = parts.map((part: any) => part.text || "").join("\n") || responseData?.text || "";
 
-  const parsed = JSON.parse(jsonMatch[0]);
+  if (rawText.includes("```")) {
+    rawText = rawText.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+  }
+
+  let parsed: any = null;
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (_) {}
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Could not parse refined meal object.");
+  }
   const parsedNutrients = parsed.nutrients || {};
 
   const dynamicNutrientMap: Record<string, number> = {};

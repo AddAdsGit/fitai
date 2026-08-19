@@ -46,12 +46,11 @@ This file defines critical rules that all AI developers and code-generation suba
 ## 7. Git Push Directive (User Permission Rule)
 * **Rule:** NEVER run `git push` or push changes to GitHub automatically. ONLY execute `git push` when the user explicitly asks or mentions to push to GitHub in their prompt.
 
-## 9. Vercel Project & Account Details
-* **Owner Username**: `sivavenkatamanikanta-2942` (also known as `manikanta's projects` / `sivavenkatamanikanta@gmail.com`)
-* **Project Name**: `ftai`
-* **Vercel Domains**: `ftai2.vercel.app`, `fitpush.vercel.app`
-* **Production Branch**: `main` (mirrored to `master`)
-* **Build Ignore Rule**: `.vercelignore` ignores `supabase/`, `.agents/`, `android/`, `ios/` to prevent Deno Edge Function bundler errors on Vercel.
+## 10. Modern Google Gemini Vision & Flash API Rule (2026 Models)
+* **Valid 2026 Model Names**: ONLY use official Google Gemini Flash model names: `gemini-3.7-flash`, `gemini-3.6-flash`, and `gemini-3.5-flash-lite`.
+* **Prohibited Obsolete / Hallucinated Model Names**: NEVER use deprecated `gemini-2.0-flash`, `gemini-1.5-flash`, or `gemini-1.5-flash-latest` on `v1beta` (Google officially replaced `gemini-2.0-flash` with `gemini-3.7-flash` / `gemini-3.6-flash` on `v1beta` which throws 404 errors).
+* **Server Proxy Execution**: ALL AI food photo, recipe, and text nutrition calls MUST route through the Supabase Edge Function (`supabase/functions/gemini/index.ts`) using backend key rotation (`GEMINI_API_KEYS`).
+* **Generation Parameters**: Use `temperature: 0.1` with `responseMimeType: "application/json"` and omit artificial token ceilings so Gemini has full breathing room for reasoning and complete JSON output.
 
 
 

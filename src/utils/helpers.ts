@@ -180,13 +180,13 @@ export const formatNutrientValue = (val?: number | string | null): string => {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 };
 
-// Utility: Compress heavy Base64 food photo strings on client-side before storing to DB (max 800px width, 0.75 quality)
-export const compressImageBase64 = (base64Str: string, maxWidth = 800, quality = 0.75): Promise<string> => {
+// Utility: Compress heavy Base64 food photo strings on client-side before network upload (800px max dimension, 0.78 quality to preserve chia seeds, peas, sesame seeds & micro-grain details)
+export const compressImageBase64 = (base64Str: string, maxWidth = 800, quality = 0.78): Promise<string> => {
   return new Promise((resolve) => {
     if (!base64Str || !base64Str.startsWith("data:image")) {
       return resolve(base64Str || "");
     }
-    if (base64Str.length < 200000) {
+    if (base64Str.length < 50000) {
       return resolve(base64Str);
     }
     const img = new Image();
@@ -194,14 +194,17 @@ export const compressImageBase64 = (base64Str: string, maxWidth = 800, quality =
     img.onload = () => {
       let width = img.width;
       let height = img.height;
-      if (width > maxWidth) {
+      if (width > maxWidth && width >= height) {
         height = Math.round((height * maxWidth) / width);
         width = maxWidth;
+      } else if (height > maxWidth) {
+        width = Math.round((width * maxWidth) / height);
+        height = maxWidth;
       }
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", { alpha: false });
       if (!ctx) return resolve(base64Str);
       ctx.drawImage(img, 0, 0, width, height);
       const compressed = canvas.toDataURL("image/jpeg", quality);

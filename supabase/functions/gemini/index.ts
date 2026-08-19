@@ -27,13 +27,7 @@ serve(async (req) => {
 
     // 2. Parse request body
     const body = await req.json().catch(() => ({}));
-    const { prompt, image, mimeType, userApiKey } = body;
-    if (!prompt) {
-      return new Response(JSON.stringify({ error: "Missing prompt parameter in request body" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const { prompt, image, mimeType, userApiKey, action } = body;
 
     // 3. Retrieve & Parse Gemini API Key Pool (Priority: Custom user keys -> GEMINI_API_KEYS -> GEMINI_API_KEY)
     const rawKeysString = (userApiKey && typeof userApiKey === "string" && userApiKey.trim())
@@ -66,15 +60,46 @@ serve(async (req) => {
       ...keyPool.slice(0, startIndex)
     ];
 
-    const parts: any[] = [{ text: prompt }];
-    if (image) {
-      const cleanBase64 = image.includes(",") ? image.split(",")[1] : image;
-      parts.push({
-        inline_data: {
-          mime_type: mimeType || "image/jpeg",
-          data: cleanBase64,
-        },
+    // Handle ListModels Request
+    if (action === "listModels") {
+      for (const apiKey of orderedKeys) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+          if (res.ok) {
+            const data = await res.json();
+            const models = (data.models || [])
+              .filter((m: any) => m.supportedGenerationMethods?.includes("generateContent"))
+              .map((m: any) => ({
+                name: m.name.replace(/^models\//, ""),
+                displayName: m.displayName || m.name,
+                description: m.description || "",
+              }));
+            return new Response(JSON.stringify({ models }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (!prompt) {
+      return new Response(JSON.stringify({ error: "Missing prompt parameter in request body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const parts: any[] = [{ text: prompt }];
+    if (image && typeof image === "string" && image.trim().length > 20) {
+      const cleanBase64 = image.includes(",") ? image.split(",")[1] : image;
+      if (cleanBase64 && cleanBase64.trim().length > 20) {
+        parts.push({
+          inline_data: {
+            mime_type: mimeType || "image/jpeg",
+            data: cleanBase64.trim(),
+          },
+        });
+      }
     }
 
     // 4. Key Pool Loop: Round-Robin rotation with instant failover on 429 rate limit
@@ -82,7 +107,7 @@ serve(async (req) => {
     let lastError = "";
 
     for (const apiKey of orderedKeys) {
-      for (const model of ["gemini-2.5-flash", "gemini-1.5-flash"]) {
+      for (const model of ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]) {
         try {
           response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
             method: "POST",
@@ -92,8 +117,7 @@ serve(async (req) => {
             body: JSON.stringify({
               contents: [{ parts }],
               generationConfig: {
-                temperature: 0.2,
-                maxOutputTokens: 300,
+                temperature: 0.1,
                 responseMimeType: "application/json"
               }
             })

@@ -162,26 +162,40 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
       let rawText = "";
       const prompt = `Create a gourmet healthy recipe based on: "${aiPrompt}". Return ONLY valid JSON format: {"name":"...","time":"...","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0,"description":"...","ingredients":["..."],"instructions":"..."}`;
 
-      if (key) {
-        const modelName = "gemini-2.5-flash";
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 500,
-              responseMimeType: "application/json"
+      if (isSupabaseConfigured) {
+        try {
+          const { data } = await supabase.functions.invoke("gemini", { body: { prompt, userApiKey: key || undefined } });
+          if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            rawText = data.candidates[0].content.parts[0].text;
+          } else if (data?.text) {
+            rawText = data.text;
+          }
+        } catch (e) {
+          console.warn("Edge function recipe generation error:", e);
+        }
+      }
+
+      if (!rawText && key) {
+        for (const modelName of ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-2.0-flash-lite"]) {
+          try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.2,
+                  responseMimeType: "application/json"
+                }
+              })
+            });
+            if (response.ok) {
+              const data = await response.json();
+              const parts = data.candidates?.[0]?.content?.parts || [];
+              rawText = parts.map((p: any) => p.text || "").join("\n") || data.text || "";
+              if (rawText) break;
             }
-          })
-        });
-        const data = await response.json();
-        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      } else if (isSupabaseConfigured) {
-        const { data } = await supabase.functions.invoke("gemini", { body: { prompt, userApiKey: key || undefined } });
-        if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          rawText = data.candidates[0].content.parts[0].text;
+          } catch (_) {}
         }
       }
 

@@ -1643,20 +1643,7 @@ Do not include any extra text, markdown styling, backticks, or "json" prefix. Ju
       showToast("✨ AI generated recipe successfully!");
     } catch (err) {
       console.error(err);
-      const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-      const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
-      if (!preferenceGeminiKey) {
-        showToast(
-          <div className="text-left font-sans">
-            <span className="font-bold text-stone-900 block text-xs">❌ Generation Failed</span>
-            <span className="text-[10px] text-stone-500 font-semibold block leading-tight mt-1">
-              Central AI credits are low. Configure your own free Gemini key in <strong className="text-orange-500">Settings</strong> to unlock uninterrupted generations!
-            </span>
-          </div>
-        );
-      } else {
-        showToast("❌ Failed to generate recipe. Please check your Gemini API key.");
-      }
+      showToast("❌ AI generation failed. Please try again in a moment.");
     } finally {
       setIsRecipeAiGenerating(false);
     }
@@ -1746,8 +1733,6 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       }
 
       if (!edgeSuccess) {
-        // All Gemini calls go through the authenticated edge function — the
-        // client never talks to Google directly with an API key.
         throw new Error("AI generation is unavailable right now. Please try again.");
       }
 
@@ -1779,20 +1764,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       showToast("✨ AI generated a custom recipe matching your macros!");
     } catch (err: any) {
       console.error(err);
-      const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-      const preferenceGeminiKey = geminiKeyTag.split(":")[1] || "";
-      if (!preferenceGeminiKey) {
-        showToast(
-          <div className="text-left font-sans">
-            <span className="font-bold text-stone-900 block text-xs">❌ Generation Failed</span>
-            <span className="text-[10px] text-stone-500 font-semibold block leading-tight mt-1">
-              Central AI credits are low. Configure your own free Gemini key in <strong className="text-orange-500">Settings</strong> to unlock uninterrupted generations!
-            </span>
-          </div>
-        );
-      } else {
-        showToast("❌ Failed to generate recipe. Please check your Gemini API key.");
-      }
+      showToast("❌ Failed to generate recipe. Please try again in a moment.");
     } finally {
       setIsGeneratingRecipe(false);
     }
@@ -1821,59 +1793,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     let finalImage = "";
     if (newMealOrRecipe.image && !hasNoGeneratedImage(newMealOrRecipe.image)) {
       finalImage = await compressImageBase64(newMealOrRecipe.image);
-    } else {
-      const cleanName = newMealOrRecipe.name.trim();
-      let southIndianContext = "";
-      const lowerName = cleanName.toLowerCase();
-      if (lowerName.includes("dosa") || lowerName.includes("idli") || lowerName.includes("idly") || lowerName.includes("sambar") || lowerName.includes("chutney") || lowerName.includes("vada") || lowerName.includes("uttapam")) {
-        southIndianContext = " Plated on a traditional stainless steel plate (thali), accompanied by small individual metal bowls of sambar and coconut/peanut chutney.";
-      }
-      const prompt = `gourmet professional food photography of ${cleanName}.${southIndianContext} Crisp food separation with distinct ingredients clearly visible and neatly arranged. High detail textures, photorealistic, macro culinary shot, top-down view, clean bright studio lighting, sharp focus, volumetric depth, no blending or bleeding between food elements.`;
-      
-      // Extract Gemini API key from preferences array
-      const geminiKeyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-      const geminiKey = geminiKeyTag.split(":")[1] || "";
-      
-      let generatedImage = "";
-      if (geminiKey) {
-        try {
-          // Set a 6-second timeout for the Gemini request
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000);
-          
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiKey}`;
-          const response = await fetch(geminiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: controller.signal,
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { responseModalities: ["IMAGE"] }
-            })
-          });
-          clearTimeout(timeoutId);
-          
-          if (response.ok) {
-            const data = await response.json();
-            const imagePart = data.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
-            if (imagePart?.inlineData?.data) {
-              generatedImage = `data:${imagePart.inlineData.mimeType || "image/png"};base64,${imagePart.inlineData.data}`;
-            }
-          }
-        } catch (err) {
-          console.warn("[gemini-image] Failed to generate, falling back to Pollinations.ai:", err);
-        }
-      }
-      
-      if (!generatedImage) {
-        const seed = Math.floor(Math.random() * 1000000);
-        generatedImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true&seed=${seed}&model=flux`;
-      }
-      
-      finalImage = generatedImage;
     }
 
-    if (newMealOrRecipe.id) {
+    const isExistingMeal = Boolean(newMealOrRecipe.id && mealsState.some((m) => m.id === newMealOrRecipe.id));
+
+    if (isExistingMeal) {
       if (isSupabaseConfigured && profileData.api_key) {
         try {
           const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
@@ -3533,6 +3457,12 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               mealsState={mealsState}
               recipesState={recipes}
               onAddMeal={onAddMeal}
+              onDeleteMeal={(mealToDelete) => {
+                confirmDeleteMeal(mealToDelete);
+                setIsCameraFullScreen(false);
+                setManualLogInitialAiMode(false);
+                setActiveTab("home");
+              }}
               triggerToast={(msg) => setToastMessage(msg)}
               onShareMeal={(meal) => {
                 setShareItemPopup({ type: "meal", item: meal });
