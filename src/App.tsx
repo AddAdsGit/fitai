@@ -237,6 +237,8 @@ export default function App() {
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [manualLogInitialAiMode, setManualLogInitialAiMode] = useState(false);
+  const [manualLogInitialInstruction, setManualLogInitialInstruction] = useState<string>("");
+  const [manualLogInitialTaggedNames, setManualLogInitialTaggedNames] = useState<string[]>([]);
   const [manualLogInitialSegment, setManualLogInitialSegment] = useState<"quick" | "detailed">("detailed");
   const [autoTriggerPhotoScan, setAutoTriggerPhotoScan] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -1770,8 +1772,105 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
   };
 
+  const incrementRecipeLogCount = (mealName: string, recipeId?: string, tags?: string[]) => {
+    // 1. Direct Recipe ID Match (Pinpoint precision: Food Library, Recipe Card, or History)
+    if (recipeId) {
+      const matched = recipes.find((r) => r.id === recipeId);
+      if (matched) {
+        const newCount = (matched.log_count || 0) + 1;
+        setRecipesState((prev) =>
+          prev.map((rec) => (rec.id === matched.id ? { ...rec, log_count: newCount } : rec))
+        );
+        if (isSupabaseConfigured) {
+          supabase
+            .from("recipes")
+            .update({ log_count: newCount })
+            .eq("id", matched.id)
+            .then();
+        }
+        return;
+      }
+    }
+
+    // 2. Explicit @Mention Match in Tags (e.g. user typed @Mom's Pizza in AI prompt)
+    const tagList = Array.isArray(tags) ? tags.map((t) => String(t).toLowerCase()) : [];
+    const explicitTags = tagList.filter((t) => t.startsWith("@"));
+
+    if (explicitTags.length > 0) {
+      const matched = recipes.filter((r) => {
+        const rTag = `@${r.name.trim().toLowerCase()}`;
+        return explicitTags.includes(rTag);
+      });
+
+      if (matched.length > 0) {
+        matched.forEach((r) => {
+          const newCount = (r.log_count || 0) + 1;
+          setRecipesState((prev) =>
+            prev.map((rec) => (rec.id === r.id ? { ...rec, log_count: newCount } : rec))
+          );
+          if (isSupabaseConfigured) {
+            supabase
+              .from("recipes")
+              .update({ log_count: newCount })
+              .eq("id", r.id)
+              .then();
+          }
+        });
+      }
+    }
+  };
+
+  const decrementRecipeLogCount = (mealName: string, recipeId?: string, tags?: string[]) => {
+    // 1. Direct Recipe ID Match
+    if (recipeId) {
+      const matched = recipes.find((r) => r.id === recipeId);
+      if (matched) {
+        const newCount = Math.max(0, (matched.log_count || 1) - 1);
+        setRecipesState((prev) =>
+          prev.map((rec) => (rec.id === matched.id ? { ...rec, log_count: newCount } : rec))
+        );
+        if (isSupabaseConfigured) {
+          supabase
+            .from("recipes")
+            .update({ log_count: newCount })
+            .eq("id", matched.id)
+            .then();
+        }
+        return;
+      }
+    }
+
+    // 2. Explicit @Mention Match in Tags
+    const tagList = Array.isArray(tags) ? tags.map((t) => String(t).toLowerCase()) : [];
+    const explicitTags = tagList.filter((t) => t.startsWith("@"));
+
+    if (explicitTags.length > 0) {
+      const matched = recipes.filter((r) => {
+        const rTag = `@${r.name.trim().toLowerCase()}`;
+        return explicitTags.includes(rTag);
+      });
+
+      if (matched.length > 0) {
+        matched.forEach((r) => {
+          const newCount = Math.max(0, (r.log_count || 1) - 1);
+          setRecipesState((prev) =>
+            prev.map((rec) => (rec.id === r.id ? { ...rec, log_count: newCount } : rec))
+          );
+          if (isSupabaseConfigured) {
+            supabase
+              .from("recipes")
+              .update({ log_count: newCount })
+              .eq("id", r.id)
+              .then();
+          }
+        });
+      }
+    }
+  };
+
   const onAddMeal = async (newMealOrRecipe: {
     id?: string;
+    recipe_id?: string;
     name: string;
     calories: number;
     protein: number;
@@ -1796,8 +1895,14 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     }
 
     const isExistingMeal = Boolean(newMealOrRecipe.id && mealsState.some((m) => m.id === newMealOrRecipe.id));
+    const previousMeal = isExistingMeal ? mealsState.find((m) => m.id === newMealOrRecipe.id) : null;
 
     if (isExistingMeal) {
+      if (previousMeal && previousMeal.name.trim().toLowerCase() !== newMealOrRecipe.name.trim().toLowerCase()) {
+        decrementRecipeLogCount(previousMeal.name, (previousMeal as any).recipe_id, previousMeal.tags);
+        incrementRecipeLogCount(newMealOrRecipe.name, newMealOrRecipe.recipe_id, (newMealOrRecipe as any).tags);
+      }
+
       if (isSupabaseConfigured && profileData.api_key) {
         try {
           const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
@@ -1923,6 +2028,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             tags: data.meal.tags || []
           };
           setMealsState((prev) => [mapped, ...prev]);
+          incrementRecipeLogCount(newMealOrRecipe.name, newMealOrRecipe.recipe_id, (newMealOrRecipe as any).tags);
           showToast(`🍽️ Logged & Synced: "${newMealOrRecipe.name}" (+${newMealOrRecipe.calories} kcal)`);
           return;
         } else {
@@ -1957,6 +2063,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
     };
 
     setMealsState((prev) => [meal, ...prev]);
+    incrementRecipeLogCount(newMealOrRecipe.name, newMealOrRecipe.recipe_id, (newMealOrRecipe as any).tags);
     showToast(`🍽️ Logged: "${newMealOrRecipe.name}" (+${newMealOrRecipe.calories} kcal)`);
   };
 
@@ -2041,6 +2148,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
     setLastDeletedMeal(meal);
     setMealsState(prev => prev.filter(m => m.id !== meal.id));
+    decrementRecipeLogCount(meal.name, (meal as any).recipe_id, meal.tags);
 
     deleteTimeoutRef.current = setTimeout(() => {
       commitDeletion(meal);
@@ -2055,6 +2163,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
           onClick={(e) => {
             e.stopPropagation();
             setMealsState(prev => [meal, ...prev]);
+            incrementRecipeLogCount(meal.name, (meal as any).recipe_id, meal.tags);
             setLastDeletedMeal(null);
             if (deleteTimeoutRef.current) {
               clearTimeout(deleteTimeoutRef.current);
@@ -3645,18 +3754,24 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               setIsCameraFullScreen(false);
               setAutoTriggerPhotoScan(false);
               setMealToEdit(null);
+              setManualLogInitialInstruction("");
+              setManualLogInitialTaggedNames([]);
             }}
             onAddMeal={onAddMeal}
             onDeleteMeal={(mealToDelete) => {
               setIsCameraFullScreen(false);
               setAutoTriggerPhotoScan(false);
               setMealToEdit(null);
+              setManualLogInitialInstruction("");
+              setManualLogInitialTaggedNames([]);
               confirmDeleteMeal(mealToDelete);
             }}
             onShareMeal={(meal) => {
               setIsCameraFullScreen(false);
               setAutoTriggerPhotoScan(false);
               setMealToEdit(null);
+              setManualLogInitialInstruction("");
+              setManualLogInitialTaggedNames([]);
               setShareItemPopup({ type: "meal", item: meal });
             }}
             mealToEdit={mealToEdit}
@@ -3664,12 +3779,16 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             mealsState={mealsState}
             recipesState={recipes}
             initialAiMode={manualLogInitialAiMode}
+            initialInstruction={manualLogInitialInstruction}
+            initialTaggedNames={manualLogInitialTaggedNames}
             autoTriggerPhotoScan={autoTriggerPhotoScan}
             profileData={profileData}
             onOpenCamera={(initialText) => {
               setIsCameraFullScreen(false);
               setAutoTriggerPhotoScan(false);
               setMealToEdit(null);
+              setManualLogInitialInstruction("");
+              setManualLogInitialTaggedNames([]);
               if (initialText) setCameraInitialNotes(initialText);
               setActiveTab("camera-log");
             }}
@@ -3743,8 +3862,20 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             tags: item.tags || [],
             nutrients: item.nutrients || {},
           } as any);
+          setManualLogInitialInstruction("");
+          setManualLogInitialTaggedNames([]);
           setManualLogInitialAiMode(false);
           setManualLogInitialSegment("quick");
+          setIsCameraFullScreen(true);
+        }}
+        onCombineWithAi={(items) => {
+          const tagInstruction = items.map((i) => `@${i.name}`).join(" ") + " ";
+          const taggedList = items.map((i) => i.name);
+          setMealToEdit(null);
+          setManualLogInitialInstruction(tagInstruction);
+          setManualLogInitialTaggedNames(taggedList);
+          setManualLogInitialAiMode(true);
+          setManualLogInitialSegment("detailed");
           setIsCameraFullScreen(true);
         }}
         recipesState={recipes}

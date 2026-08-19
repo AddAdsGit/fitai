@@ -95,7 +95,7 @@ export function decompressToRecipe(payload: SharedItemPayload, id?: string): any
     instructions: payload.ins || "",
     tags: payload.tags || ["Imported"],
     micros: [],
-    log_count: payload.lc || 0,
+    log_count: 0,
     description: payload.d || "",
   };
 }

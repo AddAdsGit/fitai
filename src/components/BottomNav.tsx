@@ -24,23 +24,23 @@ export function NavButton({
       id={id}
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center justify-center gap-1 flex-1 h-14 rounded-[18px] transition-all duration-300 relative cursor-pointer select-none border-none bg-transparent",
+        "flex flex-col items-center justify-center gap-0.5 flex-1 h-12 rounded-[14px] transition-all duration-300 relative",
         active
           ? "text-orange-600"
-          : "text-orange-950/35 hover:text-orange-600/70"
+          : "text-orange-950/40 hover:text-orange-600/60"
       )}
     >
       {active && (
         <motion.div
           layoutId="active-nav-bg"
-          className="absolute inset-0 bg-orange-100/60 rounded-[18px] -z-10"
-          transition={{ type: "spring", stiffness: 350, damping: 30 }}
+          className="absolute inset-0 bg-orange-100/60 rounded-[14px] -z-10"
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
         />
       )}
       <Icon
-        className={cn("w-5 h-5", active ? "stroke-[2.5px] text-orange-600" : "stroke-[2px]")}
+        className={cn("w-5 h-5", active ? "stroke-[2.5px]" : "stroke-[2px]")}
       />
-      <span className={cn("text-[8.5px] font-black uppercase tracking-wider", active ? "text-orange-950 font-black" : "text-orange-950/50")}>
+      <span className="text-[8px] font-black uppercase tracking-[0.1em]">
         {label}
       </span>
     </button>
@@ -68,6 +68,10 @@ export function BottomNav({
   useEffect(() => {
     setMounted(true);
 
+    // Samsung's display/page zoom can reduce the CSS viewport from ~412px to
+    // ~320px while increasing the physical size of every CSS pixel. Scale the
+    // viewport-owned nav by the same inverse factor so its physical size stays
+    // consistent without changing the dashboard layout.
     const updateViewportScale = () => {
       const width = Math.max(1, window.innerWidth);
       setViewportScale(Math.min(1, Math.max(0.75, width / 412)));
@@ -90,9 +94,9 @@ export function BottomNav({
       style={{
         position: "fixed",
         left: "50%",
-        bottom: `max(12px, env(safe-area-inset-bottom, 10px))`,
+        bottom: `calc(env(safe-area-inset-bottom, 0px) + ${10 * viewportScale}px)`,
         width: `calc(100vw / ${viewportScale} - 32px)`,
-        maxWidth: `${420 / viewportScale}px`,
+        maxWidth: `${390 / viewportScale}px`,
         transform: `translateX(-50%) scale(${viewportScale})`,
         transformOrigin: "bottom center",
         zIndex: 600,
@@ -102,7 +106,7 @@ export function BottomNav({
       <nav id="bottom-nav" className="w-full">
         <div
           id="nav-container"
-          className="backdrop-blur-2xl bg-white/90 shadow-[0_16px_40px_rgba(0,0,0,0.08),0_4px_16px_rgba(249,115,22,0.1)] rounded-[26px] p-2 flex items-center justify-between gap-2 border border-white/80 w-full"
+          className="backdrop-blur-2xl bg-white/85 shadow-[0_12px_36px_rgba(249,115,22,0.14)] rounded-[22px] p-1.5 flex items-center justify-between gap-1.5 border border-white/80 w-full"
         >
           <NavButton
             id="nav-home"
@@ -117,17 +121,17 @@ export function BottomNav({
               <motion.button
                 id="fab-add-food"
                 onClick={handleLogMealClick}
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.94 }}
-                className="w-full h-14 bg-gradient-to-br from-orange-400 to-orange-600 hover:from-orange-500 hover:to-orange-700 rounded-[18px] shadow-[0_8px_24px_rgba(249,115,22,0.38)] flex items-center justify-center text-white relative overflow-hidden cursor-pointer border-none"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="w-full h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-[14px] shadow-[0_6px_20px_rgb(251,146,60,0.35)] flex items-center justify-center text-white relative overflow-hidden cursor-pointer"
               >
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_white_0%,_transparent_40%)] opacity-35" />
-                <Plus className="w-7 h-7 stroke-[3px]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_white_0%,_transparent_40%)] opacity-30" />
+                <Plus className="w-6 h-6 stroke-[3px]" />
               </motion.button>
             ) : (
               <div
                 id="fab-disabled"
-                className="w-full h-14 bg-stone-50 border border-stone-200/50 rounded-[18px] flex flex-col items-center justify-center text-stone-400 select-none opacity-60"
+                className="w-full h-12 bg-stone-50 border border-stone-200/50 rounded-[14px] flex flex-col items-center justify-center text-stone-400 select-none opacity-60"
                 title="Logs are only editable on today's date"
               >
                 <Plus className="w-5 h-5 stroke-[2px]" />

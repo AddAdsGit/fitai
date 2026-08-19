@@ -15,6 +15,7 @@ import { cn } from "../lib/utils";
 import { normalizeTrackedNutrients, DEFAULT_TRACKED_NUTRIENTS } from "../constants/nutrition";
 import { hasNoGeneratedImage, getMealEmoji, formatDisplayTime, formatNutrientValue } from "../utils/helpers";
 import { getUserActiveAiTags } from "../utils/foodFilter";
+import { PortionStepper } from "./PortionStepper";
 import type { Meal, TrackedNutrient, Profile, Recipe } from "../types";
 
 export interface MealDetailModalProps {
@@ -45,6 +46,7 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
   mealsState = [],
 }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [portionMultiplier, setPortionMultiplier] = useState(1);
 
   // Tracked nutrients normalization
   const activeTrackedNutrients: TrackedNutrient[] = useMemo(() => {
@@ -57,17 +59,23 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
     }
   }, [profileData?.tracked_nutrients, profileData?.protein_goal, (profileData as any)?.goals?.dailyProtein]);
 
-  // Log count calculation
+  // Log count calculation prioritizing lifetime recipe popularity
   const logCount = useMemo(() => {
-    if (!meal?.name || !Array.isArray(mealsState)) return 1;
+    if (!meal?.name) return 1;
     try {
       const q = meal.name.trim().toLowerCase();
-      const count = mealsState.filter((m) => m && m.name && m.name.trim().toLowerCase() === q).length;
+      if (Array.isArray(recipesState)) {
+        const matchedRecipe = recipesState.find((r) => r && r.name && r.name.trim().toLowerCase() === q);
+        if (matchedRecipe && matchedRecipe.log_count && matchedRecipe.log_count > 0) {
+          return matchedRecipe.log_count;
+        }
+      }
+      const count = Array.isArray(mealsState) ? mealsState.filter((m) => m && m.name && m.name.trim().toLowerCase() === q).length : 0;
       return Math.max(1, count);
     } catch {
       return 1;
     }
-  }, [meal?.name, mealsState]);
+  }, [meal?.name, mealsState, recipesState]);
 
   // Check if already a recipe
   const isAlreadyRecipe = useMemo(() => {
@@ -120,6 +128,34 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
     const raw = Array.isArray(meal?.tags) ? meal!.tags : [];
     return raw.filter((t) => t && userActiveTags.has(String(t).toLowerCase()));
   }, [meal?.tags, userActiveTags]);
+
+  const getScaledMeal = (baseMeal: Meal): Meal => {
+    const mult = portionMultiplier > 0 ? portionMultiplier : 1;
+    const matchedRecipe = Array.isArray(recipesState)
+      ? recipesState.find((r) => r && (r.id === (baseMeal as any).recipe_id || (r.name && r.name.trim().toLowerCase() === baseMeal.name.trim().toLowerCase())))
+      : null;
+
+    const recipeId = (baseMeal as any).recipe_id || matchedRecipe?.id;
+
+    const scaledNutrients: Record<string, number> = {};
+    if (baseMeal.nutrients) {
+      Object.entries(baseMeal.nutrients).forEach(([k, v]) => {
+        scaledNutrients[k] = Math.round((v || 0) * mult);
+      });
+    }
+
+    return {
+      ...baseMeal,
+      recipe_id: recipeId,
+      calories: Math.round(baseMeal.calories * mult),
+      protein: Math.round(baseMeal.protein * mult),
+      carbs: Math.round(baseMeal.carbs * mult),
+      fats: Math.round(baseMeal.fats * mult),
+      fiber: Math.round((baseMeal.fiber || 0) * mult),
+      nutrients: Object.keys(scaledNutrients).length > 0 ? scaledNutrients : baseMeal.nutrients,
+      meal_description: mult !== 1 ? `${baseMeal.meal_description ? baseMeal.meal_description + " • " : ""}${mult}x portion` : baseMeal.meal_description,
+    } as any;
+  };
 
   if (typeof document === "undefined") return null;
 
@@ -357,8 +393,17 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
             </div>
           </div>
 
-            {/* STICKY BOTTOM ACTIONS BAR: 2 White Buttons (Top) + 1 Orange Primary Button (Bottom) */}
+            {/* STICKY BOTTOM ACTIONS BAR */}
             <div className="sticky bottom-0 p-4 bg-white/95 backdrop-blur-md border-t border-stone-200/60 shrink-0 w-full font-sans space-y-2.5 z-20">
+              {/* Portion Stepper for 1-Tap Scaling */}
+              <div className="bg-white/90 border border-stone-200/90 rounded-2xl p-2 shadow-3xs">
+                <PortionStepper
+                  value={portionMultiplier}
+                  onChange={setPortionMultiplier}
+                  label="Portion Multiplier"
+                />
+              </div>
+
               {/* Row 1: Two White Secondary Buttons (Shared 50/50 width or 100% if single) */}
               <div className={cn("grid gap-2.5", !isAlreadyRecipe && onConvertToRecipe ? "grid-cols-2" : "grid-cols-1")}>
                 {!isAlreadyRecipe && onConvertToRecipe && (
@@ -379,7 +424,7 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      onEditMeal(meal);
+                      onEditMeal(getScaledMeal(meal));
                       onClose();
                     }}
                     className="h-11 rounded-2xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-3xs"
@@ -394,13 +439,20 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  onLogToday(meal);
+                  onLogToday(getScaledMeal(meal));
                   onClose();
                 }}
                 className="w-full h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] shadow-lg shadow-orange-500/25 border-none"
               >
                 <Plus className="w-4 h-4 text-white stroke-[3]" />
-                <span>Log for Today (1-Tap)</span>
+                <span>
+                  Log for Today (1-Tap)
+                  {portionMultiplier !== 1 && (
+                    <span className="opacity-90 font-bold ml-1">
+                      • {Math.round(meal.calories * (portionMultiplier > 0 ? portionMultiplier : 1))} kcal
+                    </span>
+                  )}
+                </span>
               </button>
             </div>
           </motion.div>

@@ -5,6 +5,8 @@ import type { TrackedNutrient } from "../types";
 import { DEFAULT_TRACKED_NUTRIENTS, normalizeTrackedNutrients } from "../constants/nutrition";
 
 export interface PastFoodItem {
+  id?: string;
+  recipe_id?: string;
   name: string;
   calories: number;
   protein: number;

@@ -53,6 +53,8 @@ export const ManualLogModal = ({
   mealsState = [],
   recipesState = [],
   initialAiMode = true,
+  initialInstruction = "",
+  initialTaggedNames = [],
   initialPastFoodsDrawer = false,
   profileData,
   autoTriggerPhotoScan,
@@ -67,6 +69,8 @@ export const ManualLogModal = ({
   mealsState?: Meal[];
   recipesState?: any[];
   initialAiMode?: boolean;
+  initialInstruction?: string;
+  initialTaggedNames?: string[];
   initialPastFoodsDrawer?: boolean;
   profileData?: any;
   autoTriggerPhotoScan?: boolean;
@@ -156,8 +160,17 @@ export const ManualLogModal = ({
   };
   
   // AI Instruction & Photos
-  const [aiInstruction, setAiInstruction] = useState("");
-  const [taggedNames, setTaggedNames] = useState<string[]>([]);
+  const [aiInstruction, setAiInstruction] = useState(initialInstruction || "");
+  const [taggedNames, setTaggedNames] = useState<string[]>(initialTaggedNames || []);
+
+  useEffect(() => {
+    if (initialInstruction) {
+      setAiInstruction(initialInstruction);
+    }
+    if (initialTaggedNames && initialTaggedNames.length > 0) {
+      setTaggedNames(initialTaggedNames);
+    }
+  }, [initialInstruction, initialTaggedNames]);
   const notesAreaRef = useRef<HTMLTextAreaElement>(null);
   const [refinePrompt, setRefinePrompt] = useState("");
   const [isRefining, setIsRefining] = useState(false);
