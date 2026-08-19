@@ -292,10 +292,10 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
     localDraftBloatingTime || wellnessToday?.bloating_log_time || getNowTimeStr();
 
   const getBloatingDescription = (level: number) => {
-    if (level === 1) return "Level 1: Normal & comfortable — Zero bloating 🍃";
-    if (level === 2) return "Level 2: Mild tightness / Slight fullness after food 🟡";
-    if (level === 3) return "Level 3: Moderate bloating & noticeable belly pressure 🟠";
-    return "Level 4: Severe swelling, tight balloon distension 🔴";
+    if (level === 1) return "Level 1: Normal & Comfortable — Zero Bloating";
+    if (level === 2) return "Level 2: Mild Tightness — Slight Fullness After Food";
+    if (level === 3) return "Level 3: Moderate Bloating — Noticeable Belly Pressure";
+    return "Level 4: Severe Swelling — Tight Distension";
   };
 
   const formatInterestingTime = (timeStr?: string | null) => {
@@ -957,95 +957,84 @@ export const DailyVitalsSection: React.FC<DailyVitalsSectionProps> = ({
         </div>
       )}
 
-      {/* 5. BLOATING TRACKER (POPS OUT WHEN TOGGLED) */}
+      {/* 5. BLOATING TRACKER (UPGRADED MINIMALIST VISUALIZATION ART) */}
       {isBloatingActive && activeVitalsTab === "bloating" && (
-        <div className="flex flex-col gap-2">
-
+        <div className="flex flex-col gap-3 w-full animate-fade-in">
           {selectedDate === todayStr && (
-            <div className="flex flex-col gap-2 w-full animate-fade-in">
-              <div className="flex items-center gap-2.5 w-full">
-                {/* Left: Time Pill */}
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTimePickerTarget("bloating");
-                      setTimePickerInitialTime(activeBloatingTime);
-                      setIsTimePickerOpen(true);
-                    }}
-                    className="h-12 bg-stone-50 hover:bg-stone-100 border border-stone-200/80 rounded-2xl px-3 text-xs font-bold text-stone-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Clock className="w-3.5 h-3.5 text-stone-400" />
-                    <span>
-                      {formatInterestingTime(activeBloatingTime) ||
-                        activeBloatingTime}
+            <div className="flex flex-col gap-3 w-full bg-white/80 backdrop-blur-md border border-stone-200/70 rounded-3xl p-4 shadow-sm">
+              {/* Top Row: Vector Art Preview + Level Descriptor */}
+              <div className="flex items-center gap-3.5">
+                <div className="w-14 h-14 rounded-2xl bg-stone-50 border border-stone-200/80 flex items-center justify-center shrink-0 shadow-2xs">
+                  <BloatingStomachIcon level={currentBloating} className="w-10 h-10" />
+                </div>
+                <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
+                      Bloating Severity
                     </span>
-                  </button>
-                </div>
-
-                {/* Middle: Clean 1-4 Slider */}
-                <div className="flex-1 flex flex-col justify-center bg-white border border-stone-200/80 rounded-2xl px-3 py-3 shadow-3xs">
-                  <input
-                    type="range"
-                    min="1"
-                    max="4"
-                    value={currentBloating}
-                    onChange={(e) =>
-                      setLocalDraftBloating(parseInt(e.target.value))
-                    }
-                    onMouseDown={() => setLocalIsBloatingSliding(true)}
-                    onTouchStart={() => setLocalIsBloatingSliding(true)}
-                    onMouseUp={() =>
-                      setTimeout(() => setLocalIsBloatingSliding(false), 200)
-                    }
-                    onTouchEnd={() =>
-                      setTimeout(() => setLocalIsBloatingSliding(false), 200)
-                    }
-                    className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                  />
-                </div>
-
-                {/* Right: Action Box */}
-                <div className="w-12 h-12 [perspective:1000px] shrink-0">
-                  <div
-                    className={cn(
-                      "w-full h-full [transform-style:preserve-3d] transition-transform duration-500 relative",
-                      localIsBloatingSliding ? "[transform:rotateY(180deg)]" : ""
-                    )}
-                  >
-                    {/* FRONT: Log Button */}
                     <button
-                      onClick={async () => {
-                        await handleLogBloating(
-                          currentBloating,
-                          selectedDate,
-                          activeBloatingTime
-                        );
-                        setLocalDraftBloating(null);
-                        setLocalDraftBloatingTime("");
+                      type="button"
+                      onClick={() => {
+                        setTimePickerTarget("bloating");
+                        setTimePickerInitialTime(activeBloatingTime);
+                        setIsTimePickerOpen(true);
                       }}
-                      className="absolute inset-0 [backface-visibility:hidden] bg-[#F97316] hover:bg-orange-600 rounded-2xl flex items-center justify-center shadow-xs border-none cursor-pointer active:scale-95 transition-all"
-                      title="Log Bloating"
+                      className="text-[11px] font-bold text-stone-600 hover:text-stone-900 flex items-center gap-1 cursor-pointer border-none bg-transparent"
                     >
-                      <Check className="w-5 h-5 text-white" />
+                      <Clock className="w-3 h-3 text-orange-500" />
+                      <span>{formatInterestingTime(activeBloatingTime) || activeBloatingTime}</span>
                     </button>
-
-                    {/* BACK: Bloating Stomach Swelling Icon */}
-                    <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)] bg-stone-50 border border-stone-200/80 rounded-2xl flex items-center justify-center shadow-2xs">
-                      <BloatingStomachIcon level={currentBloating} className="w-7 h-7" />
-                    </div>
                   </div>
-                </div>
-              </div>
-
-              {/* Dynamic description below the section (only while sliding) */}
-              {localIsBloatingSliding && (
-                <div className="px-1 text-left animate-fade-in">
-                  <span className="text-[11px] font-medium text-stone-500">
+                  <span className="text-xs font-black text-stone-900 truncate">
                     {getBloatingDescription(currentBloating)}
                   </span>
                 </div>
-              )}
+              </div>
+
+              {/* 4 Interactive Bloating Level Selection Pills */}
+              <div className="grid grid-cols-4 gap-1.5 w-full">
+                {[
+                  { level: 1, label: "1 - Normal", activeBg: "bg-emerald-500 text-white border-emerald-500" },
+                  { level: 2, label: "2 - Mild", activeBg: "bg-amber-500 text-white border-amber-500" },
+                  { level: 3, label: "3 - Moderate", activeBg: "bg-orange-500 text-white border-orange-500" },
+                  { level: 4, label: "4 - Severe", activeBg: "bg-red-500 text-white border-red-500" },
+                ].map((item) => {
+                  const isSelected = currentBloating === item.level;
+                  return (
+                    <button
+                      key={item.level}
+                      type="button"
+                      onClick={() => setLocalDraftBloating(item.level)}
+                      className={cn(
+                        "h-10 rounded-xl text-[11px] font-bold transition-all cursor-pointer border active:scale-95 flex items-center justify-center",
+                        isSelected
+                          ? item.activeBg
+                          : "bg-stone-50 hover:bg-stone-100 text-stone-600 border-stone-200/80"
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Action Row: Log Bloating Button */}
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleLogBloating(
+                    currentBloating,
+                    selectedDate,
+                    activeBloatingTime
+                  );
+                  setLocalDraftBloating(null);
+                  setLocalDraftBloatingTime("");
+                }}
+                className="w-full h-11 bg-orange-500 hover:bg-orange-600 active:scale-[0.99] text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all border-none cursor-pointer"
+              >
+                <Check className="w-4 h-4 text-white" />
+                <span>Log Bloating Level {currentBloating}</span>
+              </button>
             </div>
           )}
         </div>

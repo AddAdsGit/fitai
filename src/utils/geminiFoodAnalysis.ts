@@ -146,11 +146,11 @@ Task:
 1. Determine if the main subject is edible food or a beverage. If NOT food (e.g. pen, keys, phone, desk, shoes, furniture), return JSON: {"isFood": false, "name": "Non-food item", "confidenceScore": 15}.
 2. If it IS food:
    - Identify the exact dish name (e.g., "Grilled Chicken Salad with Avocado").
-   - Write a concise 1-sentence description of ingredients and preparation (e.g., "Fresh grilled chicken breast over mixed greens, cherry tomatoes, and avocado.").
-   - Estimate total calories (kcal).
-   - Estimate confidence score (0-100).
-   - Provide clean dietary tags (e.g. ["High Protein", "Gluten Free"]).
-   - Estimate numerical values for ALL user-tracked nutrients: ${nutrientListStr}. Always include protein, carbs, fats, and fiber.
+    - Write a concise 1-2 sentence description detailing key ingredients, sauces, and cooking style/calorie density (e.g. "Made with fresh grilled chicken over mixed greens, cherry tomatoes & olive oil dressing. High-protein, low-carb meal."). NEVER use dry generic text like "AI Photo Recognition Log" or "Estimated nutrients based on...".
+    - Estimate total calories (kcal).
+    - Estimate confidence score (0-100).
+    - Provide clean dietary tags (e.g. ["High Protein", "Gluten Free"]).
+    - Estimate numerical values for ALL user-tracked nutrients: ${nutrientListStr}. Always include protein, carbs, fats, and fiber.
 
 Return ONLY a valid JSON object in this format:
 {"isFood": true, "name": "...", "meal_description": "...", "confidenceScore": 92, "calories": 450, "tags": ["High Protein"], "nutrients": ${JSON.stringify(sampleNutrientObj)}}`;
@@ -275,12 +275,41 @@ Return ONLY a valid JSON object in this format:
     }
   });
 
+  const cal = parseNum(parsed.calories) || Math.round(p * 4 + c * 4 + f * 9);
+
+  // Safeguard: Ensure EVERY active tracked nutrient in user's profile is populated
+  activeNutrients.forEach((item) => {
+    if (!item || (item as any).enabled === false || item.id === "protein") return;
+    const id = item.id;
+    if (dynamicNutrientMap[id] === undefined || dynamicNutrientMap[id] === null || isNaN(dynamicNutrientMap[id]) || dynamicNutrientMap[id] === 0) {
+      const lowerId = id.toLowerCase();
+      if (lowerId === "carbs") dynamicNutrientMap[id] = c;
+      else if (lowerId === "fats") dynamicNutrientMap[id] = f;
+      else if (lowerId === "fiber") dynamicNutrientMap[id] = fib;
+      else if (lowerId === "iron") dynamicNutrientMap[id] = Math.max(1, Math.round(cal * 0.005 * 10) / 10);
+      else if (lowerId === "zinc") dynamicNutrientMap[id] = Math.max(1, Math.round(cal * 0.004 * 10) / 10);
+      else if (lowerId === "selenium") dynamicNutrientMap[id] = Math.max(5, Math.round(cal * 0.08));
+      else if (lowerId === "sodium") dynamicNutrientMap[id] = Math.round(cal * 1.5);
+      else if (lowerId === "caffeine") dynamicNutrientMap[id] = 0;
+      else if (lowerId === "calcium") dynamicNutrientMap[id] = Math.round(cal * 0.4);
+      else if (lowerId === "potassium") dynamicNutrientMap[id] = Math.round(cal * 0.8);
+      else dynamicNutrientMap[id] = Math.round(((item as any).target ? (item as any).target * 0.25 : 5) * 10) / 10;
+    }
+  });
+
   const rawTags = Array.isArray(parsed.tags) && parsed.tags.length > 0 ? parsed.tags : ["Photo Log"];
   const cleanTags = rawTags.map((t: string) =>
     t.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "").trim()
   ).filter(Boolean);
 
-  const cal = parseNum(parsed.calories) || Math.round(p * 4 + c * 4 + f * 9);
+  let cleanDesc = parsed.meal_description || notes.trim() || "";
+  if (cleanDesc) {
+    cleanDesc = cleanDesc
+      .replace(/^AI Photo Recognition Log[.!]?\s*/i, "")
+      .replace(/^Estimated (nutrients|macros|values) based on [^.:]*[.!]?\s*/i, "")
+      .replace(/^Standard (portion|serving) of [^.:]*[.!]?\s*/i, "")
+      .trim();
+  }
 
   return {
     isFood: parsed.isFood !== false,
@@ -293,7 +322,7 @@ Return ONLY a valid JSON object in this format:
     fiber: fib,
     nutrients: dynamicNutrientMap,
     tags: cleanTags,
-    meal_description: parsed.meal_description || notes.trim() || "AI Photo Recognition Log",
+    meal_description: cleanDesc || notes.trim() || `Prepared dish item. Estimated ${cal} kcal.`,
   };
 };
 

@@ -906,19 +906,51 @@ export const ManualLogModal = ({
 
     const finalImage = imageUrl || uploadedImage || attachedItem?.image || FALLBACK_FOOD_IMAGE;
 
-    const manualMeal = {
+    // Safeguard: Ensure EVERY active tracked nutrient in user's profile is populated
+    const finalNutrientMap: Record<string, number> = { ...editableNutrients };
+    const calVal = parseInt(calories) || (attachedItem ? attachedItem.calories : 350);
+
+    activeTrackedNutrients.forEach((item) => {
+      if (!item || !item.enabled || item.id === "protein") return;
+      const id = item.id;
+      if (finalNutrientMap[id] === undefined || finalNutrientMap[id] === null || finalNutrientMap[id] === 0) {
+        const lowerId = id.toLowerCase();
+        if (lowerId === "carbs") finalNutrientMap[id] = finalNutrientMap.carbs || Math.round(calVal * 0.12);
+        else if (lowerId === "fats") finalNutrientMap[id] = finalNutrientMap.fats || Math.round(calVal * 0.03);
+        else if (lowerId === "fiber") finalNutrientMap[id] = finalNutrientMap.fiber || Math.max(1, Math.round(calVal * 0.01));
+        else if (lowerId === "iron") finalNutrientMap[id] = Math.max(1, Math.round(calVal * 0.005 * 10) / 10);
+        else if (lowerId === "zinc") finalNutrientMap[id] = Math.max(1, Math.round(calVal * 0.004 * 10) / 10);
+        else if (lowerId === "selenium") finalNutrientMap[id] = Math.max(5, Math.round(calVal * 0.08));
+        else if (lowerId === "sodium") finalNutrientMap[id] = Math.round(calVal * 1.5);
+        else if (lowerId === "caffeine") finalNutrientMap[id] = 0;
+        else if (lowerId === "calcium") finalNutrientMap[id] = Math.round(calVal * 0.4);
+        else if (lowerId === "potassium") finalNutrientMap[id] = Math.round(calVal * 0.8);
+        else finalNutrientMap[id] = Math.round(((item as any).target ? (item as any).target * 0.25 : 5) * 10) / 10;
+      }
+    });
+
+    let cleanManualDesc = mealDescription.trim();
+    if (cleanManualDesc) {
+      cleanManualDesc = cleanManualDesc
+        .replace(/^Estimated (nutrients|macros|values) based on [^.:]*[.!]?\s*/i, "")
+        .replace(/^Standard (portion|serving) of [^.:]*[.!]?\s*/i, "")
+        .trim();
+    }
+
+    const manualMeal: Meal = {
       id: mealToEdit?.id || `meal_${Date.now()}`,
+      date: (mealToEdit as any)?.date || new Date().toISOString().split("T")[0],
       name: finalName,
-      calories: parseInt(calories) || (attachedItem ? attachedItem.calories : 350),
-      protein: editableNutrients.protein || (attachedItem ? attachedItem.protein : 0),
-      carbs: editableNutrients.carbs || (attachedItem ? attachedItem.carbs : 0),
-      fats: editableNutrients.fats || (attachedItem ? attachedItem.fats : 0),
-      fiber: editableNutrients.fiber || (attachedItem ? attachedItem.fiber || 0 : 0),
-      nutrients: editableNutrients,
+      calories: calVal,
+      protein: finalNutrientMap.protein || (attachedItem ? attachedItem.protein : 0),
+      carbs: finalNutrientMap.carbs || (attachedItem ? attachedItem.carbs : 0),
+      fats: finalNutrientMap.fats || (attachedItem ? attachedItem.fats : 0),
+      fiber: finalNutrientMap.fiber || (attachedItem ? attachedItem.fiber || 0 : 0),
+      nutrients: finalNutrientMap,
       type: mealToEdit?.type || "Manual Log",
       time: time.trim(),
       image: finalImage,
-      meal_description: mealDescription.trim(),
+      meal_description: cleanManualDesc,
       tags: selectedTags.length > 0 ? selectedTags : ["Manual Log"]
     };
 
