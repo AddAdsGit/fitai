@@ -1,7 +1,11 @@
-export default async function handler(req: any, res: any) {
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(req: Request) {
   if (req.method === 'POST') {
     try {
-      const update = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const update: any = await req.json().catch(() => ({}));
       const msg = update?.message || update?.edited_message;
       if (msg && msg.chat && msg.chat.id) {
         const chatId = msg.chat.id;
@@ -27,9 +31,9 @@ export default async function handler(req: any, res: any) {
         });
       }
     } catch (e) {
-      console.error('Webhook error:', e);
+      console.error('Telegram webhook error:', e);
     }
-    return res.status(200).send('OK');
+    return new Response('OK', { status: 200 });
   }
-  return res.status(200).send('FitAI Telegram Webhook is active');
+  return new Response('FitAI Telegram Webhook Active', { status: 200 });
 }
