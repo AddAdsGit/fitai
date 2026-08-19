@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Flame, Bot, ArrowRight, Check, Sparkles, X } from "lucide-react";
@@ -34,6 +34,17 @@ const STEPS = [
 export const DashboardWalkthrough = ({ onDismiss }: DashboardWalkthroughProps) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+  }, []);
+
   const handleNext = () => {
     if (currentStepIndex < STEPS.length - 1) {
       setCurrentStepIndex(prev => prev + 1);
@@ -47,28 +58,46 @@ export const DashboardWalkthrough = ({ onDismiss }: DashboardWalkthroughProps) =
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-orange-950/40 backdrop-blur-md animate-fadeIn">
+      <div
+        className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onDismiss();
+        }}
+      >
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onDismiss}
+          className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
+        />
+
+        {/* Bottom Sheet */}
         <motion.div
           key={currentStepIndex}
-          initial={{ scale: 0.9, opacity: 0, y: 15 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.9, opacity: 0, y: -15 }}
-          transition={{ duration: 0.25, ease: "easeOut" }}
-          className="bg-white/95 backdrop-blur-2xl rounded-[32px] p-6 max-w-sm w-full border border-white shadow-2xl shadow-orange-950/20 text-orange-950 space-y-5 relative overflow-hidden"
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 28, stiffness: 280 }}
+          className="bg-[#FAF7F2] border-t border-x border-stone-200/80 rounded-t-[36px] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] max-w-md w-full shadow-[0_-10px_40px_rgba(0,0,0,0.2)] text-orange-950 space-y-4 relative z-10 overscroll-contain touch-pan-y"
         >
+          {/* Top Drag Indicator Pill */}
+          <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
+
           {/* Top Skip Button */}
           <button
             type="button"
             onClick={onDismiss}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-orange-50 hover:bg-orange-100 text-orange-900/60 hover:text-orange-950 flex items-center justify-center border-none cursor-pointer transition-all"
+            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center border-none cursor-pointer transition-all"
           >
             <X className="w-4 h-4" />
           </button>
 
           {/* Header Icon & Step Badge */}
-          <div className="flex flex-col items-center text-center space-y-2 pt-2">
-            <div className={`w-14 h-14 rounded-2xl ${currentStep.iconBg} shadow-lg flex items-center justify-center text-white`}>
-              <StepIcon className="w-7 h-7" />
+          <div className="flex flex-col items-center text-center space-y-2 pt-1">
+            <div className={`w-13 h-13 rounded-2xl ${currentStep.iconBg} shadow-lg flex items-center justify-center text-white`}>
+              <StepIcon className="w-6 h-6" />
             </div>
             
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100/60 border border-orange-200/50">
@@ -78,18 +107,18 @@ export const DashboardWalkthrough = ({ onDismiss }: DashboardWalkthroughProps) =
               </span>
             </div>
 
-            <h3 className="text-xl font-black text-orange-950 tracking-tight leading-snug">
+            <h3 className="text-lg font-black text-orange-950 tracking-tight leading-snug">
               {currentStep.title}
             </h3>
           </div>
 
           {/* Card Body */}
-          <div className="bg-orange-50/40 rounded-2xl p-4 border border-orange-100/60 text-xs font-bold text-orange-900/70 leading-relaxed text-center">
+          <div className="bg-white rounded-2xl p-4 border border-stone-200/80 text-xs font-medium text-stone-700 leading-relaxed text-center shadow-3xs">
             {currentStep.description}
           </div>
 
           {/* Step Dots & Next CTA */}
-          <div className="space-y-3 pt-1">
+          <div className="space-y-3 pt-1 select-none">
             <div className="flex justify-center gap-1.5">
               {STEPS.map((_, idx) => (
                 <div
@@ -104,7 +133,7 @@ export const DashboardWalkthrough = ({ onDismiss }: DashboardWalkthroughProps) =
             <button
               type="button"
               onClick={handleNext}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-3.5 rounded-2xl shadow-lg shadow-orange-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-3.5 rounded-2xl shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer border-none"
             >
               <span>{currentStepIndex === STEPS.length - 1 ? "Got It! Let's Go 🚀" : "Next Feature"}</span>
               <ArrowRight className="w-4 h-4" />

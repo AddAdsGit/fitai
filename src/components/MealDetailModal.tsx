@@ -261,31 +261,35 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
               {/* Scrollable Details Content Body */}
               <div className="p-5 space-y-4 text-left">
               {/* 1. Quick Stats Banner (Logged Time & Total Energy) */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[8.5px] font-black uppercase text-stone-400 tracking-wider block">
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex flex-col justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
+                      <Clock className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-stone-400 tracking-wider truncate">
                       Logged Time
                     </span>
-                    <span className="text-xs font-black text-stone-900 truncate block">
+                  </div>
+                  <div className="bg-stone-50 border border-stone-200/60 rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-xs font-black text-stone-900 font-mono block truncate">
                       {formatDisplayTime(meal.time)}
                     </span>
                   </div>
                 </div>
 
-                <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600 shrink-0">
-                    <Flame className="w-4 h-4 text-orange-500" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[8.5px] font-black uppercase text-orange-600 tracking-wider block">
-                      Total Energy
+                <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex flex-col justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-600 shrink-0">
+                      <Flame className="w-3.5 h-3.5 text-orange-500" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-orange-600 tracking-wider truncate">
+                      Calories
                     </span>
-                    <span className="text-xs font-black text-stone-900 truncate block">
-                      {meal.calories || 0} kcal
+                  </div>
+                  <div className="bg-orange-50/60 border border-orange-200/60 rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-xs font-black text-orange-950 font-mono block truncate">
+                      {meal.calories || 0} <span className="text-[9px] font-black text-orange-950/50 uppercase">kcal</span>
                     </span>
                   </div>
                 </div>

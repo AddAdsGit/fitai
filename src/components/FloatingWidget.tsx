@@ -1,16 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Camera, Mic, Heart } from "lucide-react";
+import { Plus, Camera, Mic, Heart, Sparkles, Search, Edit2, Bot } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
 import { ChatGPTIcon } from "./ChatGPTIcon";
 
-export type FloatingActionType = "gpt" | "voice" | "camera" | "vitals" | "manual";
+export type FloatingActionType =
+  | "ai_logger"
+  | "quick_log"
+  | "detailed_log"
+  | "camera"
+  | "vitals"
+  | "gpt"
+  | "voice"
+  | "manual";
 
 export interface FloatingWidgetProps {
   isVisible?: boolean;
-  actionType?: FloatingActionType;
-  onExecuteAction: (action: FloatingActionType) => void;
+  actionType?: FloatingActionType | string;
+  onExecuteAction: (action: FloatingActionType | string) => void;
 }
 
 export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
@@ -41,14 +49,19 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
 
   const renderIcon = () => {
     switch (actionType) {
-      case "voice":
-        return <Mic className="w-5.5 h-5.5 text-white" />;
+      case "ai_logger":
+        return <Sparkles className="w-5.5 h-5.5 text-white" />;
+      case "quick_log":
+        return <Search className="w-5.5 h-5.5 text-white" />;
+      case "detailed_log":
+      case "manual":
+        return <Edit2 className="w-5.5 h-5.5 text-white" />;
       case "camera":
         return <Camera className="w-5.5 h-5.5 text-white" />;
       case "vitals":
         return <Heart className="w-5.5 h-5.5 text-white fill-white" />;
-      case "manual":
-        return <Plus className="w-5.5 h-5.5 text-white" />;
+      case "voice":
+        return <Mic className="w-5.5 h-5.5 text-white" />;
       case "gpt":
       default:
         return <ChatGPTIcon className="w-5.5 h-5.5 text-white" />;
@@ -57,14 +70,19 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
 
   const getLabel = () => {
     switch (actionType) {
-      case "voice":
-        return "AI Voice Meal Log";
+      case "ai_logger":
+        return "AI Meal Logger";
+      case "quick_log":
+        return "Past Foods";
+      case "detailed_log":
+      case "manual":
+        return "Manual Macro Form";
       case "camera":
-        return "AI Photo Meal Log";
+        return "Direct Camera Capture";
       case "vitals":
         return "Daily Vitals Tracker";
-      case "manual":
-        return "Quick Meal Log";
+      case "voice":
+        return "AI Voice Meal Log";
       case "gpt":
       default:
         return "Open FitAI Custom GPT";

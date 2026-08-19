@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Camera, User, Smile, Scale, Ruler, Target, Info, Plus, Minus, Tag, X, ChevronLeft, Droplet, Activity, Zap, Pencil, Trash2, Search, Check, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../lib/utils";
@@ -269,7 +270,7 @@ export const EditProfileView = ({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
       transition={{ duration: 0.3 }}
-      className="mt-4 relative z-10 pb-32"
+      className="pt-6 sm:pt-8 relative z-10 pb-32"
     >
       <div className="px-2.5 sm:px-4 space-y-4 max-w-md mx-auto">
         {/* Minimalist Back Navigation */}
@@ -1352,31 +1353,49 @@ export const EditProfileView = ({
         const info = infoMap[activeInfoKey];
         if (!info) return null;
 
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
-            <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-stone-200/80 text-left space-y-4 animate-scale-in">
-              <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                <h3 className="text-sm font-black text-stone-850 tracking-tight">{info.title}</h3>
+        return createPortal(
+          <div
+            className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setActiveInfoKey(null);
+            }}
+          >
+            {/* Backdrop */}
+            <div
+              onClick={() => setActiveInfoKey(null)}
+              className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
+            />
+
+            {/* Bottom Sheet Card */}
+            <div className="bg-[#FAF7F2] border-t border-x border-stone-200/80 rounded-t-[36px] w-full max-w-md relative z-10 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] text-left space-y-4 overscroll-contain touch-pan-y animate-slide-up">
+              {/* Top Drag Indicator Pill */}
+              <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-2 shrink-0 select-none" />
+
+              <div className="flex items-center justify-between border-b border-stone-200/60 pb-3">
+                <h3 className="text-sm font-black text-stone-900 tracking-tight">{info.title}</h3>
                 <button
                   type="button"
                   onClick={() => setActiveInfoKey(null)}
-                  className="w-7 h-7 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center border-none cursor-pointer transition-all active:scale-95"
+                  className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center border-none cursor-pointer transition-all active:scale-95"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-xs text-stone-600 leading-relaxed whitespace-pre-line font-medium">
-                {info.desc}
-              </p>
+              <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
+                <p className="text-xs text-stone-700 leading-relaxed whitespace-pre-line font-medium">
+                  {info.desc}
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setActiveInfoKey(null)}
-                className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs py-3 rounded-2xl shadow-sm border-none cursor-pointer transition-all active:scale-98"
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider py-3 rounded-2xl shadow-md shadow-orange-500/20 border-none cursor-pointer transition-all active:scale-98"
               >
                 Got it
               </button>
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
     </motion.div>

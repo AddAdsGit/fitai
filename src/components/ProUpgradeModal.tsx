@@ -1,118 +1,144 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { ChevronRight, BarChart2, Brain, Target, Bot } from "lucide-react";
-import { motion } from "motion/react";
+import { X, BarChart2, Brain, Target, Bot, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 
-export const ProUpgradeModal = ({ onClose }: { onClose: () => void }) =>
-  createPortal(
-    <div className="fixed inset-0 z-[9999] flex flex-col pointer-events-none">
-    {/* Backdrop */}
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
-    />
+export const ProUpgradeModal = ({ onClose }: { onClose: () => void }) => {
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+  }, []);
 
-    {/* Modal Content */}
-    <motion.div
-      initial={{ y: "100%", opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: "100%", opacity: 0 }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="absolute top-12 bottom-0 left-0 right-0 bg-[#FAF9F6] rounded-t-[40px] pointer-events-auto p-6 flex flex-col shadow-2xl overflow-y-auto"
-    >
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-[2rem] font-light tracking-tight text-[#1a1a1a] leading-none flex items-center gap-2">
-          FitAI{" "}
-          <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">
-            PRO
-          </span>
-        </h2>
-        <button
+  return createPortal(
+    <AnimatePresence>
+      <div
+        className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           onClick={onClose}
-          className="w-8 h-8 flex items-center justify-center bg-black/5 rounded-full text-black/50 hover:bg-black/10 transition-colors"
+          className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
+        />
+
+        {/* Modal Content */}
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 28, stiffness: 280 }}
+          className="bg-[#FAF7F2] border-t border-x border-stone-200/80 rounded-t-[36px] w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.2)] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] flex flex-col gap-5 max-h-[90vh] overflow-y-auto overscroll-contain touch-pan-y relative z-10 text-left"
         >
-          <ChevronRight className="w-5 h-5 rotate-90" />
-        </button>
-      </div>
+          {/* Top Drag Handle */}
+          <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
 
-      <div className="flex-1 space-y-6 text-left">
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-[32px] p-6 text-white shadow-lg shadow-orange-500/20 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10" />
-          <h3 className="text-2xl font-bold mb-2 relative z-10">
-            Maximize Your Results
-          </h3>
-          <p className="text-orange-100 font-medium mb-6 relative z-10 text-sm">
-            Unlock personalized coaching, data insights, and integrations.
-          </p>
-          <div className="flex items-end gap-1 relative z-10">
-            <span className="text-4xl font-black">$9.99</span>
-            <span className="text-orange-200 mb-1">/month</span>
+          <div className="flex justify-between items-center select-none pb-1 border-b border-stone-200/60">
+            <h2 className="text-xl font-black tracking-tight text-orange-950 flex items-center gap-1.5">
+              <span>FitAI</span>
+              <span className="px-2 py-0.5 rounded-full bg-orange-500 text-white text-[10px] uppercase font-black tracking-widest shadow-xs">
+                PRO
+              </span>
+            </h2>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center bg-stone-100 hover:bg-stone-200 rounded-full text-stone-500 transition-colors border-none cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-        </div>
 
-        <div className="space-y-4">
-          <h4 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] px-2">
-            Pro Features
-          </h4>
-          <div className="space-y-3">
-            {[
-              {
-                title: "Advanced Data Analysis",
-                desc: "Unlock trends over 3 months and AI-powered correlations.",
-                icon: <BarChart2 className="w-4 h-4" />,
-              },
-              {
-                title: "Priority AI Responses",
-                desc: "Get answers instantly with prioritized inference.",
-                icon: <Brain className="w-4 h-4" />,
-              },
-              {
-                title: "Smart Goal Tracking",
-                desc: "AI automatically adjusts your targets based on progress.",
-                icon: <Target className="w-4 h-4" />,
-              },
-              {
-                title: "All Integrations",
-                desc: "Connect with Telegram, ChatGPT, and Claude without limits.",
-                icon: <Bot className="w-4 h-4" />,
-              },
-            ].map((feature, i) => (
-              <div
-                key={i}
-                className="flex gap-4 p-3 bg-white rounded-[24px] shadow-[0_2px_8px_rgba(0,0,0,0.04)] items-center"
-              >
-                <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center shrink-0">
-                  {feature.icon}
-                </div>
-                <div>
-                  <div className="font-medium text-[#1a1a1a] mb-0.5">
-                    {feature.title}
-                  </div>
-                  <div className="text-[11px] text-[#9e9e9e] leading-tight">
-                    {feature.desc}
-                  </div>
-                </div>
+          <div className="flex-1 space-y-4 text-left">
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-[28px] p-5 text-white shadow-lg shadow-orange-500/20 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10" />
+              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/20 text-white text-[9px] font-black uppercase tracking-wider mb-3">
+                <Sparkles className="w-3 h-3" />
+                <span>Next-Gen Fitness AI</span>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
+              <h3 className="text-xl font-black mb-1 relative z-10">
+                Maximize Your Results
+              </h3>
+              <p className="text-orange-100 font-medium mb-4 relative z-10 text-xs leading-relaxed">
+                Unlock 1-on-1 AI coaching, advanced metabolic analytics, and recipe intelligence.
+              </p>
+              <div className="flex items-end gap-1 relative z-10">
+                <span className="text-3xl font-black">$9.99</span>
+                <span className="text-orange-100 mb-1 text-xs font-bold">/month</span>
+              </div>
+            </div>
 
-      <div className="pt-6 mt-auto pb-8">
-        <button
-          disabled
-          className="w-full bg-stone-200 text-stone-500 font-bold py-4 rounded-[24px] cursor-not-allowed"
-        >
-          Coming soon
-        </button>
-        <div className="text-center text-[10px] text-[#9e9e9e] mt-4 font-medium">
-          Pro subscriptions aren&apos;t available yet.
-        </div>
+            <div className="space-y-3">
+              <span className="text-[10px] font-black text-stone-400 uppercase tracking-widest block px-1">
+                Included Features
+              </span>
+              <div className="space-y-2">
+                {[
+                  {
+                    title: "Advanced Data Analysis",
+                    desc: "Unlock trends over 3 months and AI-powered metabolic correlations.",
+                    icon: <BarChart2 className="w-4 h-4 text-orange-500" />,
+                  },
+                  {
+                    title: "Priority AI Responses",
+                    desc: "Get meal analysis and coaching answers instantly with zero wait time.",
+                    icon: <Brain className="w-4 h-4 text-orange-500" />,
+                  },
+                  {
+                    title: "Smart Goal Tracking",
+                    desc: "AI automatically adjusts your macro targets based on actual progress.",
+                    icon: <Target className="w-4 h-4 text-orange-500" />,
+                  },
+                  {
+                    title: "All Integrations",
+                    desc: "Connect with Apple Health, Telegram, and wearables seamlessly.",
+                    icon: <Bot className="w-4 h-4 text-orange-500" />,
+                  },
+                ].map((feature, i) => (
+                  <div
+                    key={i}
+                    className="flex gap-3.5 p-3.5 bg-white border border-stone-200/80 rounded-2xl shadow-3xs items-center"
+                  >
+                    <div className="w-9 h-9 bg-orange-50 rounded-xl flex items-center justify-center shrink-0">
+                      {feature.icon}
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-orange-950 mb-0.5">
+                        {feature.title}
+                      </div>
+                      <div className="text-[10px] text-stone-500 font-medium leading-tight">
+                        {feature.desc}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2 mt-auto">
+            <button
+              disabled
+              className="w-full bg-stone-200 text-stone-400 font-black text-xs uppercase tracking-wider py-3.5 rounded-2xl cursor-not-allowed border-none"
+            >
+              Coming Soon
+            </button>
+            <div className="text-center text-[10px] text-stone-400 mt-2 font-semibold">
+              Pro subscriptions are launching soon!
+            </div>
+          </div>
+        </motion.div>
       </div>
-    </motion.div>
-  </div>,
-  document.body
-);
+    </AnimatePresence>,
+    document.body
+  );
+};

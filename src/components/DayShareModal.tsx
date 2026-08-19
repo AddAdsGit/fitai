@@ -8,6 +8,8 @@ import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
 import { cn } from "../lib/utils";
 import { dayCardVariations } from "./sharecards/registry";
 import { ObsidianCardComponent } from "./sharecards/ObsidianCardComponent";
+import { ChronoCardComponent } from "./sharecards/ChronoCardComponent";
+import { SwissMinimalistCardComponent } from "./sharecards/SwissMinimalistCardComponent";
 
 interface DayShareModalProps {
   item: any; // Day summary object
@@ -28,24 +30,23 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
 
   const initialIndex = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
-    const testVar = params.get("variation");
-    if (testVar) {
-      const idx = parseInt(testVar, 10);
-      return idx >= 0 && idx < variations.length ? idx : 0;
+    const varParam = params.get("card");
+    if (varParam) {
+      const idx = variations.findIndex((v) => v.id === varParam);
+      if (idx !== -1) return idx;
     }
     return 0;
   }, [variations]);
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [copied, setCopied] = useState(false);
-  const [loadingUrl, setLoadingUrl] = useState(false);
-  const [shortUrl, setShortUrl] = useState<string | null>(null);
-  const [previewTab, setPreviewTab] = useState<"card" | "webpage">("card");
   const [canShareFile, setCanShareFile] = useState(false);
+  const [previewTab, setPreviewTab] = useState<"card" | "link">("card");
   const [fontsLoaded, setFontsLoaded] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState<"obsidian" | "sunset">("sunset");
   const [mealImages, setMealImages] = useState<Record<string, HTMLImageElement>>({});
-  const [scale, setScale] = useState(0.3);
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [loadingUrl, setLoadingUrl] = useState<boolean>(false);
+  const [scale, setScale] = useState(1);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -53,6 +54,9 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   const currentVar = variations[currentIndex];
   const cardFormat = currentVar.format;
   const isObsidian = currentVar.id === "obsidian" || currentVar.id === "obsidian_split" || currentVar.id === "obsidian_split_circles" || currentVar.id === "obsidian_creative";
+  const isChrono = currentVar.id === "chrono";
+  const isSwiss = currentVar.id === "swiss";
+  const isDomCard = isObsidian || isChrono || isSwiss;
 
   const mealsList = item.meals || [];
   
@@ -121,8 +125,8 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   const finalLink = shortUrl || generateShareUrl("day", payload);
 
   const drawCanvas = () => {
-    // Only draw canvas for standard variations, skip Obsidian
-    if (isObsidian) return;
+    // Only draw canvas for standard variations, skip DOM-rendered cards
+    if (isDomCard) return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -204,23 +208,29 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   };
 
   const handleDownloadImage = async () => {
-    if (isObsidian) {
-      const node = document.getElementById("obsidian-card-capture");
+    if (isDomCard) {
+      const node = document.getElementById("dom-card-capture");
       if (!node) return;
       triggerToast("⏳ Preparing high-res card...");
       
       try {
         // Wait for rendering elements & fonts to settle
         await new Promise((resolve) => setTimeout(resolve, 250));
+        const exportWidth = 1080;
+        const exportHeight = isSwiss ? 1440 : 1920;
+        const nodeWidth = isSwiss ? 360 : 390;
+        const nodeHeight = isSwiss ? 480 : 693.3;
+        const scaleFactor = exportWidth / nodeWidth;
+
         const dataUrl = await toPng(node, {
           cacheBust: true,
-          width: 1080,
-          height: 1920,
+          width: exportWidth,
+          height: exportHeight,
           style: {
-            transform: "scale(2.76923)",
+            transform: `scale(${scaleFactor})`,
             transformOrigin: "top left",
-            width: "390px",
-            height: "693.3px",
+            width: `${nodeWidth}px`,
+            height: `${nodeHeight}px`,
           },
         });
         
@@ -247,23 +257,29 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
   };
 
   const handleNativeShare = async () => {
-    if (isObsidian) {
-      const node = document.getElementById("obsidian-card-capture");
+    if (isDomCard) {
+      const node = document.getElementById("dom-card-capture");
       if (!node) return;
       triggerToast("⏳ Preparing share card...");
       
       try {
         // Wait for rendering elements & fonts to settle
         await new Promise((resolve) => setTimeout(resolve, 250));
+        const exportWidth = 1080;
+        const exportHeight = isSwiss ? 1440 : 1920;
+        const nodeWidth = isSwiss ? 360 : 390;
+        const nodeHeight = isSwiss ? 480 : 693.3;
+        const scaleFactor = exportWidth / nodeWidth;
+
         const dataUrl = await toPng(node, {
           cacheBust: true,
-          width: 1080,
-          height: 1920,
+          width: exportWidth,
+          height: exportHeight,
           style: {
-            transform: "scale(2.76923)",
+            transform: `scale(${scaleFactor})`,
             transformOrigin: "top left",
-            width: "390px",
-            height: "693.3px",
+            width: `${nodeWidth}px`,
+            height: `${nodeHeight}px`,
           },
         });
         
@@ -346,76 +362,122 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
     getOrCreateShortLink();
   }, [payload]);
 
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+  }, []);
+
   return createPortal(
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="fixed inset-0 bg-orange-950/30 backdrop-blur-md z-[9999] flex items-center justify-center p-6 font-sans text-orange-950 cursor-pointer"
+    <div
+      className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <motion.div
-        initial={{ scale: 0.95, y: 15 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 15 }}
-        onClick={(e) => e.stopPropagation()}
-        className="bg-[#FAF7F2] border border-white rounded-[32px] w-full max-w-[400px] shadow-xl shadow-orange-100/20 p-6 flex flex-col items-center gap-5 max-h-[90vh] overflow-y-auto no-scrollbar scroll-smooth cursor-default"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
+      />
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 28, stiffness: 280 }}
+        className="bg-[#FAF7F2] border-t border-x border-stone-200/80 rounded-t-[36px] w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.2)] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] flex flex-col items-center gap-4 max-h-[88vh] overflow-y-auto overscroll-contain touch-pan-y relative z-10 text-left"
       >
+        {/* Top Drag Indicator Pill */}
+        <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
+
         {/* Header */}
-        <div className="flex justify-between items-center w-full">
-          <span className="text-[10px] font-black uppercase tracking-widest text-orange-900/40">
+        <div className="flex justify-between items-center w-full select-none pb-1 border-b border-stone-200/60">
+          <span className="text-[10px] font-black uppercase tracking-widest text-orange-950">
             Share Daily Progress
           </span>
           <button
             onClick={onClose}
-            className="w-7 h-7 bg-orange-100/40 hover:bg-orange-100/80 text-orange-950/60 rounded-full flex items-center justify-center cursor-pointer transition-colors"
+            className="w-8 h-8 bg-stone-100 hover:bg-stone-200 text-stone-500 rounded-full flex items-center justify-center cursor-pointer transition-colors border-none"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Preview Container */}
-        <div className="relative w-full aspect-square flex flex-col items-center justify-center">
-          <div 
-            ref={containerRef}
+        <div className="relative w-full flex flex-col items-center justify-center py-1">
+          <motion.div
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.3}
+            onDragEnd={(_, info) => {
+              if (info.offset.x > 60) handlePrev();
+              else if (info.offset.x < -60) handleNext();
+            }}
             className={cn(
-              "relative w-full rounded-[28px] shadow-lg border border-orange-100/30 select-none bg-[#0A0504] no-scrollbar",
-              isObsidian ? "h-[380px] overflow-y-auto" : "aspect-square overflow-hidden flex items-center justify-center"
+              "relative rounded-[28px] overflow-hidden shadow-2xl border border-stone-200/90 select-none bg-white cursor-grab active:cursor-grabbing flex items-center justify-center",
+              isSwiss ? "w-[260px] h-[347px]" : isDomCard ? "w-[246px] h-[437px]" : "w-[260px] h-[347px]"
             )}
           >
-            <motion.div
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.4}
-              onDragEnd={(_, info) => {
-                if (info.offset.x > 80) handlePrev();
-                else if (info.offset.x < -80) handleNext();
-              }}
-              className="w-full flex flex-col items-center justify-start relative cursor-grab active:cursor-grabbing"
-              style={isObsidian ? { height: `${693.3 * scale + 32}px`, minHeight: "100%" } : { height: "100%", width: "100%" }}
-            >
-              {isObsidian ? (
-                /* Dynamic HTML Rendering with CSS scaling for the Obsidian/Dashboard Card */
-                <div 
-                  style={{
-                    width: "390px",
-                    height: "693.3px",
-                    transform: `scale(${scale})`,
-                    transformOrigin: "top left",
-                    position: "absolute",
-                    top: "16px",
-                    left: 0,
-                    flexShrink: 0
-                  }}
-                >
+            {isDomCard ? (
+              /* Dynamic HTML Rendering with CSS scaling for the DOM Cards (Obsidian, Chrono, Swiss) */
+              <div 
+                id="dom-card-capture"
+                style={
+                  isSwiss
+                    ? {
+                        width: "360px",
+                        height: "480px",
+                        transform: "scale(0.7222)",
+                        transformOrigin: "top left",
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        flexShrink: 0,
+                      }
+                    : {
+                        width: "390px",
+                        height: "693.3px",
+                        transform: "scale(0.630769)",
+                        transformOrigin: "top left",
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        flexShrink: 0,
+                      }
+                }
+              >
+                {isSwiss ? (
+                  <SwissMinimalistCardComponent
+                    date={item.date}
+                    calories={calories}
+                    protein={protein}
+                    targetCalories={Number(profileData.goals?.dailyCalories || 2000)}
+                    targetProtein={Number(profileData.macros?.protein || 150)}
+                    mealsList={mealsList}
+                    handleStr={handleStr}
+                  />
+                ) : isChrono ? (
+                  <ChronoCardComponent
+                    date={item.date}
+                    calories={calories}
+                    protein={protein}
+                    targetProtein={Number(profileData.macros?.protein || 150)}
+                    mealsList={mealsList}
+                    mealImages={mealImages}
+                    handleStr={handleStr}
+                  />
+                ) : (
                   <ObsidianCardComponent
                     layout={
                       currentVar.id === "obsidian_split_circles"
                         ? "split_circles"
-                        : currentVar.id === "obsidian_split"
-                        ? "split"
-                        : currentVar.id === "obsidian_creative"
-                        ? "creative"
                         : "original"
                     }
                     name={name}
@@ -436,16 +498,16 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
                     mealImages={mealImages}
                     handleStr={handleStr}
                   />
-                </div>
-              ) : (
-                /* Canvas fallback for standard styles */
-                <canvas
-                  ref={canvasRef}
-                  className="w-full h-full object-contain block"
-                />
-              )}
-            </motion.div>
-          </div>
+                )}
+              </div>
+            ) : (
+              /* Canvas fallback for standard styles */
+              <canvas
+                ref={canvasRef}
+                className="w-full h-full object-cover block rounded-[28px]"
+              />
+            )}
+          </motion.div>
         </div>
 
         {/* Pagination Row */}
@@ -511,7 +573,7 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
           </div>
         </div>
       </motion.div>
-    </motion.div>,
+    </div>,
     document.body
   );
 };

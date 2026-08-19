@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Target } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -25,37 +25,62 @@ export function GoalConfigPopup({
   setProfileData,
   setToastMessage,
 }: GoalConfigPopupProps) {
+  useEffect(() => {
+    if (activeGoalConfigPopup) {
+      const prevOverflow = document.body.style.overflow;
+      const prevTouchAction = document.body.style.touchAction;
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      return () => {
+        document.body.style.overflow = prevOverflow;
+        document.body.style.touchAction = prevTouchAction;
+      };
+    }
+  }, [activeGoalConfigPopup]);
+
   return createPortal(
     <AnimatePresence>
       {activeGoalConfigPopup && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/65 backdrop-blur-md z-[9999] flex items-end justify-center font-sans"
+        <div
+          className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveGoalConfigPopup(null);
+          }}
         >
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActiveGoalConfigPopup(null)}
+            className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
+          />
+
           {/* Slide up sheet panel */}
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 220 }}
-            className="bg-white rounded-t-[36px] w-full max-w-[448px] overflow-hidden flex flex-col shadow-2xl p-6 space-y-6"
+            transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            className="bg-[#FAF7F2] border-t border-x border-stone-200/80 rounded-t-[36px] w-full max-w-md overflow-hidden flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.2)] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] space-y-5 relative z-10 overscroll-contain touch-pan-y text-left"
           >
+            {/* Top Drag Indicator Pill */}
+            <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
+
             {/* Header block with visual theme */}
-            <div className="flex justify-between items-center pb-2 border-b border-black/[0.04]">
+            <div className="flex justify-between items-center pb-2 border-b border-stone-200/60 select-none">
               <div className="text-left">
-                <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1">
+                <h4 className="text-xs font-black text-orange-950 uppercase tracking-widest flex items-center gap-1.5">
                   <Target className="w-4 h-4 text-orange-500" />
                   {activeGoalConfigPopup === "dailyCalories" ? "Calorie Target" : "Target Weight"}
                 </h4>
-                <p className="text-[10px] text-stone-500 font-bold">
-                  Slide/tap adjustments with real-time visual indicator
+                <p className="text-[10px] text-stone-500 font-bold mt-0.5">
+                  Slide or tap to adjust your daily target
                 </p>
               </div>
               <button
                 onClick={() => setActiveGoalConfigPopup(null)}
-                className="w-8 h-8 rounded-full bg-stone-100/80 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
+                className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-600 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer border-none"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -185,12 +210,12 @@ export function GoalConfigPopup({
                 setToastMessage(`Goal updated to ${goalConfigValue.toLocaleString()} successfully.`);
                 setActiveGoalConfigPopup(null);
               }}
-              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-[11px] py-3 rounded-2xl font-black uppercase tracking-wider shadow-md shadow-orange-500/10 hover:shadow-orange-500/15 cursor-pointer text-center"
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs py-3.5 rounded-2xl font-black uppercase tracking-wider shadow-md shadow-orange-500/20 cursor-pointer text-center border-none active:scale-98"
             >
               Apply Goal Configuration
             </button>
           </motion.div>
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>,
     document.body

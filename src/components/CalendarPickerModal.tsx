@@ -121,14 +121,11 @@ export const CalendarPickerModal = ({
     let m = currentMonth;
     
     if (!isCurrentMonth) {
-      // If user clicks a dimmed day from previous/next month, jump there
       const idx = cells.findIndex(c => c.dayNum === dayNum && c.isCurrentMonth === isCurrentMonth);
       if (idx < startDay) {
-        // click on previous month cell
         m = currentMonth === 1 ? 12 : currentMonth - 1;
         y = currentMonth === 1 ? currentYear - 1 : currentYear;
       } else {
-        // click on next month cell
         m = currentMonth === 12 ? 1 : currentMonth + 1;
         y = currentMonth === 12 ? currentYear + 1 : currentYear;
       }
@@ -146,29 +143,40 @@ export const CalendarPickerModal = ({
 
   return createPortal(
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-6 font-sans"
-        onClick={onClose}
+      <div
+        className="fixed inset-0 z-[9999] flex items-end justify-center font-sans"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
       >
+        {/* Backdrop overlay */}
         <motion.div
-          initial={{ scale: 0.9, y: 20 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.9, y: 20 }}
-          transition={{ type: "spring", damping: 25, stiffness: 220 }}
-          className="w-full max-w-[340px] bg-white rounded-[32px] p-5 shadow-2xl border border-black/5 relative space-y-4"
-          onClick={(e) => e.stopPropagation()}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-stone-900/60 backdrop-blur-xs cursor-pointer touch-none"
+        />
+
+        {/* Bottom Sheet Card */}
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 28, stiffness: 280 }}
+          className="w-full max-w-md bg-[#FAF7F2] rounded-t-[36px] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] shadow-[0_-10px_40px_rgba(0,0,0,0.2)] border-t border-x border-stone-200/80 relative space-y-4 text-left overscroll-contain touch-pan-y z-10"
         >
+          {/* Top Drag Indicator Pill */}
+          <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
+
           {/* Header */}
-          <div className="flex justify-between items-center pb-2 border-b border-stone-150">
+          <div className="flex justify-between items-center pb-2 border-b border-stone-200/60 select-none">
             <span className="text-[10px] font-black uppercase text-stone-400 tracking-widest">
               {title}
             </span>
             <button
               onClick={onClose}
-              className="w-7 h-7 rounded-full bg-stone-100/85 hover:bg-stone-250 flex items-center justify-center text-stone-505 active:scale-90 transition-transform cursor-pointer border-none"
+              className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-500 active:scale-90 transition-transform cursor-pointer border-none"
             >
               <X className="w-4 h-4" />
             </button>
@@ -179,7 +187,7 @@ export const CalendarPickerModal = ({
             <select
               value={currentMonth}
               onChange={(e) => setCurrentMonth(Number(e.target.value))}
-              className="bg-stone-50 border border-stone-200/80 rounded-xl px-2 py-1.5 text-xs font-bold text-stone-750 focus:outline-none focus:border-orange-500 cursor-pointer"
+              className="bg-white border border-stone-200/80 rounded-xl px-3 py-2 text-xs font-black text-stone-800 focus:outline-none focus:border-orange-500 cursor-pointer shadow-3xs"
             >
               {MONTHS.map((m, idx) => (
                 <option key={m} value={idx + 1}>{m}</option>
@@ -189,7 +197,7 @@ export const CalendarPickerModal = ({
             <select
               value={currentYear}
               onChange={(e) => setCurrentYear(Number(e.target.value))}
-              className="bg-stone-50 border border-stone-200/80 rounded-xl px-2 py-1.5 text-xs font-bold text-stone-750 focus:outline-none focus:border-orange-500 cursor-pointer"
+              className="bg-white border border-stone-200/80 rounded-xl px-3 py-2 text-xs font-black text-stone-800 focus:outline-none focus:border-orange-500 cursor-pointer shadow-3xs"
             >
               {years.map((y) => (
                 <option key={y} value={y}>{y}</option>
@@ -198,36 +206,36 @@ export const CalendarPickerModal = ({
           </div>
 
           {/* Month Navigator Row */}
-          <div className="flex justify-between items-center px-1">
+          <div className="flex justify-between items-center px-1 bg-white border border-stone-200/80 rounded-2xl p-2.5 shadow-3xs select-none">
             <button
               onClick={handlePrevMonth}
-              className="w-7 h-7 rounded-lg hover:bg-stone-50 flex items-center justify-center text-stone-500 cursor-pointer active:scale-95 transition-all"
+              className="w-8 h-8 rounded-xl hover:bg-stone-100 flex items-center justify-center text-stone-600 cursor-pointer active:scale-95 transition-all border-none bg-transparent"
             >
-              <ChevronLeft className="w-4.5 h-4.5" />
+              <ChevronLeft className="w-5 h-5" />
             </button>
-            <span className="text-xs font-black uppercase tracking-wider text-stone-700">
+            <span className="text-xs font-black uppercase tracking-wider text-stone-900 font-sans">
               {MONTHS[currentMonth - 1]} {currentYear}
             </span>
             <button
               onClick={handleNextMonth}
-              className="w-7 h-7 rounded-lg hover:bg-stone-50 flex items-center justify-center text-stone-500 cursor-pointer active:scale-95 transition-all"
+              className="w-8 h-8 rounded-xl hover:bg-stone-100 flex items-center justify-center text-stone-600 cursor-pointer active:scale-95 transition-all border-none bg-transparent"
             >
-              <ChevronRight className="w-4.5 h-4.5" />
+              <ChevronRight className="w-5 h-5" />
             </button>
           </div>
 
           {/* Weekday Grid */}
-          <div className="grid grid-cols-7 gap-1 text-center">
+          <div className="grid grid-cols-7 gap-1 text-center select-none pt-1">
             {DAYS_OF_WEEK.map((d) => (
-              <span key={d} className="text-[9px] font-black text-stone-400 uppercase select-none">
+              <span key={d} className="text-[10px] font-black text-stone-400 uppercase select-none">
                 {d}
               </span>
             ))}
           </div>
 
           {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {cells.map((cell, idx) => {
+          <div className="grid grid-cols-7 gap-1.5 select-none">
+            {cells.map((cell) => {
               const isSelected = cell.isCurrentMonth && 
                                  selectedDay === cell.dayNum && 
                                  selectedDate.startsWith(`${currentYear}-${String(currentMonth).padStart(2, "0")}`);
@@ -236,12 +244,12 @@ export const CalendarPickerModal = ({
                 <button
                   key={cell.key}
                   onClick={() => handleDaySelect(cell.dayNum, cell.isCurrentMonth)}
-                  className={`aspect-square text-[10px] font-bold rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  className={`aspect-square text-xs font-bold rounded-xl flex items-center justify-center transition-all cursor-pointer border-none ${
                     isSelected
-                      ? "bg-orange-500 text-white font-black shadow-md shadow-orange-500/20"
+                      ? "bg-orange-500 text-white font-black shadow-md shadow-orange-500/20 active:scale-95"
                       : cell.isCurrentMonth
-                        ? "text-stone-700 hover:bg-orange-50 hover:text-orange-655"
-                        : "text-stone-300 hover:bg-stone-50"
+                        ? "bg-white text-stone-800 border border-stone-200/70 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200 active:scale-95 shadow-3xs"
+                        : "bg-transparent text-stone-300 pointer-events-none"
                   }`}
                 >
                   {cell.dayNum}
@@ -250,7 +258,7 @@ export const CalendarPickerModal = ({
             })}
           </div>
         </motion.div>
-      </motion.div>
+      </div>
     </AnimatePresence>,
     document.body
   );

@@ -11,7 +11,7 @@ import {
 import { cn } from "../lib/utils";
 import type { TrackedNutrient } from "../types";
 import type { FoodFilterState } from "../utils/foodFilter";
-import { getActiveFilterCount, INITIAL_FOOD_FILTER_STATE } from "../utils/foodFilter";
+import { getActiveFilterCount, INITIAL_FOOD_FILTER_STATE, saveFoodFilters } from "../utils/foodFilter";
 
 export interface FoodFilterBarProps {
   filters?: FoodFilterState;
@@ -40,15 +40,24 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const filterCardRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const filterBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!isExpanded) return;
 
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      if (filterCardRef.current && !filterCardRef.current.contains(e.target as Node)) {
-        setIsExpanded(false);
+      const target = e.target as Node;
+      // If click was inside the filter drawer, do not close
+      if (drawerRef.current && drawerRef.current.contains(target)) {
+        return;
       }
+      // If click was on the filter button, let button onClick handle it
+      if (filterBtnRef.current && filterBtnRef.current.contains(target)) {
+        return;
+      }
+      // Clicked anywhere else (search bar, top bar, food list, background) -> close drawer
+      setIsExpanded(false);
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -77,20 +86,23 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
     })),
   ];
 
+  const updateFilters = (next: FoodFilterState) => {
+    saveFoodFilters(next);
+    onChange(next);
+  };
+
   const handleReset = () => {
-    onChange({
-      ...safeFilters,
-      sortField: "date",
-      sortDirection: "desc",
-      selectedTags: [],
-      search: "",
-    });
+    const next: FoodFilterState = {
+      ...INITIAL_FOOD_FILTER_STATE,
+      search: safeFilters.search || "",
+    };
+    updateFilters(next);
   };
 
   const toggleTag = (tag: string) => {
     const selected = safeFilters.selectedTags || [];
     const isSelected = selected.includes(tag);
-    onChange({
+    updateFilters({
       ...safeFilters,
       selectedTags: isSelected
         ? selected.filter((t) => t !== tag)
@@ -100,12 +112,12 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
 
   const setSortField = (fieldId: string) => {
     if (safeFilters.sortField === fieldId) {
-      onChange({
+      updateFilters({
         ...safeFilters,
         sortDirection: safeFilters.sortDirection === "desc" ? "asc" : "desc",
       });
     } else {
-      onChange({
+      updateFilters({
         ...safeFilters,
         sortField: fieldId,
         sortDirection: fieldId === "name" ? "asc" : "desc",
@@ -114,7 +126,7 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
   };
 
   const toggleSortDirection = () => {
-    onChange({
+    updateFilters({
       ...safeFilters,
       sortDirection: safeFilters.sortDirection === "desc" ? "asc" : "desc",
     });
@@ -123,7 +135,7 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
   return (
     <div className={cn("w-full space-y-2.5 font-sans relative", className)}>
       {/* TOP CONTROLS ROW */}
-      <div className="flex items-center justify-between gap-1.5 w-full font-sans min-h-[38px] relative z-40">
+      <div className="flex items-center justify-between gap-2 w-full font-sans min-h-[38px] relative z-40">
         {/* FULL-WIDTH MORPHING SEARCH BAR WHEN OPEN */}
         {isSearchOpen ? (
           <motion.div
@@ -145,7 +157,7 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
                 autoFocus
                 placeholder={placeholder}
                 value={safeFilters.search || ""}
-                onChange={(e) => onChange({ ...safeFilters, search: e.target.value })}
+                onChange={(e) => updateFilters({ ...safeFilters, search: e.target.value })}
                 className={cn(
                   "w-full bg-transparent border-none outline-none text-xs font-bold font-sans min-w-0",
                   isDark ? "text-white placeholder:text-stone-500" : "text-stone-900 placeholder:text-stone-400"
@@ -154,7 +166,7 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
               {safeFilters.search && (
                 <button
                   type="button"
-                  onClick={() => onChange({ ...safeFilters, search: "" })}
+                  onClick={() => updateFilters({ ...safeFilters, search: "" })}
                   className={cn(
                     "shrink-0 text-xs font-black font-sans ml-1 cursor-pointer transition-colors",
                     isDark ? "text-stone-400 hover:text-white" : "text-stone-400 hover:text-stone-700"
@@ -167,7 +179,7 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
             <button
               type="button"
               onClick={() => {
-                onChange({ ...safeFilters, search: "" });
+                updateFilters({ ...safeFilters, search: "" });
                 setIsSearchOpen(false);
               }}
               className={cn(
@@ -186,70 +198,37 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -10 }}
             transition={{ duration: 0.2 }}
-            className="flex items-center justify-between gap-1.5 font-sans w-full"
+            className="flex items-center justify-between gap-2 font-sans w-full"
           >
-            {/* Left: 2 Multi-Toggle Pills (Recipes & Past Foods) */}
-            {showTypeToggles && (
-              <div className="flex items-center gap-1.5 shrink-0 py-0.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    onChange({ ...safeFilters, showRecipes: !safeFilters.showRecipes })
-                  }
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-xs transition-all cursor-pointer select-none shrink-0 flex items-center justify-center font-black active:scale-95",
-                    safeFilters.showRecipes !== false
-                      ? "bg-orange-500 text-white shadow-md shadow-orange-500/20 border border-orange-500"
-                      : isDark
-                        ? "bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 opacity-70"
-                        : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 border border-stone-200/40 opacity-70"
-                  )}
-                >
-                  <span>Recipes</span>
-                </button>
+            {/* Left: Minimalist Click-to-Search Input Area */}
+            <div
+              onClick={() => {
+                setIsSearchOpen(true);
+                setIsExpanded(false);
+              }}
+              className={cn(
+                "flex-1 flex items-center gap-2 px-3.5 py-2 rounded-2xl border cursor-pointer transition-all min-w-0 shadow-3xs",
+                isDark
+                  ? "bg-stone-900 border-stone-700 text-stone-400 hover:border-stone-600"
+                  : isTransparent
+                    ? "bg-stone-100/60 hover:bg-stone-200/60 border-stone-200/80 text-stone-500"
+                    : "bg-stone-100 hover:bg-stone-200/70 border-stone-200/80 text-stone-500"
+              )}
+            >
+              <Search className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+              <span className="text-xs font-semibold truncate select-none">
+                {safeFilters.search || placeholder}
+              </span>
+            </div>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    onChange({ ...safeFilters, showLogs: !safeFilters.showLogs })
-                  }
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-xs transition-all cursor-pointer select-none shrink-0 flex items-center justify-center font-black active:scale-95",
-                    safeFilters.showLogs !== false
-                      ? "bg-orange-500 text-white shadow-md shadow-orange-500/20 border border-orange-500"
-                      : isDark
-                        ? "bg-stone-800 hover:bg-stone-700 text-stone-300 border border-stone-700 opacity-70"
-                        : "bg-stone-100 hover:bg-stone-200/80 text-stone-600 border border-stone-200/40 opacity-70"
-                  )}
-                >
-                  <span>Past Foods</span>
-                </button>
-              </div>
-            )}
-
-            {/* Right: Search Icon + Filter Drawer Trigger + Custom Actions */}
+            {/* Right: Filter Drawer Trigger + Custom Actions */}
             <div className="flex items-center gap-1.5 shrink-0 ml-auto">
               <button
+                ref={filterBtnRef}
                 type="button"
-                onClick={() => setIsSearchOpen(true)}
+                onClick={() => setIsExpanded((prev) => !prev)}
                 className={cn(
-                  "p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center shrink-0 active:scale-95 shadow-3xs",
-                  safeFilters.search
-                    ? "bg-orange-500 text-white border-orange-500"
-                    : isDark
-                      ? "bg-stone-800 hover:bg-stone-700 border-stone-700 text-stone-200"
-                      : "bg-stone-100 hover:bg-stone-200 border-black/5 text-stone-600"
-                )}
-                title="Search Recipes & Logs"
-              >
-                <Search className={cn("w-4 h-4", safeFilters.search ? "text-white" : isDark ? "text-stone-200" : "text-stone-600")} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className={cn(
-                  "h-8 px-2.5 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-black uppercase tracking-wider shrink-0 active:scale-95 shadow-3xs",
+                  "h-8 px-3 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-black uppercase tracking-wider shrink-0 active:scale-95 shadow-3xs",
                   isExpanded || activeCount > 0
                     ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
                     : isDark
@@ -260,7 +239,7 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
                 {activeCount > 0 && (
-                  <span className="min-w-[16px] h-4 bg-white text-orange-600 rounded-full flex items-center justify-center text-[9px] font-black leading-none px-1">
+                  <span className="min-w-[18px] h-[18px] px-1.5 bg-white text-orange-600 rounded-full flex items-center justify-center text-[10px] font-black leading-none shrink-0 shadow-2xs">
                     {activeCount}
                   </span>
                 )}
@@ -272,18 +251,11 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
         )}
       </div>
 
-      {/* INVISIBLE CLICK-OUTSIDE BACKDROP (Clean Transparent Backdrop) */}
-      {isExpanded && (
-        <div
-          className="fixed inset-0 z-30 bg-transparent"
-          onClick={() => setIsExpanded(false)}
-        />
-      )}
-
       {/* EXPANDABLE FULL-WIDTH FILTER & SORT DRAWER */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
+            ref={drawerRef}
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
@@ -291,7 +263,6 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
             className="overflow-hidden font-sans relative z-40 w-full"
           >
             <div
-              ref={filterCardRef}
               className={cn(
                 "border rounded-[32px] p-5 space-y-4 text-left font-sans transition-all",
                 isDark
@@ -301,26 +272,106 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
                     : "bg-white/98 border-stone-200/90 shadow-2xs"
               )}
             >
-              
-              {/* SECTION 1: FILTER BY AI TAGS (TOP — MULTI-SELECT) */}
-              {availableTags.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className={cn("text-[10px] font-black uppercase tracking-wider block", isDark ? "text-stone-400" : "text-stone-400")}>
-                      AI Tags (Multi-Select)
-                    </span>
+              {/* DRAWER HEADER: Title & Quick Reset / Close */}
+              <div className="flex items-center justify-between pb-1 border-b border-stone-100 dark:border-stone-800">
+                <span className="text-[11px] font-black uppercase tracking-widest text-orange-950 dark:text-orange-400">
+                  Filters & Sort
+                </span>
+                <div className="flex items-center gap-2">
+                  {activeCount > 0 && (
                     <button
                       type="button"
-                      onClick={() => setIsExpanded(false)}
-                      className={cn(
-                        "w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-colors",
-                        isDark ? "bg-stone-800 hover:bg-stone-700 text-stone-300" : "bg-stone-100 hover:bg-stone-200 text-stone-500"
-                      )}
-                      title="Close Filter Panel"
+                      onClick={handleReset}
+                      className="text-[10px] font-black uppercase text-orange-500 hover:text-orange-600 flex items-center gap-1 cursor-pointer transition-colors"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Reset</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(false)}
+                    className={cn(
+                      "w-6 h-6 rounded-full flex items-center justify-center cursor-pointer transition-colors",
+                      isDark ? "bg-stone-800 hover:bg-stone-700 text-stone-300" : "bg-stone-100 hover:bg-stone-200 text-stone-500"
+                    )}
+                    title="Close Filter Panel"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* SECTION 1: FOOD TYPE (ALL, RECIPES, PAST FOODS) */}
+              {showTypeToggles && (
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-stone-400 block">
+                    Food Type (Show Items)
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {/* 1. All Foods */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateFilters({ ...safeFilters, showRecipes: true, showLogs: true })
+                      }
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 border select-none",
+                        safeFilters.showRecipes !== false && safeFilters.showLogs !== false
+                          ? "bg-orange-500 text-white border-orange-500 font-black shadow-2xs"
+                          : isDark
+                            ? "bg-stone-800 hover:bg-stone-750 border-stone-700 text-stone-400"
+                            : "bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-500"
+                      )}
+                    >
+                      All
+                    </button>
+
+                    {/* 2. Recipes Only */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateFilters({ ...safeFilters, showRecipes: true, showLogs: false })
+                      }
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 border select-none",
+                        safeFilters.showRecipes === true && safeFilters.showLogs === false
+                          ? "bg-orange-500 text-white border-orange-500 font-black shadow-2xs"
+                          : isDark
+                            ? "bg-stone-800 hover:bg-stone-750 border-stone-700 text-stone-400"
+                            : "bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-500"
+                      )}
+                    >
+                      Recipes
+                    </button>
+
+                    {/* 3. Past Foods Only */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateFilters({ ...safeFilters, showRecipes: false, showLogs: true })
+                      }
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 border select-none",
+                        safeFilters.showRecipes === false && safeFilters.showLogs === true
+                          ? "bg-orange-500 text-white border-orange-500 font-black shadow-2xs"
+                          : isDark
+                            ? "bg-stone-800 hover:bg-stone-750 border-stone-700 text-stone-400"
+                            : "bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-500"
+                      )}
+                    >
+                      Past Foods
                     </button>
                   </div>
+                </div>
+              )}
+              
+              {/* SECTION 2: FILTER BY AI TAGS (MULTI-SELECT) */}
+              {availableTags.length > 0 && (
+                <div className={cn("space-y-2", showTypeToggles && (isDark ? "pt-3.5 border-t border-stone-800" : "pt-3.5 border-t border-stone-100"))}>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-stone-400 block">
+                    Dietary & AI Tags
+                  </span>
                   <div className="flex flex-wrap gap-2 pt-0.5">
                     {availableTags.map((tag) => {
                       const isSelected = (safeFilters.selectedTags || []).includes(tag);
@@ -346,8 +397,8 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
                 </div>
               )}
 
-              {/* SECTION 2: SORT BY ATTRIBUTE + DIRECTION (BOTTOM — SINGLE SELECT) */}
-              <div className={cn("space-y-3", availableTags.length > 0 && (isDark ? "pt-4 border-t border-stone-800" : "pt-4 border-t border-stone-100"))}>
+              {/* SECTION 3: SORT BY ATTRIBUTE + DIRECTION (SINGLE SELECT) */}
+              <div className={cn("space-y-3", (showTypeToggles || availableTags.length > 0) && (isDark ? "pt-3.5 border-t border-stone-800" : "pt-3.5 border-t border-stone-100"))}>
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
                     Sort By (Pick One)
@@ -411,22 +462,11 @@ export const FoodFilterBar: React.FC<FoodFilterBarProps> = ({
                 </div>
               </div>
 
-              {/* SECTION 3: FOOTER (MATCH COUNT & RESET) */}
-              <div className={cn("pt-3.5 flex items-center justify-between", isDark ? "border-t border-stone-800" : "border-t border-stone-100")}>
+              {/* SECTION 4: FOOTER (MATCH COUNT) */}
+              <div className={cn("pt-3 flex items-center justify-between", isDark ? "border-t border-stone-800" : "border-t border-stone-100")}>
                 <span className={cn("text-xs font-bold", isDark ? "text-stone-400" : "text-stone-600")}>
                   {matchCount !== undefined ? `${matchCount} food${matchCount === 1 ? "" : "s"} match` : ""}
                 </span>
-
-                {activeCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="text-[10px] font-black uppercase text-orange-500 hover:text-orange-400 flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Reset All Filters</span>
-                  </button>
-                )}
               </div>
             </div>
           </motion.div>

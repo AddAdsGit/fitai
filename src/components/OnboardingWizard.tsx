@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { 
   Camera, 
   ChevronLeft, 
@@ -1742,37 +1743,51 @@ export const OnboardingWizard = ({
       )}
 
       {/* TERMS MODAL POPUP */}
-      {showTermsModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-[32px] p-6 max-w-md w-full shadow-2xl border border-stone-200 space-y-4 max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-black text-stone-900">FitAI Terms & Conditions</h3>
+      {showTermsModal &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowTermsModal(false);
+            }}
+          >
+            <div
+              className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
+              onClick={() => setShowTermsModal(false)}
+            />
+            <div className="bg-[#FAF7F2] rounded-t-[36px] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] max-w-md w-full shadow-[0_-10px_40px_rgba(0,0,0,0.2)] border-t border-x border-stone-200/80 space-y-4 max-h-[85vh] overflow-y-auto relative z-10 overscroll-contain touch-pan-y text-left">
+              {/* Top Drag Indicator Pill */}
+              <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
+
+              <div className="flex justify-between items-center border-b border-stone-200/60 pb-3 select-none">
+                <h3 className="text-base font-black text-stone-900">FitAI Terms & Conditions</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowTermsModal(false)}
+                  className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center font-bold border-none cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-3 text-xs text-stone-700 font-medium">
+                {TERMS_AND_CONDITIONS.map((section, idx) => (
+                  <div key={idx} className="space-y-1 bg-white border border-stone-200/80 rounded-2xl p-3.5 shadow-3xs">
+                    <div className="font-black text-orange-950 uppercase text-[10px] tracking-wider">{section.title}</div>
+                    <p className="leading-relaxed">{section.content}</p>
+                  </div>
+                ))}
+              </div>
               <button
                 type="button"
                 onClick={() => setShowTermsModal(false)}
-                className="w-8 h-8 rounded-full bg-stone-100 text-stone-700 flex items-center justify-center font-bold border-none cursor-pointer"
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black text-xs uppercase tracking-wider py-3.5 rounded-2xl cursor-pointer border-none shadow-md shadow-orange-500/20 active:scale-98 transition-all"
               >
-                ✕
+                Close
               </button>
             </div>
-            <div className="space-y-3 text-xs text-stone-600 font-medium">
-              {TERMS_AND_CONDITIONS.map((section, idx) => (
-                <div key={idx} className="space-y-1">
-                  <div className="font-black text-stone-900 uppercase text-[10px] tracking-wider">{section.title}</div>
-                  <p>{section.content}</p>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowTermsModal(false)}
-              className="w-full bg-orange-500 text-white font-black py-3 rounded-2xl cursor-pointer border-none"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
     </div>
   );

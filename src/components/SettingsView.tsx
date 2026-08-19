@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw, Sliders, Heart, Mic, ShieldCheck, AlertTriangle, FileText, Activity, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronRight, ArrowLeft, Bot, Sparkles, Database, Check, Bell, Phone, MessageSquare, Mail, Plus, Camera, Edit2, Search, X, Trash2, RotateCcw, Sliders, Heart, Mic, ShieldCheck, AlertTriangle, FileText, Activity, RefreshCw, CheckCircle2, XCircle, Clock, Sunrise, Sun, Moon, Droplets, BarChart3, VolumeX, Zap, Apple, Pill, Coffee, Utensils, Bug, BookOpen, HelpCircle, LogOut, User, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { ProUpgradeModal } from "./ProUpgradeModal";
@@ -7,7 +8,7 @@ import { ChatGPTIcon } from "./ChatGPTIcon";
 import { performHealthSync, requestHealthPermissions, clearHealthSyncLogs, type SyncLogEntry } from "../services/healthSyncService";
 import { PrivacyPolicyModal } from "./PrivacyPolicyModal";
 import { DEFAULT_CUSTOM_GPT_URL, TELEGRAM_BOT_URL } from "../constants/app";
-import { listAvailableGeminiModels } from "../utils/geminiFoodAnalysis";
+import { TimePickerModal } from "./TimePickerModal";
 
 const getOpenApiYaml = (edgeFunctionUrl: string) => `openapi: 3.1.0
 info:
@@ -686,11 +687,32 @@ export const DEFAULT_TRACKING_TAGS = [
   { id: 'quick_prep', name: 'Quick Prep', description: 'Apply when meal takes under 15 minutes to prepare', enabled: false },
 ];
 
+const GoogleFitIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg viewBox="0 0 48 48" className={className}>
+    <path fill="#EA4335" d="M33.6 13.4c-2.3-2.3-6-2.3-8.3 0L24 14.7l-1.3-1.3c-2.3-2.3-6-2.3-8.3 0-2.3 2.3-2.3 6 0 8.3l1.3 1.3L24 31.3l8.3-8.3 1.3-1.3c2.3-2.3 2.3-6 0-8.3z" />
+    <path fill="#4285F4" d="M12.7 13.4c-2.3 2.3-2.3 6 0 8.3l8.3 8.3 3-3-8.3-8.3-1.3-1.3c-.5-.5-1.1-.7-1.7-.7s-1.2.2-1.7.7z" />
+    <path fill="#FBBC05" d="M21 30l3 3 8.3-8.3c2.3-2.3 2.3-6 0-8.3-1.1-1.1-2.6-1.7-4.1-1.7s-3 .6-4.2 1.7l-3 3.6z" />
+    <path fill="#34A853" d="M24 33l-3-3-4.3 4.3c-1.2 1.2-1.2 3.1 0 4.3 1.2 1.2 3.1 1.2 4.3 0L24 35.6l3 3c1.2 1.2 3.1 1.2 4.3 0 1.2-1.2 1.2-3.1 0-4.3L24 33z" />
+  </svg>
+);
+
+const AppleHealthIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className}>
+    <rect width="24" height="24" rx="6" fill="#FF2D55" />
+    <path
+      d="M12 18.2S6 14.1 6 9.8c0-2.1 1.7-3.8 3.8-3.8 1.4 0 2.4.8 2.7 1.6.3-.8 1.3-1.6 2.7-1.6 2.1 0 3.8 1.7 3.8 3.8 0 4.3-6 8.4-6 8.4z"
+      fill="white"
+    />
+  </svg>
+);
+
 export const SettingsView = ({
   profileData,
   setProfileData,
   triggerToast,
   onLogout,
+  onEditProfile,
+  setActiveTab,
   session,
 }: {
   key?: string;
@@ -698,13 +720,15 @@ export const SettingsView = ({
   setProfileData: any;
   triggerToast: (msg: string) => void;
   onLogout: () => void;
+  onEditProfile?: () => void;
+  setActiveTab?: (tab: string) => void;
   session: any;
 }) => {
   const [showPro, setShowPro] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "logging" | "gemini" | "floating_widget" | "health_sync" | null>(null);
+  const [activeSubView, setActiveSubView] = useState<"notion" | "reminders" | "gpt" | "telegram" | "logging" | "floating_widget" | "health_sync" | null>(null);
 
   const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
   const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gpt-action`;
@@ -734,277 +758,267 @@ export const SettingsView = ({
   const [notionDb, setNotionDb] = useState(profileData.notionDatabaseId || "");
   const [notionEnabled, setNotionEnabled] = useState(!!(profileData.notionApiKey && profileData.notionDatabaseId));
 
-  // --- Telegram States ---
+  // --- Telegram & Reminder States ---
+  const [isPushEnabled, setIsPushEnabled] = useState<boolean>(() => {
+    return (profileData.preferences || []).some((p: string) => p === "push_notifications:true");
+  });
+  const [isTelegramChannelOn, setIsTelegramChannelOn] = useState<boolean>(() => {
+    return !!profileData.telegramChatId || !!profileData.telegramReportsEnabled || !!profileData.telegramRemindersEnabled;
+  });
   const [tgBotToken, setTgBotToken] = useState(profileData.telegramBotToken || "");
   const [tgChatId, setTgChatId] = useState(profileData.telegramChatId || "");
-  const [tgReportsEnabled, setTgReportsEnabled] = useState(!!profileData.telegramReportsEnabled);
-  const [tgRemindersEnabled, setTgRemindersEnabled] = useState(!!profileData.telegramRemindersEnabled);
-  const [tgReminderTimes, setTgReminderTimes] = useState<string[]>(profileData.telegramReminderTimes || ["09:00", "13:00", "20:00"]);
-  const [newReminderTime, setNewReminderTime] = useState("");
-  const [userTimezone, setUserTimezone] = useState(profileData.timezone || "UTC");
+
+  // Dynamic Reminder Slots (Breakfast, Lunch, Dinner, Custom times)
+  const [reminderSlots, setReminderSlots] = useState<{ id: string; label: string; time: string; enabled: boolean; icon?: string }[]>(() => {
+    const pref = (profileData.preferences || []).find((p: string) => p.startsWith("reminder_slots:"));
+    if (pref) {
+      try {
+        const parsed = JSON.parse(pref.substring("reminder_slots:".length));
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (_) {}
+    }
+
+    const legacyTimes = profileData.telegramReminderTimes || ["08:30", "13:00", "20:00"];
+    return [
+      { id: "breakfast", label: "Breakfast", time: legacyTimes[0] || "08:30", enabled: profileData.telegramRemindersEnabled !== false, icon: "sunrise" },
+      { id: "lunch", label: "Lunch", time: legacyTimes[1] || "13:00", enabled: profileData.telegramRemindersEnabled !== false, icon: "sun" },
+      { id: "dinner", label: "Dinner", time: legacyTimes[2] || "20:00", enabled: profileData.telegramRemindersEnabled !== false, icon: "moon" },
+      { id: "hydration", label: "Hydration & Water", time: "16:00", enabled: false, icon: "droplets" },
+    ];
+  });
+
+  const [isAddingCustomSlot, setIsAddingCustomSlot] = useState(false);
+  const [customSlotLabel, setCustomSlotLabel] = useState("");
+  const [customSlotTime, setCustomSlotTime] = useState("10:30");
+  const [customSlotIcon, setCustomSlotIcon] = useState("zap");
+
+  const [editingTimeTarget, setEditingTimeTarget] = useState<{
+    id: string;
+    time: string;
+    title: string;
+    onConfirm: (newTime: string) => void;
+  } | null>(null);
+
+  const [macroGapAlert, setMacroGapAlert] = useState<boolean>(() => {
+    const pref = (profileData.preferences || []).find((p: string) => p.startsWith("reminder_macro_gap:"));
+    return pref ? pref.split(":")[1] === "true" : true;
+  });
+
+  // Daily Summary Wrap-Up
+  const [dailyWrapUpEnabled, setDailyWrapUpEnabled] = useState<boolean>(() => {
+    const pref = (profileData.preferences || []).find((p: string) => p.startsWith("reminder_wrapup:"));
+    return pref ? pref.split(":")[1] === "true" : (profileData.telegramReportsEnabled !== false);
+  });
+  const [dailyWrapUpTime, setDailyWrapUpTime] = useState<string>(() => {
+    const pref = (profileData.preferences || []).find((p: string) => p.startsWith("reminder_wrapup:"));
+    return (pref && pref.split(":")[2]) || "21:30";
+  });
+
+  // Weekly Progress Review
+  const [weeklyReviewEnabled, setWeeklyReviewEnabled] = useState<boolean>(() => {
+    const pref = (profileData.preferences || []).find((p: string) => p.startsWith("reminder_weekly:"));
+    return pref ? pref.split(":")[1] === "true" : true;
+  });
+
+  // Quiet Hours
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState<boolean>(() => {
+    const pref = (profileData.preferences || []).find((p: string) => p.startsWith("reminder_quiet_hours:"));
+    return pref ? pref.split(":")[1] === "true" : true;
+  });
+
+  const [userTimezone, setUserTimezone] = useState<string>(() => {
+    return profileData.timezone || Intl.DateTimeFormat?.().resolvedOptions?.().timeZone || "UTC";
+  });
   const [isTestingTg, setIsTestingTg] = useState(false);
   const [isHealthSyncing, setIsHealthSyncing] = useState(false);
 
-  // --- Gemini API States ---
-  const initialGeminiKey = useMemo(() => {
-    const keyTag = (profileData.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-    return keyTag.split(":")[1] || "";
-  }, [profileData.preferences]);
-
-  const [geminiKey, setGeminiKey] = useState(initialGeminiKey);
-  const [availableModels, setAvailableModels] = useState<Array<{ name: string; displayName: string; description?: string }>>([]);
-  const [isFetchingModels, setIsFetchingModels] = useState(false);
-
-  const handleFetchGeminiModels = async () => {
-    if (!geminiKey.trim()) {
-      triggerToast("⚠️ Please enter your Gemini API Key first!");
-      return;
-    }
-    setIsFetchingModels(true);
-    try {
-      const models = await listAvailableGeminiModels(geminiKey.trim());
-      if (models && models.length > 0) {
-        setAvailableModels(models);
-        triggerToast(`✨ Fetched ${models.length} live models from Google API!`);
-      } else {
-        triggerToast("⚠️ No models returned. Please verify your API Key.");
-      }
-    } catch (_) {
-      triggerToast("❌ Error fetching models.");
-    } finally {
-      setIsFetchingModels(false);
-    }
+  const formatTime12h = (time24: string) => {
+    if (!time24) return "8:00 AM";
+    const parts = time24.split(":");
+    let h = parseInt(parts[0], 10);
+    const m = parts[1] || "00";
+    if (isNaN(h)) return time24;
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12;
+    h = h ? h : 12;
+    return `${h}:${m} ${ampm}`;
   };
 
-  const handleSaveGemini = () => {
-    const filteredPrefs = (profileData.preferences || []).filter((p: string) => !p.startsWith("gemini_api_key:"));
-    if (geminiKey.trim()) {
-      filteredPrefs.push(`gemini_api_key:${geminiKey.trim()}`);
+  const updateReminderSlotTime = (id: string, newTime: string) => {
+    setReminderSlots(prev => prev.map(s => s.id === id ? { ...s, time: newTime } : s));
+  };
+
+  const toggleReminderSlot = (id: string) => {
+    setReminderSlots(prev => prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s));
+  };
+
+  const deleteReminderSlot = (id: string) => {
+    setReminderSlots(prev => prev.filter(s => s.id !== id));
+    triggerToast("Reminder removed");
+  };
+
+  const handleAddCustomReminderSlot = () => {
+    if (!customSlotLabel.trim()) {
+      triggerToast("Please enter a reminder name");
+      return;
     }
-    setProfileData({
-      ...profileData,
-      preferences: filteredPrefs
-    });
-    triggerToast(geminiKey.trim() ? "💾 Saved Gemini API Key!" : "💾 Disabled Gemini image generation");
-    setActiveSubView(null);
+    const newSlot = {
+      id: `custom_${Date.now()}`,
+      label: customSlotLabel.trim(),
+      time: customSlotTime || "12:00",
+      enabled: true,
+      icon: customSlotIcon || "zap"
+    };
+    setReminderSlots(prev => [...prev, newSlot]);
+    setCustomSlotLabel("");
+    setCustomSlotIcon("zap");
+    setIsAddingCustomSlot(false);
+    triggerToast(`Added "${newSlot.label}" reminder!`);
+  };
+
+  const togglePushNotifications = async () => {
+    const nextVal = !isPushEnabled;
+    setIsPushEnabled(nextVal);
+    const filtered = (profileData.preferences || []).filter((p: string) => !p.startsWith("push_notifications:"));
+    if (nextVal) {
+      filtered.push("push_notifications:true");
+      if (typeof window !== "undefined" && "Notification" in window) {
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm === "granted") {
+            triggerToast("Device notifications enabled!");
+          } else {
+            triggerToast("Please enable notifications in device settings");
+          }
+        } catch (_) {}
+      }
+    } else {
+      filtered.push("push_notifications:false");
+      triggerToast("Push notifications disabled");
+    }
+    setProfileData({ ...profileData, preferences: filtered });
+  };
+
+  const handleSendTestPush = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      triggerToast("Push notifications not supported in this browser.");
+      return;
+    }
+    if (Notification.permission !== "granted") {
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") {
+          triggerToast("Please allow notifications in browser settings.");
+          return;
+        }
+      } catch (_) {
+        triggerToast("Please check browser notification settings.");
+        return;
+      }
+    }
+    try {
+      new Notification("FitAI Meal Reminder", {
+        body: "🌅 Reminder! Did you log your recent meal or vitals?",
+        icon: "/favicon.ico",
+      });
+      triggerToast("⚡ Test notification sent!");
+    } catch (_) {
+      triggerToast("Notification active!");
+    }
   };
 
   const openApiYaml = useMemo(() => getOpenApiYaml(edgeFunctionUrl), [edgeFunctionUrl]);
 
   // Notion Validations & Save
   const handleSaveNotion = () => {
-    if (notionEnabled) {
-      if (!notionKey.trim().startsWith("secret_")) {
-        triggerToast("❌ Notion token must start with 'secret_'");
-        return;
-      }
-      if (notionKey.trim().length < 25) {
-        triggerToast("❌ Invalid Notion token length");
-        return;
-      }
-      const cleanDbId = notionDb.trim().replace(/-/g, "");
-      if (cleanDbId.length !== 32) {
-        triggerToast("❌ Database ID must be a 32-character UUID");
-        return;
-      }
-    }
-
     setProfileData({
       ...profileData,
-      notionApiKey: notionEnabled ? notionKey.trim() : "",
-      notionDatabaseId: notionEnabled ? notionDb.trim() : ""
+      notionApiKey: notionEnabled ? notionKey : "",
+      notionDatabaseId: notionEnabled ? notionDb : "",
     });
-    triggerToast(notionEnabled ? "💾 Saved Notion settings!" : "💾 Disabled Notion Sync");
+    triggerToast(notionEnabled ? "💾 Saved Notion Connection!" : "💾 Notion sync disabled");
     setActiveSubView(null);
   };
 
-  // Telegram Save
-  const handleSaveTelegram = () => {
-    if (tgReportsEnabled || tgRemindersEnabled) {
-      if (!tgChatId.trim()) {
-        triggerToast("❌ Telegram Chat ID is required");
-        return;
-      }
-    }
+  // Reminders & Telegram Save
+  const handleSaveReminders = () => {
+    const filtered = (profileData.preferences || []).filter(
+      (p: string) =>
+        !p.startsWith("push_notifications:") &&
+        !p.startsWith("reminder_slots:") &&
+        !p.startsWith("reminder_only_if_unlogged:") &&
+        !p.startsWith("reminder_macro_gap:") &&
+        !p.startsWith("reminder_wrapup:") &&
+        !p.startsWith("reminder_weekly:") &&
+        !p.startsWith("reminder_quiet_hours:") &&
+        !p.startsWith("reminder_breakfast:") &&
+        !p.startsWith("reminder_lunch:") &&
+        !p.startsWith("reminder_dinner:") &&
+        !p.startsWith("reminder_hydration:")
+    );
 
+    filtered.push(`push_notifications:${isPushEnabled}`);
+    filtered.push(`reminder_slots:${JSON.stringify(reminderSlots)}`);
+    filtered.push(`reminder_only_if_unlogged:true`);
+    filtered.push(`reminder_macro_gap:${macroGapAlert}`);
+    filtered.push(`reminder_wrapup:${dailyWrapUpEnabled}:${dailyWrapUpTime}`);
+    filtered.push(`reminder_weekly:${weeklyReviewEnabled}`);
+    filtered.push(`reminder_quiet_hours:${quietHoursEnabled}`);
+
+    const activeTimes = reminderSlots.filter(s => s.enabled).map(s => s.time);
+
+    setProfileData({
+      ...profileData,
+      preferences: filtered,
+      telegramReportsEnabled: dailyWrapUpEnabled,
+      telegramRemindersEnabled: activeTimes.length > 0,
+      telegramReminderTimes: activeTimes.length > 0 ? activeTimes : ["08:30", "13:00", "20:00"],
+      timezone: userTimezone,
+    });
+    triggerToast("Saved Reminder preferences!");
+    setActiveSubView(null);
+  };
+
+  const handleSaveTelegram = () => {
     setProfileData({
       ...profileData,
       telegramBotToken: tgBotToken.trim(),
-      telegramChatId: tgChatId.trim(),
-      telegramReportsEnabled: tgReportsEnabled,
-      telegramRemindersEnabled: tgRemindersEnabled,
-      telegramReminderTimes: tgReminderTimes,
-      timezone: userTimezone
+      telegramChatId: isTelegramChannelOn ? tgChatId.trim() : "",
+      telegramReportsEnabled: isTelegramChannelOn,
+      telegramRemindersEnabled: isTelegramChannelOn,
     });
-    triggerToast("💾 Saved Telegram settings!");
+    triggerToast("Telegram settings saved!");
     setActiveSubView(null);
   };
 
-  // Telegram Test Notification
   const handleTestTelegram = async () => {
     if (!tgChatId.trim()) {
-      triggerToast("❌ Chat ID is required to send a test message!");
+      triggerToast("⚠️ Please enter a Telegram Chat ID first!");
       return;
     }
-
     setIsTestingTg(true);
     try {
       const res = await fetch(`${edgeFunctionUrl}/telegram/test`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${profileData.api_key}`
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          telegram_bot_token: tgBotToken.trim(),
-          telegram_chat_id: tgChatId.trim()
-        })
+          chatId: tgChatId.trim(),
+          botToken: tgBotToken.trim() || undefined,
+        }),
       });
-
       if (res.ok) {
-        triggerToast("🚀 Verification message sent! Check your Telegram.");
+        triggerToast("⚡ Test message sent successfully!");
       } else {
-        const err = await res.json();
-        triggerToast(`❌ Test failed: ${err.error || "Unknown error"}`);
+        triggerToast("❌ Failed to send message. Please check bot settings.");
       }
-    } catch (err) {
-      triggerToast("❌ Connection error. Check your bot settings.");
+    } catch (_) {
+      triggerToast("❌ Error contacting Telegram test server.");
     } finally {
       setIsTestingTg(false);
     }
   };
 
-  // Reminder Times Management
-  const addReminderTime = () => {
-    if (!newReminderTime) return;
-    if (tgReminderTimes.includes(newReminderTime)) {
-      triggerToast("⏰ Time already configured");
-      return;
-    }
-    setTgReminderTimes([...tgReminderTimes, newReminderTime].sort());
-    setNewReminderTime("");
-  };
-
-  const removeReminderTime = (timeToRemove: string) => {
-    setTgReminderTimes(tgReminderTimes.filter(t => t !== timeToRemove));
-  };
-
   // Render Sub-Views
-
-  if (activeSubView === "gemini") {
-    return (
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -20 }}
-        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
-      >
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setActiveSubView(null)}
-            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <h2 className="text-xl font-black text-[#1a1a1a]">Google Gemini API</h2>
-        </div>
-
-        <div className="bg-orange-50/50 border border-orange-100 rounded-[24px] p-5 space-y-3.5 text-left">
-          <span className="text-[10px] font-black uppercase text-orange-600 tracking-wider">
-            Premium Features Unlocked with your API Key:
-          </span>
-          <ul className="space-y-2.5 text-xs font-semibold text-stone-700">
-            <li className="flex items-start gap-2">
-              <span className="text-orange-500">📷</span>
-              <div>
-                <strong className="text-stone-900 block text-[11px] font-black leading-none mb-1">Ultra-Realistic Food Photos</strong>
-                Generates high-definition, photorealistic culinary photography for your daily logs.
-              </div>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-orange-500">🧠</span>
-              <div>
-                <strong className="text-stone-900 block text-[11px] font-black leading-none mb-1">Peak Reasoning Engine</strong>
-                Unlocks Google's flagship reasoning models for highly precise nutritional analyses and macro calculations.
-              </div>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-orange-500">🔍</span>
-              <div>
-                <strong className="text-stone-900 block text-[11px] font-black leading-none mb-1">In-App Camera & Scan</strong>
-                Unlocks the ability to upload or capture photos of your real food plates to log macros instantly!
-              </div>
-            </li>
-          </ul>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-[10px] font-black text-stone-400 uppercase tracking-wider mb-2">
-              Gemini API Key
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                placeholder="AIzaSy..."
-                value={geminiKey}
-                onChange={(e) => setGeminiKey(e.target.value)}
-                className="flex-1 bg-white border border-stone-200 rounded-[18px] px-4 py-3.5 text-xs font-bold text-[#1a1a1a] shadow-xs outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 transition-all placeholder:text-stone-300"
-              />
-              <button
-                type="button"
-                onClick={handleFetchGeminiModels}
-                disabled={isFetchingModels || !geminiKey.trim()}
-                className="px-4 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-[11px] font-black uppercase tracking-wider rounded-[18px] transition-all cursor-pointer shrink-0 shadow-xs flex items-center gap-1.5"
-              >
-                {isFetchingModels ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                <span>Fetch Models</span>
-              </button>
-            </div>
-            <p className="text-[9.5px] text-stone-500 font-bold leading-relaxed mt-2.5 font-sans">
-              ⏱️ <strong>1 min setup for unmatched quality.</strong> Get your free key from{" "}
-              <a
-                href="https://aistudio.google.com/"
-                target="_blank"
-                rel="noreferrer"
-                className="text-orange-500 underline font-black"
-              >
-                Google AI Studio
-              </a>.
-            </p>
-          </div>
-
-          {availableModels.length > 0 && (
-            <div className="space-y-2 pt-2 text-left animate-fade-in">
-              <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
-                Official Available Models ({availableModels.length}):
-              </span>
-              <div className="max-h-60 overflow-y-auto space-y-1.5 p-2 bg-stone-50 rounded-2xl border border-stone-200">
-                {availableModels.map((m) => (
-                  <div key={m.name} className="p-2.5 rounded-xl bg-white border border-stone-200 flex items-center justify-between gap-2 shadow-2xs">
-                    <div className="min-w-0 flex-1">
-                      <span className="text-xs font-black text-stone-900 block truncate">{m.displayName || m.name}</span>
-                      <span className="text-[9.5px] font-bold text-orange-600 block">{m.name}</span>
-                    </div>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
-                      ✓ Supported
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={handleSaveGemini}
-          className="w-full bg-stone-900 text-white hover:bg-stone-850 text-xs font-black uppercase tracking-wider py-4 rounded-[18px] transition-all active:scale-98 shadow-sm cursor-pointer"
-        >
-          Save Connection Settings
-        </button>
-        </motion.div>
-    );
-  }
 
   if (activeSubView === "health_sync") {
     const isGfitOn = (profileData.preferences || []).some((p: string) => p === "health_sync_gfit:true");
@@ -1082,142 +1096,159 @@ export const SettingsView = ({
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -20 }}
-        className="px-2.5 sm:px-4 mt-6 relative z-10 space-y-4 pb-32 font-sans text-left"
+        className="px-4 sm:px-6 mt-6 relative z-10 space-y-6 pb-32 font-sans text-left"
       >
         {/* Header */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActiveSubView(null)}
-            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+            className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/70 shadow-3xs transition-all active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h2 className="text-xl font-black text-[#1a1a1a]">Health Sync</h2>
-            <p className="text-[10px] font-semibold text-stone-400">Native HealthKit & Google Fit Integration</p>
+            <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 block">
+              Settings
+            </span>
+            <h2 className="text-xl font-black text-stone-900 tracking-tight">Health Sync</h2>
           </div>
         </div>
 
         {/* Platform Overview Banner */}
-        <div className="bg-orange-50/60 border border-orange-100/80 rounded-[28px] p-4 space-y-2 text-left">
+        <div className="bg-orange-50/50 border border-orange-100/70 rounded-[28px] p-4.5 space-y-1.5 text-left shadow-3xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-orange-500" />
+              <Activity className="w-4.5 h-4.5 text-orange-500" />
               <span className="text-xs font-black uppercase text-orange-950 tracking-wider">
-                Smartwatch & App Integration
+                Smartwatches & Wearables
               </span>
             </div>
             {lastSyncedAt && (
-              <span className="text-[9px] font-mono font-bold text-orange-800/70 bg-orange-100/60 px-2 py-0.5 rounded-full">
+              <span className="text-[9px] font-mono font-bold text-orange-800/80 bg-orange-100/70 px-2 py-0.5 rounded-full">
                 Synced {new Date(lastSyncedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
           </div>
-          <p className="text-xs font-medium text-orange-900/70 leading-relaxed">
-            Sync active calories burned, daily steps, and weight logs automatically to Supabase for AI conversation context.
+          <p className="text-[11px] font-medium text-stone-600 leading-relaxed">
+            Automatically sync active calories burned, daily step counts, and body weight logs from your connected apps.
           </p>
         </div>
 
-        {/* Google Fit / Health Connect Card */}
-        <div className="bg-white p-4 rounded-[28px] border border-stone-150 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-600 shrink-0 font-black text-xs font-mono">
-                GFit
+        {/* Unified Platform Connection Card */}
+        <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-1.5 divide-y divide-stone-100/80">
+          {/* Google Fit & Health Connect */}
+          <div className="p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 rounded-2xl bg-white border border-stone-200/70 flex items-center justify-center shrink-0 shadow-3xs p-2">
+                  <GoogleFitIcon className="w-6 h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-black text-stone-900">Google Fit</h4>
+                    {isGfitOn && (
+                      <span className="text-[8px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/60">
+                        Linked
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-semibold text-stone-400 truncate">Android, Noise, Boat, Samsung, Fitbit</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-black text-stone-900">Google Fit & Health Connect</h4>
-                <p className="text-[10px] font-semibold text-stone-400">Android, Noise, Boat, Samsung, Amazfit, Fitbit</p>
-              </div>
+
+              <button
+                type="button"
+                onClick={toggleGfit}
+                className={cn(
+                  "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0 ml-2",
+                  isGfitOn ? "bg-orange-500" : "bg-stone-200"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                    isGfitOn ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={toggleGfit}
-              className={cn(
-                "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
-                isGfitOn ? "bg-orange-500 justify-end" : "bg-stone-200 justify-start"
-              )}
-            >
-              <motion.div layout className="w-4.5 h-4.5 rounded-full bg-white shadow-sm" />
-            </button>
+            {isGfitOn && (
+              <div className="p-2.5 bg-stone-50 rounded-2xl border border-stone-100/80 text-[10px] font-medium text-stone-500 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>Syncs active burn, steps, and weight data automatically</span>
+              </div>
+            )}
           </div>
 
-          {isGfitOn && (
-            <div className="p-3 bg-stone-50/80 rounded-2xl border border-stone-100 space-y-1 text-left">
-              <div className="flex items-center justify-between text-xs font-bold text-stone-800">
-                <span>Google Fit Integration Active</span>
-                <span className="text-[9px] font-mono text-emerald-600 font-extrabold uppercase bg-emerald-50 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Connected
-                </span>
+          {/* Apple Health (HealthKit) */}
+          <div className="p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 rounded-2xl bg-white border border-stone-200/70 flex items-center justify-center shrink-0 shadow-3xs p-2">
+                  <AppleHealthIcon className="w-6 h-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-black text-stone-900">Apple Health</h4>
+                    {isAfitOn && (
+                      <span className="text-[8px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/60">
+                        Linked
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-semibold text-stone-400 truncate">Apple Watch, iPhone Health, HealthKit</p>
+                </div>
               </div>
-              <p className="text-[10px] text-stone-400 font-medium">Background sync for active burn calories, steps, and weight logs.</p>
-            </div>
-          )}
-        </div>
 
-        {/* Apple Health Card */}
-        <div className="bg-white p-4 rounded-[28px] border border-stone-150 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500 shrink-0 font-black text-xs font-mono">
-                AFit
-              </div>
-              <div>
-                <h4 className="text-xs font-black text-stone-900">Apple Health (HealthKit)</h4>
-                <p className="text-[10px] font-semibold text-stone-400">Apple Watch, iPhone Health, Connected iOS Apps</p>
-              </div>
+              <button
+                type="button"
+                onClick={toggleAfit}
+                className={cn(
+                  "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0 ml-2",
+                  isAfitOn ? "bg-orange-500" : "bg-stone-200"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                    isAfitOn ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={toggleAfit}
-              className={cn(
-                "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
-                isAfitOn ? "bg-orange-500 justify-end" : "bg-stone-200 justify-start"
-              )}
-            >
-              <motion.div layout className="w-4.5 h-4.5 rounded-full bg-white shadow-sm" />
-            </button>
+            {isAfitOn && (
+              <div className="p-2.5 bg-stone-50 rounded-2xl border border-stone-100/80 text-[10px] font-medium text-stone-500 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>Syncs Apple Watch workouts, steps, and weight logs</span>
+              </div>
+            )}
           </div>
-
-          {isAfitOn && (
-            <div className="p-3 bg-stone-50/80 rounded-2xl border border-stone-100 space-y-1 text-left">
-              <div className="flex items-center justify-between text-xs font-bold text-stone-800">
-                <span>HealthKit Integration Active</span>
-                <span className="text-[9px] font-mono text-emerald-600 font-extrabold uppercase bg-emerald-50 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Connected
-                </span>
-              </div>
-              <p className="text-[10px] text-stone-400 font-medium">Background sync for active burn calories, steps, and weight logs.</p>
-            </div>
-          )}
         </div>
 
         {/* Action Connect & Sync Button */}
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={handleSyncNow}
-            disabled={isHealthSyncing}
-            className={cn(
-              "w-full py-3.5 px-4 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-[0.99] text-white font-bold text-xs shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all duration-200",
-              isHealthSyncing && "opacity-80 cursor-not-allowed"
-            )}
-          >
-            <RefreshCw className={cn("w-4 h-4", isHealthSyncing && "animate-spin")} />
-            <span>{isHealthSyncing ? "Syncing Health Data..." : "Connect & Sync Now"}</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleSyncNow}
+          disabled={isHealthSyncing}
+          className={cn(
+            "w-full h-12 rounded-2xl bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-black text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all border-none",
+            isHealthSyncing && "opacity-80 cursor-not-allowed"
+          )}
+        >
+          <RefreshCw className={cn("w-4 h-4", isHealthSyncing && "animate-spin")} />
+          <span>{isHealthSyncing ? "Syncing Health Data..." : "Connect & Sync Now"}</span>
+        </button>
 
         {/* Sync & Error Logs Showcase */}
-        <div className="bg-white p-4 rounded-[28px] border border-stone-150 shadow-2xs space-y-3 text-left">
+        <div className="bg-white p-4.5 rounded-[28px] border border-stone-200/80 shadow-sm space-y-3 text-left">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-stone-600" />
               <h4 className="text-xs font-black text-stone-900 uppercase tracking-wider">Sync & Error Logs</h4>
               {logs.length > 0 && (
-                <span className="text-[9px] font-mono font-bold bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded-md">
+                <span className="text-[9px] font-mono font-black bg-stone-100 text-stone-700 px-2 py-0.5 rounded-full">
                   {logs.length}
                 </span>
               )}
@@ -1227,7 +1258,7 @@ export const SettingsView = ({
               <button
                 type="button"
                 onClick={handleClearLogs}
-                className="text-[10px] font-bold text-stone-400 hover:text-rose-500 flex items-center gap-1 cursor-pointer transition-colors"
+                className="text-[10px] font-bold text-stone-400 hover:text-red-500 flex items-center gap-1 cursor-pointer transition-colors bg-transparent border-none"
               >
                 <Trash2 className="w-3 h-3" /> Clear
               </button>
@@ -1239,11 +1270,11 @@ export const SettingsView = ({
               <p className="text-[11px] font-medium text-stone-400">No sync logs recorded yet. Tap "Connect & Sync Now" to run initial sync.</p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {logs.map((log) => (
                 <div
                   key={log.id}
-                  className="p-3 rounded-2xl border bg-stone-50/70 border-stone-100 space-y-1"
+                  className="p-3 rounded-2xl border bg-stone-50/70 border-stone-100 space-y-1 shadow-3xs"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
@@ -1286,36 +1317,41 @@ export const SettingsView = ({
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -20 }}
-        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
+        className="px-4 sm:px-6 mt-6 relative z-10 space-y-6 pb-32 font-sans text-left"
       >
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActiveSubView(null)}
-            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+            className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/70 shadow-3xs transition-all active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h2 className="text-xl font-black text-[#1a1a1a]">Notion Integration</h2>
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 block">
+              Settings
+            </span>
+            <h2 className="text-xl font-black text-stone-900 tracking-tight">Notion Integration</h2>
+          </div>
         </div>
 
         {/* Setup Guide */}
-        <div className="bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-4">
+        <div className="bg-white rounded-[28px] p-5 border border-stone-200/80 shadow-sm space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-stone-950 flex items-center justify-center text-white font-black text-sm select-none">
+            <div className="w-10 h-10 rounded-2xl bg-stone-950 flex items-center justify-center text-white font-black text-sm select-none shadow-3xs">
               N
             </div>
             <div>
-              <div className="font-extrabold text-[#1a1a1a] text-xs">Notion database Sync</div>
-              <div className="text-[10px] text-stone-400 font-bold leading-none mt-1">
+              <div className="font-bold text-stone-900 text-xs">Notion database Sync</div>
+              <div className="text-[10px] text-stone-400 font-semibold leading-none mt-1">
                 Auto-syncs meal logs into a Notion database table
               </div>
             </div>
           </div>
 
-          <div className="text-[10px] font-semibold text-stone-550 space-y-2 pt-2 border-t border-stone-100 leading-relaxed">
-            <p className="font-extrabold text-stone-700">How to Connect:</p>
-            <ol className="list-decimal pl-4 space-y-1.5">
-              <li>Go to <a href="https://notion.so/my-integrations" target="_blank" rel="noreferrer" className="text-orange-500 hover:underline font-extrabold">notion.so/my-integrations ↗</a> and create a new internal integration. Copy your token.</li>
+          <div className="text-xs font-medium text-stone-600 space-y-2 pt-3 border-t border-stone-100 leading-relaxed">
+            <p className="font-bold text-stone-900">How to Connect:</p>
+            <ol className="list-decimal pl-4 space-y-1.5 text-[11px] text-stone-600 font-medium">
+              <li>Go to <a href="https://notion.so/my-integrations" target="_blank" rel="noreferrer" className="text-orange-600 hover:underline font-bold">notion.so/my-integrations ↗</a> and create a new internal integration. Copy your token.</li>
               <li>Open your Notion workspace and create a table database.</li>
               <li>Share the database page with your integration (click the three dots in Notion top-right → Add Connections).</li>
               <li>Copy the database ID from the URL (the 32-character string between the workspace name and the query mark).</li>
@@ -1323,22 +1359,27 @@ export const SettingsView = ({
           </div>
 
           <div className="flex justify-between items-center pt-3 border-t border-stone-100">
-            <span className="text-xs font-bold text-stone-700">Enable Syncing</span>
+            <span className="text-xs font-bold text-stone-900">Enable Syncing</span>
             <button
               onClick={() => setNotionEnabled(!notionEnabled)}
               className={cn(
                 "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center",
-                notionEnabled ? "bg-orange-500 justify-end" : "bg-stone-200 justify-start"
+                notionEnabled ? "bg-orange-500" : "bg-stone-200"
               )}
             >
-              <motion.div layout className="w-4.5 h-4.5 rounded-full bg-white shadow-sm" />
+              <div
+                className={cn(
+                  "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                  notionEnabled ? "translate-x-5" : "translate-x-0"
+                )}
+              />
             </button>
           </div>
 
           {notionEnabled && (
             <div className="space-y-3 pt-3 border-t border-stone-100">
               <div>
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1 px-1">
                   Internal Integration Token
                 </label>
                 <input
@@ -1346,12 +1387,12 @@ export const SettingsView = ({
                   placeholder="secret_xxxxxxxxxxxxxxxxxxxxxxxxxx"
                   value={notionKey}
                   onChange={(e) => setNotionKey(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-150 rounded-xl px-3.5 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                  className="w-full bg-stone-50 focus:bg-white border border-stone-200 focus:border-orange-400 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 outline-none transition-all placeholder:text-stone-300"
                 />
               </div>
 
               <div>
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">
+                <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1 px-1">
                   Database UUID
                 </label>
                 <input
@@ -1359,7 +1400,7 @@ export const SettingsView = ({
                   placeholder="e.g. 8d39c0c8be034ff99971936c53e81d24"
                   value={notionDb}
                   onChange={(e) => setNotionDb(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-150 rounded-xl px-3.5 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                  className="w-full bg-stone-50 focus:bg-white border border-stone-200 focus:border-orange-400 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 outline-none transition-all placeholder:text-stone-300"
                 />
               </div>
             </div>
@@ -1367,7 +1408,7 @@ export const SettingsView = ({
 
           <button
             onClick={handleSaveNotion}
-            className="w-full bg-stone-950 hover:bg-stone-900 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer active:scale-95 transition-all mt-4"
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider h-12 rounded-2xl cursor-pointer active:scale-[0.98] transition-all shadow-md shadow-orange-500/20 flex items-center justify-center mt-4"
           >
             Verify & Save Settings
           </button>
@@ -1382,47 +1423,438 @@ export const SettingsView = ({
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -20 }}
-        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
+        className="px-4 sm:px-6 mt-6 relative z-10 space-y-6 pb-32 font-sans text-left"
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveSubView(null)}
+            className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/70 shadow-3xs transition-all active:scale-95"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 block">
+              Settings
+            </span>
+            <h2 className="text-xl font-black text-stone-900 tracking-tight">Reminders & Alerts</h2>
+          </div>
+        </div>
+
+        {/* 1. Push Notifications Toggle Card */}
+        <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-4 flex items-center justify-between">
+          <div className="min-w-0 flex-1 pr-3">
+            <h4 className="text-xs font-black text-stone-900">Device Push Notifications</h4>
+            <p className="text-[10px] font-semibold text-stone-400 truncate">Receive meal reminders on your device lock screen</p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {isPushEnabled && (
+              <button
+                type="button"
+                onClick={handleSendTestPush}
+                className="text-[10px] font-black uppercase tracking-wider text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1.5 rounded-xl cursor-pointer transition-all flex items-center gap-1 shadow-3xs"
+              >
+                <span>Test</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={togglePushNotifications}
+              className={cn(
+                "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
+                isPushEnabled ? "bg-orange-500" : "bg-stone-200"
+              )}
+            >
+              <div
+                className={cn(
+                  "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                  isPushEnabled ? "translate-x-5" : "translate-x-0"
+                )}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* 2. Scheduled Reminders (Customizable & Expandable) */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
+              Scheduled Reminders
+            </span>
+            <span className="text-[9px] font-bold text-stone-400">
+              {reminderSlots.filter(s => s.enabled).length} Active
+            </span>
+          </div>
+
+          <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-1.5 divide-y divide-stone-100/80">
+            {reminderSlots.map((slot) => (
+              <div key={slot.id} className="p-3.5 flex items-center justify-between group">
+                <div className="min-w-0 flex-1 pr-2">
+                  <h4 className="text-xs font-black text-stone-900 truncate">{slot.label}</h4>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                  {/* Time Picker Button (Opens TimePickerModal) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTimeTarget({
+                        id: slot.id,
+                        time: slot.time,
+                        title: `Set ${slot.label} Time`,
+                        onConfirm: (newTime) => updateReminderSlotTime(slot.id, newTime),
+                      });
+                    }}
+                    className="text-[11px] font-black text-stone-700 bg-stone-100/90 hover:bg-stone-200/80 active:scale-95 px-2.5 py-1.5 rounded-xl border border-stone-200/70 shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer border-none select-none"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-stone-400" />
+                    <span>{formatTime12h(slot.time)}</span>
+                  </button>
+
+                  {/* ON / OFF Switch */}
+                  <button
+                    type="button"
+                    onClick={() => toggleReminderSlot(slot.id)}
+                    className={cn(
+                      "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
+                      slot.enabled ? "bg-orange-500" : "bg-stone-200"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                        slot.enabled ? "translate-x-5" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+
+                  {/* Delete Button */}
+                  <button
+                    type="button"
+                    onClick={() => deleteReminderSlot(slot.id)}
+                    className="w-7 h-7 rounded-lg text-stone-300 hover:text-rose-500 hover:bg-rose-50 transition-colors flex items-center justify-center cursor-pointer border-none bg-transparent"
+                    title="Delete reminder"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Add Custom Reminder Slot */}
+            <div className="p-3">
+              {!isAddingCustomSlot ? (
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCustomSlot(true)}
+                  className="w-full py-2.5 border border-dashed border-stone-200 hover:border-orange-300 hover:bg-orange-50/50 rounded-2xl text-[11px] font-black uppercase tracking-wider text-orange-600 transition-all flex items-center justify-center gap-1.5 cursor-pointer bg-transparent"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Reminder</span>
+                </button>
+              ) : (
+                <div className="p-4 bg-stone-50/90 rounded-2xl border border-stone-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
+                      New Reminder
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingCustomSlot(false);
+                        setCustomSlotLabel("");
+                      }}
+                      className="text-stone-400 hover:text-stone-600 text-xs font-bold cursor-pointer bg-transparent border-none"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Reminder Name (e.g. Afternoon Snack, Fast-Break)"
+                    value={customSlotLabel}
+                    onChange={(e) => setCustomSlotLabel(e.target.value)}
+                    className="w-full bg-white border border-stone-200 focus:border-orange-400 rounded-xl px-3.5 py-2.5 text-xs font-bold text-stone-900 outline-none"
+                  />
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-stone-500">Time:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingTimeTarget({
+                            id: "custom_new",
+                            time: customSlotTime,
+                            title: "Set Reminder Time",
+                            onConfirm: (newTime) => setCustomSlotTime(newTime),
+                          });
+                        }}
+                        className="text-[11px] font-black text-stone-700 bg-white hover:bg-stone-50 active:scale-95 px-3 py-1.5 rounded-xl border border-stone-200 shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer border-none"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-stone-400" />
+                        <span>{formatTime12h(customSlotTime)}</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddCustomReminderSlot}
+                      className="bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-black uppercase tracking-wider px-4 py-2 rounded-xl cursor-pointer shadow-3xs active:scale-95 transition-all border-none"
+                    >
+                      Save Reminder
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Advanced Smart Digests */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider px-1 block">
+            Insights & Digests
+          </span>
+          <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-1.5 divide-y divide-stone-100/80">
+            {/* Macro Gap Alert */}
+            <div className="p-3.5 flex items-center justify-between">
+              <div className="min-w-0 flex-1 pr-2">
+                <h4 className="text-xs font-black text-stone-900">Macro Gap Alert</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">Evening prompt if &gt;20g protein remaining</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMacroGapAlert(!macroGapAlert)}
+                className={cn(
+                  "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0 ml-2",
+                  macroGapAlert ? "bg-orange-500" : "bg-stone-200"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                    macroGapAlert ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
+            </div>
+
+            {/* Daily Report Summaries */}
+            <div className="p-3.5 flex items-center justify-between">
+              <div className="min-w-0 flex-1 pr-2">
+                <h4 className="text-xs font-black text-stone-900">Daily Progress Summary</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">End-of-day calorie & macro milestone recap</p>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0 ml-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingTimeTarget({
+                      id: "daily_wrapup",
+                      time: dailyWrapUpTime,
+                      title: "Daily Summary Time",
+                      onConfirm: (newTime) => setDailyWrapUpTime(newTime),
+                    });
+                  }}
+                  className="text-[11px] font-black text-stone-700 bg-stone-100/90 hover:bg-stone-200/80 active:scale-95 px-2.5 py-1.5 rounded-xl border border-stone-200/70 shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer border-none select-none"
+                >
+                  <Clock className="w-3.5 h-3.5 text-stone-400" />
+                  <span>{formatTime12h(dailyWrapUpTime)}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDailyWrapUpEnabled(!dailyWrapUpEnabled)}
+                  className={cn(
+                    "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
+                    dailyWrapUpEnabled ? "bg-orange-500" : "bg-stone-200"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                      dailyWrapUpEnabled ? "translate-x-5" : "translate-x-0"
+                    )}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Weekly Progress Review */}
+            <div className="p-3.5 flex items-center justify-between">
+              <div className="min-w-0 flex-1 pr-2">
+                <h4 className="text-xs font-black text-stone-900">Weekly Progress Review</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">Sunday evening average & adherence review</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setWeeklyReviewEnabled(!weeklyReviewEnabled)}
+                className={cn(
+                  "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0 ml-2",
+                  weeklyReviewEnabled ? "bg-orange-500" : "bg-stone-200"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                    weeklyReviewEnabled ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Preferences & Quiet Hours */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider px-1 block">
+            Preferences & Timing
+          </span>
+          <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-4 space-y-4">
+            <div>
+              <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1 px-1">
+                Timezone
+              </label>
+              <select
+                value={userTimezone}
+                onChange={(e) => setUserTimezone(e.target.value)}
+                className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-4 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-400 cursor-pointer"
+              >
+                <option value="UTC">UTC</option>
+                <option value="Asia/Kolkata">India (IST - Asia/Kolkata)</option>
+                <option value="America/New_York">US Eastern (EST - America/New_York)</option>
+                <option value="America/Chicago">US Central (CST - America/Chicago)</option>
+                <option value="America/Los_Angeles">US Pacific (PST - America/Los_Angeles)</option>
+                <option value="Europe/London">London (GMT/BST - Europe/London)</option>
+                <option value="Asia/Singapore">Singapore (SGT - Asia/Singapore)</option>
+                <option value="Australia/Sydney">Sydney (AEST - Australia/Sydney)</option>
+                <option value="Asia/Dubai">Dubai (GST - Asia/Dubai)</option>
+              </select>
+            </div>
+
+            <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
+              <div className="min-w-0 flex-1 pr-2">
+                <h4 className="text-xs font-black text-stone-900">Quiet Hours (Auto-Mute)</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">Silence alerts from 10:30 PM – 7:00 AM</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setQuietHoursEnabled(!quietHoursEnabled)}
+                className={cn(
+                  "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0 ml-2",
+                  quietHoursEnabled ? "bg-orange-500" : "bg-stone-200"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                    quietHoursEnabled ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <button
+          type="button"
+          onClick={handleSaveReminders}
+          className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-[0.98] transition-all shadow-md shadow-orange-500/20 flex items-center justify-center border-none"
+        >
+          Save Reminders
+        </button>
+
+        {/* TimePicker Bottom Sheet Modal */}
+        {editingTimeTarget && (
+          <TimePickerModal
+            isOpen={!!editingTimeTarget}
+            onClose={() => setEditingTimeTarget(null)}
+            initialTime={editingTimeTarget.time}
+            title={editingTimeTarget.title}
+            onSave={(newTime) => {
+              editingTimeTarget.onConfirm(newTime);
+              setEditingTimeTarget(null);
+            }}
+          />
+        )}
+      </motion.div>
+    );
+  }
+
+  if (activeSubView === "telegram") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        className="px-4 sm:px-6 mt-6 relative z-10 space-y-6 pb-32 font-sans text-left"
       >
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActiveSubView(null)}
-            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+            className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/70 shadow-3xs transition-all active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h2 className="text-xl font-black text-[#1a1a1a]">Telegram Alerts</h2>
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 block">
+              Integrations & Sync
+            </span>
+            <h2 className="text-xl font-black text-stone-900 tracking-tight">Telegram Weekly Digest</h2>
+          </div>
         </div>
 
-        {/* Setup Guide */}
-        <div className="bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-550">
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-1.95 1.23-5.51 3.63-.52.36-.99.53-1.41.52-.46-.01-1.35-.26-2.01-.48-.81-.27-1.46-.42-1.4-.88.03-.24.37-.49 1.02-.74 3.99-1.74 6.66-2.88 7.99-3.44 3.8-1.6 4.59-1.88 5.1-.19.01.03.01.07.01.1z" />
-              </svg>
-            </div>
-            <div>
-              <div className="font-extrabold text-[#1a1a1a] text-xs">Telegram Reports & Alerts</div>
-              <div className="text-[10px] text-stone-400 font-bold leading-none mt-1">
-                Receive logging reminders and end-of-day summaries
-              </div>
-            </div>
+        {/* Enable Switch Card */}
+        <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-4 flex items-center justify-between">
+          <div className="min-w-0 flex-1 pr-3">
+            <h4 className="text-xs font-black text-stone-900">Sunday Weekly Digest</h4>
+            <p className="text-[10px] font-semibold text-stone-400 truncate">7-day average calories, macro score & wellness recap</p>
           </div>
 
-          <div className="text-[10px] font-semibold text-stone-550 space-y-2 pt-2 border-t border-stone-100 leading-relaxed">
-            <p className="font-extrabold text-stone-700">How to Connect:</p>
-            <ol className="list-decimal pl-4 space-y-1.5">
-              <li>Start a conversation with the official <a href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer" className="font-extrabold underline">FitAI Telegram Bot</a>.</li>
-              <li>Send `/start` or `/id` to the bot to retrieve your unique numeric **Chat ID**.</li>
-              <li>Enter your Chat ID below and click **Send Test Message** to verify the connection.</li>
-            </ol>
-          </div>
+          <button
+            type="button"
+            onClick={() => setIsTelegramChannelOn(!isTelegramChannelOn)}
+            className={cn(
+              "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
+              isTelegramChannelOn ? "bg-orange-500" : "bg-stone-200"
+            )}
+          >
+            <div
+              className={cn(
+                "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                isTelegramChannelOn ? "translate-x-5" : "translate-x-0"
+              )}
+            />
+          </button>
+        </div>
 
-          {/* Credentials */}
-          <div className="space-y-3 pt-3 border-t border-stone-100">
+        {/* Telegram Chat Configuration */}
+        {isTelegramChannelOn && (
+          <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-5 space-y-4">
             <div>
-              <label className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">
+              <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1 px-1">
+                Setup Instructions
+              </label>
+              <p className="text-xs text-stone-600 font-semibold leading-relaxed">
+                1. Open <a href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer" className="text-orange-600 font-bold underline">@FitAIBot</a> in Telegram.
+                <br />
+                2. Send <code className="bg-stone-100 text-stone-800 px-1 py-0.5 rounded text-[10px] font-mono">/id</code> to get your Chat ID.
+                <br />
+                3. Paste your Chat ID below:
+              </p>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1 px-1">
                 Telegram Chat ID
               </label>
               <input
@@ -1430,127 +1862,30 @@ export const SettingsView = ({
                 placeholder="e.g. 987654321"
                 value={tgChatId}
                 onChange={(e) => setTgChatId(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-150 rounded-xl px-3.5 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-500"
+                className="w-full bg-stone-50 focus:bg-white border border-stone-200 focus:border-orange-400 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 outline-none transition-all"
               />
             </div>
-            
+
             <button
+              type="button"
               onClick={handleTestTelegram}
               disabled={isTestingTg}
-              className="w-full border border-sky-200 bg-sky-50/50 hover:bg-sky-50 text-sky-600 text-[9px] font-black uppercase tracking-wider py-2.5 rounded-xl transition-all cursor-pointer disabled:opacity-50 select-none"
+              className="w-full border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-600 text-xs font-black uppercase tracking-wider py-3 rounded-2xl transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {isTestingTg ? "Sending Test..." : "⚡ Send Test Message"}
+              {isTestingTg ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              <span>{isTestingTg ? "Sending Digest..." : "Send Sample Weekly Digest"}</span>
             </button>
           </div>
+        )}
 
-          {/* Toggles */}
-          <div className="space-y-4 pt-3 border-t border-stone-100">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-xs font-bold text-stone-700 block">Daily Report Summaries</span>
-                <span className="text-[9px] text-stone-450 block leading-tight mt-0.5">End-of-day summary of calorie & macro milestones</span>
-              </div>
-              <button
-                onClick={() => setTgReportsEnabled(!tgReportsEnabled)}
-                className={cn(
-                  "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center",
-                  tgReportsEnabled ? "bg-orange-500 justify-end" : "bg-stone-200 justify-start"
-                )}
-              >
-                <motion.div layout className="w-4.5 h-4.5 rounded-full bg-white shadow-sm" />
-              </button>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-xs font-bold text-stone-700 block">Logging Reminders</span>
-                <span className="text-[9px] text-stone-450 block leading-tight mt-0.5">Periodic prompts to log your food items</span>
-              </div>
-              <button
-                onClick={() => setTgRemindersEnabled(!tgRemindersEnabled)}
-                className={cn(
-                  "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center",
-                  tgRemindersEnabled ? "bg-orange-500 justify-end" : "bg-stone-200 justify-start"
-                )}
-              >
-                <motion.div layout className="w-4.5 h-4.5 rounded-full bg-white shadow-sm" />
-              </button>
-            </div>
-          </div>
-
-          {/* Reminder Times & Timezone Settings */}
-          {(tgReportsEnabled || tgRemindersEnabled) && (
-            <div className="space-y-4 pt-4 border-t border-stone-100">
-              <div>
-                <label className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">
-                  Local Timezone
-                </label>
-                <select
-                  value={userTimezone}
-                  onChange={(e) => setUserTimezone(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-150 rounded-xl px-3.5 py-2.5 text-xs font-bold text-stone-850 focus:outline-none"
-                >
-                  <option value="UTC">UTC</option>
-                  <option value="Asia/Kolkata">India (IST - Asia/Kolkata)</option>
-                  <option value="America/New_York">US Eastern (EST - America/New_York)</option>
-                  <option value="America/Chicago">US Central (CST - America/Chicago)</option>
-                  <option value="America/Los_Angeles">US Pacific (PST - America/Los_Angeles)</option>
-                  <option value="Europe/London">London (GMT/BST - Europe/London)</option>
-                  <option value="Asia/Singapore">Singapore (SGT - Asia/Singapore)</option>
-                  <option value="Australia/Sydney">Sydney (AEST - Australia/Sydney)</option>
-                  <option value="Asia/Dubai">Dubai (GST - Asia/Dubai)</option>
-                </select>
-              </div>
-
-              {tgRemindersEnabled && (
-                <div>
-                  <label className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1.5">
-                    Configure Reminder Alerts (Local Time)
-                  </label>
-                  
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {tgReminderTimes.map((time) => (
-                      <span
-                        key={time}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-stone-100 border border-stone-200 text-stone-700 rounded-full text-[10px] font-black shadow-3xs"
-                      >
-                        {time}
-                        <button
-                          onClick={() => removeReminderTime(time)}
-                          className="text-stone-400 hover:text-red-500 text-xs font-light font-sans ml-0.5 cursor-pointer leading-none"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="time"
-                      value={newReminderTime}
-                      onChange={(e) => setNewReminderTime(e.target.value)}
-                      className="bg-stone-50 border border-stone-150 rounded-xl px-3 py-1.5 text-xs font-bold text-stone-850 focus:outline-none flex-1"
-                    />
-                    <button
-                      onClick={addReminderTime}
-                      className="bg-stone-900 hover:bg-stone-800 text-white text-[9px] font-black uppercase tracking-wider px-4 py-1.5 rounded-xl cursor-pointer"
-                    >
-                      Add Time
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <button
-            onClick={handleSaveTelegram}
-            className="w-full bg-stone-950 hover:bg-stone-900 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer active:scale-95 transition-all mt-4"
-          >
-            Verify & Save Settings
-          </button>
-        </div>
+        {/* Save Button */}
+        <button
+          type="button"
+          onClick={handleSaveTelegram}
+          className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-[0.98] transition-all shadow-md shadow-orange-500/20 flex items-center justify-center border-none"
+        >
+          Save Digest Settings
+        </button>
       </motion.div>
     );
   }
@@ -1561,28 +1896,33 @@ export const SettingsView = ({
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -20 }}
-        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
+        className="px-4 sm:px-6 mt-6 relative z-10 space-y-6 pb-32 font-sans text-left"
       >
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActiveSubView(null)}
-            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+            className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/70 shadow-3xs transition-all active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h2 className="text-xl font-black text-[#1a1a1a]">Custom GPT</h2>
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 block">
+              Settings
+            </span>
+            <h2 className="text-xl font-black text-stone-900 tracking-tight">Custom GPT</h2>
+          </div>
         </div>
 
         {/* Status card */}
-        <div className="bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-stone-50 select-none">
+        <div className="bg-white rounded-[28px] p-5 border border-stone-200/80 shadow-sm space-y-5">
+          <div className="flex items-center justify-between pb-3 border-b border-stone-100 select-none">
             <div className="flex items-center gap-2">
-              <ChatGPTIcon className="w-5 h-5 text-stone-750" />
-              <span className="text-[11px] font-black text-stone-850 uppercase tracking-wider">ChatGPT Connection</span>
+              <ChatGPTIcon className="w-5 h-5 text-stone-800" />
+              <span className="text-xs font-black text-stone-900 uppercase tracking-wider">ChatGPT Connection</span>
             </div>
-            <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-100/50">
+            <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-100/60">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[9px] font-bold uppercase tracking-wider">Linked</span>
+              <span className="text-[9px] font-black uppercase tracking-wider">Linked</span>
             </div>
           </div>
 
@@ -1591,7 +1931,7 @@ export const SettingsView = ({
               href={DEFAULT_CUSTOM_GPT_URL}
               target="_blank"
               rel="noreferrer"
-              className="w-full flex items-center justify-center gap-2 bg-stone-900 hover:bg-stone-850 text-white text-[10px] font-black uppercase tracking-wider py-3.5 rounded-2xl transition-all cursor-pointer shadow-sm active:scale-99 text-center select-none border-none"
+              className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider h-12 rounded-2xl transition-all cursor-pointer shadow-md shadow-orange-500/20 active:scale-[0.98] text-center select-none border-none"
             >
               <span>Open Custom GPT ↗</span>
             </a>
@@ -1611,7 +1951,7 @@ export const SettingsView = ({
                     triggerToast("🔒 ChatGPT unlinked successfully!");
                   }
                 }}
-                className="text-[9px] font-bold text-stone-400 hover:text-red-500 transition-colors bg-transparent border-none p-0 cursor-pointer underline hover:no-underline"
+                className="text-[10px] font-bold text-stone-400 hover:text-red-500 transition-colors bg-transparent border-none p-0 cursor-pointer underline hover:no-underline"
               >
                 Unlink Connection
               </button>
@@ -1619,10 +1959,10 @@ export const SettingsView = ({
 
             <div className="space-y-5 pt-3 border-t border-stone-100">
 
-              <div className="flex items-center justify-between pt-3 border-t border-stone-50">
+              <div className="flex items-center justify-between pt-3 border-t border-stone-100">
                 <div>
-                  <span className="text-[10px] font-bold text-stone-700 block">Generate Food Images</span>
-                  <span className="text-[9px] text-stone-400 font-medium block leading-tight">Create AI/Stock food photos automatically for text-only logs</span>
+                  <span className="text-xs font-bold text-stone-900 block">Generate Food Images</span>
+                  <span className="text-[10px] text-stone-400 font-medium block leading-tight mt-0.5">Create AI/Stock food photos automatically for text-only logs</span>
                 </div>
                 <button
                   onClick={() => {
@@ -1632,24 +1972,26 @@ export const SettingsView = ({
                       ...profileData,
                       agent_config: { ...current, generateImages: !isEnabled }
                     });
-                    triggerToast(!isEnabled ? "🖼️ Image generation enabled!" : "🖼️ Image generation disabled");
+                    triggerToast(!isEnabled ? "Image generation enabled!" : "Image generation disabled");
                   }}
-                  className={`w-10 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative flex items-center cursor-pointer ${
-                    (profileData.agent_config?.generateImages ?? true) ? "bg-emerald-500" : "bg-stone-200"
-                  }`}
+                  className={cn(
+                    "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
+                    (profileData.agent_config?.generateImages ?? true) ? "bg-orange-500" : "bg-stone-200"
+                  )}
                 >
                   <div
-                    className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
-                      (profileData.agent_config?.generateImages ?? true) ? "translate-x-4" : "translate-x-0"
-                    }`}
+                    className={cn(
+                      "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                      (profileData.agent_config?.generateImages ?? true) ? "translate-x-5" : "translate-x-0"
+                    )}
                   />
                 </button>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-stone-50">
+              <div className="flex items-center justify-between pt-3 border-t border-stone-100">
                 <div>
-                  <span className="text-[10px] font-bold text-stone-700 block">Require Log Confirmation</span>
-                  <span className="text-[9px] text-stone-400 font-medium block leading-tight">Always ask for confirmation before saving logged meals</span>
+                  <span className="text-xs font-bold text-stone-900 block">Require Log Confirmation</span>
+                  <span className="text-[10px] text-stone-400 font-medium block leading-tight mt-0.5">Always ask for confirmation before saving logged meals</span>
                 </div>
                 <button
                   onClick={() => {
@@ -1659,25 +2001,27 @@ export const SettingsView = ({
                       ...profileData,
                       agent_config: { ...current, requireConfirmation: !isEnabled }
                     });
-                    triggerToast(!isEnabled ? "✅ Log confirmation required!" : "✅ Log confirmation optional");
+                    triggerToast(!isEnabled ? "Log confirmation required!" : "Log confirmation optional");
                   }}
-                  className={`w-10 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative flex items-center cursor-pointer ${
-                    (profileData.agent_config?.requireConfirmation ?? false) ? "bg-emerald-500" : "bg-stone-200"
-                  }`}
+                  className={cn(
+                    "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
+                    (profileData.agent_config?.requireConfirmation ?? false) ? "bg-orange-500" : "bg-stone-200"
+                  )}
                 >
                   <div
-                    className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
-                      (profileData.agent_config?.requireConfirmation ?? false) ? "translate-x-4" : "translate-x-0"
-                    }`}
+                    className={cn(
+                      "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                      (profileData.agent_config?.requireConfirmation ?? false) ? "translate-x-5" : "translate-x-0"
+                    )}
                   />
                 </button>
               </div>
 
-              <div className="flex flex-col gap-2 pt-3 border-t border-stone-50">
+              <div className="flex flex-col gap-2 pt-3 border-t border-stone-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] font-bold text-stone-700 block">Refine Uploaded Photos with AI</span>
-                    <span className="text-[9px] text-stone-400 font-medium block leading-tight">Replace uploaded food photos with styled AI versions</span>
+                    <span className="text-xs font-bold text-stone-900 block">Refine Uploaded Photos with AI</span>
+                    <span className="text-[10px] text-stone-400 font-medium block leading-tight mt-0.5">Replace uploaded food photos with styled AI versions</span>
                   </div>
                   <button
                     onClick={() => {
@@ -1687,16 +2031,18 @@ export const SettingsView = ({
                         ...profileData,
                         agent_config: { ...current, refinePhotos: !isEnabled }
                       });
-                      triggerToast(!isEnabled ? "🎨 AI Photo Refinement enabled!" : "🎨 AI Photo Refinement disabled");
+                      triggerToast(!isEnabled ? "AI Photo Refinement enabled!" : "AI Photo Refinement disabled");
                     }}
-                    className={`w-10 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative flex items-center cursor-pointer ${
-                      (profileData.agent_config?.refinePhotos ?? false) ? "bg-emerald-500" : "bg-stone-200"
-                    }`}
+                    className={cn(
+                      "w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer border border-black/5 flex items-center shrink-0",
+                      (profileData.agent_config?.refinePhotos ?? false) ? "bg-orange-500" : "bg-stone-200"
+                    )}
                   >
                     <div
-                      className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
-                        (profileData.agent_config?.refinePhotos ?? false) ? "translate-x-4" : "translate-x-0"
-                      }`}
+                      className={cn(
+                        "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out",
+                        (profileData.agent_config?.refinePhotos ?? false) ? "translate-x-5" : "translate-x-0"
+                      )}
                     />
                   </button>
                 </div>
@@ -1709,7 +2055,7 @@ export const SettingsView = ({
                     className="mt-2 space-y-3 pl-1"
                   >
                     <div>
-                      <label className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">Visual Art Style</label>
+                      <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1">Visual Art Style</label>
                       <select
                         value={profileData.agent_config?.artStyle || "gourmet"}
                         onChange={(e) => {
@@ -1719,7 +2065,7 @@ export const SettingsView = ({
                             agent_config: { ...current, artStyle: e.target.value }
                           });
                         }}
-                        className="w-full bg-stone-50 border border-stone-150 rounded-xl px-3 py-2 text-[10px] font-bold text-stone-700 focus:outline-none cursor-pointer"
+                        className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-3.5 py-2.5 text-xs font-bold text-stone-900 focus:outline-none cursor-pointer"
                       >
                         <option value="gourmet">Gourmet Studio (Default)</option>
                         <option value="anime">Anime / Studio Ghibli illustration</option>
@@ -1736,7 +2082,7 @@ export const SettingsView = ({
                         animate={{ opacity: 1, y: 0 }}
                         className="space-y-1"
                       >
-                        <label className="text-[9px] font-black text-stone-400 uppercase tracking-wider block mb-1">Custom Style Prompt</label>
+                        <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1">Custom Style Prompt</label>
                         <input
                           type="text"
                           placeholder="e.g. claymation style, oil painting, sketch"
@@ -1748,7 +2094,7 @@ export const SettingsView = ({
                               agent_config: { ...current, customArtStyle: e.target.value }
                             });
                           }}
-                          className="w-full bg-stone-50 border border-stone-150 rounded-xl px-3 py-2 text-[10px] font-bold text-stone-700 focus:outline-none focus:border-stone-300"
+                          className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-4 py-2.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-400"
                         />
                       </motion.div>
                     )}
@@ -1757,9 +2103,9 @@ export const SettingsView = ({
               </div>
 
               {/* Custom Instructions Textarea */}
-              <div className="flex flex-col gap-1.5 pt-3 border-t border-stone-50">
+              <div className="flex flex-col gap-1.5 pt-3 border-t border-stone-100">
                 <div className="flex justify-between items-center">
-                  <label className="text-[10px] font-bold text-stone-700">Custom Instructions to AI</label>
+                  <label className="text-xs font-bold text-stone-900">Custom Instructions to AI</label>
                   <button
                     type="button"
                     onClick={() => {
@@ -1771,14 +2117,14 @@ export const SettingsView = ({
                           customInstructions: "Be a hyper-efficient fitness assistant. Minimize chit-chat. Keep replies extremely concise. Prefix macro estimations with ≈. Focus on accurate protein tracking and calorie targets."
                         }
                       });
-                      triggerToast("✏️ Reset to default instructions!");
+                      triggerToast("Reset to default instructions!");
                     }}
-                    className="text-[9px] font-bold text-stone-400 hover:text-orange-500 transition-colors bg-transparent border-none p-0 cursor-pointer underline hover:no-underline"
+                    className="text-[10px] font-bold text-stone-400 hover:text-orange-500 transition-colors bg-transparent border-none p-0 cursor-pointer underline hover:no-underline"
                   >
                     Restore Default
                   </button>
                 </div>
-                <span className="text-[9px] text-stone-400 font-medium block leading-tight mb-2">Write strict behavioral rules for the agent (e.g. 'be brief', 'no greetings')</span>
+                <span className="text-[10px] text-stone-400 font-medium block leading-tight mb-2">Write strict behavioral rules for the agent (e.g. 'be brief', 'no greetings')</span>
                 <textarea
                   value={profileData.agent_config?.customInstructions || ""}
                   onChange={(e) => {
@@ -1789,12 +2135,12 @@ export const SettingsView = ({
                     });
                   }}
                   placeholder="E.g. Be very brief, do not repeat yourself, count double protein for eggs..."
-                  className="w-full bg-stone-50 border border-stone-150 rounded-2xl p-3 text-[10px] font-bold text-stone-700 focus:outline-none focus:border-stone-300 min-h-[80px]"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-2xl p-3.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-400 min-h-[90px]"
                 />
               </div>
 
-              <div className="bg-orange-50/50 border border-orange-100 rounded-2xl p-3 text-[9px] text-orange-800 font-medium leading-normal flex items-start gap-2 select-none">
-                <span>⚙️</span>
+              <div className="bg-orange-50/60 border border-orange-100 rounded-2xl p-3.5 text-[10px] text-orange-950 font-semibold leading-relaxed flex items-start gap-2 select-none shadow-3xs">
+                <Sliders className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
                 <span>ChatGPT cannot modify these settings. These are your strict instructions.</span>
               </div>
 
@@ -1808,338 +2154,214 @@ export const SettingsView = ({
   if (activeSubView === "logging") {
     const currentAction = profileData.preferences?.find((p: string) => p.startsWith("plus_button_action:"))?.split(":")[1] || "ai_logger";
 
+    const ACTION_OPTIONS = [
+      { id: "ai_logger", title: "AI Meal Logger", icon: Sparkles },
+      { id: "camera", title: "Camera Scanner", icon: Camera },
+      { id: "quick_log", title: "Past Foods", icon: Search },
+      { id: "detailed_log", title: "Manual Form", icon: Edit2 },
+      { id: "vitals", title: "Daily Vitals", icon: Heart },
+      { id: "gpt_redirect", title: "Custom GPT", icon: Bot },
+    ];
+
     return (
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -20 }}
-        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
+        className="px-4 sm:px-6 mt-6 relative z-10 space-y-4 pb-32 font-sans text-left"
       >
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActiveSubView(null)}
-            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+            className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/70 shadow-3xs transition-all active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h2 className="text-xl font-black text-[#1a1a1a]">Logging Preferences</h2>
-        </div>
-
-        <div>
-          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
-            Plus Button (+) Action
-          </h3>
-          <p className="text-[10px] text-stone-450 font-bold px-3 mb-4 leading-normal">
-            Choose what action triggers automatically when you tap the Plus (+) button on your Home screen.
-          </p>
-
-          <div className="space-y-3">
-            {[
-              {
-                id: "ai_logger",
-                title: "AI Logger (Default)",
-                description: "Describe meals in natural language, AI handles the rest.",
-                icon: Sparkles,
-              },
-              {
-                id: "quick_log",
-                title: "Past Foods",
-                description: "Search history or tap past logs to add meals in one click.",
-                icon: Search,
-              },
-              {
-                id: "detailed_log",
-                title: "Detailed Manual Form",
-                description: "Opens standard text fields to manually input calories and macros.",
-                icon: Edit2,
-              },
-              {
-                id: "camera",
-                title: "Direct Camera Capture",
-                description: "Opens the scanner and immediately triggers the device camera.",
-                icon: Camera,
-              },
-              {
-                id: "gpt_redirect",
-                title: "Redirect to Custom GPT",
-                description: "Launches and opens your Custom ChatGPT fitness action.",
-                icon: Bot,
-              },
-            ].map((opt) => {
-              const isSelected = currentAction === opt.id;
-              const IconComp = opt.icon;
-
-              return (
-                <motion.div
-                  key={opt.id}
-                  onClick={() => {
-                    const filteredPrefs = (profileData.preferences || []).filter((p: string) => !p.startsWith("plus_button_action:"));
-                    filteredPrefs.push(`plus_button_action:${opt.id}`);
-                    setProfileData({
-                      ...profileData,
-                      preferences: filteredPrefs
-                    });
-                    triggerToast(`Saved preference: ${opt.title} ⚡`);
-                  }}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  className={cn(
-                    "flex items-center justify-between p-4 rounded-3xl border transition-all cursor-pointer select-none",
-                    isSelected
-                      ? "bg-orange-50/70 border-orange-200/60 shadow-xs"
-                      : "bg-white border-stone-100 hover:border-stone-200 shadow-3xs"
-                  )}
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className={cn(
-                      "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                      isSelected ? "bg-orange-500 text-white" : "bg-stone-50 text-stone-550 border border-stone-100"
-                    )}>
-                      <IconComp className="w-4 h-4" />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <h4 className={cn("text-xs font-black leading-tight", isSelected ? "text-orange-950" : "text-stone-850")}>
-                        {opt.title}
-                      </h4>
-                      <p className="text-[9.5px] text-stone-400 font-semibold mt-0.5 leading-snug">
-                        {opt.description}
-                      </p>
-                    </div>
-                  </div>
-                  {isSelected && (
-                    <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white shrink-0 shadow-xs">
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })}
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 block">
+              Quick Actions
+            </span>
+            <h2 className="text-xl font-black text-stone-900 tracking-tight">Plus Button</h2>
           </div>
-
-          {currentAction === "gpt_redirect" && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-3.5 text-left"
-            >
-              <div>
-                <label className="text-[9px] font-black text-stone-450 uppercase tracking-widest block mb-1.5 px-1">
-                  Custom GPT Chat URL
-                </label>
-                <input
-                  type="text"
-                  placeholder="https://chatgpt.com/g/g-..."
-                  value={localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL}
-                  onChange={(e) => {
-                    localStorage.setItem("fitai_custom_gpt_url", e.target.value);
-                  }}
-                  className="w-full bg-stone-50 border border-stone-150 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-400"
-                />
-              </div>
-              <p className="text-[9.5px] text-stone-400 font-bold leading-relaxed px-1">
-                Tapping the Plus button will launch a new tab pointing directly to your ChatGPT custom action interface.
-              </p>
-            </motion.div>
-          )}
         </div>
+
+        <div className="space-y-3">
+          {ACTION_OPTIONS.map((opt) => {
+            const isSelected = currentAction === opt.id;
+            const IconComp = opt.icon;
+
+            return (
+              <div
+                key={opt.id}
+                onClick={() => {
+                  const filteredPrefs = (profileData.preferences || []).filter((p: string) => !p.startsWith("plus_button_action:"));
+                  filteredPrefs.push(`plus_button_action:${opt.id}`);
+                  setProfileData({
+                    ...profileData,
+                    preferences: filteredPrefs
+                  });
+                  triggerToast(`Plus Button: ${opt.title}`);
+                }}
+                className={cn(
+                  "flex items-center justify-between p-4 rounded-[24px] border transition-all cursor-pointer select-none",
+                  isSelected
+                    ? "bg-orange-50/70 border-orange-200/80 shadow-xs"
+                    : "bg-white border-stone-200/80 hover:border-stone-300 shadow-3xs"
+                )}
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className={cn(
+                    "w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 transition-colors",
+                    isSelected ? "bg-orange-500 text-white shadow-md shadow-orange-500/20" : "bg-stone-50 text-stone-600 border border-stone-100"
+                  )}>
+                    <IconComp className="w-4 h-4" />
+                  </div>
+                  <h4 className={cn("text-xs font-black leading-tight", isSelected ? "text-orange-950" : "text-stone-900")}>
+                    {opt.title}
+                  </h4>
+                </div>
+                {isSelected && (
+                  <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white shrink-0 shadow-xs">
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {currentAction === "gpt_redirect" && (
+          <div className="mt-4 bg-white rounded-[28px] p-5 border border-stone-200/80 shadow-sm space-y-2 text-left">
+            <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest block px-1">
+              Custom GPT URL
+            </label>
+            <input
+              type="text"
+              placeholder="https://chatgpt.com/g/g-..."
+              value={localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL}
+              onChange={(e) => {
+                localStorage.setItem("fitai_custom_gpt_url", e.target.value);
+              }}
+              className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-400"
+            />
+          </div>
+        )}
       </motion.div>
     );
   }
 
   if (activeSubView === "floating_widget") {
-    const isWidgetEnabled = profileData.agent_config?.showGptWidget ?? true;
-    const currentAction = profileData.agent_config?.floatingWidgetAction || "gpt";
+    const isWidgetDisabled = (profileData.agent_config?.showGptWidget === false) || (profileData.agent_config?.floatingWidgetAction === "none");
+    const currentAction = isWidgetDisabled ? "none" : (profileData.agent_config?.floatingWidgetAction || "gpt");
+
+    const FLOATING_ACTION_OPTIONS = [
+      { id: "ai_logger", title: "AI Meal Logger", icon: Sparkles },
+      { id: "camera", title: "Camera Scanner", icon: Camera },
+      { id: "quick_log", title: "Past Foods", icon: Search },
+      { id: "detailed_log", title: "Manual Form", icon: Edit2 },
+      { id: "vitals", title: "Daily Vitals", icon: Heart },
+      { id: "gpt", title: "Custom GPT", icon: Bot },
+      { id: "none", title: "None (Hidden)", icon: EyeOff },
+    ];
 
     return (
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -20 }}
-        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
+        className="px-4 sm:px-6 mt-6 relative z-10 space-y-4 pb-32 font-sans text-left"
       >
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActiveSubView(null)}
-            className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/50"
+            className="w-8 h-8 rounded-full bg-white hover:bg-stone-100 flex items-center justify-center text-stone-600 cursor-pointer border border-stone-200/70 shadow-3xs transition-all active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h2 className="text-xl font-black text-[#1a1a1a]">Floating Button Actions</h2>
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 block">
+              Quick Actions
+            </span>
+            <h2 className="text-xl font-black text-stone-900 tracking-tight">Floating Button</h2>
+          </div>
         </div>
 
-        {/* Master Toggle Card */}
-        <div className="bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-black text-stone-900 block">Show Floating Action Button</span>
-              <span className="text-[10px] text-stone-400 font-semibold block leading-tight mt-0.5">
-                Display floating quick action button on Home & Profile screens
-              </span>
-            </div>
-            <button
-              onClick={() => {
-                const current = profileData.agent_config || {};
-                const isEnabled = current.showGptWidget ?? true;
-                setProfileData({
-                  ...profileData,
-                  agent_config: { ...current, showGptWidget: !isEnabled }
-                });
-                triggerToast(!isEnabled ? "💬 Floating button enabled!" : "💬 Floating button hidden");
-              }}
-              className={`w-10 h-6 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative flex items-center cursor-pointer ${
-                isWidgetEnabled ? "bg-emerald-500" : "bg-stone-200"
-              }`}
-            >
+        <div className="space-y-3">
+          {FLOATING_ACTION_OPTIONS.map((opt) => {
+            const isSelected = currentAction === opt.id || (opt.id === "gpt" && currentAction === "gpt_redirect");
+            const IconComp = opt.icon;
+
+            return (
               <div
-                className={`w-4 h-4 rounded-full bg-white shadow-sm transform duration-200 ${
-                  isWidgetEnabled ? "translate-x-4" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-        </div>
-
-        {/* Live Interactive Button Preview Card */}
-        <div className="bg-white rounded-3xl p-5 border border-stone-100 shadow-2xs space-y-3">
-          <div className="flex justify-between items-center pb-2 border-b border-stone-100">
-            <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
-              Live Floating Button Preview
-            </span>
-            <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100 uppercase font-mono">
-              {currentAction}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between bg-stone-50/70 rounded-2xl p-4 border border-stone-150">
-            <div>
-              <span className="text-xs font-black text-stone-900 block">
-                {currentAction === "gpt" ? "FitAI Custom GPT" :
-                 currentAction === "voice" ? "AI Voice Logger" :
-                 currentAction === "camera" ? "AI Photo Logger" :
-                 currentAction === "vitals" ? "Daily Vitals Tracker" :
-                 "Detailed Manual Log"}
-              </span>
-              <span className="text-[10px] text-stone-400 font-semibold block mt-0.5">
-                {currentAction === "gpt" ? "Orange Theme • 💬 Custom GPT" :
-                 currentAction === "voice" ? "Emerald Theme • 🎙️ Natural Voice" :
-                 currentAction === "camera" ? "Purple Theme • 📸 AI Scanner" :
-                 currentAction === "vitals" ? "Red Theme • 💓 Vitals Sheet" :
-                 "Dark Theme • ✏️ Manual Form"}
-              </span>
-            </div>
-
-            {/* Live Floating FAB Button */}
-            <div className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center shadow-md text-white border border-white/20 shrink-0",
-              currentAction === "vitals" ? "bg-gradient-to-tr from-rose-500 to-red-500" :
-              currentAction === "voice" ? "bg-gradient-to-tr from-emerald-500 to-teal-500" :
-              currentAction === "camera" ? "bg-gradient-to-tr from-purple-500 to-indigo-500" :
-              currentAction === "manual" ? "bg-stone-900" :
-              "bg-gradient-to-tr from-orange-500 to-amber-500"
-            )}>
-              {currentAction === "voice" && <Mic className="w-5.5 h-5.5 text-white" />}
-              {currentAction === "camera" && <Camera className="w-5.5 h-5.5 text-white" />}
-              {currentAction === "vitals" && <Heart className="w-5.5 h-5.5 text-white fill-white" />}
-              {currentAction === "manual" && <Edit2 className="w-5.5 h-5.5 text-white" />}
-              {currentAction === "gpt" && <ChatGPTIcon className="w-5.5 h-5.5 text-white" />}
-            </div>
-          </div>
-        </div>
-
-        {/* Action Selection List (Exact same UI as Plus Button Actions) */}
-        <div>
-          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
-            Floating Button Default Action
-          </h3>
-          <p className="text-[10px] text-stone-450 font-bold px-3 mb-4 leading-normal">
-            Choose what action triggers automatically when you tap the Floating Action button on your screen.
-          </p>
-
-          <div className="space-y-3">
-            {[
-              {
-                id: "gpt",
-                title: "FitAI Custom GPT (Default)",
-                description: "Launches and opens your Custom ChatGPT fitness companion.",
-                icon: Bot,
-              },
-              {
-                id: "voice",
-                title: "AI Voice Logger",
-                description: "Speak meal details out loud in natural language.",
-                icon: Mic,
-              },
-              {
-                id: "camera",
-                title: "AI Photo Logger",
-                description: "Snap food photo to auto-estimate calories & macros.",
-                icon: Camera,
-              },
-              {
-                id: "vitals",
-                title: "Daily Vitals Tracker",
-                description: "Log weight, water intake, stool scale, & energy level.",
-                icon: Heart,
-              },
-              {
-                id: "manual",
-                title: "Detailed Manual Log",
-                description: "Opens standard text fields to manually input calories and macros.",
-                icon: Edit2,
-              },
-            ].map((opt) => {
-              const isSelected = currentAction === opt.id;
-              const IconComp = opt.icon;
-
-              return (
-                <motion.div
-                  key={opt.id}
-                  onClick={() => {
-                    const current = profileData.agent_config || {};
+                key={opt.id}
+                onClick={() => {
+                  const current = profileData.agent_config || {};
+                  if (opt.id === "none") {
                     setProfileData({
                       ...profileData,
-                      agent_config: { ...current, floatingWidgetAction: opt.id }
+                      agent_config: { ...current, showGptWidget: false, floatingWidgetAction: "none" }
                     });
-                    triggerToast(`Saved Floating preference: ${opt.title} ⚡`);
-                  }}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  className={cn(
-                    "flex items-center justify-between p-4 rounded-3xl border transition-all cursor-pointer select-none",
-                    isSelected
-                      ? "bg-orange-50/70 border-orange-200/60 shadow-xs"
-                      : "bg-white border-stone-100 hover:border-stone-200 shadow-3xs"
-                  )}
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className={cn(
-                      "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                      isSelected ? "bg-orange-500 text-white" : "bg-stone-50 text-stone-550 border border-stone-100"
-                    )}>
-                      <IconComp className="w-4 h-4" />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <h4 className={cn("text-xs font-black leading-tight", isSelected ? "text-orange-950" : "text-stone-850")}>
-                        {opt.title}
-                      </h4>
-                      <p className="text-[9.5px] text-stone-400 font-semibold mt-0.5 leading-snug">
-                        {opt.description}
-                      </p>
-                    </div>
+                    triggerToast("Floating button hidden");
+                  } else {
+                    setProfileData({
+                      ...profileData,
+                      agent_config: { ...current, showGptWidget: true, floatingWidgetAction: opt.id }
+                    });
+                    triggerToast(`Floating Button: ${opt.title}`);
+                  }
+                }}
+                className={cn(
+                  "flex items-center justify-between p-4 rounded-[24px] border transition-all cursor-pointer select-none",
+                  isSelected
+                    ? "bg-orange-50/70 border-orange-200/80 shadow-xs"
+                    : "bg-white border-stone-200/80 hover:border-stone-300 shadow-3xs"
+                )}
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className={cn(
+                    "w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 transition-colors",
+                    isSelected ? "bg-orange-500 text-white shadow-md shadow-orange-500/20" : "bg-stone-50 text-stone-600 border border-stone-100"
+                  )}>
+                    <IconComp className="w-4 h-4" />
                   </div>
-                  {isSelected && (
-                    <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white shrink-0 shadow-xs">
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
+                  <h4 className={cn("text-xs font-black leading-tight", isSelected ? "text-orange-950" : "text-stone-900")}>
+                    {opt.title}
+                  </h4>
+                </div>
+                {isSelected && (
+                  <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white shrink-0 shadow-xs">
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+
+        {(currentAction === "gpt" || currentAction === "gpt_redirect") && (
+          <div className="mt-4 bg-white rounded-[28px] p-5 border border-stone-200/80 shadow-sm space-y-2 text-left">
+            <label className="text-[10px] font-black text-stone-400 uppercase tracking-widest block px-1">
+              Custom GPT URL
+            </label>
+            <input
+              type="text"
+              placeholder="https://chatgpt.com/g/g-..."
+              value={localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL}
+              onChange={(e) => {
+                localStorage.setItem("fitai_custom_gpt_url", e.target.value);
+              }}
+              className="w-full bg-stone-50 border border-stone-200 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 focus:outline-none focus:border-orange-400"
+            />
+          </div>
+        )}
       </motion.div>
     );
   }
+
+  // User Identity Helpers
+  const userDisplayName = profileData?.name?.trim() || (session?.user?.email ? session.user.email.split("@")[0] : "FitAI Member");
+  const userDisplayEmail = session?.user?.email || profileData?.name || "Active Member";
+  const userInitials = (userDisplayName.split(" ").map((n: string) => n[0]).join("") || "F").toUpperCase().slice(0, 2);
 
   // --- Main Settings View ---
   return (
@@ -2149,286 +2371,280 @@ export const SettingsView = ({
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: 20 }}
         transition={{ duration: 0.3 }}
-        className="px-6 mt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
+        className="px-4 sm:px-6 pt-6 sm:pt-8 relative z-10 space-y-6 pb-32 font-sans text-left"
       >
-        <div className="flex justify-between items-end mb-2 text-left">
-          <h2 className="text-[3rem] font-light tracking-tight text-[#1a1a1a] leading-none mb-4">
+        {/* Header Title */}
+        <div className="space-y-0.5 text-left">
+          <span className="text-[10px] font-black tracking-widest text-orange-600 uppercase">
+            Preferences & Tools
+          </span>
+          <h2 className="text-3xl font-black tracking-tight text-stone-950">
             Settings
           </h2>
         </div>
 
-        {/* Integrations grid list */}
-        <div>
-          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
-            Integrations & Cloud Sync
-          </h3>
-          <div className="bg-white rounded-[24px] p-2 shadow-[0_2px_8px_rgba(0,0,0,0.04)] divide-y divide-stone-50">
-            {/* Custom GPT */}
-            <div
-              onClick={() => setActiveSubView("gpt")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] rounded-t-[18px] transition-colors cursor-pointer group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                  <Bot className="w-4 h-4 text-emerald-500" />
+        {/* 1. Account & Goals Preview Card */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider px-1 block">
+            Profile & Goals
+          </span>
+          <div
+            onClick={() => {
+              if (onEditProfile) {
+                onEditProfile();
+              } else if (setActiveTab) {
+                setActiveTab("edit-profile");
+              }
+            }}
+            className="bg-white/80 backdrop-blur-md rounded-[28px] border border-white/90 shadow-sm p-4 space-y-3.5 text-left cursor-pointer group hover:bg-white transition-all active:scale-[0.99]"
+          >
+            {/* User Info Row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white font-black text-xs flex items-center justify-center shadow-md shadow-orange-500/20 ring-2 ring-orange-100 shrink-0 select-none overflow-hidden">
+                  {profileData?.imageUrl ? (
+                    <img src={profileData.imageUrl} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    userInitials
+                  )}
                 </div>
-                <div>
-                  <div className="font-bold text-[#1a1a1a] text-xs">Custom GPT Connection</div>
-                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
-                    Link ChatGPT as a personalized health companion
-                  </div>
+                <div className="min-w-0">
+                  <h4 className="font-black text-stone-900 text-sm truncate">{userDisplayName}</h4>
+                  <p className="text-[11px] font-semibold text-stone-400 truncate mt-0.5">{userDisplayEmail}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
-                <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
-                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+
+              <div className="flex items-center gap-1 text-[10px] text-orange-600 font-bold shrink-0">
+                <span className="text-orange-600 bg-orange-50 border border-orange-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">Edit</span>
+                <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
 
+            {/* Quick Goals & Targets Preview Grid (Universal: Calorie Goal & Weight Goal) */}
+            <div className="grid grid-cols-2 gap-2.5 pt-2.5 border-t border-stone-100/80">
+              <div className="bg-stone-50/80 rounded-2xl p-2.5 text-center">
+                <span className="text-[9px] font-black text-stone-400 uppercase tracking-wider block">Calorie Goal</span>
+                <span className="text-xs font-black text-stone-900 mt-0.5 block truncate">
+                  {profileData.goals?.dailyCalories ? `${Number(profileData.goals.dailyCalories).toLocaleString()} kcal / day` : "2,000 kcal / day"}
+                </span>
+              </div>
+              <div className="bg-stone-50/80 rounded-2xl p-2.5 text-center">
+                <span className="text-[9px] font-black text-stone-400 uppercase tracking-wider block">Weight Goal</span>
+                <span className="text-xs font-black text-stone-900 mt-0.5 block truncate">
+                  {profileData.goals?.weightGoal ? `${profileData.goals.weightGoal} kg target` : profileData.weight ? `${profileData.weight} kg current` : "Set Goal"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Quick Workflows & Logging Section */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider px-1 block">
+            Workflows & Actions
+          </span>
+          <div className="bg-white/80 backdrop-blur-md rounded-[28px] border border-white/90 shadow-sm p-1.5 divide-y divide-stone-100/80 text-left">
             {/* Floating Button Actions */}
             <div
               onClick={() => setActiveSubView("floating_widget")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group border-t border-stone-50"
+              className="flex justify-between items-center px-3.5 py-3 hover:bg-orange-50/40 rounded-2xl transition-colors cursor-pointer group"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-550 shrink-0">
-                  <Sliders className="w-4 h-4 text-orange-550" />
-                </div>
-                <div>
-                  <div className="font-bold text-[#1a1a1a] text-xs">Floating Button Actions</div>
-                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
-                    Configure what happens when you tap the floating action button
-                  </div>
-                </div>
+              <div className="min-w-0 flex-1 pr-3">
+                <h4 className="font-bold text-stone-900 text-xs">Floating Button</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">Quick logging shortcut overlay</p>
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
-                <span className="text-stone-500 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">
+              <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-bold shrink-0">
+                <span className="text-stone-700 bg-stone-100 border border-stone-200 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">
                   {(() => {
+                    const isOff = (profileData.agent_config?.showGptWidget === false) || (profileData.agent_config?.floatingWidgetAction === "none");
+                    if (isOff) return "None";
                     const act = profileData.agent_config?.floatingWidgetAction || "gpt";
-                    return act === "gpt" ? "GPT" :
-                           act === "voice" ? "Voice" :
+                    return act === "ai_logger" ? "AI" :
                            act === "camera" ? "Camera" :
+                           act === "quick_log" ? "Past" :
+                           act === "detailed_log" ? "Manual" :
                            act === "vitals" ? "Vitals" :
-                           "Form";
+                           "GPT";
                   })()}
                 </span>
-                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </div>
-
-            {/* Notion Integration commented out for now
-            <div
-              onClick={() => setActiveSubView("notion")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-stone-950 flex items-center justify-center text-white font-black text-xs shrink-0 shadow-sm select-none">
-                  N
-                </div>
-                <div>
-                  <div className="font-bold text-[#1a1a1a] text-xs">Notion Database Sync</div>
-                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
-                    Sync food items to Notion database automatically
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
-                {profileData.notionApiKey && profileData.notionDatabaseId ? (
-                  <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Linked</span>
-                ) : (
-                  <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Off</span>
-                )}
-                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </div>
-            */}
-
-            {/* Reminders & Reports */}
-            <div
-              onClick={() => setActiveSubView("reminders")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shrink-0">
-                  <Bell className="w-4 h-4 text-orange-550" />
-                </div>
-                <div>
-                  <div className="font-bold text-[#1a1a1a] text-xs">Reminders & Reports</div>
-                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
-                    Schedule daily reminders, weekly reports, and delivery channels
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
-                {profileData.telegramReportsEnabled || profileData.telegramRemindersEnabled ? (
-                  <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
-                ) : (
-                  <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Off</span>
-                )}
-                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
 
             {/* Plus Button Actions */}
             <div
               onClick={() => setActiveSubView("logging")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group border-t border-stone-50"
+              className="flex justify-between items-center px-3.5 py-3 hover:bg-orange-50/40 rounded-2xl transition-colors cursor-pointer group"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-550 shrink-0">
-                  <Plus className="w-4 h-4 text-orange-550" />
-                </div>
-                <div>
-                  <div className="font-bold text-[#1a1a1a] text-xs">Plus Button Actions</div>
-                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
-                    Configure what happens when you tap the home Plus button
-                  </div>
-                </div>
+              <div className="min-w-0 flex-1 pr-3">
+                <h4 className="font-bold text-stone-900 text-xs">Plus Button Action</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">Bottom navigation action menu</p>
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
-                <span className="text-stone-500 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">
+              <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-bold shrink-0">
+                <span className="text-stone-700 bg-stone-100 border border-stone-200 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">
                   {(() => {
                     const act = profileData.preferences?.find((p: string) => p.startsWith("plus_button_action:"))?.split(":")[1] || "ai_logger";
                     return act === "ai_logger" ? "AI" :
-                           act === "quick_log" ? "Past" :
-                           act === "detailed_log" ? "Form" :
                            act === "camera" ? "Camera" :
+                           act === "quick_log" ? "Past" :
+                           act === "detailed_log" ? "Manual" :
+                           act === "vitals" ? "Vitals" :
                            "GPT";
                   })()}
                 </span>
-                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Google Gemini API */}
+        {/* 2. Notifications & Sync */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider px-1 block">
+            Alerts & Sync
+          </span>
+          <div className="bg-white/80 backdrop-blur-md rounded-[28px] border border-white/90 shadow-sm p-1.5 divide-y divide-stone-100/80 text-left">
+            {/* Reminders & Alerts */}
             <div
-              onClick={() => setActiveSubView("gemini")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] transition-colors cursor-pointer group border-t border-stone-50"
+              onClick={() => setActiveSubView("reminders")}
+              className="flex justify-between items-center px-3.5 py-3 hover:bg-orange-50/40 rounded-2xl transition-colors cursor-pointer group"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-550 shrink-0">
-                  <Sparkles className="w-4 h-4 text-orange-550 fill-orange-100" />
-                </div>
-                <div>
-                  <div className="font-bold text-[#1a1a1a] text-xs">Google Gemini Image API</div>
-                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
-                    Use your Gemini key for premium performance
-                  </div>
-                </div>
+              <div className="min-w-0 flex-1 pr-3">
+                <h4 className="font-bold text-stone-900 text-xs">Reminders & Alerts</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">Meal schedules, digests & smart timing</p>
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
-                {geminiKey.trim() ? (
-                  <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
+              <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-bold shrink-0">
+                {isPushEnabled || profileData.telegramReportsEnabled || profileData.telegramRemindersEnabled ? (
+                  <span className="text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">On</span>
                 ) : (
-                  <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Off</span>
+                  <span className="text-stone-500 bg-stone-100 border border-stone-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">Off</span>
                 )}
-                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
 
             {/* Health Sync (Apple Health & Google Fit) */}
             <div
               onClick={() => setActiveSubView("health_sync")}
-              className="flex justify-between items-center p-4 hover:bg-[#fcfcfc] rounded-b-[18px] transition-colors cursor-pointer group border-t border-stone-50"
+              className="flex justify-between items-center px-3.5 py-3 hover:bg-orange-50/40 rounded-2xl transition-colors cursor-pointer group"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-550 shrink-0">
-                  <Activity className="w-4 h-4 text-orange-550" />
-                </div>
-                <div>
-                  <div className="font-bold text-[#1a1a1a] text-xs">Health Sync</div>
-                  <div className="text-[9px] text-[#9e9e9e] font-semibold mt-0.5 leading-none">
-                    Apple Health & Google Fit (Smartwatches, Noise, Boat, Samsung)
-                  </div>
-                </div>
+              <div className="min-w-0 flex-1 pr-3">
+                <h4 className="font-bold text-stone-900 text-xs">Health Sync (Wearables)</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">Apple Health, Google Fit & step tracking</p>
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-stone-400 font-bold">
+              <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-bold shrink-0">
                 {(profileData.preferences || []).some((p: string) => p.startsWith("health_sync_")) ? (
-                  <span className="text-emerald-500 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">On</span>
+                  <span className="text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">On</span>
                 ) : (
-                  <span className="text-stone-400 bg-stone-50 border border-stone-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase">Configure</span>
+                  <span className="text-stone-500 bg-stone-100 border border-stone-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">Setup</span>
                 )}
-                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Privacy & Legal Policies */}
-        <div>
-          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
-            Privacy & Compliance
-          </h3>
-          <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-3">
+        {/* 3. AI & External Integrations */}
+        <div className="space-y-2">
+          <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider px-1 block">
+            AI & Integrations
+          </span>
+          <div className="bg-white/80 backdrop-blur-md rounded-[28px] border border-white/90 shadow-sm p-1.5 divide-y divide-stone-100/80 text-left">
+            {/* Custom GPT */}
+            <div
+              onClick={() => setActiveSubView("gpt")}
+              className="flex justify-between items-center px-3.5 py-3 hover:bg-orange-50/40 rounded-2xl transition-colors cursor-pointer group"
+            >
+              <div className="min-w-0 flex-1 pr-3">
+                <h4 className="font-bold text-stone-900 text-xs">Custom GPT</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">ChatGPT logging action endpoint</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-bold shrink-0">
+                <span className="text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">On</span>
+                <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+
+            {/* Telegram Reports */}
+            <div
+              onClick={() => setActiveSubView("telegram")}
+              className="flex justify-between items-center px-3.5 py-3 hover:bg-orange-50/40 rounded-2xl transition-colors cursor-pointer group"
+            >
+              <div className="min-w-0 flex-1 pr-3">
+                <h4 className="font-bold text-stone-900 text-xs">Telegram Weekly Digest</h4>
+                <p className="text-[10px] font-semibold text-stone-400 truncate">Sunday macro & wellness progress summary</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-bold shrink-0">
+                {profileData.telegramChatId ? (
+                  <span className="text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">Connected</span>
+                ) : (
+                  <span className="text-stone-500 bg-stone-100 border border-stone-200/60 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase">Off</span>
+                )}
+                <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Minimalist Utility Icons Bar (Bug Report, Docs, Privacy, Delete Account) */}
+        <div className="pt-4 flex flex-col items-center gap-4">
+          {/* Clean Logout Button */}
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="text-xs font-bold text-stone-500 hover:text-stone-800 transition-colors cursor-pointer py-1 px-3.5 rounded-xl hover:bg-stone-200/50 border border-stone-200/60 bg-white/60 shadow-3xs flex items-center gap-1.5 active:scale-95"
+            >
+              <LogOut className="w-3.5 h-3.5 text-stone-400" />
+              <span>Log out as <span className="text-stone-800 font-black">{userDisplayEmail}</span></span>
+            </button>
+          )}
+
+          <div className="flex items-center justify-center gap-3">
+            {/* 1. Bug Report */}
+            <button
+              type="button"
+              onClick={() => triggerToast("Bug reporting opened")}
+              className="w-10 h-10 rounded-2xl bg-white/80 hover:bg-white border border-stone-200/80 shadow-3xs flex items-center justify-center text-stone-500 hover:text-stone-800 transition-all active:scale-95 cursor-pointer"
+              title="Report a Bug"
+            >
+              <Bug className="w-4 h-4" />
+            </button>
+
+            {/* 2. Documentation */}
+            <button
+              type="button"
+              onClick={() => triggerToast("Documentation coming soon!")}
+              className="w-10 h-10 rounded-2xl bg-white/80 hover:bg-white border border-stone-200/80 shadow-3xs flex items-center justify-center text-stone-500 hover:text-stone-800 transition-all active:scale-95 cursor-pointer"
+              title="Documentation & Guides"
+            >
+              <BookOpen className="w-4 h-4" />
+            </button>
+
+            {/* 3. Privacy & Legal (Opens Bottom Sheet Modal) */}
             <button
               type="button"
               onClick={() => setShowPrivacyModal(true)}
-              className="w-full flex items-center justify-between text-left group cursor-pointer"
+              className="w-10 h-10 rounded-2xl bg-white/80 hover:bg-white border border-stone-200/80 shadow-3xs flex items-center justify-center text-stone-500 hover:text-stone-800 transition-all active:scale-95 cursor-pointer"
+              title="Privacy Policy & Terms"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 shrink-0">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="font-bold text-[#1a1a1a] text-xs">
-                    Privacy Policy & Terms
-                  </div>
-                  <div className="text-[9px] text-stone-400 font-semibold leading-tight mt-0.5">
-                    How FitAI protects your health data and AI meal prompts
-                  </div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-stone-400 opacity-60 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              <ShieldCheck className="w-4 h-4" />
+            </button>
+
+            {/* 4. Delete Account (Opens Bottom Sheet Modal) */}
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-10 h-10 rounded-2xl bg-white/80 hover:bg-rose-50 border border-stone-200/80 hover:border-rose-200 shadow-3xs flex items-center justify-center text-rose-500 hover:text-rose-600 transition-all active:scale-95 cursor-pointer"
+              title="Delete Account"
+            >
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
-        </div>
 
-        {/* Account Management */}
-        <div>
-          <h3 className="text-[11px] font-medium text-[#9e9e9e] uppercase tracking-[0.1em] mb-2 px-3">
-            Account Management
-          </h3>
-          <div className="bg-white rounded-[24px] p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <div className="font-bold text-[#1a1a1a] text-xs truncate">
-                  {session?.user?.email
-                    ? `Signed in as ${session.user.email}`
-                    : profileData.name
-                    ? `Signed in as ${profileData.name}`
-                    : "Signed in"}
-                </div>
-                <div className="text-[9px] text-stone-400 font-semibold leading-tight mt-1">
-                  Sign out of your account on this device
-                </div>
-              </div>
-              <button
-                onClick={onLogout}
-                className="bg-stone-900 text-white hover:bg-stone-850 text-[9px] font-black uppercase tracking-wider px-4 py-2 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
-              >
-                Logout
-              </button>
-            </div>
-
-            <div className="pt-3 border-t border-stone-100 flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <div className="font-bold text-red-600 text-xs flex items-center gap-1.5">
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete Account & Data
-                </div>
-                <div className="text-[9px] text-stone-400 font-semibold leading-tight mt-0.5">
-                  Permanently purge all meal logs, recipes, and user profile
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[9px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all active:scale-95 shrink-0 cursor-pointer"
-              >
-                Delete Account
-              </button>
-            </div>
-          </div>
+          <p className="text-[10px] font-semibold text-stone-400">
+            FitAI • Mindful Nutrition & Analytics
+          </p>
         </div>
 
         {/* Privacy Policy Modal */}
@@ -2438,51 +2654,73 @@ export const SettingsView = ({
         />
 
         {/* Delete Account Confirmation Modal */}
-        <AnimatePresence>
-          {showDeleteConfirm && (
-            <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-[2px] flex items-center justify-center p-6 font-sans">
-              <motion.div
-                initial={{ scale: 0.9, y: 15 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.9, y: 15 }}
-                className="bg-white rounded-[32px] p-6 max-w-sm w-full shadow-2xl border border-stone-100 text-left space-y-4"
+        {createPortal(
+          <AnimatePresence>
+            {showDeleteConfirm && (
+              <div
+                className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget && !isDeletingAccount) setShowDeleteConfirm(false);
+                }}
               >
-                <div className="flex items-center gap-3 text-left">
-                  <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600 shrink-0">
-                    <AlertTriangle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-stone-900">Delete entire account?</h3>
-                    <p className="text-[10px] text-stone-400 font-semibold mt-0.5">This action is permanent and cannot be undone.</p>
-                  </div>
-                </div>
+                {/* Backdrop */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => !isDeletingAccount && setShowDeleteConfirm(false)}
+                  className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
+                />
 
-                <div className="bg-red-50 border border-red-100 rounded-2xl p-3.5 text-left text-red-900 text-[11px] leading-relaxed font-medium">
-                  This will permanently delete all your logged meals, recipes, macro records, and custom settings from our servers immediately.
-                </div>
+                {/* Bottom Sheet Card */}
+                <motion.div
+                  initial={{ y: "100%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "100%" }}
+                  transition={{ type: "spring", damping: 28, stiffness: 280 }}
+                  className="bg-[#FAF7F2] border-t border-x border-stone-200/80 rounded-t-[36px] w-full max-w-md relative z-10 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] text-left space-y-4 overscroll-contain touch-pan-y"
+                >
+                  {/* Top Drag Indicator Pill */}
+                  <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-2 shrink-0 select-none" />
 
-                <div className="flex gap-2.5 pt-1">
-                  <button
-                    type="button"
-                    disabled={isDeletingAccount}
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer select-none"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isDeletingAccount}
-                    onClick={handleDeleteAccount}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-wider py-3 rounded-xl cursor-pointer select-none shadow-md shadow-red-600/20 flex items-center justify-center gap-1.5"
-                  >
-                    {isDeletingAccount ? "Deleting..." : "Purge Everything"}
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 shrink-0 shadow-3xs">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-black text-stone-900 tracking-tight">Delete entire account?</h3>
+                      <p className="text-xs text-stone-400 font-medium mt-0.5">This action is permanent and cannot be undone.</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-red-200/80 rounded-2xl p-4 text-left text-red-950 text-xs leading-relaxed font-medium shadow-3xs">
+                    This will permanently delete all your logged meals, recipes, macro records, and custom settings from our servers immediately.
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-1 select-none">
+                    <button
+                      type="button"
+                      disabled={isDeletingAccount}
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="h-12 bg-stone-200/80 hover:bg-stone-300 text-stone-700 text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer select-none transition-all active:scale-[0.98] border-none"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isDeletingAccount}
+                      onClick={handleDeleteAccount}
+                      className="h-12 bg-red-500 hover:bg-red-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer select-none shadow-md shadow-red-500/20 active:scale-[0.98] border-none flex items-center justify-center gap-1.5"
+                    >
+                      {isDeletingAccount ? "Deleting..." : "Purge Everything"}
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
       </motion.div>
     </>
   );

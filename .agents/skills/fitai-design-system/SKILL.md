@@ -135,3 +135,20 @@ This is the exact gold standard established by the main Dashboard screen:
   * Section titles (*"Nutrient Tracking"*, *"Daily Vitals"*, *"AI Meal Tags"*) must remain 100% bold, clean, and un-cluttered.
   * NEVER add redundant `<Info />` icon buttons to self-explanatory section headers.
 
+---
+
+## 📱 10. Mandatory Bottom-Aligned Mobile Sheet Popups Standard
+
+* **100% Bottom Sheet Mandate**: Every popup modal, confirmation dialog, settings alert, delete prompt, date/time picker, vitals drawer, and tool panel in FitAI MUST slide up as an iconic **Bottom-Aligned Mobile Sheet**.
+* **Prohibition of Centered Dialogs**: Centered floating alert boxes (desktop modal pattern) are strictly prohibited.
+* **Sheet Anatomy Guidelines**:
+  * **Outer Wrapper**: `fixed inset-0 z-[99999] flex items-end justify-center font-sans` portaled to `document.body`.
+  * **Backdrop Overlay**: `absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none` with click-outside to close.
+  * **Top Corners**: `rounded-t-[36px]`.
+  * **Top Drag Indicator Pill**: `<div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />`.
+  * **Background & Elevation**: Signature Warm Cream `#FAF7F2` (`bg-[#FAF7F2] border-t border-x border-stone-200/80 shadow-[0_-10px_40px_rgba(0,0,0,0.2)]`).
+  * **Animation**: Framer Motion spring slide-up `initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}` with `transition={{ type: "spring", damping: 28, stiffness: 280 }}`.
+  * **Body Scroll Lock**: Automatically lock `document.body.style.overflow = "hidden"` and `touchAction = "none"` when mounted.
+  * **Safe Area Bottom Padding**: `pb-[max(20px,env(safe-area-inset-bottom,20px))]` for all iPhone bottom home indicators.
+  * **Invisible Native Scrollbars**: All scrollable sheets and inner cards must hide visible scrollbars (`scrollbar-width: none`, `-ms-overflow-style: none`, `::-webkit-scrollbar { display: none }`) to preserve native mobile app aesthetics.
+

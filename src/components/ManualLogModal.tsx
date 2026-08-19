@@ -39,6 +39,7 @@ import {
   filterAndSortFoods,
   getUserActiveAiTags,
   INITIAL_FOOD_FILTER_STATE,
+  loadSavedFoodFilters,
   FoodFilterState,
 } from "../utils/foodFilter";
 import { AiClarificationModal, PendingAiClarification } from "./AiClarificationModal";
@@ -80,8 +81,14 @@ export const ManualLogModal = ({
   // Step State: "input" -> "preview"
   const [modalStep, setModalStep] = useState<"input" | "preview">(mealToEdit ? "preview" : "input");
   
-  // Mode Switcher in Step 1: "ai" (default) vs "manual"
-  const [logMode, setLogMode] = useState<"ai" | "manual">(mealToEdit ? "manual" : "ai");
+  // Mode Switcher in Step 1: "ai" vs "manual"
+  const [logMode, setLogMode] = useState<"ai" | "manual">(mealToEdit ? "manual" : (initialAiMode ? "ai" : "manual"));
+
+  useEffect(() => {
+    if (!mealToEdit) {
+      setLogMode(initialAiMode ? "ai" : "manual");
+    }
+  }, [initialAiMode, mealToEdit]);
 
   // Past Foods Drawer & Multi-Select State
   const [showPastFoodsDrawer, setShowPastFoodsDrawer] = useState(initialPastFoodsDrawer);
@@ -111,8 +118,8 @@ export const ManualLogModal = ({
   // SINGLE ATTACHED MEAL RULE
   const [attachedItem, setAttachedItem] = useState<PastFoodItem | null>(null);
 
-  // Past Foods Drawer & Multi-Select State
-  const [foodFilters, setFoodFilters] = useState<FoodFilterState>(INITIAL_FOOD_FILTER_STATE);
+  // Past Foods Drawer & Multi-Select State (Persisted)
+  const [foodFilters, setFoodFilters] = useState<FoodFilterState>(loadSavedFoodFilters);
   const [selectedDrawerItems, setSelectedDrawerItems] = useState<PastFoodItem[]>([]);
 
   const toggleDrawerItemSelect = (item: PastFoodItem) => {
@@ -159,9 +166,19 @@ export const ManualLogModal = ({
     onClose();
   };
   
-  // AI Instruction & Photos
-  const [aiInstruction, setAiInstruction] = useState(initialInstruction || "");
+  // AI Instruction & Photos (with session draft protection)
+  const [aiInstruction, setAiInstruction] = useState(() => {
+    return initialInstruction || sessionStorage.getItem("fitai_manual_log_draft") || "";
+  });
   const [taggedNames, setTaggedNames] = useState<string[]>(initialTaggedNames || []);
+
+  useEffect(() => {
+    if (aiInstruction) {
+      sessionStorage.setItem("fitai_manual_log_draft", aiInstruction);
+    } else {
+      sessionStorage.removeItem("fitai_manual_log_draft");
+    }
+  }, [aiInstruction]);
 
   useEffect(() => {
     if (initialInstruction) {
@@ -552,7 +569,7 @@ export const ManualLogModal = ({
     return parts.map((part, i) => {
       if (part.startsWith("@")) {
         return (
-          <span key={i} className="text-orange-600 font-bold bg-orange-100/90 rounded font-sans px-0.5">
+          <span key={i} className="text-orange-600">
             {part}
           </span>
         );
@@ -885,6 +902,7 @@ export const ManualLogModal = ({
   const getCurrentMealData = () => {
     return {
       id: loggedMealResult?.id || mealToEdit?.id || `meal_${Date.now()}`,
+      recipe_id: (mealToEdit as any)?.recipe_id || (loggedMealResult as any)?.recipe_id,
       name: name.trim() || "Meal Log",
       meal_description: mealDescription.trim(),
       calories: parseInt(calories) || 350,
@@ -1187,11 +1205,11 @@ export const ManualLogModal = ({
                     </AnimatePresence>
 
                     <div className="relative flex-1 flex flex-col min-h-0 w-full">
-                      {/* BACKDROP HIGHLIGHT LAYER FOR ORANGE @MENTIONS */}
+                      {/* ZERO-PADDING TEXT COLOR HIGHLIGHT LAYER FOR @TAGS */}
                       {aiInstruction && (
                         <div
                           aria-hidden="true"
-                          className="absolute inset-0 p-4 pr-24 text-xs font-bold leading-relaxed whitespace-pre-wrap break-words pointer-events-none overflow-hidden font-sans z-[11] select-none"
+                          className="absolute inset-0 p-4 pr-24 text-xs font-bold leading-relaxed whitespace-pre-wrap break-words pointer-events-none overflow-hidden font-sans z-[11] select-none text-left"
                         >
                           {renderHighlightedNotes(aiInstruction)}
                         </div>
@@ -1204,7 +1222,7 @@ export const ManualLogModal = ({
                         onChange={handleNotesTextChange}
                         onKeyDown={handleNotesKeyDown}
                         className={cn(
-                          "flex-1 w-full h-full min-h-[140px] bg-white border border-stone-200 focus:border-orange-500 focus:outline-none rounded-3xl p-4 pr-24 text-xs font-bold placeholder:text-stone-400 placeholder:font-normal resize-none shadow-xs leading-relaxed font-sans relative z-10",
+                          "flex-1 w-full h-full min-h-[140px] bg-white border border-stone-200 focus:border-orange-500 focus:outline-none rounded-3xl p-4 pr-24 text-xs font-bold placeholder:text-stone-400 placeholder:font-normal resize-none shadow-xs leading-relaxed font-sans relative z-10 text-left",
                           aiInstruction ? "text-transparent caret-stone-900 selection:bg-orange-500/20" : "text-stone-900"
                         )}
                       />
@@ -1595,63 +1613,67 @@ export const ManualLogModal = ({
                 <button
                   type="button"
                   onClick={() => setIsTimePickerOpen(true)}
-                  className="bg-white border border-stone-200/80 hover:border-orange-400 focus:border-orange-500 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5 cursor-pointer transition-all active:scale-[0.98] text-left border-none"
+                  className="bg-white border border-stone-200/80 hover:border-orange-400 focus:border-orange-500 rounded-2xl p-3 shadow-3xs flex flex-col justify-between gap-1.5 cursor-pointer transition-all active:scale-[0.98] text-left border-none"
                   title="Tap to change logged time"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[8.5px] font-black uppercase text-stone-400 tracking-wider block">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
+                      <Clock className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-stone-400 tracking-wider truncate">
                       Logged Time
                     </span>
-                    <span className="text-xs font-black text-stone-900 block truncate">
+                  </div>
+                  <div className="bg-stone-50 border border-stone-200/60 rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-xs font-black text-stone-900 font-mono block truncate">
                       {time || "12:00 PM"}
                     </span>
                   </div>
                 </button>
 
                 {/* Total Energy Stepper Card */}
-                <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600 shrink-0">
-                    <Flame className="w-4 h-4 text-orange-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[8.5px] font-black uppercase text-orange-600 tracking-wider block">
+                <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex flex-col justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-600 shrink-0">
+                      <Flame className="w-3.5 h-3.5 text-orange-500" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-orange-600 tracking-wider truncate">
                       Calories
                     </span>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <StepperButton
-                        onStep={() => {
-                          setCalories((prev) => {
-                            const c = parseInt(prev) || 0;
-                            return String(Math.max(0, c - 25));
-                          });
-                        }}
-                        className="w-5 h-5 rounded-md flex items-center justify-center text-orange-950/60 hover:text-orange-950 hover:bg-orange-100/60 active:scale-90 transition-all border-none bg-transparent cursor-pointer"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </StepperButton>
+                  </div>
+                  <div className="flex items-center justify-between bg-orange-50/60 border border-orange-200/60 rounded-xl px-1 py-1">
+                    <StepperButton
+                      onStep={() => {
+                        setCalories((prev) => {
+                          const c = parseInt(prev) || 0;
+                          return String(Math.max(0, c - 25));
+                        });
+                      }}
+                      className="w-6 h-6 rounded-lg bg-white shadow-3xs flex items-center justify-center text-orange-950 hover:bg-orange-100/60 active:scale-90 transition-all border border-stone-200/40 cursor-pointer shrink-0"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </StepperButton>
+                    <div className="flex items-baseline justify-center gap-0.5 min-w-0 flex-1 px-1">
                       <input
                         type="number"
                         inputMode="numeric"
                         value={calories === "0" ? "" : calories}
                         onChange={(e) => setCalories(e.target.value)}
-                        className="bg-transparent border-none text-center text-xs font-black text-orange-950 focus:outline-none w-12 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="bg-transparent border-none text-center text-xs font-black text-orange-950 focus:outline-none w-10 p-0 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <span className="text-[10px] font-black text-orange-950/60">kcal</span>
-                      <StepperButton
-                        onStep={() => {
-                          setCalories((prev) => {
-                            const c = parseInt(prev) || 0;
-                            return String(c + 25);
-                          });
-                        }}
-                        className="w-5 h-5 rounded-md flex items-center justify-center text-orange-950/60 hover:text-orange-950 hover:bg-orange-100/60 active:scale-90 transition-all border-none bg-transparent cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </StepperButton>
+                      <span className="text-[9px] font-black text-orange-950/50 uppercase">kcal</span>
                     </div>
+                    <StepperButton
+                      onStep={() => {
+                        setCalories((prev) => {
+                          const c = parseInt(prev) || 0;
+                          return String(c + 25);
+                        });
+                      }}
+                      className="w-6 h-6 rounded-lg bg-white shadow-3xs flex items-center justify-center text-orange-950 hover:bg-orange-100/60 active:scale-90 transition-all border border-stone-200/40 cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </StepperButton>
                   </div>
                 </div>
               </div>
@@ -1858,9 +1880,19 @@ export const ManualLogModal = ({
                 /* 2-ROW COMPACT ACTIONS BAR: Shared 50/50 when 1x, or Unified Extended Pill when != 1x */
                 <div className="space-y-2.5">
                   {portionMultiplier === 1 ? (
-                    /* STATE A: 50 / 50 Split (Portion Stepper + AI Assist) */
+                    /* STATE A: 50 / 50 Split (Left: AI Assist | Right: Portion Stepper Pill in thumb zone) */
                     <div className="grid grid-cols-2 gap-2.5">
-                      {/* Left 50%: Portion Stepper Pill */}
+                      {/* Left 50%: AI Assist Button */}
+                      <button
+                        type="button"
+                        onClick={() => setShowAiRefineInput(true)}
+                        className="h-11 rounded-2xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-3xs font-sans"
+                      >
+                        <Wand2 className="w-3.5 h-3.5 text-orange-500" />
+                        <span>AI Assist</span>
+                      </button>
+
+                      {/* Right 50%: Portion Stepper Pill */}
                       <div className="h-11 bg-white border border-stone-200/90 rounded-2xl px-2 py-1 flex items-center justify-between shadow-3xs transition-all">
                         <StepperButton
                           onStep={() => handlePortionChange(Math.max(0.25, parseFloat((portionMultiplier - 0.25).toFixed(2))))}
@@ -1905,22 +1937,41 @@ export const ManualLogModal = ({
                           <Plus className="w-3.5 h-3.5" />
                         </StepperButton>
                       </div>
-
-                      {/* Right 50%: AI Assist Button */}
-                      <button
-                        type="button"
-                        onClick={() => setShowAiRefineInput(true)}
-                        className="h-11 rounded-2xl bg-white hover:bg-stone-50 border border-stone-200/90 text-stone-800 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-3xs font-sans"
-                      >
-                        <Wand2 className="w-3.5 h-3.5 text-orange-500" />
-                        <span>AI Assist</span>
-                      </button>
                     </div>
                   ) : (
-                    /* STATE B: Unified Full-Width Extended Pill with Design 3 (Controls pinned Left + Clean Calories & Diff on Right) */
+                    /* STATE B: Unified Full-Width Extended Pill (Left: (✕) Reset + Scaled Calories & Diff | Right: Controls pinned on Right) */
                     <div className="h-11 bg-white border border-stone-200/90 rounded-2xl px-2 py-1 flex items-center justify-between shadow-3xs transition-all w-full font-sans">
-                      {/* Left Side: Controls pinned at exact same width / position */}
-                      <div className="w-[46%] sm:w-[45%] flex items-center justify-between shrink-0 pr-1.5 border-r border-stone-200/60">
+                      {/* Left Side: (✕) Reset Button + Live Scaled Calories & Diff */}
+                      <div className="flex-1 flex items-center justify-start pl-1 pr-2 min-w-0 font-sans border-r border-stone-200/60 mr-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handlePortionChange(1)}
+                          className="w-6 h-6 rounded-full bg-stone-100 hover:bg-orange-50 text-stone-400 hover:text-orange-600 flex items-center justify-center transition-all cursor-pointer border border-stone-200/40 active:scale-90 shrink-0 mr-1.5"
+                          title="Reset portion to 1.00x"
+                        >
+                          <X className="w-3 h-3 stroke-[2.5]" />
+                        </button>
+
+                        <div className="flex-1 flex items-center justify-center gap-1 min-w-0 text-center truncate">
+                          <span className="text-xs font-black text-stone-900 tabular-nums">
+                            {calories} kcal
+                          </span>
+                          {baseNutrientData && baseNutrientData.calories > 0 && (parseInt(calories, 10) || 0) !== baseNutrientData.calories && (
+                            <span className={cn(
+                              "text-[10px] font-bold tabular-nums ml-0.5",
+                              (parseInt(calories, 10) || 0) > baseNutrientData.calories
+                                ? "text-orange-600"
+                                : "text-emerald-600"
+                            )}>
+                              ({(parseInt(calories, 10) || 0) > baseNutrientData.calories ? "+" : ""}
+                              {(parseInt(calories, 10) || 0) - baseNutrientData.calories})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right Side: Stepper Controls pinned at exact right thumb position */}
+                      <div className="w-[46%] sm:w-[45%] flex items-center justify-between shrink-0 pl-1">
                         <StepperButton
                           onStep={() => handlePortionChange(Math.max(0.25, parseFloat((portionMultiplier - 0.25).toFixed(2))))}
                           disabled={portionMultiplier <= 0.25}
@@ -1963,35 +2014,6 @@ export const ManualLogModal = ({
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </StepperButton>
-                      </div>
-
-                      {/* Right Side: Design 3 - Clean Calories with (+diff) and Circular Reset Button */}
-                      <div className="flex-1 min-w-0 pl-2.5 flex items-center justify-between">
-                        <div className="flex items-baseline gap-1 min-w-0 truncate">
-                          <span className="text-xs font-black text-orange-950 truncate">
-                            {calories} <span className="text-[10px] font-bold text-orange-900/60 lowercase">kcal</span>
-                          </span>
-                          {baseNutrientData && baseNutrientData.calories > 0 && (parseInt(calories, 10) || 0) !== baseNutrientData.calories && (
-                            <span className={cn(
-                              "text-[10px] font-bold shrink-0",
-                              (parseInt(calories, 10) || 0) > baseNutrientData.calories
-                                ? "text-orange-600"
-                                : "text-stone-400"
-                            )}>
-                              ({(parseInt(calories, 10) || 0) > baseNutrientData.calories ? "+" : ""}
-                              {(parseInt(calories, 10) || 0) - baseNutrientData.calories})
-                            </span>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handlePortionChange(1)}
-                          className="w-6 h-6 rounded-full bg-stone-100 hover:bg-orange-50 text-stone-400 hover:text-orange-600 flex items-center justify-center transition-all cursor-pointer border border-stone-200/40 active:scale-90 shrink-0 ml-1.5"
-                          title="Reset portion to 1.00x"
-                        >
-                          <X className="w-3 h-3 stroke-[2.5]" />
-                        </button>
                       </div>
                     </div>
                   )}

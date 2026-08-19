@@ -19,9 +19,11 @@ This file defines critical rules that all AI developers and code-generation suba
 * **Weight Tracker:** In weight analytics, do NOT display redundant Start/Current/Goal stats. Display ONLY `Average Weight (kg)` with `avg from X logged days`.
 * **Chart Zero Drops:** Do NOT plot dots or drop lines to 0 for unlogged days on charts.
 
-## 3. Modal Stacking Context & Portal Rule (No BottomNav Overlap)
-* **React Portals (`createPortal`):** ALL popup modals, bottom sheets, date range pickers, vitals modals, and dialog overlays MUST be rendered using React's `createPortal(..., document.body)` with `z-[9999]`.
-* **Reasoning:** Sub-page components sit inside lower `z-10` container layers. If a popup is rendered inside a sub-component, it gets trapped in `z-10`, allowing `BottomNav` (`z-50`) to render on top of the popup. Rendering popups directly on `document.body` guarantees they float **100% above everything**.
+## 3. Mandatory 100% Uniform Bottom-Aligned Mobile Sheet Popups & Portal Rule
+* **Mandatory Bottom-Aligned Sheets**: ALL modal dialogs, popups, alert confirmations, delete prompts, settings dialogs, date/time pickers, food library, vitals, and actions MUST use FitAI's iconic **Bottom-Aligned Sheet Popup** (`items-end justify-center font-sans`, portaled to `document.body` with `z-[99999]`, rounded top corners `rounded-t-[36px]`, top drag pill indicator `w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none`, Warm Cream `#FAF7F2` background, smooth spring slide-up animation `initial={{ y: "100%" }} animate={{ y: 0 }}`, backdrop blur `bg-stone-950/60`, and safe area bottom padding `pb-[max(20px,env(safe-area-inset-bottom,20px))]`).
+* **Strict Prohibition of Centered Desktop Dialogs**: NEVER render centered floating alert boxes (e.g. `items-center justify-center rounded-3xl m-4` or generic floating alert boxes) in mobile views. Every single popup MUST slide up smoothly from the bottom as a thumb-friendly bottom sheet.
+* **React Portals (`createPortal`):** ALL popup modals and sheets MUST be rendered using React's `createPortal(..., document.body)` with `z-[99999]` so they float 100% above `BottomNav` (`z-50`) and lower container layers.
+* **Background Body Scroll Lock**: ALL modals must lock `document.body.style.overflow = "hidden"` and `touchAction = "none"` when open so background pages never scroll or cause viewport rubber-banding.
 
 ## 4. Mobile Header Congestion & Stat Grid Rule
 * **Header Title + Filter Row:** NEVER squeeze multi-pill filter bars on the same horizontal flex row as a large page heading (e.g., `Your Progress`) on mobile. ALWAYS use a single compact dropdown trigger badge (`[ 7 Days ▾ ]`) or stack them cleanly.
@@ -38,6 +40,9 @@ This file defines critical rules that all AI developers and code-generation suba
 * **Numeric Input Backspacing**: ALWAYS support empty string (`""`) state (`value={val === 0 ? "" : val}`) so users can backspace completely without forced fallback digits.
 * **Clean Section Headers**: Keep section titles bold, clean, and un-cluttered. Never add redundant `<Info />` icon buttons to self-explanatory section headers.
 * **No Unnecessary Screen Titles or Viewfinder Badges**: NEVER add redundant title banners, explanatory subtext, or badges (e.g. "FitAI Camera", "Camera Viewfinder", "Photo Recognition") to clean full-screen views or camera viewfinders. Keep screens 100% minimal, direct, and clutter-free — imagery & pure function only.
+* **Simple Generic Titles & Ultra-Minimal Subtitles Rule**: ALWAYS use simple, clean, generic names as titles (e.g. `FitAI`, `Today`, `Meals`, `Calories`, `Protein`, `Daily Timeline`). NEVER invent convoluted, poetic, or verbose titles. Use subtitles ONLY when strictly necessary, keeping them ultra-minimal (1-3 words maximum, e.g. `Daily Timeline`).
+* **Share Cards Protein Goal Rule**: NEVER display goal percentages (e.g. `94% goal` or `% of Goal`) inside the Protein summary box on share cards. Display ONLY the raw protein value (e.g. `102g` / `165g`) and label (`Protein`).
+* **No Visible Scrollbars (Clean Native App Standard)**: NEVER render visible browser scrollbar tracks or thumbs on popups, sheets, or pages. All scrollable areas must scroll smoothly while hiding scrollbar tracks (`scrollbar-width: none`, `-ms-overflow-style: none`, `::-webkit-scrollbar { display: none }`).
 
 ## 6. Today's Notes / Wellness Journal Dashboard Rule (v2 Unhide Directive)
 * **Status:** "Today's Notes" (`WellnessJournal`) section is currently commented out in `src/App.tsx` for v2.

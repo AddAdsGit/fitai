@@ -78,8 +78,18 @@ export const CameraLogView = ({
   const [isEditingDetails, setIsEditingDetails] = useState<boolean>(false);
   
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [notes, setNotes] = useState(initialNotes || "");
+  const [notes, setNotes] = useState(() => {
+    return initialNotes || sessionStorage.getItem("fitai_camera_notes_draft") || "";
+  });
   const [hasMediaPermission, setHasMediaPermission] = useState<boolean | null>(true);
+
+  useEffect(() => {
+    if (notes) {
+      sessionStorage.setItem("fitai_camera_notes_draft", notes);
+    } else {
+      sessionStorage.removeItem("fitai_camera_notes_draft");
+    }
+  }, [notes]);
 
   useEffect(() => {
     if (initialNotes) {
@@ -121,6 +131,7 @@ export const CameraLogView = ({
 
   // Live WebRTC Stream State for Macbook / Desktop / Mobile
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const notesAreaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -417,18 +428,29 @@ export const CameraLogView = ({
     });
     allTracksRef.current = [];
 
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => {
+    const activeStream = cameraStreamRef.current || cameraStream;
+    if (activeStream) {
+      activeStream.getTracks().forEach((track) => {
         try {
           track.enabled = false;
           track.stop();
         } catch (_) {}
       });
+      cameraStreamRef.current = null;
       setCameraStream(null);
     }
 
     if (videoRef.current) {
       try {
+        const srcObj = videoRef.current.srcObject as MediaStream | null;
+        if (srcObj && srcObj.getTracks) {
+          srcObj.getTracks().forEach((track) => {
+            try {
+              track.enabled = false;
+              track.stop();
+            } catch (_) {}
+          });
+        }
         videoRef.current.pause();
         videoRef.current.srcObject = null;
       } catch (_) {}
@@ -468,21 +490,32 @@ export const CameraLogView = ({
     let isCancelled = false;
 
     if (flowStep === "capture" && !uploadedImage) {
-      if (cameraStream && videoRef.current && !videoRef.current.srcObject) {
-        videoRef.current.srcObject = cameraStream;
+      if (cameraStreamRef.current && videoRef.current && !videoRef.current.srcObject) {
+        videoRef.current.srcObject = cameraStreamRef.current;
         return;
       }
 
-      if (!cameraStream && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      if (!cameraStreamRef.current && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
           .catch(() => navigator.mediaDevices.getUserMedia({ video: true }))
           .then((stream) => {
-            if (isCancelled || !stream) return;
+            if (!stream) return;
+            if (isCancelled) {
+              // Immediately kill tracks if cancelled before promise resolved!
+              stream.getTracks().forEach((track) => {
+                try {
+                  track.enabled = false;
+                  track.stop();
+                } catch (_) {}
+              });
+              return;
+            }
             
             const videoTracks = stream.getVideoTracks();
             allTracksRef.current.push(...videoTracks);
-
+            cameraStreamRef.current = stream;
             setCameraStream(stream);
+
             if (videoRef.current) {
               videoRef.current.srcObject = stream;
             }
@@ -492,10 +525,13 @@ export const CameraLogView = ({
             setHasMediaPermission(false);
           });
       }
+    } else {
+      stopCameraHardware();
     }
 
     return () => {
       isCancelled = true;
+      stopCameraHardware();
     };
   }, [flowStep, uploadedImage]);
 
@@ -1193,55 +1229,57 @@ export const CameraLogView = ({
                 <button
                   type="button"
                   onClick={() => setIsTimePickerOpen(true)}
-                  className="bg-white border border-stone-200/80 hover:border-orange-400 focus:border-orange-500 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5 cursor-pointer transition-all active:scale-[0.98] text-left border-none"
+                  className="bg-white border border-stone-200/80 hover:border-orange-400 focus:border-orange-500 rounded-2xl p-3 shadow-3xs flex flex-col justify-between gap-1.5 cursor-pointer transition-all active:scale-[0.98] text-left border-none"
                   title="Tap to change logged time"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[8.5px] font-black uppercase text-stone-400 tracking-wider block">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500 shrink-0">
+                      <Clock className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-stone-400 tracking-wider truncate">
                       Logged Time
                     </span>
-                    <span className="text-xs font-black text-stone-900 block truncate">
+                  </div>
+                  <div className="bg-stone-50 border border-stone-200/60 rounded-xl px-2.5 py-1.5 text-center">
+                    <span className="text-xs font-black text-stone-900 font-mono block truncate">
                       {editableTime || loggedMealResult?.time || "12:00 PM"}
                     </span>
                   </div>
                 </button>
 
                 {/* Total Energy Stepper Card */}
-                <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-600 shrink-0">
-                    <Flame className="w-4 h-4 text-orange-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[8.5px] font-black uppercase text-orange-600 tracking-wider block mb-0.5">
-                      Total Energy
+                <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs flex flex-col justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-600 shrink-0">
+                      <Flame className="w-3.5 h-3.5 text-orange-500" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-orange-600 tracking-wider truncate">
+                      Calories
                     </span>
-                    <div className="flex items-center gap-1">
-                      <StepperButton
-                        onStep={() => setEditableCalories((prev) => Math.max(0, prev - 25))}
-                        className="w-5 h-5 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 active:scale-90 cursor-pointer"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </StepperButton>
+                  </div>
+                  <div className="flex items-center justify-between bg-orange-50/60 border border-orange-200/60 rounded-xl px-1 py-1">
+                    <StepperButton
+                      onStep={() => setEditableCalories((prev) => Math.max(0, prev - 25))}
+                      className="w-6 h-6 rounded-lg bg-white shadow-3xs flex items-center justify-center text-orange-950 hover:bg-orange-100/60 active:scale-90 transition-all border border-stone-200/40 cursor-pointer shrink-0"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </StepperButton>
+                    <div className="flex items-baseline justify-center gap-0.5 min-w-0 flex-1 px-1">
                       <input
                         type="number"
                         inputMode="numeric"
                         value={editableCalories === 0 ? "" : editableCalories}
                         onChange={(e) => setEditableCalories(parseInt(e.target.value) || 0)}
-                        className="w-12 text-center text-xs font-black text-stone-900 bg-transparent border-none focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="bg-transparent border-none text-center text-xs font-black text-orange-950 focus:outline-none w-10 p-0 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <span className="text-[10px] font-bold text-stone-400 select-none">
-                        kcal
-                      </span>
-                      <StepperButton
-                        onStep={() => setEditableCalories((prev) => prev + 25)}
-                        className="w-5 h-5 rounded flex items-center justify-center text-stone-400 hover:text-stone-700 active:scale-90 cursor-pointer"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </StepperButton>
+                      <span className="text-[9px] font-black text-orange-950/50 uppercase">kcal</span>
                     </div>
+                    <StepperButton
+                      onStep={() => setEditableCalories((prev) => prev + 25)}
+                      className="w-6 h-6 rounded-lg bg-white shadow-3xs flex items-center justify-center text-orange-950 hover:bg-orange-100/60 active:scale-90 transition-all border border-stone-200/40 cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </StepperButton>
                   </div>
                 </div>
               </div>

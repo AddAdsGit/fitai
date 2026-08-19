@@ -12,6 +12,8 @@ export interface HeaderProps {
   setActiveTab: (tab: string) => void;
 }
 
+import { BrandLogo } from "./BrandLogo";
+
 export function Header({ currentStreak, profileData, setActiveTab }: HeaderProps) {
   const gptUrl = localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL;
 
@@ -20,13 +22,8 @@ export function Header({ currentStreak, profileData, setActiveTab }: HeaderProps
       id="header-main"
       className="px-6 pt-5 flex items-center justify-between relative z-10"
     >
-      <div id="brand-logo" className="flex items-center gap-2">
-        <div className="w-9 h-9 rounded-xl bg-orange-500 shadow-lg shadow-orange-200 flex items-center justify-center">
-          <Flame className="text-white w-5 h-5" />
-        </div>
-        <h1 className="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-orange-400">
-          FitAI
-        </h1>
+      <div id="brand-logo">
+        <BrandLogo variant="lockup" textColor="bg-clip-text text-transparent bg-gradient-to-r from-orange-600 to-orange-400" />
       </div>
       <div id="user-stats" className="flex items-center gap-3">
         <motion.div

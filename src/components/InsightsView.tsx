@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Calendar,
   Flame,
+  Trophy,
   Wind,
   Info,
 } from "lucide-react";
@@ -132,6 +133,17 @@ const CustomScatterTooltip = ({ active, payload }: any) => {
   return null;
 };
 
+const formatShortMonthDay = (dateInput: Date | string) => {
+  if (!dateInput) return "";
+  try {
+    const d = typeof dateInput === "string" ? new Date(dateInput.includes("T") ? dateInput : `${dateInput}T00:00:00`) : dateInput;
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${months[d.getMonth()]} ${d.getDate()}`;
+  } catch (_) {
+    return String(dateInput);
+  }
+};
+
 const formatXAxisDateTick = (dateStr: string, totalDays: number = 7) => {
   if (!dateStr) return "";
   try {
@@ -185,6 +197,82 @@ export const InsightsView = ({
   const [showCustomPicker, setShowCustomPicker] = useState<boolean>(false);
   const [showTdeeInfoModal, setShowTdeeInfoModal] = useState<boolean>(false);
   const [nutrientSlide, setNutrientSlide] = useState<number>(0);
+
+  // Minimalist Interactive Scrubber States (Auto-fade in 2.5s)
+  const [activeCalorieScrub, setActiveCalorieScrub] = useState<any | null>(null);
+  const calorieTimerRef = React.useRef<any>(null);
+
+  const [activeWeightScrub, setActiveWeightScrub] = useState<any | null>(null);
+  const weightTimerRef = React.useRef<any>(null);
+
+  const [activeWaterScrub, setActiveWaterScrub] = useState<any | null>(null);
+  const waterTimerRef = React.useRef<any>(null);
+
+  const [activeEnergyScrub, setActiveEnergyScrub] = useState<any | null>(null);
+  const energyTimerRef = React.useRef<any>(null);
+
+  const [activeBloatingScrub, setActiveBloatingScrub] = useState<any | null>(null);
+  const bloatingTimerRef = React.useRef<any>(null);
+
+  const handleCalorieScrub = (state: any) => {
+    if (state && state.activePayload && state.activePayload.length) {
+      if (calorieTimerRef.current) clearTimeout(calorieTimerRef.current);
+      setActiveCalorieScrub(state.activePayload[0].payload);
+      calorieTimerRef.current = setTimeout(() => {
+        setActiveCalorieScrub(null);
+      }, 2500);
+    }
+  };
+
+  const handleWeightScrub = (state: any) => {
+    if (state && state.activePayload && state.activePayload.length) {
+      if (weightTimerRef.current) clearTimeout(weightTimerRef.current);
+      setActiveWeightScrub(state.activePayload[0].payload);
+      weightTimerRef.current = setTimeout(() => {
+        setActiveWeightScrub(null);
+      }, 2500);
+    }
+  };
+
+  const handleWaterScrub = (state: any) => {
+    if (state && state.activePayload && state.activePayload.length) {
+      if (waterTimerRef.current) clearTimeout(waterTimerRef.current);
+      setActiveWaterScrub(state.activePayload[0].payload);
+      waterTimerRef.current = setTimeout(() => {
+        setActiveWaterScrub(null);
+      }, 2500);
+    }
+  };
+
+  const handleEnergyScrub = (state: any) => {
+    if (state && state.activePayload && state.activePayload.length) {
+      if (energyTimerRef.current) clearTimeout(energyTimerRef.current);
+      setActiveEnergyScrub(state.activePayload[0].payload);
+      energyTimerRef.current = setTimeout(() => {
+        setActiveEnergyScrub(null);
+      }, 2500);
+    }
+  };
+
+  const handleBloatingScrub = (state: any) => {
+    if (state && state.activePayload && state.activePayload.length) {
+      if (bloatingTimerRef.current) clearTimeout(bloatingTimerRef.current);
+      setActiveBloatingScrub(state.activePayload[0].payload);
+      bloatingTimerRef.current = setTimeout(() => {
+        setActiveBloatingScrub(null);
+      }, 2500);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (calorieTimerRef.current) clearTimeout(calorieTimerRef.current);
+      if (weightTimerRef.current) clearTimeout(weightTimerRef.current);
+      if (waterTimerRef.current) clearTimeout(waterTimerRef.current);
+      if (energyTimerRef.current) clearTimeout(energyTimerRef.current);
+      if (bloatingTimerRef.current) clearTimeout(bloatingTimerRef.current);
+    };
+  }, []);
 
   const localFormatDateStr = (date: Date) => {
     const y = date.getFullYear();
@@ -441,16 +529,16 @@ export const InsightsView = ({
       label = "No logs";
       badgeBg = "text-stone-400";
     } else if (avg <= 1.5) {
-      label = "Calm / None 🟢";
+      label = "Calm / None";
       badgeBg = "text-emerald-600";
     } else if (avg <= 2.5) {
-      label = "Mild Bloating 🟡";
+      label = "Mild Bloating";
       badgeBg = "text-amber-600";
     } else if (avg <= 3.5) {
-      label = "Moderate Bloating 🟠";
+      label = "Moderate Bloating";
       badgeBg = "text-orange-600";
     } else {
-      label = "Severe Bloating 🔴";
+      label = "Severe Bloating";
       badgeBg = "text-rose-600";
     }
     return { avg, count, label, badgeBg };
@@ -652,8 +740,8 @@ export const InsightsView = ({
         {/* Metric 1: Current Streak */}
         <div className="bg-white/60 backdrop-blur-md p-5 rounded-[24px] border border-white/80 shadow-sm flex flex-col justify-between gap-3 relative">
           <div className="flex justify-between items-start">
-            <div className="w-10 h-10 rounded-full bg-orange-100/50 flex items-center justify-center text-orange-600">
-              <Flame className="w-5 h-5 text-orange-500 fill-orange-500" />
+            <div className="w-10 h-10 rounded-2xl bg-orange-500/10 flex items-center justify-center text-xl shadow-inner border border-orange-500/10 select-none">
+              🔥
             </div>
             <button
               onClick={() => {
@@ -678,12 +766,12 @@ export const InsightsView = ({
         {/* Metric 2: Best Record */}
         <div className="bg-white/60 backdrop-blur-md p-5 rounded-[24px] border border-white/80 shadow-sm flex flex-col justify-between gap-3 relative">
           <div className="flex justify-between items-start">
-            <div className="w-10 h-10 rounded-full bg-orange-100/50 flex items-center justify-center text-orange-600">
-              <span className="text-xl">🏆</span>
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center text-xl shadow-inner border border-amber-500/10 select-none">
+              🏆
             </div>
             <button
               onClick={() => {
-                if (triggerToast) triggerToast("🏆 Record copied to clipboard!");
+                if (triggerToast) triggerToast("Record copied to clipboard!");
               }}
               title="Share Record"
               className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95"
@@ -735,99 +823,118 @@ export const InsightsView = ({
             <p className="text-[10px] text-orange-950/30 font-medium mt-1">Start logging meals to see your calorie trends</p>
           </div>
         ) : (
-          <div className="h-48 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              {timeRange === "7D" ? (
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                >
-                  <XAxis
-                    dataKey="date"
-                    axisLine={false}
-                    tickLine={false}
-                    minTickGap={25}
-                    tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)}
-                    tick={{
-                      fontSize: 10,
-                      fontWeight: 900,
-                      fill: "#7C2D12",
-                      opacity: 0.5,
-                    }}
-                    dy={10}
-                  />
-                  <RechartsTooltip
-                    cursor={{ fill: "rgba(255, 112, 8, 0.05)" }}
-                    contentStyle={{
-                      borderRadius: "16px",
-                      border: "none",
-                      background: "rgba(255,255,255,0.9)",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                      color: "#431407",
-                      fontWeight: 900,
-                    }}
-                    itemStyle={{ color: "#FF7008", pointerEvents: "none" }}
-                  />
-                  <ReferenceLine y={profileData?.goals?.dailyCalories || 2000} stroke="#f9731640" strokeDasharray="6 4" strokeWidth={1.5} />
-                  <Bar dataKey="calories" radius={[6, 6, 6, 6]}>
-                    {chartData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.calories > entry.goal ? "#fed7aa" : "#f97316"}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              ) : (
-                <LineChart
-                  data={chartData}
-                  margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
-                >
-                  <XAxis
-                    dataKey="date"
-                    axisLine={false}
-                    tickLine={false}
-                    minTickGap={25}
-                    tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)}
-                    tick={{
-                      fontSize: 10,
-                      fontWeight: 900,
-                      fill: "#7C2D12",
-                      opacity: 0.5,
-                    }}
-                    dy={10}
-                  />
-                  <RechartsTooltip
-                    contentStyle={{
-                      borderRadius: "16px",
-                      border: "none",
-                      background: "rgba(255,255,255,0.9)",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                      color: "#431407",
-                      fontWeight: 900,
-                    }}
-                    itemStyle={{ color: "#FF7008", fontWeight: 900 }}
-                  />
-                  <ReferenceLine y={profileData?.goals?.dailyCalories || 2000} stroke="#f9731640" strokeDasharray="6 4" strokeWidth={1.5} />
-                  <Line
-                    type="monotone"
-                    dataKey="calories"
-                    connectNulls={true}
-                    stroke="#f97316"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: "#f97316", stroke: "#fff", strokeWidth: 2 }}
-                    activeDot={{
-                      r: 6,
-                      fill: "#f97316",
-                      stroke: "#fff",
-                      strokeWidth: 2,
-                    }}
-                  />
-                </LineChart>
-              )}
-            </ResponsiveContainer>
+          <div className="space-y-1 relative">
+            {/* Auto-fading Scrubber Pill for Continuous Range */}
+            {timeRange !== "7D" && (
+              <AnimatePresence>
+                {activeCalorieScrub && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                  >
+                    <span className="text-[10px] font-bold text-orange-900/60">
+                      {formatFullDateLabel(activeCalorieScrub.date)}
+                    </span>
+                    <span className="w-1 h-1 rounded-full bg-orange-300" />
+                    <span className="text-xs font-black text-orange-600 tabular-nums">
+                      {activeCalorieScrub.calories ? `${activeCalorieScrub.calories.toLocaleString()} kcal` : "Unlogged"}
+                    </span>
+                    {activeCalorieScrub.calories && activeCalorieScrub.goal && (
+                      <span className={cn(
+                        "text-[9px] font-bold tabular-nums",
+                        activeCalorieScrub.calories > activeCalorieScrub.goal ? "text-orange-600" : "text-emerald-600"
+                      )}>
+                        ({activeCalorieScrub.calories > activeCalorieScrub.goal ? "+" : ""}
+                        {(activeCalorieScrub.calories - activeCalorieScrub.goal).toLocaleString()})
+                      </span>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
+
+            <div className="h-44 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                {timeRange === "7D" ? (
+                  <BarChart
+                    data={chartData}
+                    margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+                  >
+                    <XAxis
+                      dataKey="date"
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={10}
+                      tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)}
+                      tick={{
+                        fontSize: 10,
+                        fontWeight: 900,
+                        fill: "#7C2D12",
+                        opacity: 0.5,
+                      }}
+                      dy={6}
+                    />
+                    <RechartsTooltip
+                      cursor={{ fill: "rgba(255, 112, 8, 0.05)" }}
+                      contentStyle={{
+                        borderRadius: "16px",
+                        border: "none",
+                        background: "rgba(255,255,255,0.9)",
+                        backdropFilter: "blur(10px)",
+                        boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                        color: "#431407",
+                        fontWeight: 900,
+                      }}
+                      itemStyle={{ color: "#FF7008", pointerEvents: "none" }}
+                    />
+                    <ReferenceLine y={profileData?.goals?.dailyCalories || 2000} stroke="#f9731640" strokeDasharray="6 4" strokeWidth={1.5} />
+                    <Bar dataKey="calories" radius={[6, 6, 6, 6]}>
+                      {chartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.calories > entry.goal ? "#fed7aa" : "#f97316"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                ) : (
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+                    onMouseMove={handleCalorieScrub}
+                    onTouchMove={handleCalorieScrub}
+                  >
+                    <ReferenceLine y={profileData?.goals?.dailyCalories || 2000} stroke="#f9731640" strokeDasharray="6 4" strokeWidth={1.5} />
+                    <Line
+                      type="monotone"
+                      dataKey="calories"
+                      connectNulls={true}
+                      stroke="#f97316"
+                      strokeWidth={3}
+                      dot={{ r: 3, fill: "#f97316", stroke: "#fff", strokeWidth: 2 }}
+                      activeDot={{
+                        r: 6,
+                        fill: "#f97316",
+                        stroke: "#fff",
+                        strokeWidth: 2,
+                      }}
+                    />
+                  </LineChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+
+            {/* Minimalist Date Range Footer for Long Range Views */}
+            {timeRange !== "7D" && (
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
+                <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
+                <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
+                <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -960,57 +1067,64 @@ export const InsightsView = ({
           </div>
 
           {/* Recharts Area Chart */}
-          <div className="h-48 w-full relative z-0">
+          <div className="space-y-1 relative z-0">
+            <AnimatePresence>
+              {activeWeightScrub && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                >
+                  <span className="text-[10px] font-bold text-orange-900/60">
+                    {formatFullDateLabel(activeWeightScrub.date)}
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-orange-300" />
+                  <span className="text-xs font-black text-orange-600 tabular-nums">
+                    {activeWeightScrub.weight} kg
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {filteredWeightData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={filteredWeightData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="insightsWeightGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0.0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.03)" />
-                  <XAxis 
-                    dataKey="date" 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }}
-                    tickFormatter={(str) => {
-                      try {
-                        const d = new Date(str);
-                        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-                      } catch (_) {
-                        return str;
-                      }
-                    }}
-                  />
-                  <YAxis 
-                    domain={['dataMin - 1', 'dataMax + 1']} 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }}
-                  />
-                  <RechartsTooltip 
-                    contentStyle={{ 
-                      borderRadius: "16px", 
-                      border: "none", 
-                      background: "rgba(255,255,255,0.9)", 
-                      backdropFilter: "blur(10px)", 
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)", 
-                      fontSize: 10,
-                      fontWeight: 900,
-                      color: "#431407"
-                    }}
-                    labelFormatter={(label) => {
-                      return new Date(label).toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
-                    }}
-                  />
-                  <Area type="monotone" dataKey="weight" stroke="#f97316" strokeWidth={2.5} fillOpacity={1} fill="url(#insightsWeightGrad)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              <>
+                <div className="h-44 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={filteredWeightData}
+                      margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                      onMouseMove={handleWeightScrub}
+                      onTouchMove={handleWeightScrub}
+                    >
+                      <defs>
+                        <linearGradient id="insightsWeightGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.25}/>
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0.0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.03)" />
+                      <YAxis 
+                        domain={['dataMin - 0.5', 'dataMax + 0.5']} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }}
+                      />
+                      <Area type="monotone" dataKey="weight" stroke="#f97316" strokeWidth={2.5} fillOpacity={1} fill="url(#insightsWeightGrad)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Minimalist Date Range Footer */}
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
+                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
+                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
+                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
+                </div>
+              </>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+              <div className="h-44 flex flex-col items-center justify-center text-center p-4">
                 <Scale className="w-8 h-8 text-orange-950/20" />
                 <span className="text-xs font-bold text-orange-900/40 mt-2">No weight logs recorded in this range</span>
               </div>
@@ -1126,44 +1240,45 @@ export const InsightsView = ({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.25 }}
-            className="h-56 w-full pt-2"
+            className="space-y-1 pt-2"
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <XAxis
-                  dataKey="date"
-                  axisLine={false}
-                  tickLine={false}
-                  minTickGap={25}
-                  tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)}
-                  tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }}
-                />
-                <RechartsTooltip
-                  contentStyle={{
-                    borderRadius: "16px",
-                    border: "none",
-                    background: "rgba(255,255,255,0.9)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                    color: "#431407",
-                    fontWeight: 900,
-                    fontSize: 11,
-                  }}
-                />
-                {periodNutrientStats.map((n) => (
-                  <Line
-                    key={n.id}
-                    type="monotone"
-                    dataKey={n.id}
-                    connectNulls={true}
-                    stroke={n.color}
-                    strokeWidth={2.5}
-                    dot={false}
-                    name={`${n.name} (${n.unit})`}
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                  <RechartsTooltip
+                    contentStyle={{
+                      borderRadius: "16px",
+                      border: "none",
+                      background: "rgba(255,255,255,0.9)",
+                      backdropFilter: "blur(10px)",
+                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                      color: "#431407",
+                      fontWeight: 900,
+                      fontSize: 11,
+                    }}
                   />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+                  {periodNutrientStats.map((n) => (
+                    <Line
+                      key={n.id}
+                      type="monotone"
+                      dataKey={n.id}
+                      connectNulls={true}
+                      stroke={n.color}
+                      strokeWidth={2.5}
+                      dot={false}
+                      name={`${n.name} (${n.unit})`}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Minimalist Date Range Footer */}
+            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
+              <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
+              <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
+              <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
+            </div>
           </motion.div>
         )}
 
@@ -1224,33 +1339,53 @@ export const InsightsView = ({
           </div>
 
           {/* Dynamic Water Intake Bar Chart */}
-          <div className="h-40 w-full pt-2">
-            {waterStats.count > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={dynamicVitalsChartData}
-                  margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
+          <div className="space-y-1 relative pt-2">
+            <AnimatePresence>
+              {activeWaterScrub && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-sky-200/80 shadow-md shadow-sky-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
                 >
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-                  <YAxis domain={[0, 'dataMax + 0.5']} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
-                  <RechartsTooltip
-                    contentStyle={{
-                      borderRadius: "16px",
-                      border: "none",
-                      background: "rgba(255,255,255,0.9)",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                      fontSize: 11,
-                      fontWeight: 900,
-                      color: "#431407",
-                    }}
-                  />
-                  <ReferenceLine y={waterStats.goal} stroke="#38BDF8" strokeDasharray="4 4" strokeWidth={1.5} />
-                  <Bar dataKey="water" fill="#38BDF8" radius={[6, 6, 6, 6]} name="Water (L)" />
-                </BarChart>
-              </ResponsiveContainer>
+                  <span className="text-[10px] font-bold text-sky-900/60">
+                    {formatFullDateLabel(activeWaterScrub.date)}
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-sky-300" />
+                  <span className="text-xs font-black text-sky-600 tabular-nums">
+                    {activeWaterScrub.water ?? 0} L
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {waterStats.count > 0 ? (
+              <>
+                <div className="h-36 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={dynamicVitalsChartData}
+                      margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
+                      onMouseMove={handleWaterScrub}
+                      onTouchMove={handleWaterScrub}
+                    >
+                      <YAxis domain={[0, 'dataMax + 0.5']} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} />
+                      <ReferenceLine y={waterStats.goal} stroke="#38BDF8" strokeDasharray="4 4" strokeWidth={1.5} />
+                      <Bar dataKey="water" fill="#38BDF8" radius={[6, 6, 6, 6]} name="Water (L)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Minimalist Date Range Footer */}
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
+                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
+                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
+                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
+                </div>
+              </>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+              <div className="h-36 flex flex-col items-center justify-center text-center p-4">
                 <Droplets className="w-8 h-8 text-orange-950/20" />
                 <span className="text-xs font-bold text-orange-900/40 mt-2">No water logs recorded in this range</span>
               </div>
@@ -1298,33 +1433,52 @@ export const InsightsView = ({
           </div>
 
           {/* Dynamic Energy Level Line Chart */}
-          <div className="h-40 w-full pt-2">
-            {energyStats.count > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={dynamicVitalsChartData}
-                  margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+          <div className="space-y-1 relative pt-2">
+            <AnimatePresence>
+              {activeEnergyScrub && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-amber-200/80 shadow-md shadow-amber-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
                 >
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-                  <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
-                  <RechartsTooltip
-                    contentStyle={{
-                      borderRadius: "16px",
-                      border: "none",
-                      background: "rgba(255,255,255,0.9)",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                      fontSize: 11,
-                      fontWeight: 900,
-                      color: "#431407",
-                    }}
-                    formatter={(val: any) => [`Level ${val}`, "Energy"]}
-                  />
-                  <Line type="monotone" dataKey="energy" connectNulls={true} stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} name="Energy (1-5)" />
-                </LineChart>
-              </ResponsiveContainer>
+                  <span className="text-[10px] font-bold text-amber-900/60">
+                    {formatFullDateLabel(activeEnergyScrub.date)}
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-amber-300" />
+                  <span className="text-xs font-black text-amber-600 tabular-nums">
+                    Level {activeEnergyScrub.energy ?? "-"} / 5.0
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {energyStats.count > 0 ? (
+              <>
+                <div className="h-36 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={dynamicVitalsChartData}
+                      margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                      onMouseMove={handleEnergyScrub}
+                      onTouchMove={handleEnergyScrub}
+                    >
+                      <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} />
+                      <Line type="monotone" dataKey="energy" connectNulls={true} stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} name="Energy (1-5)" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Minimalist Date Range Footer */}
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
+                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
+                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
+                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
+                </div>
+              </>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+              <div className="h-36 flex flex-col items-center justify-center text-center p-4">
                 <Zap className="w-8 h-8 text-orange-950/20" />
                 <span className="text-xs font-bold text-orange-900/40 mt-2">No energy logs recorded in this range</span>
               </div>
@@ -1335,34 +1489,29 @@ export const InsightsView = ({
 
       {/* 3. Dedicated Bloating Severity Card (Respects trackBloating config) */}
       {profileData?.agent_config?.trackBloating !== false && (
-        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
+        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans text-left">
           <div className="flex justify-between items-start">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-rose-100/70 text-rose-600 flex items-center justify-center border border-rose-200/50 shadow-2xs">
-                <Wind className="w-5 h-5" />
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
+                Bloating Severity
               </div>
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
-                  Bloating Severity
-                </div>
-                <div className="text-2xl font-black text-orange-950">
-                  {bloatingStats.avg > 0 ? (
-                    <>
-                      {bloatingStats.avg}{" "}
-                      <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
-                        / 5.0 <span className={cn("font-bold", bloatingStats.badgeBg)}>({bloatingStats.label})</span>
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-sm font-black text-orange-950/40">No logs in range</span>
-                  )}
-                </div>
+              <div className="text-2xl font-black text-orange-950">
+                {bloatingStats.avg > 0 ? (
+                  <>
+                    {bloatingStats.avg}{" "}
+                    <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                      / 5.0 <span className={cn("font-bold", bloatingStats.badgeBg)}>({bloatingStats.label})</span>
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm font-black text-orange-950/40">No logs in range</span>
+                )}
               </div>
             </div>
 
             <button
               onClick={() => {
-                if (triggerToast) triggerToast("💨 Bloating report copied!");
+                if (triggerToast) triggerToast("Bloating report copied!");
               }}
               title="Share Bloating Report"
               className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
@@ -1372,43 +1521,52 @@ export const InsightsView = ({
           </div>
 
           {/* Dynamic Bloating Level Line Chart */}
-          <div className="h-40 w-full pt-2">
-            {bloatingStats.count > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={dynamicVitalsChartData}
-                  margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+          <div className="space-y-1 relative pt-2">
+            <AnimatePresence>
+              {activeBloatingScrub && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-rose-200/80 shadow-md shadow-rose-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
                 >
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-                  <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} />
-                  <RechartsTooltip
-                    contentStyle={{
-                      borderRadius: "16px",
-                      border: "none",
-                      background: "rgba(255,255,255,0.9)",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                      fontSize: 11,
-                      fontWeight: 900,
-                      color: "#431407",
-                    }}
-                    formatter={(val: any) => {
-                      const num = Number(val);
-                      const labels: Record<number, string> = {
-                        1: "Level 1 (None/Calm)",
-                        2: "Level 2 (Mild)",
-                        3: "Level 3 (Moderate)",
-                        4: "Level 4 (Severe)",
-                        5: "Level 5 (Very Severe)",
-                      };
-                      return [labels[num] || `Level ${num}`, "Bloating"];
-                    }}
-                  />
-                  <Line type="monotone" dataKey="bloating" connectNulls={true} stroke="#F43F5E" strokeWidth={3} dot={{ r: 4, fill: "#F43F5E", stroke: "#fff", strokeWidth: 2 }} name="Bloating (1-5)" />
-                </LineChart>
-              </ResponsiveContainer>
+                  <span className="text-[10px] font-bold text-rose-900/60">
+                    {formatFullDateLabel(activeBloatingScrub.date)}
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-rose-300" />
+                  <span className="text-xs font-black text-rose-600 tabular-nums">
+                    Level {activeBloatingScrub.bloating ?? "-"} / 5.0
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {bloatingStats.count > 0 ? (
+              <>
+                <div className="h-36 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={dynamicVitalsChartData}
+                      margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                      onMouseMove={handleBloatingScrub}
+                      onTouchMove={handleBloatingScrub}
+                    >
+                      <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} />
+                      <Line type="monotone" dataKey="bloating" connectNulls={true} stroke="#F43F5E" strokeWidth={3} dot={{ r: 4, fill: "#F43F5E", stroke: "#fff", strokeWidth: 2 }} name="Bloating (1-5)" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Minimalist Date Range Footer */}
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
+                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
+                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
+                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
+                </div>
+              </>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+              <div className="h-36 flex flex-col items-center justify-center text-center p-4">
                 <Wind className="w-8 h-8 text-orange-950/20" />
                 <span className="text-xs font-bold text-orange-900/40 mt-2">No bloating logs recorded in this range</span>
               </div>
@@ -1419,34 +1577,29 @@ export const InsightsView = ({
 
       {/* 4. Dedicated Digestion Card (Respects trackDigestion config) */}
       {profileData?.agent_config?.trackDigestion !== false && (
-        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans">
+        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans text-left">
           <div className="flex justify-between items-start">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-100/70 text-emerald-600 flex items-center justify-center border border-emerald-200/50 shadow-2xs">
-                <Activity className="w-5 h-5" />
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
+                Digestion (Bristol Scatter)
               </div>
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
-                  Digestion (Bristol Scatter)
-                </div>
-                <div className="text-2xl font-black text-orange-950 flex flex-wrap items-baseline gap-2">
-                  {digestionStats.count > 0 ? (
-                    <>
-                      <span>Type {digestionStats.avgType}</span>
-                      <span className="text-xs font-bold text-emerald-600 tracking-normal font-sans">
-                        {digestionStats.label}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-sm font-black text-orange-950/40">No logs in range</span>
-                  )}
-                </div>
+              <div className="text-2xl font-black text-orange-950 flex flex-wrap items-baseline gap-2">
+                {digestionStats.count > 0 ? (
+                  <>
+                    <span>Type {digestionStats.avgType}</span>
+                    <span className="text-xs font-bold text-emerald-600 tracking-normal font-sans">
+                      {digestionStats.label}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm font-black text-orange-950/40">No logs in range</span>
+                )}
               </div>
             </div>
 
             <button
               onClick={() => {
-                if (triggerToast) triggerToast("💩 Digestion report copied!");
+                if (triggerToast) triggerToast("Digestion report copied!");
               }}
               title="Share Digestion Report"
               className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
@@ -1500,25 +1653,20 @@ export const InsightsView = ({
       )}
 
       {/* 5. Dedicated Eating Habits & Meal Tags Card */}
-      <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-5 font-sans">
+      <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-5 font-sans text-left">
         <div className="flex justify-between items-start">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-orange-100/70 text-orange-600 flex items-center justify-center border border-orange-200/50 shadow-2xs">
-              <Utensils className="w-5 h-5" />
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
+              Eating Habits & Tags
             </div>
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
-                Eating Habits & Tags
-              </div>
-              <div className="text-xs font-bold text-orange-900/60 font-sans">
-                based on {eatingHabitsStats.totalMeals} logged meals
-              </div>
+            <div className="text-xs font-bold text-orange-900/60 font-sans">
+              based on {eatingHabitsStats.totalMeals} logged meals
             </div>
           </div>
 
           <button
             onClick={() => {
-              if (triggerToast) triggerToast("🏷️ Eating Habits report copied!");
+              if (triggerToast) triggerToast("Eating Habits report copied!");
             }}
             title="Share Eating Habits"
             className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
@@ -1583,22 +1731,30 @@ export const InsightsView = ({
       {/* TIME RANGE PICKER BOTTOM SHEET MODAL (PORTAL TO BODY) */}
       {showCustomPicker &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
+          <div
+            className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowCustomPicker(false);
+            }}
+          >
             <div
-              className="fixed inset-0"
+              className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
               onClick={() => setShowCustomPicker(false)}
             />
-            <div className="w-full max-w-md bg-white rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl border border-stone-200 space-y-6 font-sans relative z-10 animate-slide-up">
-              <div className="flex justify-between items-center">
+            <div className="w-full max-w-md bg-[#FAF7F2] rounded-t-[36px] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] shadow-[0_-10px_40px_rgba(0,0,0,0.2)] border-t border-x border-stone-200/80 space-y-5 font-sans relative z-10 overscroll-contain touch-pan-y animate-slide-up text-left">
+              {/* Top Drag Indicator Pill */}
+              <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
+
+              <div className="flex justify-between items-center pb-2 border-b border-stone-200/60 select-none">
                 <div>
-                  <h3 className="text-lg font-black text-orange-950">Select Time Range</h3>
-                  <p className="text-xs text-stone-400 font-semibold mt-0.5">
+                  <h3 className="text-base font-black text-orange-950">Select Time Range</h3>
+                  <p className="text-[10px] text-stone-400 font-semibold mt-0.5">
                     Choose a quick preset or set custom dates
                   </p>
                 </div>
                 <button
                   onClick={() => setShowCustomPicker(false)}
-                  className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:text-stone-800 transition-colors cursor-pointer border-none"
+                  className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-500 hover:text-stone-800 transition-colors cursor-pointer border-none"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1624,10 +1780,10 @@ export const InsightsView = ({
                         setShowCustomPicker(false);
                       }}
                       className={cn(
-                        "py-2.5 px-3 rounded-2xl text-xs font-black transition-all cursor-pointer border text-center active:scale-95",
+                        "py-2.5 px-3 rounded-2xl text-xs font-black transition-all cursor-pointer border text-center active:scale-95 shadow-3xs",
                         timeRange === item.id
                           ? "bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20"
-                          : "bg-stone-50 text-stone-700 border-stone-200/80 hover:bg-stone-100"
+                          : "bg-white text-stone-700 border-stone-200/80 hover:bg-orange-50"
                       )}
                     >
                       {item.label}
@@ -1637,45 +1793,43 @@ export const InsightsView = ({
               </div>
 
               {/* Custom Date Pickers */}
-              <div className="space-y-3 pt-2 border-t border-stone-100">
+              <div className="space-y-3 pt-2 border-t border-stone-200/60">
                 <label className="text-[10px] font-black uppercase text-stone-400 tracking-wider block">
-                  Custom Dates
+                  Custom Range
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-stone-500 block mb-1">
-                      Start Date
-                    </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs">
+                    <span className="text-[9px] font-black uppercase text-stone-400 block mb-1">Start Date</span>
                     <input
                       type="date"
                       value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="w-full bg-stone-50 border border-stone-200/80 rounded-xl p-2.5 text-xs font-bold text-stone-800 focus:outline-none focus:border-orange-500"
+                      onChange={(e) => {
+                        setCustomStartDate(e.target.value);
+                        setTimeRange("custom");
+                      }}
+                      className="w-full text-xs font-bold text-stone-800 bg-transparent border-none focus:outline-none cursor-pointer"
                     />
                   </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-stone-500 block mb-1">
-                      End Date
-                    </span>
+                  <div className="bg-white border border-stone-200/80 rounded-2xl p-3 shadow-3xs">
+                    <span className="text-[9px] font-black uppercase text-stone-400 block mb-1">End Date</span>
                     <input
                       type="date"
                       value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="w-full bg-stone-50 border border-stone-200/80 rounded-xl p-2.5 text-xs font-bold text-stone-800 focus:outline-none focus:border-orange-500"
+                      onChange={(e) => {
+                        setCustomEndDate(e.target.value);
+                        setTimeRange("custom");
+                      }}
+                      className="w-full text-xs font-bold text-stone-800 bg-transparent border-none focus:outline-none cursor-pointer"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Apply Custom Range Button */}
               <button
-                onClick={() => {
-                  setTimeRange("CUSTOM");
-                  setShowCustomPicker(false);
-                }}
-                className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-black rounded-2xl shadow-lg shadow-orange-500/25 active:scale-95 transition-all cursor-pointer border-none"
+                onClick={() => setShowCustomPicker(false)}
+                className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-md shadow-orange-500/20 active:scale-98 transition-all cursor-pointer border-none"
               >
-                Apply Custom Range
+                Apply Time Range
               </button>
             </div>
           </div>,
@@ -1685,13 +1839,21 @@ export const InsightsView = ({
       {/* TDEE FORMULA & SCIENCE MODAL (PORTAL TO BODY) */}
       {showTdeeInfoModal &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
+          <div
+            className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowTdeeInfoModal(false);
+            }}
+          >
             <div
-              className="fixed inset-0"
+              className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
               onClick={() => setShowTdeeInfoModal(false)}
             />
-            <div className="bg-white/95 backdrop-blur-md rounded-[32px] p-6 shadow-2xl border border-white/80 max-w-md w-full max-h-[85vh] overflow-y-auto space-y-4 font-sans relative z-10">
-              <div className="flex justify-between items-center pb-2 border-b border-black/5">
+            <div className="bg-[#FAF7F2] rounded-t-[36px] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] shadow-[0_-10px_40px_rgba(0,0,0,0.2)] border-t border-x border-stone-200/80 max-w-md w-full max-h-[85vh] overflow-y-auto space-y-4 font-sans relative z-10 overscroll-contain touch-pan-y text-left">
+              {/* Top Drag Indicator Pill */}
+              <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
+
+              <div className="flex justify-between items-center pb-2 border-b border-stone-200/60 select-none">
                 <div className="flex items-center gap-2">
                   <Flame className="w-5 h-5 text-orange-500 fill-orange-500 shrink-0" />
                   <h3 className="text-base font-black text-orange-950">
@@ -1700,47 +1862,47 @@ export const InsightsView = ({
                 </div>
                 <button
                   onClick={() => setShowTdeeInfoModal(false)}
-                  className="w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center text-orange-950/60 transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-500 transition-colors cursor-pointer border-none"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="space-y-3.5 text-xs text-orange-950/80 leading-relaxed">
-                <div>
+                <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
                   <div className="font-extrabold text-orange-950 mb-1 flex items-center gap-1">
                     <span>1. Basal Metabolic Rate (BMR)</span>
                   </div>
-                  <p className="text-[11px] text-orange-900/70">
+                  <p className="text-[11px] text-stone-600">
                     Your resting burn is calculated using the established Mifflin-St Jeor formula based on your age, height, weight, and gender.
                   </p>
                 </div>
 
-                <div>
+                <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
                   <div className="font-extrabold text-orange-950 mb-1">
                     2. Weight Change Calorie Impact
                   </div>
-                  <p className="text-[11px] text-orange-900/70">
+                  <p className="text-[11px] text-stone-600">
                     1 kg of body tissue equals ~7,700 kcal. FitAI measures your weight trend change over the selected days to find your daily calorie impact:
                   </p>
-                  <div className="bg-orange-50/60 border border-orange-100 rounded-xl p-2.5 mt-1 font-mono text-[10px] text-orange-900 font-bold">
+                  <div className="bg-orange-50 border border-orange-100 rounded-xl p-2.5 mt-2 font-mono text-[10px] text-orange-900 font-bold">
                     Calorie Impact = (Weight Delta kg × 7,700) ÷ Days
                   </div>
                 </div>
 
-                <div>
+                <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
                   <div className="font-extrabold text-orange-950 mb-1">
                     3. True AI TDEE Formula
                   </div>
-                  <p className="text-[11px] text-orange-900/70">
+                  <p className="text-[11px] text-stone-600">
                     Combining your average logged intake with your weight trend delta reveals your actual real-world metabolism:
                   </p>
-                  <div className="bg-orange-50/60 border border-orange-100 rounded-xl p-2.5 mt-1 font-mono text-[10px] text-orange-900 font-bold">
+                  <div className="bg-orange-50 border border-orange-100 rounded-xl p-2.5 mt-2 font-mono text-[10px] text-orange-900 font-bold">
                     Real TDEE = Avg Daily Intake - Calorie Impact
                   </div>
                 </div>
 
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 text-amber-900 text-[11px]">
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 text-amber-900 text-[11px]">
                   <span className="font-extrabold block mb-0.5">⚠️ Tracking Consistency Warning:</span>
                   If you miss logging meals or scale weight for multiple days, your calculated TDEE will lose precision. Consistent daily tracking unlocks maximum accuracy!
                 </div>
@@ -1748,7 +1910,7 @@ export const InsightsView = ({
 
               <button
                 onClick={() => setShowTdeeInfoModal(false)}
-                className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black rounded-2xl shadow-lg shadow-orange-500/20 active:scale-95 transition-all cursor-pointer border-none mt-2"
+                className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-md shadow-orange-500/20 active:scale-98 transition-all cursor-pointer border-none mt-2"
               >
                 Got It
               </button>

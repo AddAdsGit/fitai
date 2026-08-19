@@ -29,6 +29,7 @@ import {
   filterAndSortFoods,
   getUserActiveAiTags,
   INITIAL_FOOD_FILTER_STATE,
+  loadSavedFoodFilters,
   type FoodFilterState,
 } from "../utils/foodFilter";
 
@@ -350,8 +351,8 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
     }
   };
 
-  // Unified Advanced Food Filter State
-  const [foodFilters, setFoodFilters] = useState<FoodFilterState>(INITIAL_FOOD_FILTER_STATE);
+  // Unified Advanced Food Filter State (Persisted)
+  const [foodFilters, setFoodFilters] = useState<FoodFilterState>(loadSavedFoodFilters);
   const [selectedMealDetail, setSelectedMealDetail] = useState<Meal | null>(null);
 
   // Active AI Tracking Tags (User configured in Profile / Onboarding)
@@ -796,36 +797,36 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
       {createPortal(
         <AnimatePresence>
           {showLogsToRecipeModal && (
-            <div className="fixed inset-0 z-[9999] flex items-end justify-center font-sans">
+            <div className="fixed inset-0 z-[99999] flex items-end justify-center font-sans">
               {/* Backdrop */}
               <motion.div
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 0.5 }}
+                animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => !isGeneratingRecipe && setShowLogsToRecipeModal(false)}
-                className="absolute inset-0 bg-black/60 cursor-pointer"
+                className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
               />
               {/* Sheet */}
               <motion.div
                 initial={{ y: "100%" }}
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                className="relative w-full max-w-md bg-white rounded-t-[32px] shadow-2xl p-6 pb-8 z-10 flex flex-col max-h-[85vh]"
+                transition={{ type: "spring", damping: 28, stiffness: 280 }}
+                className="relative w-full max-w-md bg-[#FAF7F2] border-t border-x border-stone-200/80 rounded-t-[36px] shadow-[0_-10px_40px_rgba(0,0,0,0.2)] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] z-10 flex flex-col max-h-[85vh] overscroll-contain touch-pan-y"
               >
                 {/* Drag Handle */}
-                <div className="w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-4" />
+                <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-2 shrink-0 select-none" />
 
                 {/* Title & Close */}
-                <div className="flex justify-between items-center mb-3 text-left">
+                <div className="flex justify-between items-center mb-3 text-left border-b border-stone-200/60 pb-2">
                   <div>
-                    <h3 className="text-base font-black text-[#1a1a1a]">Convert Log to Recipe</h3>
+                    <h3 className="text-base font-black text-orange-950">Convert Log to Recipe</h3>
                     <p className="text-[10px] text-stone-400 font-semibold mt-0.5">Select any past logged meal to convert into an AI recipe</p>
                   </div>
                   {!isGeneratingRecipe && (
                     <button
                       onClick={() => setShowLogsToRecipeModal(false)}
-                      className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-500 cursor-pointer"
+                      className="w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center text-stone-500 cursor-pointer border-none"
                     >
                       <X className="w-4 h-4" />
                     </button>

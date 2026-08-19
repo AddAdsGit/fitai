@@ -127,9 +127,14 @@ export default function App() {
     const plusActionTag = (profileData.preferences || []).find((p: string) => p.startsWith("plus_button_action:")) || "";
     const plusAction = plusActionTag.split(":")[1] || "ai_logger";
 
-    if (plusAction === "gpt_redirect") {
+    if (plusAction === "gpt_redirect" || plusAction === "gpt") {
       const gptUrl = localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL;
       window.open(gptUrl.trim(), "_blank");
+      return;
+    }
+
+    if (plusAction === "vitals") {
+      setIsVitalsModalOpen(true);
       return;
     }
 
@@ -139,10 +144,7 @@ export default function App() {
     }
 
     if (plusAction === "quick_log") {
-      setManualLogInitialAiMode(false);
-      setIsCameraFullScreen(true);
-      setManualLogInitialSegment("quick");
-      setAutoTriggerPhotoScan(false);
+      setIsFoodLibraryModalOpen(true);
       return;
     }
 
@@ -399,16 +401,7 @@ export default function App() {
 
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [profileData, setProfileDataState] = useState(INITIAL_PROFILE_STATE);
-  const [mealsState, setMealsState] = useState<Meal[]>(() => {
-    try {
-      const saved = localStorage.getItem("fitai_meals");
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed.filter(m => m.name !== "Parotta" && m.name !== "1") : [];
-    } catch (_) {
-      return [];
-    }
-  });
+  const [mealsState, setMealsState] = useState<Meal[]>([]);
   const [recipes, setRecipesState] = useState<Recipe[]>([]);
 
   useEffect(() => {
@@ -935,7 +928,7 @@ export default function App() {
         setIsSessionLoading(false);
       } else if (event === "PASSWORD_RECOVERY") {
         navigateTo("/reset-password");
-      } else if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+      } else if (event === "SIGNED_IN") {
         if (session?.user) {
           setIsDataLoading(true);
           try {
@@ -950,6 +943,8 @@ export default function App() {
             setCurrentPath("/");
           }
         }
+        setIsSessionLoading(false);
+      } else if (event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
         setIsSessionLoading(false);
       }
     });
@@ -1198,59 +1193,7 @@ export default function App() {
             };
           });
 
-          if (mappedRecipes.length === 0 && activeProfileId) {
-            // Seed the 3 default recipes for beginning flow
-            const seedPromises = INITIAL_RECIPES.map(r => 
-              supabase.from("recipes").insert({
-                profile_id: activeProfileId,
-                name: r.name,
-                time: r.time,
-                calories: r.calories,
-                protein: r.protein,
-                carbs: r.carbs,
-                fats: r.fats,
-                fiber: r.fiber,
-                description: r.description,
-                tags: r.tags,
-                image: r.image,
-                ingredients: r.ingredients,
-                instructions: r.instructions
-              }).select("*").single()
-            );
-
-            Promise.all(seedPromises).then(seededResults => {
-              const seededMapped = seededResults
-                .map(res => res.data)
-                .filter(Boolean)
-                .map(r => ({
-                  id: r.id,
-                  name: r.name,
-                  time: r.time,
-                  calories: r.calories,
-                  protein: r.protein,
-                  carbs: r.carbs,
-                  fats: r.fats,
-                  fiber: r.fiber || 0,
-                  description: r.description || "",
-                  tags: r.tags || [],
-                  image: r.image,
-                  ingredients: r.ingredients || [],
-                  instructions: r.instructions,
-                  micros: r.micros || [],
-                  log_count: r.log_count || 0
-                }));
-              if (seededMapped.length > 0) {
-                setRecipesState(seededMapped);
-              } else {
-                setRecipesState(INITIAL_RECIPES);
-              }
-            }).catch(err => {
-              console.error("Error seeding default recipes:", err);
-              setRecipesState(INITIAL_RECIPES);
-            });
-          } else {
-            setRecipesState(mappedRecipes);
-          }
+          setRecipesState(mappedRecipes);
         }
 
         if (mealsRes.error) {
@@ -1276,54 +1219,7 @@ export default function App() {
             };
           });
 
-          if (mappedMeals.length === 0 && profileRes.data?.username === "johndoe") {
-            const seedPromises = INITIAL_MEALS.map(m =>
-              supabase.from("meals").insert({
-                profile_id: activeProfileId,
-                name: m.name,
-                time: m.time,
-                type: m.type,
-                calories: m.calories,
-                protein: m.protein,
-                nutrients: { carbs: m.carbs || 0, fats: m.fats || 0, fiber: m.fiber || 0 },
-                image: m.image,
-                meal_description: m.meal_description || "",
-                date: m.date
-              }).select("*").single()
-            );
-
-            Promise.all(seedPromises).then(seededResults => {
-              const seededMapped = seededResults
-                .map(res => res.data)
-                .filter(Boolean)
-                .map(m => ({
-                  id: m.id,
-                  name: m.name,
-                  time: m.time,
-                  type: m.type,
-                  calories: m.calories,
-                  protein: m.protein,
-                  carbs: m.nutrients?.carbs ?? 0,
-                  fats: m.nutrients?.fats ?? 0,
-                  fiber: m.nutrients?.fiber ?? 0,
-                  nutrients: m.nutrients || {},
-                  image: m.image,
-                  meal_description: m.meal_description || "",
-                  date: m.date,
-                  tags: m.tags || []
-                }));
-              if (seededMapped.length > 0) {
-                setMealsState(seededMapped);
-              } else {
-                setMealsState(INITIAL_MEALS);
-              }
-            }).catch(err => {
-              console.error("Error seeding default meals for johndoe:", err);
-              setMealsState(INITIAL_MEALS);
-            });
-          } else {
-            setMealsState(mappedMeals);
-          }
+          setMealsState(mappedMeals);
         }
       } catch (err) {
         console.error("Unexpected error loading user data:", err);
@@ -1496,6 +1392,80 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
+
+  // Periodic in-browser push notification scheduler
+  useEffect(() => {
+    const isPushOn = (profileData.preferences || []).some((p: string) => p === "push_notifications:true");
+    if (!isPushOn || typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+
+    const checkReminders = () => {
+      const now = new Date();
+      const currentH = String(now.getHours()).padStart(2, "0");
+      const currentM = String(now.getMinutes()).padStart(2, "0");
+      const currentTimeStr = `${currentH}:${currentM}`;
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      // Check Quiet Hours (10:30 PM - 7:00 AM)
+      const quietPref = (profileData.preferences || []).find((p: string) => p.startsWith("reminder_quiet_hours:"));
+      const isQuietOn = quietPref ? quietPref.split(":")[1] === "true" : true;
+      if (isQuietOn && (currentMinutes >= 22 * 60 + 30 || currentMinutes < 7 * 60)) {
+        return;
+      }
+
+      // Read slots
+      const slotsPref = (profileData.preferences || []).find((p: string) => p.startsWith("reminder_slots:"));
+      let slots: { id: string; label: string; time: string; enabled: boolean }[] = [];
+      if (slotsPref) {
+        try {
+          slots = JSON.parse(slotsPref.substring("reminder_slots:".length));
+        } catch (_) {}
+      } else {
+        const legacy = profileData.telegramReminderTimes || ["08:30", "13:00", "20:00"];
+        slots = [
+          { id: "breakfast", label: "Breakfast", time: legacy[0] || "08:30", enabled: profileData.telegramRemindersEnabled !== false },
+          { id: "lunch", label: "Lunch", time: legacy[1] || "13:00", enabled: profileData.telegramRemindersEnabled !== false },
+          { id: "dinner", label: "Dinner", time: legacy[2] || "20:00", enabled: profileData.telegramRemindersEnabled !== false },
+        ];
+      }
+
+      // Check unlogged filter
+      const unloggedPref = (profileData.preferences || []).find((p: string) => p.startsWith("reminder_only_if_unlogged:"));
+      const isOnlyIfUnlogged = unloggedPref ? unloggedPref.split(":")[1] === "true" : true;
+
+      // Has user logged meals today?
+      const todayMeals = mealsState.filter(m => m.date === todayStr);
+
+      for (const slot of slots) {
+        if (slot.enabled && slot.time === currentTimeStr) {
+          const lastFiredKey = `fitai_notif_fired_${todayStr}_${slot.id}`;
+          if (sessionStorage.getItem(lastFiredKey)) continue;
+
+          // If only if unlogged, check if any meal was logged recently or if goal reached
+          if (isOnlyIfUnlogged && todayMeals.length > 0) {
+            const slotL = slot.label.toLowerCase();
+            const slotMatchedMeal = todayMeals.some(m => m.name.toLowerCase().includes(slotL));
+            if (slotMatchedMeal) {
+              sessionStorage.setItem(lastFiredKey, "skipped_already_logged");
+              continue;
+            }
+          }
+
+          try {
+            new Notification(`FitAI • ${slot.label} Reminder`, {
+              body: `Time to log your ${slot.label.toLowerCase()}! Stay on track with your macros today.`,
+              icon: "/favicon.ico",
+            });
+            sessionStorage.setItem(lastFiredKey, "sent");
+          } catch (_) {}
+        }
+      }
+    };
+
+    const interval = setInterval(checkReminders, 30000);
+    return () => clearInterval(interval);
+  }, [profileData.preferences, profileData.telegramReminderTimes, profileData.telegramRemindersEnabled, mealsState, todayStr]);
 
   const showToast = (msg: React.ReactNode | string) => {
     setToastMessage(msg);
@@ -3296,8 +3266,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
 
 
 
-  // 1. Initial Supabase DB Sync Barrier (Prevents UI loading / onboarding flashes before DB fetch finishes)
-  if (isDataLoading) {
+  // 1. Initial Supabase DB Sync Barrier (Only blocks initial blank app boot before first fetch)
+  if (isDataLoading && (!profileData.name && mealsState.length === 0)) {
     return (
       <div className="min-h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans p-6 max-w-md mx-auto space-y-8 flex flex-col justify-center items-center">
         <div className="animate-pulse flex flex-col items-center gap-6 w-full px-4">
@@ -3394,7 +3364,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_var(--tw-gradient-from)_0%,_transparent_40%)] from-orange-50/30 pointer-events-none" />
 
       {/* Dynamic Header */}
-      {activeTab !== "camera-log" && (
+      {activeTab !== "camera-log" && activeTab !== "settings" && activeTab !== "edit-profile" && (
         <Header
           currentStreak={currentStreak}
           profileData={profileData}
@@ -3588,6 +3558,8 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
             triggerToast={(msg) => setToastMessage(msg)}
             session={session}
             onLogout={handleLogout}
+            onEditProfile={() => setActiveTab("edit-profile")}
+            setActiveTab={setActiveTab}
           />
         )}
         {activeTab === "profile" && (
@@ -3890,6 +3862,7 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
         <FloatingWidget
           isVisible={
             (profileData.agent_config?.showGptWidget ?? true) &&
+            profileData.agent_config?.floatingWidgetAction !== "none" &&
             !isCameraFullScreen &&
             !isCameraModalOpen &&
             !isVitalsModalOpen &&
@@ -3903,9 +3876,9 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
           }
           actionType={profileData.agent_config?.floatingWidgetAction || "gpt"}
           onExecuteAction={(action) => {
-            if (action === "gpt") {
+            if (action === "gpt" || action === "gpt_redirect") {
               window.open(localStorage.getItem("fitai_custom_gpt_url") || DEFAULT_CUSTOM_GPT_URL, "_blank");
-            } else if (action === "voice") {
+            } else if (action === "ai_logger" || action === "voice") {
               setManualLogInitialAiMode(true);
               setManualLogInitialSegment("detailed");
               setIsCameraFullScreen(true);
@@ -3913,9 +3886,11 @@ Do not include any markdown styling, backticks, or "json" prefix. Just return th
               setActiveTab("camera-log");
             } else if (action === "vitals") {
               setIsVitalsModalOpen(true);
-            } else if (action === "manual") {
+            } else if (action === "quick_log") {
+              setIsFoodLibraryModalOpen(true);
+            } else if (action === "detailed_log" || action === "manual") {
               setManualLogInitialAiMode(false);
-              setManualLogInitialSegment("quick");
+              setManualLogInitialSegment("detailed");
               setIsCameraFullScreen(true);
             }
           }}

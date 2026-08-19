@@ -11,103 +11,67 @@ export function drawObsidianCard(dc: CardDrawContext): void {
   const H = canvas.height;
 
   // =================================================================
-  // BACKGROUND — Two overlapping radial gradients (exact dashboard)
-  // bg-[radial-gradient(circle_at_top_right,...)] from-orange-100/40
-  // bg-[radial-gradient(circle_at_bottom_left,...)] from-orange-50/30
+  // BACKGROUND — Deep Obsidian with Top-Center Ambient Spotlight Glow
   // =================================================================
-  // Base warm cream
-  ctx.fillStyle = "#FAF8F5";
+  // Base Obsidian #0A0908
+  ctx.fillStyle = "#0A0908";
   ctx.fillRect(0, 0, W, H);
 
-  // Radial glow: top-right warm peach (orange-100/40 = rgba(255,237,213,0.4))
-  const grad1 = ctx.createRadialGradient(W, 0, 0, W, 0, W * 0.65);
-  grad1.addColorStop(0, "rgba(255, 237, 213, 0.45)");
-  grad1.addColorStop(1, "transparent");
-  ctx.fillStyle = grad1;
+  // Top-center ambient spotlight glow (Warm ember radiating downwards)
+  const topGlow = ctx.createRadialGradient(W / 2, 280, 50, W / 2, 280, 750);
+  topGlow.addColorStop(0, "rgba(249, 115, 22, 0.22)");
+  topGlow.addColorStop(0.45, "rgba(249, 115, 22, 0.08)");
+  topGlow.addColorStop(1, "transparent");
+  ctx.fillStyle = topGlow;
   ctx.fillRect(0, 0, W, H);
 
-  // Radial glow: bottom-left soft peach (orange-50/30 = rgba(255,247,237,0.3))
-  const grad2 = ctx.createRadialGradient(0, H, 0, 0, H, W * 0.65);
-  grad2.addColorStop(0, "rgba(255, 247, 237, 0.35)");
-  grad2.addColorStop(1, "transparent");
-  ctx.fillStyle = grad2;
-  ctx.fillRect(0, 0, W, H);
-
+  // Bottom subtle secondary glow
+  const bottomGlow = ctx.createRadialGradient(W / 2, H - 200, 50, W / 2, H - 200, 600);
+  bottomGlow.addColorStop(0, "rgba(234, 179, 8, 0.06)");
+  bottomGlow.addColorStop(1, "transparent");
   // =================================================================
-  // HEADER — Brand logo + streak badge (exact dashboard layout)
+  // HEADER — Brand logo + username badge (Dark Obsidian)
   // =================================================================
-  // Logo: w-9 h-9 rounded-xl bg-orange-500 shadow-lg shadow-orange-200
   drawBrandHeader(ctx, handleStr, {
-    logoBoxColor: "#FF7008",
-    textColor: "#2A1810",
+    logoBoxColor: "#F97316",
+    textColor: "#FFFFFF",
     fontFamily: "Inter, system-ui, sans-serif",
-    badgeFont: "800 20px Inter, system-ui, sans-serif",
-    badgeTextColor: "#FAF8F5"
+    badgeFont: "800 22px Inter, system-ui, sans-serif",
+    badgeTextColor: "#FAF9F6"
   });
 
-  // FitAI text as gradient (bg-clip-text from-orange-600 to-orange-400)
-  // Canvas can't do text gradients natively, so we draw orange-600 solid
-  // (the brand header already draws "FitAI" at x=172, y=116 — that's handled)
-
-  // Streak counter: bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-orange-100/50
+  // Streak counter badge if active
   if (currentStreak > 0) {
     const streakStr = `${currentStreak}`;
-    ctx.font = "700 28px Inter, system-ui, sans-serif";
+    ctx.font = "700 24px Inter, system-ui, sans-serif";
     const tw = ctx.measureText(streakStr).width;
-    const pillW = 72 + tw;
+    const pillW = 68 + tw;
     const pillX = 920 - pillW;
-    const pillY = 82;
-    const pillH = 64;
+    const pillY = 86;
+    const pillH = 58;
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
     ctx.beginPath();
-    ctx.roundRect(pillX, pillY, pillW, pillH, 32);
+    ctx.roundRect(pillX, pillY, pillW, pillH, 29);
     ctx.fill();
 
-    ctx.strokeStyle = "rgba(255, 237, 213, 0.5)"; // border-orange-100/50
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(pillX, pillY, pillW, pillH, 32);
+    ctx.roundRect(pillX, pillY, pillW, pillH, 29);
     ctx.stroke();
 
-    // 🔥 emoji (text-orange-500 text-lg)
     ctx.textAlign = "left";
-    ctx.font = "32px Arial, sans-serif";
-    ctx.fillText("🔥", pillX + 16, pillY + 43);
+    ctx.font = "28px Arial, sans-serif";
+    ctx.fillText("🔥", pillX + 14, pillY + 40);
 
-    // streak count (font-bold text-orange-900)
-    ctx.fillStyle = "#7C2D12"; // orange-900
-    ctx.font = "700 28px Inter, system-ui, sans-serif";
-    ctx.fillText(streakStr, pillX + 52, pillY + 43);
+    ctx.fillStyle = "#F97316";
+    ctx.font = "800 24px Inter, system-ui, sans-serif";
+    ctx.fillText(streakStr, pillX + 48, pillY + 40);
   }
 
-  // Profile avatar circle: w-10 h-10 rounded-full border-2 border-orange-500
-  const avatarX = 960;
-  const avatarY = 84;
-  const avatarR = 30;
-
-  ctx.strokeStyle = "#FF7008";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarR, avatarY + avatarR, avatarR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.fillStyle = "#F5F5F4"; // bg-stone-100
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarR, avatarY + avatarR, avatarR - 3, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Default avatar silhouette inside
-  ctx.fillStyle = "rgba(42, 24, 16, 0.2)";
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarR, avatarY + avatarR - 6, 10, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(avatarX + avatarR, avatarY + avatarR + 18, 18, Math.PI + 0.6, -0.6);
-  ctx.fill();
-
   // =================================================================
-  // DATE ROW — "JULY 13, 2026" (text-xs font-black uppercase tracking-widest text-stone-500)
+  // DATE ROW — "JULY 13, 2026" (Uppercase tracking-widest)
   // =================================================================
   let dateLabel = "TODAY";
   if (date) {
@@ -119,66 +83,52 @@ export function drawObsidianCard(dc: CardDrawContext): void {
     }
   }
 
-  const dateRowY = 190;
+  const dateRowY = 185;
   ctx.textAlign = "left";
-  ctx.fillStyle = "#78716C"; // text-stone-500
+  ctx.fillStyle = "#A8A29E"; // text-stone-400
   ctx.font = "900 22px Inter, system-ui, sans-serif";
-  ctx.letterSpacing = "0.1em";
   ctx.fillText(dateLabel, 80, dateRowY);
 
-  // Weight indicator on right side of date row
+  // Weight indicator on right side
   if (weight && weight > 0) {
     ctx.textAlign = "right";
-    ctx.fillStyle = "#78716C";
+    ctx.fillStyle = "#D6D3D1";
     ctx.font = "800 20px Inter, system-ui, sans-serif";
     ctx.fillText(`${weight} kg`, 1000, dateRowY);
     ctx.textAlign = "left";
   }
 
   // =================================================================
-  // CALORIE RING — THE HERO (exact dashboard: max-w-[280px], r=104, strokeWidth=20)
-  // Canvas scale: dashboard is 280px wide → on 1080 canvas we scale to ~540px
+  // CALORIE RING — THE HERO WITH DUAL AMBIENT HALO
   // =================================================================
   const ringCenterX = W / 2;
-  const ringCenterY = dateRowY + 320;
-  const ringRadius = 210; // Dominant hero ring
-  const strokeW = 40;    // strokeWidth=20 scaled 2x for canvas density
+  const ringCenterY = dateRowY + 310;
+  const ringRadius = 205;
+  const strokeW = 36;
 
-  // --- Warm halo glow behind ring (the signature dashboard look) ---
-  const haloGrad = ctx.createRadialGradient(
-    ringCenterX, ringCenterY, ringRadius * 0.5,
-    ringCenterX, ringCenterY, ringRadius * 1.6
-  );
-  haloGrad.addColorStop(0, "rgba(255, 180, 100, 0.12)");
-  haloGrad.addColorStop(0.5, "rgba(255, 200, 140, 0.06)");
-  haloGrad.addColorStop(1, "transparent");
-  ctx.fillStyle = haloGrad;
+  // Dual ambient halo behind ring
+  const haloGrad1 = ctx.createRadialGradient(ringCenterX, ringCenterY, 50, ringCenterX, ringCenterY, ringRadius * 1.5);
+  haloGrad1.addColorStop(0, "rgba(249, 115, 22, 0.16)");
+  haloGrad1.addColorStop(1, "transparent");
+  ctx.fillStyle = haloGrad1;
   ctx.fillRect(ringCenterX - ringRadius * 2, ringCenterY - ringRadius * 2, ringRadius * 4, ringRadius * 4);
 
-  // --- Drop shadow under ring (drop-shadow-xl) ---
-  ctx.save();
-  ctx.shadowColor = "rgba(255, 140, 50, 0.15)";
-  ctx.shadowBlur = 40;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 20;
-
-  // Background track: stroke-orange-100/50 = rgba(255,237,213,0.5)
-  ctx.strokeStyle = "rgba(255, 237, 213, 0.5)";
+  // Background Track
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
   ctx.lineWidth = strokeW;
   ctx.beginPath();
   ctx.arc(ringCenterX, ringCenterY, ringRadius, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.restore();
 
-  // Active progress arc: stroke-orange-500 = #F97316, strokeLinecap=round
+  // Active Progress Arc
   const goalCal = targetCalories || 2000;
   const pct = Math.min(1, calories / goalCal);
 
   if (pct > 0) {
     ctx.save();
-    ctx.shadowColor = "rgba(255, 112, 8, 0.25)";
-    ctx.shadowBlur = 20;
-    ctx.strokeStyle = "#F97316"; // stroke-orange-500
+    ctx.shadowColor = "rgba(249, 115, 22, 0.4)";
+    ctx.shadowBlur = 24;
+    ctx.strokeStyle = "#F97316";
     ctx.lineWidth = strokeW;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -187,253 +137,192 @@ export function drawObsidianCard(dc: CardDrawContext): void {
     ctx.restore();
   }
 
-  // --- Inner circle card: bg-white/40 backdrop-blur-md w-40 h-40 rounded-full shadow-inner border border-white/50 ---
-  const innerR = 155; // w-40 h-40 = 160px → scaled
-
-  // Inner shadow effect (shadow-inner simulation)
-  ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.06)";
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 2;
-
-  ctx.fillStyle = "rgba(255, 255, 255, 0.4)"; // bg-white/40
-  ctx.beginPath();
-  ctx.arc(ringCenterX, ringCenterY, innerR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Border: border-white/50
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(ringCenterX, ringCenterY, innerR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // --- Calorie number: text-5xl font-black text-orange-950 ---
+  // Inner Number Display
   ctx.textAlign = "center";
-  ctx.fillStyle = "#431407"; // text-orange-950
-  ctx.font = "900 96px Inter, system-ui, sans-serif";
-  ctx.fillText(calories.toLocaleString(), ringCenterX, ringCenterY - 10);
+  ctx.fillStyle = "rgba(249, 115, 22, 0.9)";
+  ctx.font = "900 18px Inter, system-ui, sans-serif";
+  ctx.fillText("ENERGY LOGGED", ringCenterX, ringCenterY - 75);
 
-  // Orange divider bar: h-1.5 w-8 bg-orange-500 rounded-full
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "900 88px Inter, system-ui, sans-serif";
+  ctx.fillText(calories.toLocaleString(), ringCenterX, ringCenterY - 2);
+
+  // Orange Accent Dash
   ctx.fillStyle = "#F97316";
   ctx.beginPath();
-  ctx.roundRect(ringCenterX - 20, ringCenterY + 16, 40, 7, 4);
+  ctx.roundRect(ringCenterX - 24, ringCenterY + 44, 48, 6, 3);
   ctx.fill();
 
-  // Goal text: text-orange-900/50 font-black tracking-[0.1em] text-[10px]
-  ctx.fillStyle = "rgba(124, 45, 18, 0.5)"; // text-orange-900/50
-  ctx.font = "900 20px Inter, system-ui, sans-serif";
-  ctx.fillText(`/ ${goalCal.toLocaleString()} KCAL`, ringCenterX, ringCenterY + 56);
+  // Target Calorie Text
+  ctx.fillStyle = "#A8A29E";
+  ctx.font = "900 18px Inter, system-ui, sans-serif";
+  ctx.fillText(`TARGET: ${goalCal.toLocaleString()} KCAL`, ringCenterX, ringCenterY + 80);
 
   // =================================================================
-  // MACRO PROGRESS BARS — Frosted glass panel (exact dashboard)
-  // bg-white/60 backdrop-blur-md p-6 rounded-[32px] border border-white/80
-  // shadow-xl shadow-orange-100/20 grid grid-cols-2 gap-x-6 gap-y-6
+  // 4-MACRO CAPSULES GRID (Dark Frosted Glass)
   // =================================================================
-  const macroPanelY = ringCenterY + ringRadius + 70;
-  const macroPanelH = 250;
+  const macroGridY = ringCenterY + ringRadius + 65;
+  const cardW = 212;
+  const cardGap = 20;
+  const cardH = 175;
+  const gridStartX = 80;
 
-  // Panel shadow: shadow-xl shadow-orange-100/20
-  ctx.save();
-  ctx.shadowColor = "rgba(255, 237, 213, 0.2)";
-  ctx.shadowBlur = 30;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 12;
-
-  // bg-white/60
-  ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-  ctx.beginPath();
-  ctx.roundRect(80, macroPanelY, 920, macroPanelH, 32);
-  ctx.fill();
-  ctx.restore();
-
-  // border-white/80
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(80, macroPanelY, 920, macroPanelH, 32);
-  ctx.stroke();
-
-  // Macro data (exact dashboard colors: Protein #FF7008, Carbs #006B7D, Fats #FFB800, Fiber #10B981)
   const macros = [
-    { label: "PROTEIN", val: protein, goal: targetProtein || 140, color: "#FF7008" },
-    { label: "CARBS",   val: carbs,   goal: targetCarbs || 210,   color: "#006B7D" },
-    { label: "FATS",    val: fats,    goal: targetFats || 65,     color: "#FFB800" },
-    { label: "FIBER",   val: fiber,   goal: targetFiber || 35,    color: "#10B981" }
+    { name: "PROTEIN", val: `${protein}g`, goal: `Goal ${targetProtein || 140}g`, color: "#F97316" },
+    { name: "CARBS",   val: `${carbs}g`,   goal: `Goal ${targetCarbs || 210}g`,   color: "#38BDF8" },
+    { name: "FATS",    val: `${fats}g`,    goal: `Goal ${targetFats || 65}g`,     color: "#FBBF24" },
+    { name: "FIBER",   val: `${fiber}g`,   goal: `Goal ${targetFiber || 35}g`,    color: "#34D399" }
   ];
 
-  const colW = 380;
-  const colGap = 60;
-  const gridStartX = 120;
-  const gridStartY = macroPanelY + 40;
-  const rowGap = 105;
-
-  macros.forEach((m, idx) => {
-    const col = idx % 2;
-    const row = Math.floor(idx / 2);
-    const mX = gridStartX + col * (colW + colGap);
-    const mY = gridStartY + row * rowGap;
-
-    // Label (left-aligned)
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#2A1810";
-    ctx.font = "900 20px Inter, system-ui, sans-serif";
-    ctx.fillText(m.label, mX, mY + 20);
-
-    // Value (colored) + / goal (muted) — right-aligned
-    ctx.textAlign = "right";
-    ctx.fillStyle = m.color;
-    ctx.font = "900 20px Inter, system-ui, sans-serif";
-    const valStr = `${m.val}`;
-    const valW = ctx.measureText(valStr).width;
-
-    ctx.fillStyle = "rgba(42, 24, 16, 0.35)";
-    ctx.font = "700 18px Inter, system-ui, sans-serif";
-    const goalStr = ` / ${m.goal}`;
-    const goalW = ctx.measureText(goalStr).width;
-    ctx.fillText(goalStr, mX + colW, mY + 20);
-
-    ctx.fillStyle = m.color;
-    ctx.font = "900 20px Inter, system-ui, sans-serif";
-    ctx.fillText(valStr, mX + colW - goalW, mY + 20);
-
-    // Progress bar track: bg-stone-200/60 → light gray
-    const barY = mY + 38;
-    const barH = 10;
-    ctx.fillStyle = "rgba(214, 211, 209, 0.6)"; // stone-300/60
+  macros.forEach((m, i) => {
+    const bx = gridStartX + i * (cardW + cardGap);
+    
+    // Frosted dark glass container
+    ctx.fillStyle = "rgba(24, 21, 19, 0.92)";
     ctx.beginPath();
-    ctx.roundRect(mX, barY, colW, barH, 5);
+    ctx.roundRect(bx, macroGridY, cardW, cardH, 26);
     ctx.fill();
 
-    // Progress bar fill (colored)
-    const fillPct = Math.min(1, m.val / m.goal);
-    if (fillPct > 0) {
-      ctx.fillStyle = m.color;
-      ctx.beginPath();
-      ctx.roundRect(mX, barY, colW * fillPct, barH, 5);
-      ctx.fill();
-    }
-  });
-
-  ctx.textAlign = "left";
-
-  // =================================================================
-  // MEAL TIMELINE — Frosted glass cards (exact dashboard style)
-  // bg-white/80 backdrop-blur-md rounded-2xl border border-white/90 p-4 shadow-3xs
-  // =================================================================
-  const mealsStartY = macroPanelY + macroPanelH + 40;
-  const topMeals = mealsList.slice(0, 4);
-  const cardH = 115;
-  const cardGap = 14;
-
-  topMeals.forEach((meal: any, idx: number) => {
-    const itemY = mealsStartY + idx * (cardH + cardGap);
-
-    // Card shadow (shadow-3xs → very subtle)
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.03)";
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 2;
-
-    // bg-white/80
-    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(80, itemY, 920, cardH, 24);
-    ctx.fill();
-    ctx.restore();
-
-    // border border-white/90
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(80, itemY, 920, cardH, 24);
+    ctx.roundRect(bx, macroGridY, cardW, cardH, 26);
     ctx.stroke();
 
-    // Thumbnail: w-9 h-9 rounded-xl (scaled 2x = 72x72 rounded-xl)
-    const thumbX = 102;
-    const thumbY = itemY + (cardH - 72) / 2;
-    const thumbSize = 72;
+    // Tag
+    ctx.textAlign = "center";
+    ctx.fillStyle = m.color;
+    ctx.font = "900 20px Inter, system-ui, sans-serif";
+    ctx.fillText(m.name, bx + cardW / 2, macroGridY + 34);
 
-    const imgElement = mealImages?.[meal.id || meal.name];
-    if (imgElement) {
-      drawCoverImage(ctx, imgElement, thumbX, thumbY, thumbSize, thumbSize, 14);
-    } else {
-      // bg-stone-100/60 border border-stone-200/20
-      ctx.fillStyle = "rgba(245, 245, 244, 0.6)";
-      ctx.beginPath();
-      ctx.roundRect(thumbX, thumbY, thumbSize, thumbSize, 14);
-      ctx.fill();
+    // Value
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "900 38px Inter, system-ui, sans-serif";
+    ctx.fillText(m.val, bx + cardW / 2, macroGridY + 92);
 
-      ctx.strokeStyle = "rgba(214, 211, 209, 0.2)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(thumbX, thumbY, thumbSize, thumbSize, 14);
-      ctx.stroke();
-
-      const getMealEmoji = (typeStr: string) => {
-        const t = typeStr?.toLowerCase() || "";
-        if (t.includes("breakfast") || t.includes("morning")) return "🥞";
-        if (t.includes("lunch") || t.includes("afternoon")) return "🥗";
-        if (t.includes("dinner") || t.includes("night") || t.includes("evening")) return "🥩";
-        if (t.includes("snack") || t.includes("bite") || t.includes("tea")) return "🍎";
-        return "🍽️";
-      };
-      ctx.textAlign = "center";
-      ctx.font = "32px Arial, sans-serif";
-      ctx.fillText(getMealEmoji(meal.type || "meal"), thumbX + thumbSize / 2, thumbY + 48);
-    }
-
-    // Title: text-xs font-black text-stone-850 truncate
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#1C1917"; // stone-850/900
-    ctx.font = "900 22px Inter, system-ui, sans-serif";
-    let mealLabel = meal.name || "Logged Meal";
-    if (mealLabel.length > 30) mealLabel = mealLabel.substring(0, 27) + "...";
-    ctx.fillText(mealLabel, thumbX + thumbSize + 20, thumbY + 28);
-
-    // Macros micro line: P: Xg • C: Yg • F: Zg • Fiber: Wg
-    // text-[8px] font-extrabold text-stone-500 uppercase tracking-wide
-    ctx.fillStyle = "#78716C"; // stone-500
-    ctx.font = "800 16px Inter, system-ui, sans-serif";
-    const macroLine = `P: ${meal.protein || 0}g  •  C: ${meal.carbs || 0}g  •  F: ${meal.fats || 0}g  •  Fiber: ${meal.fiber || 0}g`;
-    ctx.fillText(macroLine, thumbX + thumbSize + 20, thumbY + 58);
-
-    // Calories: text-sm font-black text-orange-600 → +Xkcal on right
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#EA580C"; // orange-600
-    ctx.font = "900 22px Inter, system-ui, sans-serif";
-    ctx.fillText(`+${meal.calories || 0} kcal`, 970, itemY + cardH / 2 + 7);
-    ctx.textAlign = "left";
+    // Goal
+    ctx.fillStyle = "#A8A29E";
+    ctx.font = "700 18px Inter, system-ui, sans-serif";
+    ctx.fillText(m.goal, bx + cardW / 2, macroGridY + 140);
   });
 
-  // "More meals" indicator
-  if (mealsList.length > topMeals.length) {
-    const moreY = mealsStartY + topMeals.length * (cardH + cardGap) + 5;
-    ctx.fillStyle = "#A8A29E"; // stone-400
+  // =================================================================
+  // MEALS TIMELINE CONTAINER (Dark Frosted Glass with Glowing Dots)
+  // =================================================================
+  const timelineY = macroGridY + cardH + 30;
+  const timelineH = H - timelineY - 140;
+
+  ctx.fillStyle = "rgba(24, 21, 19, 0.92)";
+  ctx.beginPath();
+  ctx.roundRect(80, timelineY, 920, timelineH, 32);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(80, timelineY, 920, timelineH, 32);
+  ctx.stroke();
+
+  // Header Title
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#A8A29E";
+  ctx.font = "900 20px Inter, system-ui, sans-serif";
+  ctx.fillText("TIMELINE SUMMARY", 120, timelineY + 46);
+
+  // Compliance Pill
+  ctx.fillStyle = "rgba(16, 185, 129, 0.15)";
+  ctx.beginPath();
+  ctx.roundRect(710, timelineY + 22, 250, 48, 24);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(16, 185, 129, 0.35)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(710, timelineY + 22, 250, 48, 24);
+  ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#34D399";
+  ctx.font = "900 19px Inter, system-ui, sans-serif";
+  ctx.fillText("🔥 92% ON TARGET", 835, timelineY + 52);
+
+  // Separator Line
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(120, timelineY + 92);
+  ctx.lineTo(960, timelineY + 92);
+  ctx.stroke();
+
+  // Timeline Items
+  const topMeals = mealsList.slice(0, 4);
+  let itemY = timelineY + 120;
+  const rowSpacing = (timelineH - 140) / Math.max(topMeals.length, 1);
+
+  topMeals.forEach((meal: any, idx: number) => {
+    // Glowing bullet dot
+    ctx.fillStyle = "rgba(249, 115, 22, 0.25)";
+    ctx.beginPath();
+    ctx.arc(126, itemY + 14, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#F97316";
+    ctx.beginPath();
+    ctx.arc(126, itemY + 14, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Meal Title
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "900 24px Inter, system-ui, sans-serif";
+    let mealLabel = meal.name || "Logged Meal";
+    if (mealLabel.length > 32) mealLabel = mealLabel.substring(0, 29) + "...";
+    ctx.fillText(mealLabel, 155, itemY + 14);
+
+    // Calorie Tag
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#F97316";
+    ctx.font = "900 24px Inter, system-ui, sans-serif";
+    ctx.fillText(`${meal.calories || 0} kcal`, 960, itemY + 14);
+
+    // Subtitle (Time + Protein)
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#A8A29E";
     ctx.font = "700 18px Inter, system-ui, sans-serif";
-    ctx.fillText(`+ ${mealsList.length - topMeals.length} more meals logged`, 100, moreY + 14);
-  }
+    const subStr = `${meal.time || "Logged"}  •  ${meal.protein || 0}g Protein`;
+    ctx.fillText(subStr, 155, itemY + 44);
+
+    // Row Divider
+    if (idx < topMeals.length - 1) {
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(155, itemY + 68);
+      ctx.lineTo(960, itemY + 68);
+      ctx.stroke();
+    }
+
+    itemY += Math.min(rowSpacing, 110);
+  });
 
   // =================================================================
-  // FOOTER — Clean branding
+  // FOOTER — Clean Branding
   // =================================================================
-  const footerY = H - 100;
+  const footerY = H - 85;
 
-  // Subtle divider line
-  ctx.strokeStyle = "rgba(42, 24, 16, 0.06)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(80, footerY);
   ctx.lineTo(1000, footerY);
   ctx.stroke();
 
-  ctx.fillStyle = "#A8A29E"; // stone-400
-  ctx.font = "700 20px Inter, system-ui, sans-serif";
-  ctx.fillText("FITAI • DAILY REPORT", 80, footerY + 42);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#A8A29E";
+  ctx.font = "800 20px Inter, system-ui, sans-serif";
+  ctx.fillText("FITAI • PROGRESS ENGINE", 80, footerY + 38);
+
   ctx.textAlign = "right";
-  ctx.fillText("fitpush.vercel.app", 1000, footerY + 42);
+  ctx.fillText("fitpush.vercel.app", 1000, footerY + 38);
   ctx.textAlign = "left";
 }

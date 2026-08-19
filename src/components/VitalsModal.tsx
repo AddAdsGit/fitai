@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, Scale, Droplet, Zap, Heart, Check, Plus, Minus, Clock, Activity, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -105,6 +105,20 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
     setDraftBloatingLevel(null);
   }, [dailyNotes, weightLogs, selectedDate, latestWeightFromHistory]);
 
+  // Lock background body scroll to eliminate jitter and scroll bounce on mobile
+  useEffect(() => {
+    if (isOpen) {
+      const prevOverflow = document.body.style.overflow;
+      const prevTouchAction = document.body.style.touchAction;
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      return () => {
+        document.body.style.overflow = prevOverflow;
+        document.body.style.touchAction = prevTouchAction;
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const isWeightActive = profileData?.agent_config?.trackWeight ?? true;
@@ -168,14 +182,19 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center font-sans">
+        <div
+          className="fixed inset-0 z-[9999] flex items-end justify-center font-sans"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
+        >
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.6 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/60 cursor-pointer backdrop-blur-xs"
+            className="absolute inset-0 bg-black/60 cursor-pointer backdrop-blur-xs touch-none"
           />
 
           {/* Modal Bottom Sheet */}
@@ -183,8 +202,8 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 26, stiffness: 240 }}
-            className="relative w-full max-w-[448px] bg-stone-50 rounded-t-[36px] overflow-hidden flex flex-col max-h-[85vh] shadow-2xl z-10 border-t border-white/20 text-left font-sans"
+            transition={{ type: "spring", damping: 28, stiffness: 260 }}
+            className="relative w-full max-w-[448px] bg-stone-50 rounded-t-[36px] overflow-hidden flex flex-col max-h-[85vh] shadow-2xl z-10 border-t border-white/20 text-left font-sans overscroll-contain touch-pan-y"
           >
             {/* Header */}
             <div className="p-5 pb-3 bg-white border-b border-stone-100 flex justify-between items-center shrink-0 select-none">
@@ -210,7 +229,7 @@ export const VitalsModal: React.FC<VitalsModalProps> = ({
             </div>
 
             {/* Content Container */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-left">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-left overscroll-contain touch-pan-y">
 
               {!hasAnyActiveVitals && (
                 <div className="py-8 px-4 text-center select-none bg-white border border-stone-200/80 rounded-3xl space-y-2">

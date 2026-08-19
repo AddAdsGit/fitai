@@ -238,49 +238,69 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
     getOrCreateShortLink();
   }, [payload]);
 
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+  }, []);
+
   return createPortal(
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      onClick={onClose}
-      className="fixed inset-0 bg-orange-950/30 backdrop-blur-md z-[9999] flex items-center justify-center p-6 font-sans text-orange-950 cursor-pointer"
+    <div
+      className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <motion.div
-        initial={{ scale: 0.95, y: 15 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 15 }}
-        onClick={(e) => e.stopPropagation()}
-        className="bg-[#FAF7F2] border border-white rounded-[32px] w-full max-w-[400px] shadow-xl shadow-orange-100/20 p-6 flex flex-col items-center gap-5 max-h-[90vh] overflow-y-auto no-scrollbar scroll-smooth cursor-default"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
+      />
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 28, stiffness: 280 }}
+        className="bg-[#FAF7F2] border-t border-x border-stone-200/80 rounded-t-[36px] w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.2)] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] flex flex-col items-center gap-4 max-h-[88vh] overflow-y-auto overscroll-contain touch-pan-y relative z-10 text-left"
       >
+        {/* Top Drag Indicator Pill */}
+        <div className="w-10 h-1 bg-stone-300/70 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
+
         {/* Header */}
-        <div className="flex justify-between items-center w-full">
-          <span className="text-[10px] font-black uppercase tracking-widest text-orange-900/40">
+        <div className="flex justify-between items-center w-full select-none pb-1 border-b border-stone-200/60">
+          <span className="text-[10px] font-black uppercase tracking-widest text-orange-950">
             Share Recipe Card
           </span>
           <button
             onClick={onClose}
-            className="w-7 h-7 bg-orange-100/40 hover:bg-orange-100/80 text-orange-950/60 rounded-full flex items-center justify-center cursor-pointer transition-colors"
+            className="w-8 h-8 bg-stone-100 hover:bg-stone-200 text-stone-500 rounded-full flex items-center justify-center cursor-pointer transition-colors border-none"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Preview Container */}
-        <div className="relative w-full aspect-square flex flex-col items-center justify-center">
+        <div className="relative w-full flex flex-col items-center justify-center py-1">
           <motion.div
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.4}
+            dragElastic={0.3}
             onDragEnd={(_, info) => {
-              if (info.offset.x > 80) handlePrev();
-              else if (info.offset.x < -80) handleNext();
+              if (info.offset.x > 60) handlePrev();
+              else if (info.offset.x < -60) handleNext();
             }}
-            className="w-full h-full rounded-[28px] overflow-hidden shadow-lg border border-orange-100/30 flex items-center justify-center relative select-none cursor-grab active:cursor-grabbing bg-[#0A0504]"
+            className="relative w-[280px] h-[280px] rounded-[28px] overflow-hidden shadow-2xl border border-stone-200/90 flex flex-col items-center justify-center select-none bg-white cursor-grab active:cursor-grabbing"
           >
             <canvas
               ref={canvasRef}
-              className="w-full h-full object-contain block"
+              className="w-full h-full object-cover block rounded-[28px]"
             />
           </motion.div>
         </div>
@@ -321,7 +341,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
           {typeof navigator !== "undefined" && navigator.share && (
             <button
               onClick={handleNativeShare}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-200 active:scale-98 transition-all"
+              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-widest py-4 rounded-2xl flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-200 active:scale-98 transition-all border-none"
             >
               <Share2 className="w-4 h-4" />
               <span>Share to Apps (WhatsApp, IG...)</span>
@@ -332,7 +352,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
             <button
               onClick={handleCopyLink}
               disabled={loadingUrl}
-              className="flex-1 bg-white hover:bg-orange-50/50 border border-orange-100 text-orange-950 disabled:opacity-60 text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+              className="flex-1 bg-white hover:bg-orange-50/50 border border-stone-200 text-orange-950 disabled:opacity-60 text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all shadow-3xs"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? "Copied!" : "Copy URL"}</span>
@@ -340,7 +360,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
 
             <button
               onClick={handleDownloadImage}
-              className="flex-1 bg-orange-950 hover:bg-orange-900 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+              className="flex-1 bg-orange-950 hover:bg-orange-900 text-white text-xs font-black uppercase tracking-wider py-4 rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all border-none"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download PNG</span>
@@ -348,7 +368,7 @@ export const RecipeShareModal: React.FC<RecipeShareModalProps> = ({
           </div>
         </div>
       </motion.div>
-    </motion.div>,
+    </div>,
     document.body
   );
 };

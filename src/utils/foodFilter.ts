@@ -20,7 +20,39 @@ export const INITIAL_FOOD_FILTER_STATE: FoodFilterState = {
   showLogs: true,
 };
 
-// Count active filters (excluding defaults)
+const STORAGE_KEY = "fitai_food_filter_state";
+
+export function loadSavedFoodFilters(): FoodFilterState {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        ...INITIAL_FOOD_FILTER_STATE,
+        ...parsed,
+        search: "", // Never lock search across reloads
+      };
+    }
+  } catch (_) {}
+  return INITIAL_FOOD_FILTER_STATE;
+}
+
+export function saveFoodFilters(filters: FoodFilterState): void {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        selectedTags: filters.selectedTags || [],
+        sortField: filters.sortField || "date",
+        sortDirection: filters.sortDirection || "desc",
+        showRecipes: filters.showRecipes ?? true,
+        showLogs: filters.showLogs ?? true,
+      })
+    );
+  } catch (_) {}
+}
+
+// Count active filters (only dietary tags and custom sort parameters)
 export function getActiveFilterCount(state?: FoodFilterState): number {
   if (!state) return 0;
   let count = 0;

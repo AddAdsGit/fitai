@@ -104,6 +104,8 @@ export function drawStructuredImage(
   ctx.stroke();
 }
 
+import { BRAND_FLAME_SVG_PATH } from "../../constants/brand";
+
 export function drawBrandHeader(
   ctx: CanvasRenderingContext2D,
   handleStr: string,
@@ -124,9 +126,7 @@ export function drawBrandHeader(
   ctx.save();
   ctx.translate(96, 96);
   ctx.scale(1.7, 1.7);
-  const flamePath = new Path2D(
-    "M8.5 14.5a2.5 2.5 0 0 0 2.5-2.5c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
-  );
+  const flamePath = new Path2D(BRAND_FLAME_SVG_PATH);
   ctx.fillStyle = "#FFFFFF";
   ctx.fill(flamePath);
   ctx.restore();

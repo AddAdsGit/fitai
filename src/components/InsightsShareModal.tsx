@@ -169,91 +169,103 @@ export const InsightsShareModal: React.FC<InsightsShareModalProps> = ({
           url: finalLink,
         });
       } else if (navigator.share) {
-        await navigator.share({
-          title: `FitAI Insights: ${data.title}`,
-          text: `Check out my fitness progress on FitAI: ${data.title}!`,
-          url: finalLink,
-        });
+        await navigator.share({ files: [file], title: "FitAI", text: data.title, url: finalLink });
       } else {
         handleCopyLink();
       }
     } catch (err) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        handleCopyLink();
-      }
+      if (err instanceof Error && err.name !== "AbortError") handleCopyLink();
     }
   };
 
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+  }, []);
+
   return createPortal(
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-stone-900/70 backdrop-blur-md z-[9999] flex items-center justify-center p-4 sm:p-6 font-sans"
+    <div
+      className="fixed inset-0 z-[99999] flex items-end justify-center font-sans"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <motion.div
-        initial={{ scale: 0.95, y: 15 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 15 }}
-        className="bg-stone-900 border border-stone-800 rounded-[32px] w-full max-w-[420px] shadow-2xl p-6 flex flex-col items-center gap-4 max-h-[92vh] overflow-y-auto no-scrollbar scroll-smooth text-white"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-stone-950/60 backdrop-blur-sm cursor-pointer touch-none"
+      />
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 28, stiffness: 280 }}
+        className="bg-stone-900 border-t border-x border-stone-800 rounded-t-[36px] w-full max-w-md shadow-[0_-10px_40px_rgba(0,0,0,0.5)] p-6 pb-[max(20px,env(safe-area-inset-bottom,20px))] flex flex-col items-center gap-4 max-h-[88vh] overflow-y-auto overscroll-contain touch-pan-y text-white relative z-10 text-left"
       >
-        {/* Header */}
-        <div className="flex justify-between items-center w-full">
+        <div className="w-10 h-1 bg-stone-700 rounded-full mx-auto -mt-2 mb-1 shrink-0 select-none" />
+
+        <div className="flex justify-between items-center w-full select-none pb-1 border-b border-stone-800">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-orange-400" />
-            <span className="text-[11px] font-black uppercase tracking-widest text-stone-300">
+            <span className="text-[11px] font-black uppercase tracking-widest text-stone-200">
               Share Insights
             </span>
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+            className="w-8 h-8 bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors border-none"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Tab & Theme Switches */}
         <div className="flex items-center justify-between w-full gap-2 select-none">
           <div className="flex bg-stone-800 p-1 rounded-xl gap-1 flex-1 font-sans">
             <button
               type="button"
               onClick={() => setPreviewTab("card")}
               className={cn(
-                "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                previewTab === "card" ? "bg-orange-500 text-white shadow-xs" : "text-stone-400 hover:text-stone-200"
+                "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer border-none",
+                previewTab === "card" ? "bg-orange-500 text-white shadow-xs" : "text-stone-400 hover:text-stone-200 bg-transparent"
               )}
             >
-              🖼️ Share Card
+              Share Card
             </button>
             <button
               type="button"
-              onClick={() => setPreviewTab("webpage")}
+              onClick={() => setPreviewTab("report")}
               className={cn(
-                "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                previewTab === "webpage" ? "bg-orange-500 text-white shadow-xs" : "text-stone-400 hover:text-stone-200"
+                "flex-1 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer border-none",
+                previewTab === "report" ? "bg-orange-500 text-white shadow-xs" : "text-stone-400 hover:text-stone-200 bg-transparent"
               )}
             >
-              🌐 Web View
+              Report View
             </button>
           </div>
 
-          {previewTab === "card" && (
-            <div className="flex bg-stone-800 p-1 rounded-xl gap-1">
-              {(["obsidian", "warm", "cyber"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTheme(t)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer capitalize",
-                    theme === t ? "bg-stone-700 text-white" : "text-stone-500 hover:text-stone-300"
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex bg-stone-800 p-1 rounded-xl gap-1 font-sans">
+            {(["dark", "light"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTheme(t)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition-all cursor-pointer border-none",
+                  theme === t ? "bg-stone-700 text-white shadow-xs" : "text-stone-400 hover:text-stone-200 bg-transparent"
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Preview Area */}
@@ -481,7 +493,7 @@ export const InsightsShareModal: React.FC<InsightsShareModalProps> = ({
           </div>
         </div>
       </motion.div>
-    </motion.div>,
+    </div>,
     document.body
   );
 };
