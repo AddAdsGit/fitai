@@ -7,6 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+let globalKeyPointer = 0;
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -33,14 +35,20 @@ serve(async (req) => {
       });
     }
 
-    // 3. Retrieve Gemini API Key (Priority: Custom user key -> Remote GEMINI_API_KEY Secret)
-    const apiKey = (userApiKey && typeof userApiKey === "string" && userApiKey.trim())
+    // 3. Retrieve & Parse Gemini API Key Pool (Priority: Custom user keys -> GEMINI_API_KEYS -> GEMINI_API_KEY)
+    const rawKeysString = (userApiKey && typeof userApiKey === "string" && userApiKey.trim())
       ? userApiKey.trim()
-      : (Deno.env.get("GEMINI_API_KEY") || "");
-    if (!apiKey) {
+      : (Deno.env.get("GEMINI_API_KEYS") || Deno.env.get("GEMINI_API_KEY") || "");
+
+    const keyPool = rawKeysString
+      .split(/[,;\n]+/)
+      .map((k: string) => k.trim())
+      .filter(Boolean);
+
+    if (keyPool.length === 0) {
       return new Response(
         JSON.stringify({
-          error: "GEMINI_API_KEY secret is not set in Supabase Edge Function environment. Please enter a custom Gemini API key in App Settings.",
+          error: "No Gemini API keys found. Please set GEMINI_API_KEYS in Supabase secrets or enter API keys in App Settings.",
         }),
         {
           status: 400,
@@ -48,6 +56,15 @@ serve(async (req) => {
         }
       );
     }
+
+    // Round-robin selection index
+    const startIndex = globalKeyPointer % keyPool.length;
+    globalKeyPointer = (globalKeyPointer + 1) % keyPool.length;
+
+    const orderedKeys = [
+      ...keyPool.slice(startIndex),
+      ...keyPool.slice(0, startIndex)
+    ];
 
     const parts: any[] = [{ text: prompt }];
     if (image) {
@@ -60,36 +77,48 @@ serve(async (req) => {
       });
     }
 
-    // 4. Direct Call to Google's stable gemini-2.5-flash model with JSON config
+    // 4. Key Pool Loop: Round-Robin rotation with instant failover on 429 rate limit
     let response = null;
     let lastError = "";
 
-    for (const model of ["gemini-2.5-flash", "gemini-1.5-flash"]) {
-      try {
-        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 300,
-              responseMimeType: "application/json"
-            }
-          })
-        });
+    for (const apiKey of orderedKeys) {
+      for (const model of ["gemini-2.5-flash", "gemini-1.5-flash"]) {
+        try {
+          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 300,
+                responseMimeType: "application/json"
+              }
+            })
+          });
 
-        if (response.ok) {
-          lastError = "";
-          break;
-        } else {
-          const errData = await response.json().catch(() => ({}));
-          lastError = errData.error?.message || `HTTP ${response.status} Error`;
+          if (response.ok) {
+            lastError = "";
+            break;
+          } else {
+            const errData = await response.json().catch(() => ({}));
+            lastError = errData.error?.message || `HTTP ${response.status} Error`;
+
+            // If key hit rate limit (429) or quota error (403), failover to next key in key pool
+            if (response.status === 429 || response.status === 403 || lastError.includes("RESOURCE_EXHAUSTED")) {
+              console.warn(`[Key Pool] Key ${apiKey.substring(0, 6)}... hit rate limit (${response.status}). Failing over to next key...`);
+              break;
+            }
+          }
+        } catch (err: any) {
+          lastError = err.message || "Connection failed";
         }
-      } catch (err: any) {
-        lastError = err.message || "Connection failed";
+      }
+
+      if (response && response.ok) {
+        break;
       }
     }
 
