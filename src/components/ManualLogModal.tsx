@@ -28,7 +28,7 @@ import { cn } from "../lib/utils";
 import type { Meal, TrackedNutrient } from "../types";
 import { hasNoGeneratedImage, formatDisplayTime } from "../utils/helpers";
 import { supabase, isSupabaseConfigured } from "../lib/supabaseClient";
-import { getBestGeminiModel } from "../utils/geminiFoodAnalysis";
+import { getBestGeminiModel, resolveGeminiApiKey } from "../utils/geminiFoodAnalysis";
 import { TimePickerModal } from "./TimePickerModal";
 import { PastFoodCard, PastFoodItem } from "./PastFoodCard";
 import { DEFAULT_TRACKED_NUTRIENTS, normalizeTrackedNutrients } from "../constants/nutrition";
@@ -547,8 +547,7 @@ export const ManualLogModal = ({
   const handleGenerateAndLogWithAi = async () => {
     if (!aiInstruction.trim() && !uploadedImage && !attachedItem) return;
 
-    const geminiKeyTag = (profileData?.preferences || []).find((p: string) => p.startsWith("gemini_api_key:")) || "";
-    const key = geminiKeyTag.split(":")[1] || "";
+    const key = resolveGeminiApiKey(profileData);
 
     const fullInstruction = attachedItem 
       ? `Attached meal: ${attachedItem.name}. User notes: ${aiInstruction.trim()}`
@@ -562,49 +561,54 @@ export const ManualLogModal = ({
     setErrorMessage("");
 
     try {
-      let rawText = "";
-      let calculatedMeal: any = null;
+      let responseData: any = null;
       const finalImage = imageUrl || uploadedImage || attachedItem?.image || FALLBACK_FOOD_IMAGE;
 
-      if (!key && uploadedImage) {
-        calculatedMeal = {
-          id: mealToEdit?.id || `meal_${Date.now()}`,
-          name: name.trim() || attachedItem?.name || aiInstruction.trim() || "Photo Meal Log",
-          calories: parseInt(calories) || 450,
-          protein: 32,
-          carbs: 45,
-          fats: 14,
-          fiber: 6,
-          nutrients: { protein: 32, carbs: 45, fats: 14, fiber: 6 },
-          type: "AI Photo Log",
-          time: time.trim(),
-          image: finalImage,
-          meal_description: aiInstruction.trim() || "AI Photo Log",
-          tags: selectedTags.length > 0 ? selectedTags : ["Photo Log", "High Protein"]
-        };
-      } else if (uploadedImage && key) {
-        const commaIndex = uploadedImage.indexOf(",");
-        const mimeType = uploadedImage.substring(5, uploadedImage.indexOf(";base64"));
-        const base64Data = uploadedImage.substring(commaIndex + 1);
-        
-        const sampleNutrientObj: Record<string, number> = {};
-        activeTrackedNutrients.forEach((n) => { sampleNutrientObj[n.id] = 10; });
+      const sampleNutrientObj: Record<string, number> = {};
+      activeTrackedNutrients.forEach((n) => { sampleNutrientObj[n.id] = 10; });
 
-        const imagePrompt = `Analyze the food plate in this image. User notes & attached item: "${fullInstruction}". Estimate meal name, total calories (kcal), description, clean dietary tags, and values for ALL user-tracked nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
-        
-        const modelName = "gemini-2.5-flash";
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
+      const promptText = uploadedImage
+        ? `Analyze the food plate in this image. User notes & attached item: "${fullInstruction}". Estimate meal name, total calories (kcal), 1-sentence meal_description, clean dietary tags (e.g. ["High Protein"]), and numerical values for ALL user-tracked nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`
+        : `Calculate nutrition for: "${fullInstruction}". Estimate dish name, total calories (kcal), 1-sentence meal_description, clean dietary tags (e.g. ["High Protein"]), and numerical values for ALL user-tracked nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
+
+      let cleanBase64 = "";
+      let mimeType = "image/jpeg";
+      if (uploadedImage) {
+        const commaIndex = uploadedImage.indexOf(",");
+        mimeType = uploadedImage.substring(5, uploadedImage.indexOf(";base64")) || "image/jpeg";
+        cleanBase64 = uploadedImage.substring(commaIndex + 1);
+      }
+
+      // 1. Try Supabase Edge Function first (100% Server Proxy Execution)
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase.functions.invoke("gemini", {
+            body: {
+              prompt: promptText,
+              image: cleanBase64 || undefined,
+              mimeType: cleanBase64 ? mimeType : undefined,
+              userApiKey: key || undefined,
+            }
+          });
+          if (!error && data) {
+            responseData = data;
+          }
+        } catch (err) {
+          console.warn("[ManualLogModal] Edge function call failed, falling back to direct key:", err);
+        }
+      }
+
+      // 2. Fallback to direct client key call if Edge Function wasn't available
+      if (!responseData && key) {
+        const parts: any[] = [{ text: promptText }];
+        if (cleanBase64) {
+          parts.push({ inlineData: { mimeType, data: cleanBase64 } });
+        }
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: imagePrompt },
-                  { inlineData: { mimeType: mimeType, data: base64Data } }
-                ]
-              }
-            ],
+            contents: [{ parts }],
             generationConfig: {
               temperature: 0.2,
               maxOutputTokens: 300,
@@ -612,129 +616,53 @@ export const ManualLogModal = ({
             }
           })
         });
-
-        const data = await response.json();
-        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
-        const parsedNutrients = parsed.nutrients || {};
-
-        const parseVal = (val: any) => {
-          if (typeof val === "number") return isNaN(val) ? 0 : val;
-          if (!val) return 0;
-          const p = parseFloat(String(val).replace(/[^0-9.]/g, ""));
-          return isNaN(p) ? 0 : Math.round(p * 10) / 10;
-        };
-
-        const pVal = parseVal(parsedNutrients.protein ?? parsed.protein);
-        const cVal = parseVal(parsedNutrients.carbs ?? parsed.carbs);
-        const fVal = parseVal(parsedNutrients.fats ?? parsed.fats);
-        const fibVal = parseVal(parsedNutrients.fiber ?? parsed.fiber);
-
-        const dynamicNutrientMap: Record<string, number> = {
-          protein: pVal,
-          carbs: cVal,
-          fats: fVal,
-          fiber: fibVal,
-          ...parsedNutrients,
-        };
-
-        calculatedMeal = {
-          id: mealToEdit?.id || `meal_${Date.now()}`,
-          name: parsed.name || attachedItem?.name || aiInstruction.trim() || "Custom Meal Log",
-          calories: parseVal(parsed.calories) || Math.round(pVal * 4 + cVal * 4 + fVal * 9),
-          protein: pVal,
-          carbs: cVal,
-          fats: fVal,
-          fiber: fibVal,
-          nutrients: dynamicNutrientMap,
-          type: mealToEdit?.type || "AI Meal Log",
-          time: time.trim(),
-          image: finalImage,
-          meal_description: parsed.description || aiInstruction.trim(),
-          tags: selectedTags.length > 0 ? selectedTags : (parsed.tags || ["AI Log"])
-        };
-      } else {
-        const sampleNutrientObj: Record<string, number> = {};
-        activeTrackedNutrients.forEach((n) => { sampleNutrientObj[n.id] = 10; });
-
-        const prompt = `Calculate nutrition for: "${fullInstruction}". Estimate dish name, total calories (kcal), 1-sentence meal_description, clean dietary tags (e.g. ["High Protein"]), and numerical values for ALL user-tracked nutrients (${nutrientPromptList}). Return ONLY valid JSON: {"name":"...","calories":0,"meal_description":"...","tags":["High Protein"],"nutrients":${JSON.stringify(sampleNutrientObj)}}`;
-
-        // 1. Try user's Gemini API key directly for sub-second execution
-        if (key) {
-          try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                  temperature: 0.2,
-                  maxOutputTokens: 300,
-                  responseMimeType: "application/json"
-                }
-              })
-            });
-            if (response.ok) {
-              const data = await response.json();
-              rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            }
-          } catch (e) {
-            console.warn("[ManualLogModal] Direct key call failed, falling back to Supabase:", e);
-          }
+        if (response.ok) {
+          responseData = await response.json();
         }
-
-        if (!rawText && isSupabaseConfigured) {
-          const { data } = await supabase.functions.invoke("gemini", { body: { prompt, userApiKey: key || undefined } });
-          if (data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-            rawText = data.candidates[0].content.parts[0].text;
-          }
-        }
-
-        let cleaned = rawText.trim();
-        if (cleaned.startsWith("```")) {
-          cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-        }
-
-        const result = cleaned ? JSON.parse(cleaned) : {};
-        const resultNutrients = result.nutrients || {};
-
-        const parseVal = (val: any) => {
-          if (typeof val === "number") return isNaN(val) ? 0 : val;
-          if (!val) return 0;
-          const p = parseFloat(String(val).replace(/[^0-9.]/g, ""));
-          return isNaN(p) ? 0 : Math.round(p * 10) / 10;
-        };
-
-        const pVal = parseVal(resultNutrients.protein ?? result.protein);
-        const cVal = parseVal(resultNutrients.carbs ?? result.carbs);
-        const fVal = parseVal(resultNutrients.fats ?? result.fats);
-        const fibVal = parseVal(resultNutrients.fiber ?? result.fiber);
-
-        const dynamicNutrientMap: Record<string, number> = {
-          protein: pVal,
-          carbs: cVal,
-          fats: fVal,
-          fiber: fibVal,
-          ...resultNutrients,
-        };
-        
-        calculatedMeal = {
-          id: mealToEdit?.id || `meal_${Date.now()}`,
-          name: result.name || attachedItem?.name || aiInstruction.trim() || "Custom Meal Log",
-          calories: parseVal(result.calories) || Math.round(pVal * 4 + cVal * 4 + fVal * 9),
-          protein: pVal,
-          carbs: cVal,
-          fats: fVal,
-          fiber: fibVal,
-          nutrients: dynamicNutrientMap,
-          type: mealToEdit?.type || "AI Meal Log",
-          time: time.trim(),
-          image: finalImage,
-          meal_description: result.meal_description || result.description || aiInstruction.trim(),
-          tags: selectedTags.length > 0 ? selectedTags : (result.tags || ["AI Log"])
-        };
       }
+
+      const rawText = responseData?.candidates?.[0]?.content?.parts?.[0]?.text || responseData?.text || "";
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+      const parsedNutrients = parsed.nutrients || {};
+
+      const parseVal = (val: any) => {
+        if (typeof val === "number") return isNaN(val) ? 0 : val;
+        if (!val) return 0;
+        const p = parseFloat(String(val).replace(/[^0-9.]/g, ""));
+        return isNaN(p) ? 0 : Math.round(p * 10) / 10;
+      };
+
+      const pVal = parseVal(parsedNutrients.protein ?? parsed.protein);
+      const cVal = parseVal(parsedNutrients.carbs ?? parsed.carbs);
+      const fVal = parseVal(parsedNutrients.fats ?? parsed.fats);
+      const fibVal = parseVal(parsedNutrients.fiber ?? parsed.fiber);
+
+      const dynamicNutrientMap: Record<string, number> = {
+        protein: pVal,
+        carbs: cVal,
+        fats: fVal,
+        fiber: fibVal,
+        ...parsedNutrients,
+      };
+
+      const calculatedMeal = {
+        id: mealToEdit?.id || `meal_${Date.now()}`,
+        name: parsed.name || attachedItem?.name || aiInstruction.trim() || "Custom Meal Log",
+        calories: parseVal(parsed.calories) || Math.round(pVal * 4 + cVal * 4 + fVal * 9),
+        protein: pVal,
+        carbs: cVal,
+        fats: fVal,
+        fiber: fibVal,
+        nutrients: dynamicNutrientMap,
+        type: mealToEdit?.type || (uploadedImage ? "AI Photo Log" : "AI Meal Log"),
+        time: time.trim(),
+        image: finalImage,
+        meal_description: parsed.meal_description || parsed.description || aiInstruction.trim(),
+        tags: selectedTags.length > 0 ? selectedTags : (parsed.tags || ["AI Log"]),
+        isFood: parsed.isFood !== false,
+        confidenceScore: parseVal(parsed.confidenceScore) || 92
+      };
 
       // AI Confidence Score Check (Threshold: 90% & Non-Food Guardrail)
       const isNonFoodDetected = calculatedMeal.isFood === false || (calculatedMeal.name && (calculatedMeal.name.toLowerCase().includes("pen") || calculatedMeal.name.toLowerCase().includes("stationery") || calculatedMeal.name.toLowerCase().includes("keys") || calculatedMeal.name.toLowerCase().includes("phone")));
