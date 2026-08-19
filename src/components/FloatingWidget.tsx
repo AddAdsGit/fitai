@@ -76,8 +76,8 @@ export const FloatingWidget: React.FC<FloatingWidgetProps> = ({
       id="floating-widget-viewport-layer"
       style={{
         position: "fixed",
-        right: `${16 * viewportScale}px`,
-        bottom: `calc(env(safe-area-inset-bottom, 0px) + ${76 * viewportScale}px)`,
+        right: `${20 * viewportScale}px`,
+        bottom: `${112 * viewportScale}px`,
         width: "48px",
         height: "48px",
         transform: `scale(${viewportScale})`,
