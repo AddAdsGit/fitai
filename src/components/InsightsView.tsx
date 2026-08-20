@@ -1258,23 +1258,43 @@ export const InsightsView = ({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.25 }}
-              className="space-y-1 pt-2"
+              className="space-y-1 pt-2 relative"
             >
+              <AnimatePresence>
+                {activeChartScrub?.chartId === "nutrients" && activeChartScrub.data && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans whitespace-nowrap"
+                  >
+                    <span className="text-[10px] font-bold text-orange-900/60">
+                      {formatFullDateLabel(activeChartScrub.data.date)}
+                    </span>
+                    <span className="w-1 h-1 rounded-full bg-orange-300" />
+                    <div className="flex items-center gap-1.5 text-[10px] font-black">
+                      {periodNutrientStats.slice(0, 4).map((n) => {
+                        const val = activeChartScrub.data[n.id];
+                        return (
+                          <span key={n.id} style={{ color: n.color }}>
+                            {n.name.slice(0, 3)}: {val != null ? `${val}g` : "-"}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                    <RechartsTooltip
-                      contentStyle={{
-                        borderRadius: "16px",
-                        border: "none",
-                        background: "rgba(255,255,255,0.9)",
-                        backdropFilter: "blur(10px)",
-                        boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                        color: "#431407",
-                        fontWeight: 900,
-                        fontSize: 11,
-                      }}
-                    />
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                    onMouseMove={(state) => handleChartStateScrub("nutrients", state)}
+                    onTouchMove={(state) => handleChartStateScrub("nutrients", state)}
+                  >
                     {periodNutrientStats.map((n) => (
                       <Line
                         key={n.id}
@@ -1297,12 +1317,12 @@ export const InsightsView = ({
                 endDate={dateRangeBounds.end}
                 dataLength={chartData.length}
                 currentIndex={
-                  activeChartScrub?.chartId === "calories" && activeChartScrub.data
+                  activeChartScrub?.chartId === "nutrients" && activeChartScrub.data
                     ? chartData.findIndex((d) => d.date === activeChartScrub.data.date)
                     : -1
                 }
                 onScrubIndex={(idx) => {
-                  if (chartData[idx]) triggerChartScrub("calories", chartData[idx]);
+                  if (chartData[idx]) triggerChartScrub("nutrients", chartData[idx]);
                 }}
               />
             </motion.div>
