@@ -166,6 +166,52 @@ const formatXAxisDateTick = (dateStr: string, totalDays: number = 7) => {
   }
 };
 
+const ChartDateSlider = ({
+  startDate,
+  endDate,
+  dataLength,
+  currentIndex,
+  onScrubIndex,
+}: {
+  startDate: Date | string;
+  endDate: Date | string;
+  dataLength: number;
+  currentIndex: number;
+  onScrubIndex: (index: number) => void;
+}) => {
+  if (dataLength <= 1) {
+    return (
+      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
+        <span>{formatShortMonthDay(startDate)}</span>
+        <span>{formatShortMonthDay(endDate)}</span>
+      </div>
+    );
+  }
+
+  const safeIndex = Math.max(0, Math.min(dataLength - 1, currentIndex < 0 ? dataLength - 1 : currentIndex));
+
+  return (
+    <div className="pt-2 px-1 border-t border-black/[0.04] space-y-1 select-none">
+      <div className="relative flex items-center w-full h-4 touch-none group">
+        <input
+          type="range"
+          min={0}
+          max={dataLength - 1}
+          value={safeIndex}
+          onChange={(e) => onScrubIndex(parseInt(e.target.value, 10))}
+          className="w-full h-1.5 bg-orange-100/80 hover:bg-orange-200/70 rounded-full appearance-none cursor-pointer accent-orange-500 transition-all border border-orange-200/50 focus:outline-none"
+        />
+      </div>
+
+      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-1">
+        <span>{formatShortMonthDay(startDate)}</span>
+        <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">drag slider to inspect</span>
+        <span>{formatShortMonthDay(endDate)}</span>
+      </div>
+    </div>
+  );
+};
+
 export const InsightsView = ({
   currentStreak = 0,
   mealsState = [],
@@ -510,13 +556,13 @@ export const InsightsView = ({
     const current = new Date(start);
 
     const labels: Record<number, string> = {
-      1: "Hard/Constipated (Type 1)",
-      2: "Mildly Hard (Type 2)",
-      3: "Ideal/Normal (Type 3)",
-      4: "Optimal/Smooth (Type 4)",
-      5: "Soft (Type 5)",
-      6: "Loose (Type 6)",
-      7: "Liquid/Diarrhea (Type 7)",
+      1: "Constipated",
+      2: "Mildly Hard",
+      3: "Normal",
+      4: "Healthy",
+      5: "Soft",
+      6: "Loose",
+      7: "Diarrhea",
     };
     const colors: Record<number, string> = {
       1: "#F59E0B",
@@ -550,7 +596,7 @@ export const InsightsView = ({
               date: dateStr,
               time: log.time || "Logged",
               type: stoolType,
-              label: labels[stoolType] || `Type ${stoolType}`,
+              label: labels[stoolType] || "Normal",
               fill: colors[stoolType] || "#10B981",
             });
           }
@@ -566,9 +612,9 @@ export const InsightsView = ({
     if (dynamicDigestionScatterData.length === 0) return { avgType: 0, count: 0, label: "No logs recorded" };
     const count = dynamicDigestionScatterData.length;
     const avg = parseFloat((dynamicDigestionScatterData.reduce((s, d) => s + d.type, 0) / count).toFixed(1));
-    let label = "Optimal Zone 🟢";
-    if (avg < 2.8) label = "Constipated Zone 🟡";
-    else if (avg > 4.5) label = "Loose Zone 🔴";
+    let label = "Healthy";
+    if (avg < 2.8) label = "Constipated";
+    else if (avg > 4.5) label = "Diarrhea";
     return { avgType: avg, count, label };
   }, [dynamicDigestionScatterData]);
 
@@ -883,13 +929,21 @@ export const InsightsView = ({
               </ResponsiveContainer>
             </div>
 
-            {/* Minimalist Date Range Footer for Long Range Views */}
+            {/* Interactive Date Slider for Long Range Views */}
             {timeRange !== "7D" && (
-              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
-                <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
-                <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
-                <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
-              </div>
+              <ChartDateSlider
+                startDate={dateRangeBounds.start}
+                endDate={dateRangeBounds.end}
+                dataLength={chartData.length}
+                currentIndex={
+                  activeChartScrub?.chartId === "calories" && activeChartScrub.data
+                    ? chartData.findIndex((d) => d.date === activeChartScrub.data.date)
+                    : -1
+                }
+                onScrubIndex={(idx) => {
+                  if (chartData[idx]) triggerChartScrub("calories", chartData[idx]);
+                }}
+              />
             )}
           </div>
         )}
@@ -1034,12 +1088,20 @@ export const InsightsView = ({
                   </ResponsiveContainer>
                 </div>
 
-                {/* Minimalist Date Range Footer */}
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
-                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
-                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
-                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
-                </div>
+                {/* Interactive Date Slider */}
+                <ChartDateSlider
+                  startDate={dateRangeBounds.start}
+                  endDate={dateRangeBounds.end}
+                  dataLength={filteredWeightData.length}
+                  currentIndex={
+                    activeChartScrub?.chartId === "weight" && activeChartScrub.data
+                      ? filteredWeightData.findIndex((d) => d.date === activeChartScrub.data.date)
+                      : -1
+                  }
+                  onScrubIndex={(idx) => {
+                    if (filteredWeightData[idx]) triggerChartScrub("weight", filteredWeightData[idx]);
+                  }}
+                />
               </>
             ) : (
               <div className="h-44 flex flex-col items-center justify-center text-center p-4">
@@ -1192,12 +1254,20 @@ export const InsightsView = ({
                 </ResponsiveContainer>
               </div>
 
-              {/* Minimalist Date Range Footer */}
-              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
-                <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
-                <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
-                <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
-              </div>
+              {/* Interactive Date Slider */}
+              <ChartDateSlider
+                startDate={dateRangeBounds.start}
+                endDate={dateRangeBounds.end}
+                dataLength={chartData.length}
+                currentIndex={
+                  activeChartScrub?.chartId === "calories" && activeChartScrub.data
+                    ? chartData.findIndex((d) => d.date === activeChartScrub.data.date)
+                    : -1
+                }
+                onScrubIndex={(idx) => {
+                  if (chartData[idx]) triggerChartScrub("calories", chartData[idx]);
+                }}
+              />
             </motion.div>
           )}
 
@@ -1297,12 +1367,20 @@ export const InsightsView = ({
                   </ResponsiveContainer>
                 </div>
 
-                {/* Minimalist Date Range Footer */}
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
-                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
-                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
-                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
-                </div>
+                {/* Interactive Date Slider */}
+                <ChartDateSlider
+                  startDate={dateRangeBounds.start}
+                  endDate={dateRangeBounds.end}
+                  dataLength={dynamicVitalsChartData.length}
+                  currentIndex={
+                    activeChartScrub?.chartId === "water" && activeChartScrub.data
+                      ? dynamicVitalsChartData.findIndex((d) => d.date === activeChartScrub.data.date)
+                      : -1
+                  }
+                  onScrubIndex={(idx) => {
+                    if (dynamicVitalsChartData[idx]) triggerChartScrub("water", dynamicVitalsChartData[idx]);
+                  }}
+                />
               </>
             ) : (
               <div className="h-36 flex flex-col items-center justify-center text-center p-4">
@@ -1390,12 +1468,20 @@ export const InsightsView = ({
                   </ResponsiveContainer>
                 </div>
 
-                {/* Minimalist Date Range Footer */}
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
-                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
-                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
-                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
-                </div>
+                {/* Interactive Date Slider */}
+                <ChartDateSlider
+                  startDate={dateRangeBounds.start}
+                  endDate={dateRangeBounds.end}
+                  dataLength={dynamicVitalsChartData.length}
+                  currentIndex={
+                    activeChartScrub?.chartId === "energy" && activeChartScrub.data
+                      ? dynamicVitalsChartData.findIndex((d) => d.date === activeChartScrub.data.date)
+                      : -1
+                  }
+                  onScrubIndex={(idx) => {
+                    if (dynamicVitalsChartData[idx]) triggerChartScrub("energy", dynamicVitalsChartData[idx]);
+                  }}
+                />
               </>
             ) : (
               <div className="h-36 flex flex-col items-center justify-center text-center p-4">
@@ -1478,12 +1564,20 @@ export const InsightsView = ({
                   </ResponsiveContainer>
                 </div>
 
-                {/* Minimalist Date Range Footer */}
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
-                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
-                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
-                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
-                </div>
+                {/* Interactive Date Slider */}
+                <ChartDateSlider
+                  startDate={dateRangeBounds.start}
+                  endDate={dateRangeBounds.end}
+                  dataLength={dynamicVitalsChartData.length}
+                  currentIndex={
+                    activeChartScrub?.chartId === "bloating" && activeChartScrub.data
+                      ? dynamicVitalsChartData.findIndex((d) => d.date === activeChartScrub.data.date)
+                      : -1
+                  }
+                  onScrubIndex={(idx) => {
+                    if (dynamicVitalsChartData[idx]) triggerChartScrub("bloating", dynamicVitalsChartData[idx]);
+                  }}
+                />
               </>
             ) : (
               <div className="h-36 flex flex-col items-center justify-center text-center p-4">
@@ -1501,13 +1595,12 @@ export const InsightsView = ({
           <div className="flex justify-between items-start">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-0.5">
-                Digestion (Bristol Scatter)
+                Digestion Quality
               </div>
               <div className="text-2xl font-black text-orange-950 flex flex-wrap items-baseline gap-2">
                 {digestionStats.count > 0 ? (
                   <>
-                    <span>Type {digestionStats.avgType}</span>
-                    <span className="text-xs font-bold text-emerald-600 tracking-normal font-sans">
+                    <span className="text-base font-bold text-emerald-600 tracking-normal font-sans">
                       {digestionStats.label}
                     </span>
                   </>
@@ -1544,7 +1637,7 @@ export const InsightsView = ({
                   </span>
                   <span className="w-1 h-1 rounded-full bg-emerald-400" />
                   <span className="text-xs font-black text-emerald-600 tabular-nums">
-                    {activeChartScrub.data.label || `Type ${activeChartScrub.data.type}`}
+                    {activeChartScrub.data.label}
                   </span>
                 </motion.div>
               )}
@@ -1569,7 +1662,19 @@ export const InsightsView = ({
                     >
                       <ReferenceLine y={3} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
                       <ReferenceLine y={4} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
-                      <YAxis domain={[1, 7]} ticks={[1, 2, 3, 4, 5, 6, 7]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} tickFormatter={(val) => `Type ${val}`} />
+                      <YAxis
+                        domain={[1, 7]}
+                        ticks={[1, 4, 7]}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }}
+                        tickFormatter={(val) => {
+                          if (val === 1) return "Hard";
+                          if (val === 4) return "Healthy";
+                          if (val === 7) return "Diarrhea";
+                          return "";
+                        }}
+                      />
                       <ZAxis range={[60, 60]} />
                       <Scatter data={dynamicDigestionScatterData} dataKey="type">
                         {dynamicDigestionScatterData.map((entry, index) => (
@@ -1580,12 +1685,25 @@ export const InsightsView = ({
                   </ResponsiveContainer>
                 </div>
 
-                {/* Minimalist Date Range Footer */}
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
-                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
-                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
-                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
-                </div>
+                {/* Interactive Date Slider */}
+                <ChartDateSlider
+                  startDate={dateRangeBounds.start}
+                  endDate={dateRangeBounds.end}
+                  dataLength={dynamicDigestionScatterData.length}
+                  currentIndex={
+                    activeChartScrub?.chartId === "digestion" && activeChartScrub.data
+                      ? dynamicDigestionScatterData.findIndex(
+                          (d) =>
+                            d.date === activeChartScrub.data.date &&
+                            d.time === activeChartScrub.data.time
+                        )
+                      : -1
+                  }
+                  onScrubIndex={(idx) => {
+                    if (dynamicDigestionScatterData[idx])
+                      triggerChartScrub("digestion", dynamicDigestionScatterData[idx]);
+                  }}
+                />
               </>
             ) : (
               <div className="h-36 flex flex-col items-center justify-center text-center p-4">
@@ -1599,15 +1717,15 @@ export const InsightsView = ({
           <div className="flex justify-between items-center text-[10px] font-black text-orange-950/60 pt-1 px-1">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              Optimal (Type 3–4)
+              Healthy
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-500" />
-              Constipated (Type 1–2)
+              Constipated
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-rose-500" />
-              Loose (Type 5–7)
+              Diarrhea
             </span>
           </div>
         </div>
