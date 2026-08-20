@@ -192,14 +192,16 @@ const ChartDateSlider = ({
 
   return (
     <div className="pt-2 px-1 border-t border-black/[0.04] space-y-1 select-none">
-      <div className="relative flex items-center w-full h-4 touch-none group">
+      <div className="relative flex items-center w-full h-6 touch-none py-1">
         <input
           type="range"
           min={0}
           max={dataLength - 1}
           value={safeIndex}
-          onChange={(e) => onScrubIndex(parseInt(e.target.value, 10))}
-          className="w-full h-1.5 bg-orange-100/80 hover:bg-orange-200/70 rounded-full appearance-none cursor-pointer accent-orange-500 transition-all border border-orange-200/50 focus:outline-none"
+          onInput={(e) => onScrubIndex(parseInt(e.currentTarget.value, 10))}
+          onChange={(e) => onScrubIndex(parseInt(e.currentTarget.value, 10))}
+          className="w-full h-2 bg-orange-100/90 hover:bg-orange-200/80 rounded-full appearance-none cursor-pointer accent-orange-500 transition-all border border-orange-200/60 focus:outline-none touch-none"
+          style={{ WebkitAppearance: "none", touchAction: "none" }}
         />
       </div>
 
@@ -332,7 +334,21 @@ export const InsightsView = ({
     const sorted = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date));
     const startStr = localFormatDateStr(dateRangeBounds.start);
     const endStr = localFormatDateStr(dateRangeBounds.end);
-    return sorted.filter((log) => log.date >= startStr && log.date <= endStr);
+    return sorted
+      .filter((log) => log.date >= startStr && log.date <= endStr)
+      .map((log) => {
+        let timeStr = "";
+        if (log.created_at) {
+          try {
+            const d = new Date(log.created_at);
+            timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+          } catch (_) {}
+        }
+        return {
+          ...log,
+          time: timeStr || "Logged",
+        };
+      });
   }, [weightLogs, dateRangeBounds]);
 
   const weightStats = useMemo(() => {
@@ -389,6 +405,8 @@ export const InsightsView = ({
         day: dayLabel,
         calories: hasLogs ? calories : null,
         goal: profileData?.goals?.dailyCalories || 2000,
+        mealCount: daysMeals.length,
+        lastMealTime: daysMeals.length > 0 ? daysMeals[daysMeals.length - 1].time : null,
         ...nutrientValues,
         date: dateStr,
       });
@@ -476,24 +494,33 @@ export const InsightsView = ({
       }
 
       const row = wellnessByDate.get(dateStr);
-      const water = row?.water_intake ?? (row?.water_logs && row.water_logs.length > 0 ? row.water_logs.reduce((s, l) => s + (l.amount || 0), 0) : null);
+      const waterLogs = row?.water_logs || [];
+      const water = row?.water_intake ?? (waterLogs.length > 0 ? waterLogs.reduce((s, l) => s + (l.amount || 0), 0) : null);
+      const waterTime = waterLogs.length > 0 ? waterLogs[waterLogs.length - 1].time : null;
       
       const energyLogs = row?.energy_logs || [];
       const energy = row?.energy_level ?? (energyLogs.length > 0 ? energyLogs[energyLogs.length - 1].level : null);
+      const energyTime = energyLogs.length > 0 ? energyLogs[energyLogs.length - 1].time : null;
 
       const bloatLogs = row?.bloating_logs || [];
       const bloating = row?.bloating_level ?? (bloatLogs.length > 0 ? bloatLogs[bloatLogs.length - 1].level : null);
+      const bloatTime = bloatLogs.length > 0 ? bloatLogs[bloatLogs.length - 1].time : null;
 
       const stoolLogs = row?.stool_logs || [];
       const stoolType = row?.stool_type ?? (stoolLogs.length > 0 ? stoolLogs[stoolLogs.length - 1].type : null);
+      const stoolTime = stoolLogs.length > 0 ? stoolLogs[stoolLogs.length - 1].time : null;
 
       data.push({
         day: dayLabel,
         date: dateStr,
         water: water !== undefined && water !== null && water > 0 ? parseFloat(water.toFixed(1)) : null,
+        waterTime,
         energy: energy !== undefined && energy !== null && energy > 0 ? energy : null,
+        energyTime,
         bloating: bloating !== undefined && bloating !== null && bloating > 0 ? bloating : null,
+        bloatTime,
         stoolType: stoolType !== undefined && stoolType !== null && stoolType > 0 ? stoolType : null,
+        stoolTime,
       });
 
       current.setDate(current.getDate() + 1);
@@ -836,7 +863,7 @@ export const InsightsView = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans whitespace-nowrap"
                 >
                   <span className="text-[10px] font-bold text-orange-900/60">
                     {formatFullDateLabel(activeChartScrub.data.date)}
@@ -845,6 +872,11 @@ export const InsightsView = ({
                   <span className="text-xs font-black text-orange-600 tabular-nums">
                     {activeChartScrub.data.calories ? `${activeChartScrub.data.calories.toLocaleString()} kcal` : "Unlogged"}
                   </span>
+                  {activeChartScrub.data.mealCount > 0 && (
+                    <span className="text-[10px] font-bold text-orange-950/40 font-mono">
+                      • {activeChartScrub.data.mealCount} {activeChartScrub.data.mealCount === 1 ? "meal" : "meals"}
+                    </span>
+                  )}
                   {activeChartScrub.data.calories && activeChartScrub.data.goal && (
                     <span className={cn(
                       "text-[9px] font-bold tabular-nums",
@@ -1047,7 +1079,7 @@ export const InsightsView = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans whitespace-nowrap"
                 >
                   <span className="text-[10px] font-bold text-orange-900/60">
                     {formatFullDateLabel(activeChartScrub.data.date)}
@@ -1056,6 +1088,11 @@ export const InsightsView = ({
                   <span className="text-xs font-black text-orange-600 tabular-nums">
                     {activeChartScrub.data.weight} kg
                   </span>
+                  {activeChartScrub.data.time && (
+                    <span className="text-[10px] font-bold text-orange-950/40 font-mono">
+                      • {activeChartScrub.data.time}
+                    </span>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1337,7 +1374,7 @@ export const InsightsView = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-sky-200/80 shadow-md shadow-sky-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-sky-200/80 shadow-md shadow-sky-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans whitespace-nowrap"
                 >
                   <span className="text-[10px] font-bold text-sky-900/60">
                     {formatFullDateLabel(activeChartScrub.data.date)}
@@ -1346,6 +1383,11 @@ export const InsightsView = ({
                   <span className="text-xs font-black text-sky-600 tabular-nums">
                     {activeChartScrub.data.water ?? 0} L
                   </span>
+                  {activeChartScrub.data.waterTime && (
+                    <span className="text-[10px] font-bold text-sky-950/40 font-mono">
+                      • {activeChartScrub.data.waterTime}
+                    </span>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1439,15 +1481,20 @@ export const InsightsView = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-amber-200/80 shadow-md shadow-amber-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-amber-200/80 shadow-md shadow-amber-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans whitespace-nowrap"
                 >
                   <span className="text-[10px] font-bold text-amber-900/60">
                     {formatFullDateLabel(activeChartScrub.data.date)}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-amber-300" />
                   <span className="text-xs font-black text-amber-600 tabular-nums">
-                    Level {activeChartScrub.data.energy ?? "-"} / 5.0
+                    Level {activeChartScrub.data.energy ?? "-"}
                   </span>
+                  {activeChartScrub.data.energyTime && (
+                    <span className="text-[10px] font-bold text-amber-950/40 font-mono">
+                      • {activeChartScrub.data.energyTime}
+                    </span>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1535,15 +1582,20 @@ export const InsightsView = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-rose-200/80 shadow-md shadow-rose-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-rose-200/80 shadow-md shadow-rose-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans whitespace-nowrap"
                 >
                   <span className="text-[10px] font-bold text-rose-900/60">
                     {formatFullDateLabel(activeChartScrub.data.date)}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-rose-300" />
                   <span className="text-xs font-black text-rose-600 tabular-nums">
-                    Level {activeChartScrub.data.bloating ?? "-"} / 5.0
+                    Level {activeChartScrub.data.bloating ?? "-"}
                   </span>
+                  {activeChartScrub.data.bloatTime && (
+                    <span className="text-[10px] font-bold text-rose-950/40 font-mono">
+                      • {activeChartScrub.data.bloatTime}
+                    </span>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1630,15 +1682,20 @@ export const InsightsView = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -4, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-emerald-200/80 shadow-md shadow-emerald-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-emerald-200/80 shadow-md shadow-emerald-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans whitespace-nowrap"
                 >
                   <span className="text-[10px] font-bold text-emerald-950/70">
-                    {formatFullDateLabel(activeChartScrub.data.date)} {activeChartScrub.data.time ? `at ${activeChartScrub.data.time}` : ""}
+                    {formatFullDateLabel(activeChartScrub.data.date)}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-emerald-400" />
                   <span className="text-xs font-black text-emerald-600 tabular-nums">
                     {activeChartScrub.data.label}
                   </span>
+                  {activeChartScrub.data.time && (
+                    <span className="text-[10px] font-bold text-emerald-950/40 font-mono">
+                      • {activeChartScrub.data.time}
+                    </span>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
