@@ -198,79 +198,37 @@ export const InsightsView = ({
   const [showTdeeInfoModal, setShowTdeeInfoModal] = useState<boolean>(false);
   const [nutrientSlide, setNutrientSlide] = useState<number>(0);
 
-  // Minimalist Interactive Scrubber States (Auto-fade in 2.5s)
-  const [activeCalorieScrub, setActiveCalorieScrub] = useState<any | null>(null);
-  const calorieTimerRef = React.useRef<any>(null);
+  // Minimalist Interactive Scrubber State (Unified Mutual Exclusion & Auto-fade in 2.5s)
+  const [activeChartScrub, setActiveChartScrub] = useState<{
+    chartId: "calories" | "weight" | "water" | "energy" | "bloating" | "digestion";
+    data: any;
+  } | null>(null);
+  const scrubTimerRef = React.useRef<any>(null);
 
-  const [activeWeightScrub, setActiveWeightScrub] = useState<any | null>(null);
-  const weightTimerRef = React.useRef<any>(null);
-
-  const [activeWaterScrub, setActiveWaterScrub] = useState<any | null>(null);
-  const waterTimerRef = React.useRef<any>(null);
-
-  const [activeEnergyScrub, setActiveEnergyScrub] = useState<any | null>(null);
-  const energyTimerRef = React.useRef<any>(null);
-
-  const [activeBloatingScrub, setActiveBloatingScrub] = useState<any | null>(null);
-  const bloatingTimerRef = React.useRef<any>(null);
-
-  const handleCalorieScrub = (state: any) => {
-    if (state && state.activePayload && state.activePayload.length) {
-      if (calorieTimerRef.current) clearTimeout(calorieTimerRef.current);
-      setActiveCalorieScrub(state.activePayload[0].payload);
-      calorieTimerRef.current = setTimeout(() => {
-        setActiveCalorieScrub(null);
-      }, 2500);
-    }
+  const triggerChartScrub = (
+    chartId: "calories" | "weight" | "water" | "energy" | "bloating" | "digestion",
+    payload: any
+  ) => {
+    if (!payload) return;
+    if (scrubTimerRef.current) clearTimeout(scrubTimerRef.current);
+    setActiveChartScrub({ chartId, data: payload });
+    scrubTimerRef.current = setTimeout(() => {
+      setActiveChartScrub(null);
+    }, 2500);
   };
 
-  const handleWeightScrub = (state: any) => {
+  const handleChartStateScrub = (
+    chartId: "calories" | "weight" | "water" | "energy" | "bloating" | "digestion",
+    state: any
+  ) => {
     if (state && state.activePayload && state.activePayload.length) {
-      if (weightTimerRef.current) clearTimeout(weightTimerRef.current);
-      setActiveWeightScrub(state.activePayload[0].payload);
-      weightTimerRef.current = setTimeout(() => {
-        setActiveWeightScrub(null);
-      }, 2500);
-    }
-  };
-
-  const handleWaterScrub = (state: any) => {
-    if (state && state.activePayload && state.activePayload.length) {
-      if (waterTimerRef.current) clearTimeout(waterTimerRef.current);
-      setActiveWaterScrub(state.activePayload[0].payload);
-      waterTimerRef.current = setTimeout(() => {
-        setActiveWaterScrub(null);
-      }, 2500);
-    }
-  };
-
-  const handleEnergyScrub = (state: any) => {
-    if (state && state.activePayload && state.activePayload.length) {
-      if (energyTimerRef.current) clearTimeout(energyTimerRef.current);
-      setActiveEnergyScrub(state.activePayload[0].payload);
-      energyTimerRef.current = setTimeout(() => {
-        setActiveEnergyScrub(null);
-      }, 2500);
-    }
-  };
-
-  const handleBloatingScrub = (state: any) => {
-    if (state && state.activePayload && state.activePayload.length) {
-      if (bloatingTimerRef.current) clearTimeout(bloatingTimerRef.current);
-      setActiveBloatingScrub(state.activePayload[0].payload);
-      bloatingTimerRef.current = setTimeout(() => {
-        setActiveBloatingScrub(null);
-      }, 2500);
+      triggerChartScrub(chartId, state.activePayload[0].payload);
     }
   };
 
   useEffect(() => {
     return () => {
-      if (calorieTimerRef.current) clearTimeout(calorieTimerRef.current);
-      if (weightTimerRef.current) clearTimeout(weightTimerRef.current);
-      if (waterTimerRef.current) clearTimeout(waterTimerRef.current);
-      if (energyTimerRef.current) clearTimeout(energyTimerRef.current);
-      if (bloatingTimerRef.current) clearTimeout(bloatingTimerRef.current);
+      if (scrubTimerRef.current) clearTimeout(scrubTimerRef.current);
     };
   }, []);
 
@@ -825,36 +783,34 @@ export const InsightsView = ({
         ) : (
           <div className="space-y-1 relative">
             {/* Auto-fading Scrubber Pill for Continuous Range */}
-            {timeRange !== "7D" && (
-              <AnimatePresence>
-                {activeCalorieScrub && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -6, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
-                  >
-                    <span className="text-[10px] font-bold text-orange-900/60">
-                      {formatFullDateLabel(activeCalorieScrub.date)}
+            <AnimatePresence>
+              {activeChartScrub?.chartId === "calories" && activeChartScrub.data && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                >
+                  <span className="text-[10px] font-bold text-orange-900/60">
+                    {formatFullDateLabel(activeChartScrub.data.date)}
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-orange-300" />
+                  <span className="text-xs font-black text-orange-600 tabular-nums">
+                    {activeChartScrub.data.calories ? `${activeChartScrub.data.calories.toLocaleString()} kcal` : "Unlogged"}
+                  </span>
+                  {activeChartScrub.data.calories && activeChartScrub.data.goal && (
+                    <span className={cn(
+                      "text-[9px] font-bold tabular-nums",
+                      activeChartScrub.data.calories > activeChartScrub.data.goal ? "text-orange-600" : "text-emerald-600"
+                    )}>
+                      ({activeChartScrub.data.calories > activeChartScrub.data.goal ? "+" : ""}
+                      {(activeChartScrub.data.calories - activeChartScrub.data.goal).toLocaleString()})
                     </span>
-                    <span className="w-1 h-1 rounded-full bg-orange-300" />
-                    <span className="text-xs font-black text-orange-600 tabular-nums">
-                      {activeCalorieScrub.calories ? `${activeCalorieScrub.calories.toLocaleString()} kcal` : "Unlogged"}
-                    </span>
-                    {activeCalorieScrub.calories && activeCalorieScrub.goal && (
-                      <span className={cn(
-                        "text-[9px] font-bold tabular-nums",
-                        activeCalorieScrub.calories > activeCalorieScrub.goal ? "text-orange-600" : "text-emerald-600"
-                      )}>
-                        ({activeCalorieScrub.calories > activeCalorieScrub.goal ? "+" : ""}
-                        {(activeCalorieScrub.calories - activeCalorieScrub.goal).toLocaleString()})
-                      </span>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <div className="h-44 w-full">
               <ResponsiveContainer width="100%" height="100%">
@@ -904,8 +860,8 @@ export const InsightsView = ({
                   <LineChart
                     data={chartData}
                     margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-                    onMouseMove={handleCalorieScrub}
-                    onTouchMove={handleCalorieScrub}
+                    onMouseMove={(state) => handleChartStateScrub("calories", state)}
+                    onTouchMove={(state) => handleChartStateScrub("calories", state)}
                   >
                     <ReferenceLine y={profileData?.goals?.dailyCalories || 2000} stroke="#f9731640" strokeDasharray="6 4" strokeWidth={1.5} />
                     <Line
@@ -953,7 +909,7 @@ export const InsightsView = ({
                   <>
                     {tdeeStats.tdee.toLocaleString()}{" "}
                     <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
-                      kcal/day avg
+                      kcal/day est
                     </span>
                   </>
                 ) : (
@@ -965,93 +921,55 @@ export const InsightsView = ({
                   </>
                 )}
               </div>
-              <div className="text-[10px] font-medium text-orange-900/50 mt-1">
-                {tdeeStats.isRealAI
-                  ? `(based on ${tdeeStats.foodLogsCount} food logs & ${tdeeStats.weightLogsCount} weight logs)`
-                  : "(Complete requirements below to unlock)"}
-              </div>
+              <p className="text-[10px] font-semibold text-orange-900/50 mt-0.5">
+                {tdeeStats.isRealAI ? (
+                  <span className="text-emerald-700 font-bold">
+                    ✨ Adaptive AI Model (from {tdeeStats.daysSampled} logged days)
+                  </span>
+                ) : (
+                  "Standard Mifflin-St Jeor estimate (Log 7+ days with weight for Adaptive AI)"
+                )}
+              </p>
             </div>
 
             <button
-              onClick={() => {
-                if (triggerToast) triggerToast("🔥 Metabolism report copied!");
-              }}
-              title="Share Metabolism Report"
+              onClick={() => setShowTdeeInfoModal(true)}
               className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
+              title="How is TDEE calculated?"
             >
-              <Share2 className="w-3.5 h-3.5" />
+              <Info className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Accuracy Status & Single Merged Progress Indicator */}
-          {tdeeStats.isRealAI ? (
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center gap-2">
-                <span className="bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  True AI TDEE
-                </span>
-                <span className="text-[10px] text-orange-900/50 font-medium">
-                  High Accuracy (Energy Balance Model)
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3 pt-1">
-              {/* Single Merged Clean Progress Bar */}
-              <div className="space-y-1.5 bg-black/5 rounded-2xl p-3 border border-white/40">
-                <div className="flex justify-between text-[9px] font-black text-orange-950/60 uppercase tracking-wider">
-                  <span>Unlock Progress</span>
-                  <span>
-                    {Math.min(4, tdeeStats.loggedDays)}/4 Days Logged &bull; {Math.min(4, tdeeStats.weightLogsCount)}/4 Weight Logs
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden border border-white/40">
-                  <div
-                    className="h-full bg-orange-500 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        ((Math.min(4, tdeeStats.loggedDays) + Math.min(4, tdeeStats.weightLogsCount)) / 8) * 100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Standard Scientific Disclaimer + Formula Info Button */}
-          <div className="pt-2 border-t border-black/5 flex items-start justify-between gap-2">
-            <p className="text-[9px] text-orange-900/40 font-medium leading-normal italic flex-1">
-              * Disclaimer: TDEE is an estimated daily calorie burn based on energy balance equations. Accuracy requires consistent daily food &amp; weight tracking.
-            </p>
-            <button
-              onClick={() => setShowTdeeInfoModal(true)}
-              className="p-1 rounded-full hover:bg-orange-100 text-orange-600 transition-colors shrink-0 cursor-pointer"
-              title="View full TDEE calculation formula"
-            >
-              <Info className="w-3.5 h-3.5" />
-            </button>
+          <div className="pt-2 border-t border-black/5 flex items-center justify-between text-[11px] font-bold text-orange-950/70">
+            <span>Adaptive Metabolism Insight</span>
+            <span className="text-orange-600 font-extrabold flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" />
+              {tdeeStats.isRealAI ? "Active Tracking" : "Standard Model"}
+            </span>
           </div>
         </div>
       )}
 
-      {/* Simplified Weight Progress Card */}
+      {/* Weight Tracking Card */}
       {profileData?.agent_config?.trackWeight !== false && (
-        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-6">
-          
-          {/* Stats Header */}
+        <div className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4">
           <div className="flex justify-between items-start">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-1">
-                Weight
+                Average Weight (kg)
               </div>
               <div className="text-3xl font-black text-orange-950">
-                {weightStats.avgWeight}{" "}
-                <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
-                  kg avg <span className="font-medium text-orange-900/40">(avg from {filteredWeightData.length} logged entries)</span>
-                </span>
+                {filteredWeightData.length > 0 ? (
+                  <>
+                    {weightStats.avgWeight}{" "}
+                    <span className="text-xs font-bold text-orange-900/40 tracking-normal font-sans">
+                      kg avg <span className="font-medium text-orange-900/40">(avg from {filteredWeightData.length} logged days)</span>
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-lg font-bold text-orange-950/40">No logs in range</span>
+                )}
               </div>
             </div>
 
@@ -1069,7 +987,7 @@ export const InsightsView = ({
           {/* Recharts Area Chart */}
           <div className="space-y-1 relative z-0">
             <AnimatePresence>
-              {activeWeightScrub && (
+              {activeChartScrub?.chartId === "weight" && activeChartScrub.data && (
                 <motion.div
                   initial={{ opacity: 0, y: -6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1078,11 +996,11 @@ export const InsightsView = ({
                   className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-orange-200/80 shadow-md shadow-orange-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
                 >
                   <span className="text-[10px] font-bold text-orange-900/60">
-                    {formatFullDateLabel(activeWeightScrub.date)}
+                    {formatFullDateLabel(activeChartScrub.data.date)}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-orange-300" />
                   <span className="text-xs font-black text-orange-600 tabular-nums">
-                    {activeWeightScrub.weight} kg
+                    {activeChartScrub.data.weight} kg
                   </span>
                 </motion.div>
               )}
@@ -1095,8 +1013,8 @@ export const InsightsView = ({
                     <AreaChart
                       data={filteredWeightData}
                       margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                      onMouseMove={handleWeightScrub}
-                      onTouchMove={handleWeightScrub}
+                      onMouseMove={(state) => handleChartStateScrub("weight", state)}
+                      onTouchMove={(state) => handleChartStateScrub("weight", state)}
                     >
                       <defs>
                         <linearGradient id="insightsWeightGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1134,171 +1052,173 @@ export const InsightsView = ({
       )}
 
       {/* Dynamic Nutrient Tracking Carousel Card (2 Slides: List View & Trend Chart) */}
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.15}
-        onDragEnd={(_, info) => {
-          if (info.offset.x < -30 || info.velocity.x < -200) {
-            setNutrientSlide((prev) => (prev + 1) % 2);
-          } else if (info.offset.x > 30 || info.velocity.x > 200) {
-            setNutrientSlide((prev) => (prev - 1 + 2) % 2);
-          }
-        }}
-        className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans relative overflow-hidden touch-pan-y select-none cursor-grab active:cursor-grabbing"
-      >
-        {/* Card Header */}
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-1">
-              Nutrient Tracking {nutrientSlide === 0 ? "(List)" : "(Trend Chart)"}
+      {periodNutrientStats && periodNutrientStats.length > 0 && (
+        <motion.div
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.15}
+          onDragEnd={(_, info) => {
+            if (info.offset.x < -30 || info.velocity.x < -200) {
+              setNutrientSlide((prev) => (prev + 1) % 2);
+            } else if (info.offset.x > 30 || info.velocity.x > 200) {
+              setNutrientSlide((prev) => (prev - 1 + 2) % 2);
+            }
+          }}
+          className="bg-white/60 backdrop-blur-md rounded-[32px] p-6 shadow-xl shadow-orange-100/20 border border-white/80 space-y-4 font-sans relative overflow-hidden touch-pan-y select-none cursor-grab active:cursor-grabbing"
+        >
+          {/* Card Header */}
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-orange-950/50 mb-1">
+                Nutrient Tracking {nutrientSlide === 0 ? "(List)" : "(Trend Chart)"}
+              </div>
+              <div className="text-xs font-bold text-orange-900/60 font-sans">
+                avg from {loggedDaysCount} logged days
+              </div>
             </div>
-            <div className="text-xs font-bold text-orange-900/60 font-sans">
-              avg from {loggedDaysCount} logged days
-            </div>
+
+            <button
+              onClick={() => {
+                if (triggerToast) triggerToast("🥗 Nutrient report copied!");
+              }}
+              title="Share Nutrient Tracking"
+              className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <button
-            onClick={() => {
-              if (triggerToast) triggerToast("🥗 Nutrient report copied!");
-            }}
-            title="Share Nutrient Tracking"
-            className="w-8 h-8 rounded-full bg-orange-100/50 hover:bg-orange-100 text-orange-600 flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
+          {/* Slide 0: Stacked Progress List */}
+          {nutrientSlide === 0 && (
+            <motion.div
+              key="slide-list"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-3 pt-1 min-h-[160px]"
+            >
+              {periodNutrientStats.map((n, idx) => {
+                const isZero = n.avgDaily === 0;
+                const statusBadgeText = isZero ? "0%" : `${n.pct}%`;
 
-        {/* Slide 0: Stacked Progress List */}
-        {nutrientSlide === 0 && (
-          <motion.div
-            key="slide-list"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.25 }}
-            className="space-y-3 pt-1 min-h-[160px]"
-          >
-            {periodNutrientStats.map((n, idx) => {
-              const isZero = n.avgDaily === 0;
-              const statusBadgeText = isZero ? "0%" : `${n.pct}%`;
+                const statusBg = isZero
+                  ? "bg-stone-100 text-stone-400 border-stone-200"
+                  : n.pct >= 90
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
+                  : n.pct >= 70
+                  ? "bg-sky-50 text-sky-700 border-sky-200/60"
+                  : "bg-amber-50 text-amber-700 border-amber-200/60";
 
-              const statusBg = isZero
-                ? "bg-stone-100 text-stone-400 border-stone-200"
-                : n.pct >= 90
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200/60"
-                : n.pct >= 70
-                ? "bg-sky-50 text-sky-700 border-sky-200/60"
-                : "bg-amber-50 text-amber-700 border-amber-200/60";
+                return (
+                  <div
+                    key={n.id}
+                    className="bg-white/80 rounded-2xl p-4 border border-orange-100/60 shadow-xs space-y-2.5"
+                  >
+                    <div className="flex justify-between items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="w-3 h-3 rounded-full shrink-0 shadow-xs"
+                          style={{ backgroundColor: n.color }}
+                        />
+                        <span className="font-extrabold text-sm tracking-tight text-orange-950 truncate">
+                          {n.name}
+                        </span>
+                      </div>
 
-              return (
-                <div
-                  key={n.id}
-                  className="bg-white/80 rounded-2xl p-4 border border-orange-100/60 shadow-xs space-y-2.5"
-                >
-                  <div className="flex justify-between items-center gap-2 min-w-0">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className="w-3 h-3 rounded-full shrink-0 shadow-xs"
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-black text-orange-950 font-mono">
+                          {n.avgDaily}<span className="text-[10px] text-orange-900/50 font-bold font-sans ml-0.5">{n.unit}</span>
+                        </span>
+                        <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border font-mono", statusBg)}>
+                          {statusBadgeText}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="w-full bg-orange-100/40 h-2 rounded-full overflow-hidden border border-orange-200/30">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${n.pct}%` }}
+                        transition={{ duration: 0.8, delay: idx * 0.05 }}
+                        className="h-full rounded-full transition-all"
                         style={{ backgroundColor: n.color }}
                       />
-                      <span className="font-extrabold text-sm tracking-tight text-orange-950 truncate">
-                        {n.name}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-black text-orange-950 font-mono">
-                        {n.avgDaily}<span className="text-[10px] text-orange-900/50 font-bold font-sans ml-0.5">{n.unit}</span>
-                      </span>
-                      <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border font-mono", statusBg)}>
-                        {statusBadgeText}
-                      </span>
                     </div>
                   </div>
+                );
+              })}
+            </motion.div>
+          )}
 
-                  <div className="w-full bg-orange-100/40 h-2 rounded-full overflow-hidden border border-orange-200/30">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${n.pct}%` }}
-                      transition={{ duration: 0.8, delay: idx * 0.05 }}
-                      className="h-full rounded-full transition-all"
-                      style={{ backgroundColor: n.color }}
+          {/* Slide 1: Multi-Nutrient Trend Chart */}
+          {nutrientSlide === 1 && (
+            <motion.div
+              key="slide-chart"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-1 pt-2"
+            >
+              <div className="h-48 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                    <RechartsTooltip
+                      contentStyle={{
+                        borderRadius: "16px",
+                        border: "none",
+                        background: "rgba(255,255,255,0.9)",
+                        backdropFilter: "blur(10px)",
+                        boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                        color: "#431407",
+                        fontWeight: 900,
+                        fontSize: 11,
+                      }}
                     />
-                  </div>
-                </div>
-              );
-            })}
-          </motion.div>
-        )}
+                    {periodNutrientStats.map((n) => (
+                      <Line
+                        key={n.id}
+                        type="monotone"
+                        dataKey={n.id}
+                        connectNulls={true}
+                        stroke={n.color}
+                        strokeWidth={2.5}
+                        dot={false}
+                        name={`${n.name} (${n.unit})`}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
 
-        {/* Slide 1: Multi-Nutrient Trend Chart */}
-        {nutrientSlide === 1 && (
-          <motion.div
-            key="slide-chart"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.25 }}
-            className="space-y-1 pt-2"
-          >
-            <div className="h-48 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                  <RechartsTooltip
-                    contentStyle={{
-                      borderRadius: "16px",
-                      border: "none",
-                      background: "rgba(255,255,255,0.9)",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                      color: "#431407",
-                      fontWeight: 900,
-                      fontSize: 11,
-                    }}
-                  />
-                  {periodNutrientStats.map((n) => (
-                    <Line
-                      key={n.id}
-                      type="monotone"
-                      dataKey={n.id}
-                      connectNulls={true}
-                      stroke={n.color}
-                      strokeWidth={2.5}
-                      dot={false}
-                      name={`${n.name} (${n.unit})`}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+              {/* Minimalist Date Range Footer */}
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
+                <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
+                <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
+                <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
+              </div>
+            </motion.div>
+          )}
 
-            {/* Minimalist Date Range Footer */}
-            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
-              <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
-              <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
-              <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Pagination Dots at Bottom Center (● ○) */}
-        <div className="flex justify-center items-center gap-2 pt-2 pb-1">
-          {[0, 1].map((idx) => (
-            <button
-              key={idx}
-              onClick={() => setNutrientSlide(idx)}
-              title={`Switch to slide ${idx + 1}`}
-              className={cn(
-                "h-2 rounded-full transition-all cursor-pointer",
-                nutrientSlide === idx
-                  ? "w-6 bg-orange-500 shadow-xs"
-                  : "w-2 bg-orange-200/80 hover:bg-orange-300",
-              )}
-            />
-          ))}
-        </div>
-      </motion.div>
+          {/* Pagination Dots at Bottom Center (● ○) */}
+          <div className="flex justify-center items-center gap-2 pt-2 pb-1">
+            {[0, 1].map((idx) => (
+              <button
+                key={idx}
+                onClick={() => setNutrientSlide(idx)}
+                title={`Switch to slide ${idx + 1}`}
+                className={cn(
+                  "h-2 rounded-full transition-all cursor-pointer",
+                  nutrientSlide === idx
+                    ? "w-6 bg-orange-500 shadow-xs"
+                    : "w-2 bg-orange-200/80 hover:bg-orange-300",
+                )}
+              />
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* 1. Dedicated Water Hydration Card (Respects trackWater config) */}
       {profileData?.agent_config?.trackWater !== false && (
@@ -1341,7 +1261,7 @@ export const InsightsView = ({
           {/* Dynamic Water Intake Bar Chart */}
           <div className="space-y-1 relative pt-2">
             <AnimatePresence>
-              {activeWaterScrub && (
+              {activeChartScrub?.chartId === "water" && activeChartScrub.data && (
                 <motion.div
                   initial={{ opacity: 0, y: -6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1350,11 +1270,11 @@ export const InsightsView = ({
                   className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-sky-200/80 shadow-md shadow-sky-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
                 >
                   <span className="text-[10px] font-bold text-sky-900/60">
-                    {formatFullDateLabel(activeWaterScrub.date)}
+                    {formatFullDateLabel(activeChartScrub.data.date)}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-sky-300" />
                   <span className="text-xs font-black text-sky-600 tabular-nums">
-                    {activeWaterScrub.water ?? 0} L
+                    {activeChartScrub.data.water ?? 0} L
                   </span>
                 </motion.div>
               )}
@@ -1367,8 +1287,8 @@ export const InsightsView = ({
                     <BarChart
                       data={dynamicVitalsChartData}
                       margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
-                      onMouseMove={handleWaterScrub}
-                      onTouchMove={handleWaterScrub}
+                      onMouseMove={(state) => handleChartStateScrub("water", state)}
+                      onTouchMove={(state) => handleChartStateScrub("water", state)}
                     >
                       <YAxis domain={[0, 'dataMax + 0.5']} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} />
                       <ReferenceLine y={waterStats.goal} stroke="#38BDF8" strokeDasharray="4 4" strokeWidth={1.5} />
@@ -1435,7 +1355,7 @@ export const InsightsView = ({
           {/* Dynamic Energy Level Line Chart */}
           <div className="space-y-1 relative pt-2">
             <AnimatePresence>
-              {activeEnergyScrub && (
+              {activeChartScrub?.chartId === "energy" && activeChartScrub.data && (
                 <motion.div
                   initial={{ opacity: 0, y: -6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1444,11 +1364,11 @@ export const InsightsView = ({
                   className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-amber-200/80 shadow-md shadow-amber-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
                 >
                   <span className="text-[10px] font-bold text-amber-900/60">
-                    {formatFullDateLabel(activeEnergyScrub.date)}
+                    {formatFullDateLabel(activeChartScrub.data.date)}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-amber-300" />
                   <span className="text-xs font-black text-amber-600 tabular-nums">
-                    Level {activeEnergyScrub.energy ?? "-"} / 5.0
+                    Level {activeChartScrub.data.energy ?? "-"} / 5.0
                   </span>
                 </motion.div>
               )}
@@ -1461,8 +1381,8 @@ export const InsightsView = ({
                     <LineChart
                       data={dynamicVitalsChartData}
                       margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                      onMouseMove={handleEnergyScrub}
-                      onTouchMove={handleEnergyScrub}
+                      onMouseMove={(state) => handleChartStateScrub("energy", state)}
+                      onTouchMove={(state) => handleChartStateScrub("energy", state)}
                     >
                       <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} />
                       <Line type="monotone" dataKey="energy" connectNulls={true} stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} name="Energy (1-5)" />
@@ -1523,7 +1443,7 @@ export const InsightsView = ({
           {/* Dynamic Bloating Level Line Chart */}
           <div className="space-y-1 relative pt-2">
             <AnimatePresence>
-              {activeBloatingScrub && (
+              {activeChartScrub?.chartId === "bloating" && activeChartScrub.data && (
                 <motion.div
                   initial={{ opacity: 0, y: -6, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1532,11 +1452,11 @@ export const InsightsView = ({
                   className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-rose-200/80 shadow-md shadow-rose-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
                 >
                   <span className="text-[10px] font-bold text-rose-900/60">
-                    {formatFullDateLabel(activeBloatingScrub.date)}
+                    {formatFullDateLabel(activeChartScrub.data.date)}
                   </span>
                   <span className="w-1 h-1 rounded-full bg-rose-300" />
                   <span className="text-xs font-black text-rose-600 tabular-nums">
-                    Level {activeBloatingScrub.bloating ?? "-"} / 5.0
+                    Level {activeChartScrub.data.bloating ?? "-"} / 5.0
                   </span>
                 </motion.div>
               )}
@@ -1549,8 +1469,8 @@ export const InsightsView = ({
                     <LineChart
                       data={dynamicVitalsChartData}
                       margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                      onMouseMove={handleBloatingScrub}
-                      onTouchMove={handleBloatingScrub}
+                      onMouseMove={(state) => handleChartStateScrub("bloating", state)}
+                      onTouchMove={(state) => handleChartStateScrub("bloating", state)}
                     >
                       <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} />
                       <Line type="monotone" dataKey="bloating" connectNulls={true} stroke="#F43F5E" strokeWidth={3} dot={{ r: 4, fill: "#F43F5E", stroke: "#fff", strokeWidth: 2 }} name="Bloating (1-5)" />
@@ -1609,25 +1529,66 @@ export const InsightsView = ({
           </div>
 
           {/* Dynamic Multi-Dot Scatter Chart */}
-          <div className="h-44 w-full pt-2">
+          <div className="space-y-1 relative pt-2">
+            <AnimatePresence>
+              {activeChartScrub?.chartId === "digestion" && activeChartScrub.data && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-2 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-emerald-200/80 shadow-md shadow-emerald-500/10 flex items-center gap-2 z-20 pointer-events-none font-sans"
+                >
+                  <span className="text-[10px] font-bold text-emerald-950/70">
+                    {formatFullDateLabel(activeChartScrub.data.date)} {activeChartScrub.data.time ? `at ${activeChartScrub.data.time}` : ""}
+                  </span>
+                  <span className="w-1 h-1 rounded-full bg-emerald-400" />
+                  <span className="text-xs font-black text-emerald-600 tabular-nums">
+                    {activeChartScrub.data.label || `Type ${activeChartScrub.data.type}`}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {digestionStats.count > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <ReferenceLine y={3} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
-                  <ReferenceLine y={4} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
-                  <XAxis dataKey="date" name="Date" axisLine={false} tickLine={false} minTickGap={25} tickFormatter={(str) => formatXAxisDateTick(str, totalDaysInRange)} tick={{ fontSize: 10, fontWeight: 900, fill: "#7C2D12", opacity: 0.5 }} dy={10} />
-                  <YAxis domain={[1, 7]} ticks={[1, 2, 3, 4, 5, 6, 7]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.5, fontWeight: "bold" }} tickFormatter={(val) => `Type ${val}`} />
-                  <ZAxis range={[60, 60]} />
-                  <RechartsTooltip content={<CustomScatterTooltip />} />
-                  <Scatter data={dynamicDigestionScatterData} dataKey="type">
-                    {dynamicDigestionScatterData.map((entry, index) => (
-                      <Cell key={`scatter-cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Scatter>
-                </ScatterChart>
-              </ResponsiveContainer>
+              <>
+                <div className="h-36 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                      onMouseMove={(state: any) => {
+                        if (state && state.activePayload && state.activePayload.length) {
+                          triggerChartScrub("digestion", state.activePayload[0].payload);
+                        }
+                      }}
+                      onTouchMove={(state: any) => {
+                        if (state && state.activePayload && state.activePayload.length) {
+                          triggerChartScrub("digestion", state.activePayload[0].payload);
+                        }
+                      }}
+                    >
+                      <ReferenceLine y={3} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
+                      <ReferenceLine y={4} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
+                      <YAxis domain={[1, 7]} ticks={[1, 2, 3, 4, 5, 6, 7]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} tickFormatter={(val) => `Type ${val}`} />
+                      <ZAxis range={[60, 60]} />
+                      <Scatter data={dynamicDigestionScatterData} dataKey="type">
+                        {dynamicDigestionScatterData.map((entry, index) => (
+                          <Cell key={`scatter-cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Scatter>
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Minimalist Date Range Footer */}
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-2 pt-1 border-t border-black/[0.04]">
+                  <span>{formatShortMonthDay(dateRangeBounds.start)}</span>
+                  <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">slide across chart to inspect</span>
+                  <span>{formatShortMonthDay(dateRangeBounds.end)}</span>
+                </div>
+              </>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-4">
+              <div className="h-36 flex flex-col items-center justify-center text-center p-4">
                 <Activity className="w-8 h-8 text-orange-950/20" />
                 <span className="text-xs font-bold text-orange-900/40 mt-2">No digestion logs recorded in this range</span>
               </div>

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X, Camera, Sparkles, Image as ImageIcon, FileText, Share2, Wand2, Check, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
 import { analyzeFoodPhotoWithAI } from "../utils/geminiFoodAnalysis";
 import { compressImageBase64 } from "../utils/helpers";
+import { normalizeTrackedNutrients } from "../constants/nutrition";
 
 export const CameraLogModal = ({
   isOpen,
@@ -21,6 +22,10 @@ export const CameraLogModal = ({
   showToast: (msg: string) => void;
   onShareMeal?: (meal: any) => void;
 }) => {
+  const activeNutrients = useMemo(() => {
+    return normalizeTrackedNutrients(profileData?.tracked_nutrients, profileData?.protein_goal || profileData?.goals?.dailyProtein);
+  }, [profileData?.tracked_nutrients, profileData?.protein_goal, profileData?.goals?.dailyProtein]);
+
   // Flow States: "capture" -> "confirm" -> "preview"
   const [flowStep, setFlowStep] = useState<"capture" | "confirm" | "preview">("capture");
   
@@ -418,24 +423,39 @@ export const CameraLogModal = ({
                 </div>
 
                 {/* Macro Pills Grid */}
-                <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-stone-100 text-center">
-                  <div className="bg-orange-50/80 p-2 rounded-xl border border-orange-100">
-                    <span className="text-[8px] font-black uppercase text-orange-600 block">Protein</span>
-                    <span className="text-xs font-black text-orange-950">{loggedMealResult.protein}g</span>
+                {activeNutrients.length > 0 && (
+                  <div className={`grid gap-1.5 pt-2 border-t border-stone-100 text-center ${activeNutrients.length === 1 ? 'grid-cols-1' : activeNutrients.length === 2 ? 'grid-cols-2' : activeNutrients.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+                    {activeNutrients.slice(0, 4).map((n) => {
+                      let val = 0;
+                      if (n.id === "protein") val = loggedMealResult.protein || 0;
+                      else if (n.id === "carbs") val = loggedMealResult.carbs || 0;
+                      else if (n.id === "fats") val = loggedMealResult.fats || 0;
+                      else if (n.id === "fiber") val = loggedMealResult.fiber || 0;
+                      else val = loggedMealResult.nutrients?.[n.id] || 0;
+
+                      return (
+                        <div
+                          key={n.id}
+                          className="p-2 rounded-xl border text-center"
+                          style={{
+                            backgroundColor: `${n.color || '#F97316'}15`,
+                            borderColor: `${n.color || '#F97316'}30`
+                          }}
+                        >
+                          <span
+                            className="text-[8px] font-black uppercase block truncate"
+                            style={{ color: n.color || '#F97316' }}
+                          >
+                            {n.name}
+                          </span>
+                          <span className="text-xs font-black text-stone-900 font-mono">
+                            {val}{n.unit || 'g'}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="bg-sky-50/80 p-2 rounded-xl border border-sky-100">
-                    <span className="text-[8px] font-black uppercase text-sky-600 block">Carbs</span>
-                    <span className="text-xs font-black text-sky-950">{loggedMealResult.carbs}g</span>
-                  </div>
-                  <div className="bg-amber-50/80 p-2 rounded-xl border border-amber-100">
-                    <span className="text-[8px] font-black uppercase text-amber-600 block">Fats</span>
-                    <span className="text-xs font-black text-amber-950">{loggedMealResult.fats}g</span>
-                  </div>
-                  <div className="bg-emerald-50/80 p-2 rounded-xl border border-emerald-100">
-                    <span className="text-[8px] font-black uppercase text-emerald-600 block">Fiber</span>
-                    <span className="text-xs font-black text-emerald-950">{loggedMealResult.fiber}g</span>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* AI Food Decorator & Aesthetic Presets Card */}

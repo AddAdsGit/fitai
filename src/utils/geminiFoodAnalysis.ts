@@ -18,6 +18,22 @@ export const resolveGeminiApiKey = (profileData?: Profile): string => {
   return "";
 };
 
+export const resolveOpenRouterApiKey = (profileData?: Profile): string => {
+  const orTag = (profileData?.preferences || []).find((p: string) => p.startsWith("openrouter_api_key:")) || "";
+  const prefKey = orTag.split(":")[1] || "";
+  if (prefKey.trim()) return prefKey.trim();
+
+  const envKey = (import.meta.env as any)?.VITE_OPENROUTER_API_KEY;
+  if (envKey && typeof envKey === "string" && envKey.trim()) return envKey.trim();
+
+  if (typeof window !== "undefined") {
+    const localKey = localStorage.getItem("openrouter_api_key") || localStorage.getItem("fitai_openrouter_api_key");
+    if (localKey && localKey.trim()) return localKey.trim();
+  }
+
+  return "";
+};
+
 let cachedBestModel: string | null = null;
 
 export const getBestGeminiModel = async (apiKey?: string): Promise<string> => {
@@ -143,11 +159,15 @@ Task:
 1. Determine if the main subject is edible food or a beverage. If NOT food (e.g. pen, keys, phone, desk, shoes, furniture), return JSON: {"isFood": false, "name": "Non-food item", "confidenceScore": 15}.
 2. If it IS food:
    - Identify the exact dish name (e.g., "Grilled Chicken Salad with Avocado").
-   - Write a concise 1-2 sentence description detailing key ingredients, sauces, and cooking style/calorie density.
-   - Estimate total calories (kcal).
+   - Commercial Oil & Visual Sheen Reality: Inspect surface oil glazes, deep-frying, and gravies. If analyzing Indian curries, gravies, biryani, street food, or restaurant dishes with visible oil sheen or floating oil separation, calculate cooking oil at commercial restaurant levels (25g–40g vegetable/palm oil or ghee / 225–360 kcal from oils) rather than light home cooking (10g–14g).
+   - Write a compact 2-part "meal_description" that anchors your nutrient calculations:
+     1) 1-line culinary summary & cooking style/calorie density.
+     2) "Key Items: [Ingredient 1 with portion], [Ingredient 2 with portion], [Sauce/Oil with portion]".
+     (e.g., "Wok-tossed egg fried rice. Calorie-dense from commercial wok oil.\\nKey Items: ~1.5 cups white rice, 2 eggs, 1.5 tbsp cooking oil, soy sauce, green onions.")
+   - Estimate total calories (kcal) based directly on these itemized ingredients.
    - Estimate confidence score (0-100).
    - Provide clean dietary tags (e.g. ["High Protein", "Gluten Free"]).
-   - Estimate numerical values for ALL user-tracked nutrients: ${nutrientListStr}. Always include protein, carbs, fats, and fiber.
+   - Estimate numerical values strictly for the user's active tracked nutrients: ${nutrientListStr}. Protein and Calories are mandatory; all other nutrients depend on the user's active configuration.
 
 Return ONLY a valid JSON object in this format:
 {"isFood": true, "name": "...", "meal_description": "...", "confidenceScore": 92, "calories": 450, "tags": ["High Protein"], "nutrients": ${JSON.stringify(sampleNutrientObj)}}`
@@ -157,11 +177,15 @@ Task:
 1. Determine if the instruction describes edible food or a beverage. If NOT food, return JSON: {"isFood": false, "name": "Non-food item", "confidenceScore": 15}.
 2. If it IS food:
    - Identify the exact dish name (e.g., "Scrambled Eggs with Sourdough Toast").
-   - Write a concise 1-2 sentence description detailing ingredients, cooking method, and portion size.
-   - Estimate total calories (kcal).
+   - Restaurant & Commercial Oil Reality: If instruction mentions "restaurant", "dhaba", "mess", "hotel", takeout, brand name, or street food (e.g. Biryani, Paneer Butter Masala, Fried Rice, Poori), assume heavy commercial sunflower/palm oil/ghee (25g–40g fat / 225–360 kcal from oils) rather than light home-cooked defaults (10g–14g).
+   - Write a compact 2-part "meal_description" that anchors your nutrient calculations:
+     1) 1-line culinary summary & cooking style/calorie density.
+     2) "Key Items: [Ingredient 1 with portion], [Ingredient 2 with portion], [Sauce/Oil with portion]".
+     (e.g., "Fluffy scrambled eggs with toasted sourdough bread. Calorie-dense from butter.\\nKey Items: ~2 large whole eggs, 1 slice sourdough bread (45g), 1 tsp butter, black pepper.")
+   - Estimate total calories (kcal) based directly on these itemized ingredients.
    - Estimate confidence score (0-100).
    - Provide clean dietary tags (e.g. ["High Protein", "Quick Meal"]).
-   - Estimate numerical values for ALL user-tracked nutrients: ${nutrientListStr}. Always include protein, carbs, fats, and fiber.
+   - Estimate numerical values strictly for the user's active tracked nutrients: ${nutrientListStr}. Protein and Calories are mandatory; all other nutrients depend on the user's active configuration.
 
 Return ONLY a valid JSON object in this format:
 {"isFood": true, "name": "...", "meal_description": "...", "confidenceScore": 95, "calories": 420, "tags": ["High Protein"], "nutrients": ${JSON.stringify(sampleNutrientObj)}}`;
@@ -199,9 +223,9 @@ Return ONLY a valid JSON object in this format:
     }
   }
 
-  // 2. Direct Call to Google Gemini Flash models with robust fallback if custom key provided
+  // 2. Direct Call to Google Gemini Flash models with robust fallback if custom/env key available
   if (!responseData && key) {
-    const candidateModels = ["gemini-3.7-flash", "gemini-3.6-flash"];
+    const candidateModels = ["gemini-3.6-flash", "gemini-3.7-flash"];
     for (const modelName of candidateModels) {
       try {
         const parts: any[] = [{ text: promptText }];
@@ -231,14 +255,44 @@ Return ONLY a valid JSON object in this format:
           const errData = await res.json().catch(() => null);
           lastApiErrorMessage = errData?.error?.message || `HTTP ${res.status}`;
           console.warn(`[AI Photo] ${modelName} returned ${res.status}: ${lastApiErrorMessage}`);
-          if (res.status === 400 || res.status === 403) {
-            break;
-          }
         }
       } catch (err: any) {
         lastApiErrorMessage = err?.message || "Network error";
         console.error(`[AI Photo] Fetch error for ${modelName}:`, err);
       }
+    }
+  }
+
+  // 3. Fallback: OpenRouter AI Provider (if OpenRouter key configured)
+  const openRouterKey = resolveOpenRouterApiKey(profileData);
+  if (!responseData && openRouterKey) {
+    try {
+      const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${openRouterKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://fitai.app",
+          "X-Title": "FitAI",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{ role: "user", content: promptText }],
+          response_format: { type: "json_object" },
+          temperature: 0.1,
+        }),
+      });
+
+      if (orRes.ok) {
+        const orData = await orRes.json();
+        const content = orData?.choices?.[0]?.message?.content || "{}";
+        responseData = { text: content, candidates: [{ content: { parts: [{ text: content }] } }] };
+      } else {
+        const orErr = await orRes.json().catch(() => ({}));
+        lastApiErrorMessage = orErr?.error?.message || `OpenRouter HTTP ${orRes.status}`;
+      }
+    } catch (orCatch: any) {
+      lastApiErrorMessage = orCatch?.message || "OpenRouter network error";
     }
   }
 
@@ -437,7 +491,7 @@ Return ONLY valid JSON:
   }
 
   if (!responseData && key) {
-    const candidateModels = ["gemini-3.7-flash", "gemini-3.6-flash"];
+    const candidateModels = ["gemini-3.6-flash", "gemini-3.7-flash"];
     for (const modelName of candidateModels) {
       try {
         const res = await fetch(
@@ -461,6 +515,35 @@ Return ONLY valid JSON:
       } catch (err) {
         console.error("[AI Refine] Direct Gemini API call failed:", err);
       }
+    }
+  }
+
+  const openRouterKey = resolveOpenRouterApiKey(profileData);
+  if (!responseData && openRouterKey) {
+    try {
+      const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${openRouterKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://fitai.app",
+          "X-Title": "FitAI",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{ role: "user", content: promptText }],
+          response_format: { type: "json_object" },
+          temperature: 0.1,
+        }),
+      });
+
+      if (orRes.ok) {
+        const orData = await orRes.json();
+        const content = orData?.choices?.[0]?.message?.content || "{}";
+        responseData = { text: content, candidates: [{ content: { parts: [{ text: content }] } }] };
+      }
+    } catch (err) {
+      console.error("[AI Refine] OpenRouter fallback failed:", err);
     }
   }
 

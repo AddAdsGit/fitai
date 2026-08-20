@@ -354,21 +354,23 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
                 </div>
               </div>
 
-              {/* Macros */}
-              <div className={cn("grid grid-cols-3 gap-3 border-t pt-6 z-10", hasImage ? "border-white/20" : "border-stone-200/60")}>
-                {[
-                  { label: "Protein", val: payload.p, col: "bg-orange-500" },
-                  { label: "Carbs", val: payload.cb, col: "bg-cyan-500" },
-                  { label: "Fats", val: payload.f, col: "bg-yellow-500" }
-                ].map((m) => (
-                  <div key={m.label} className={cn("p-2.5 rounded-2xl text-center border", hasImage ? "bg-white/10 border-white/10" : "bg-white border-stone-200/40 shadow-2xs")}>
-                    <span className={cn("text-[9px] font-black block uppercase tracking-wider", hasImage ? "text-stone-300" : "text-stone-400")}>
-                      {m.label}
-                    </span>
-                    <span className="text-sm font-extrabold mt-1 block">{m.val}g</span>
-                  </div>
-                ))}
-              </div>
+              {/* Dynamic Macros Grid */}
+              {(payload.p > 0 || payload.cb > 0 || payload.f > 0) && (
+                <div className={cn("grid grid-cols-3 gap-3 border-t pt-6 z-10", hasImage ? "border-white/20" : "border-stone-200/60")}>
+                  {[
+                    { label: "Protein", val: payload.p, col: "bg-orange-500" },
+                    { label: "Carbs", val: payload.cb, col: "bg-cyan-500" },
+                    { label: "Fats", val: payload.f, col: "bg-yellow-500" }
+                  ].filter(m => m.val > 0).map((m) => (
+                    <div key={m.label} className={cn("p-2.5 rounded-2xl text-center border", hasImage ? "bg-white/10 border-white/10" : "bg-white border-stone-200/40 shadow-2xs")}>
+                      <span className={cn("text-[9px] font-black block uppercase tracking-wider", hasImage ? "text-stone-300" : "text-stone-400")}>
+                        {m.label}
+                      </span>
+                      <span className="text-sm font-extrabold mt-1 block">{m.val}g</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             
             <p className="text-[10px] text-stone-400 font-semibold tracking-wider uppercase mt-1">
@@ -510,35 +512,37 @@ export const PublicShareView: React.FC<PublicShareViewProps> = ({
             </div>
 
             {/* In-app styled Macronutrient Density Dashboard widget */}
-            <div className="px-6 mt-8">
-              <div className="bg-white border border-stone-200/50 rounded-[32px] p-6 shadow-xs text-left">
-                <div className="flex justify-between items-center mb-5">
-                  <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
-                    Macronutrient Density
-                  </span>
-                  <div className="flex items-center gap-1.5 text-xs font-black text-orange-600">
-                    <span>🔥 {payload.c} kcal</span>
+            {(payload.p > 0 || payload.cb > 0 || payload.f > 0) && (
+              <div className="px-6 mt-8">
+                <div className="bg-white border border-stone-200/50 rounded-[32px] p-6 shadow-xs text-left">
+                  <div className="flex justify-between items-center mb-5">
+                    <span className="text-[10px] font-black uppercase text-stone-400 tracking-wider">
+                      Macronutrient Density
+                    </span>
+                    <div className="flex items-center gap-1.5 text-xs font-black text-orange-600">
+                      <span>🔥 {payload.c} kcal</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { l: "Protein", v: payload.p, col: "bg-orange-500", rawCol: "orange" },
+                      { l: "Carbs", v: payload.cb, col: "bg-blue-500", rawCol: "blue" },
+                      { l: "Fats", v: payload.f, col: "bg-yellow-500", rawCol: "yellow" }
+                    ].map((m) => (
+                      <div key={m.l} className={`p-3 rounded-2xl border bg-stone-50/50 border-stone-100 flex flex-col justify-between`}>
+                        <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">{m.l}</span>
+                        <span className="text-base font-black text-stone-900 mt-2 block">{m.v}g</span>
+                        {/* Sub progress indicator */}
+                        <div className="w-full h-1 bg-stone-100 rounded-full mt-2 overflow-hidden">
+                          <div className={`h-full ${m.col}`} style={{ width: `${Math.min(100, (m.v / 100) * 100)}%` }} />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { l: "Protein", v: payload.p, col: "bg-orange-500", rawCol: "orange" },
-                    { l: "Carbs", v: payload.cb, col: "bg-blue-500", rawCol: "blue" },
-                    { l: "Fats", v: payload.f, col: "bg-yellow-500", rawCol: "yellow" }
-                  ].map((m) => (
-                    <div key={m.l} className={`p-3 rounded-2xl border bg-stone-50/50 border-stone-100 flex flex-col justify-between`}>
-                      <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">{m.l}</span>
-                      <span className="text-base font-black text-stone-900 mt-2 block">{m.v}g</span>
-                      {/* Sub progress indicator */}
-                      <div className="w-full h-1 bg-stone-100 rounded-full mt-2 overflow-hidden">
-                        <div className={`h-full ${m.col}`} style={{ width: `${Math.min(100, (m.v / 100) * 100)}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
-            </div>
+            )}
 
             {/* Recipe description */}
             {payload.d && (

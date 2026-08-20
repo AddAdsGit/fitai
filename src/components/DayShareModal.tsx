@@ -164,6 +164,7 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
       targetCarbs: Number(profileData.macros?.carbs || 210),
       targetFats: Number(profileData.macros?.fats || 65),
       targetFiber: Number(profileData.macros?.fiber || 35),
+      trackedNutrients: profileData.tracked_nutrients,
       currentStreak,
     });
   };
@@ -494,6 +495,7 @@ export const DayShareModal: React.FC<DayShareModalProps> = ({
                     targetCarbs={Number(profileData.macros?.carbs || 210)}
                     targetFats={Number(profileData.macros?.fats || 65)}
                     targetFiber={Number(profileData.macros?.fiber || 35)}
+                    trackedNutrients={profileData.tracked_nutrients}
                     currentStreak={currentStreak}
                     mealImages={mealImages}
                     handleStr={handleStr}

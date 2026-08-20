@@ -123,6 +123,7 @@ export const MealShareModal: React.FC<MealShareModalProps> = ({
       description: item.meal_description || "",
       loadedImg,
       tags: item.tags || [],
+      trackedNutrients: profileData?.tracked_nutrients,
     });
   };
 

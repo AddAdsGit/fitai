@@ -159,57 +159,76 @@ export function drawObsidianCard(dc: CardDrawContext): void {
   ctx.fillText(`TARGET: ${goalCal.toLocaleString()} KCAL`, ringCenterX, ringCenterY + 80);
 
   // =================================================================
-  // 4-MACRO CAPSULES GRID (Dark Frosted Glass)
+  // DYNAMIC MACRO CAPSULES GRID (Adapts to 0, 2, 3, or 4 nutrients)
   // =================================================================
+  const activeMacros: any[] = [];
+  if (Array.isArray(dc.trackedNutrients) && dc.trackedNutrients.length > 0) {
+    dc.trackedNutrients.slice(0, 4).forEach((n) => {
+      let val = 0;
+      if (n.id === "protein") val = protein;
+      else if (n.id === "carbs") val = carbs;
+      else if (n.id === "fats") val = fats;
+      else if (n.id === "fiber") val = fiber;
+      activeMacros.push({
+        name: n.name.toUpperCase(),
+        val: `${val}${n.unit || "g"}`,
+        goal: `Goal ${n.target || 100}${n.unit || "g"}`,
+        color: n.color || "#F97316"
+      });
+    });
+  } else if ((targetProtein && targetProtein > 0) || (targetCarbs && targetCarbs > 0)) {
+    if (targetProtein) activeMacros.push({ name: "PROTEIN", val: `${protein}g`, goal: `Goal ${targetProtein || 140}g`, color: "#F97316" });
+    if (targetCarbs) activeMacros.push({ name: "CARBS", val: `${carbs}g`, goal: `Goal ${targetCarbs || 210}g`, color: "#38BDF8" });
+    if (targetFats) activeMacros.push({ name: "FATS", val: `${fats}g`, goal: `Goal ${targetFats || 65}g`, color: "#FBBF24" });
+    if (targetFiber) activeMacros.push({ name: "FIBER", val: `${fiber}g`, goal: `Goal ${targetFiber || 35}g`, color: "#34D399" });
+  }
+
+  const hasMacros = activeMacros.length > 0;
   const macroGridY = ringCenterY + ringRadius + 65;
-  const cardW = 212;
   const cardGap = 20;
+  const totalGridW = 920;
+  const cardW = hasMacros ? (totalGridW - (activeMacros.length - 1) * cardGap) / activeMacros.length : 0;
   const cardH = 175;
   const gridStartX = 80;
 
-  const macros = [
-    { name: "PROTEIN", val: `${protein}g`, goal: `Goal ${targetProtein || 140}g`, color: "#F97316" },
-    { name: "CARBS",   val: `${carbs}g`,   goal: `Goal ${targetCarbs || 210}g`,   color: "#38BDF8" },
-    { name: "FATS",    val: `${fats}g`,    goal: `Goal ${targetFats || 65}g`,     color: "#FBBF24" },
-    { name: "FIBER",   val: `${fiber}g`,   goal: `Goal ${targetFiber || 35}g`,    color: "#34D399" }
-  ];
+  if (hasMacros) {
+    activeMacros.forEach((m, i) => {
+      const bx = gridStartX + i * (cardW + cardGap);
+      
+      // Frosted dark glass container
+      ctx.fillStyle = "rgba(24, 21, 19, 0.92)";
+      ctx.beginPath();
+      ctx.roundRect(bx, macroGridY, cardW, cardH, 26);
+      ctx.fill();
 
-  macros.forEach((m, i) => {
-    const bx = gridStartX + i * (cardW + cardGap);
-    
-    // Frosted dark glass container
-    ctx.fillStyle = "rgba(24, 21, 19, 0.92)";
-    ctx.beginPath();
-    ctx.roundRect(bx, macroGridY, cardW, cardH, 26);
-    ctx.fill();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(bx, macroGridY, cardW, cardH, 26);
+      ctx.stroke();
 
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(bx, macroGridY, cardW, cardH, 26);
-    ctx.stroke();
+      // Tag
+      ctx.textAlign = "center";
+      ctx.fillStyle = m.color;
+      ctx.font = "900 20px Inter, system-ui, sans-serif";
+      ctx.fillText(m.name, bx + cardW / 2, macroGridY + 34);
 
-    // Tag
-    ctx.textAlign = "center";
-    ctx.fillStyle = m.color;
-    ctx.font = "900 20px Inter, system-ui, sans-serif";
-    ctx.fillText(m.name, bx + cardW / 2, macroGridY + 34);
+      // Value
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "900 38px Inter, system-ui, sans-serif";
+      ctx.fillText(m.val, bx + cardW / 2, macroGridY + 92);
 
-    // Value
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "900 38px Inter, system-ui, sans-serif";
-    ctx.fillText(m.val, bx + cardW / 2, macroGridY + 92);
-
-    // Goal
-    ctx.fillStyle = "#A8A29E";
-    ctx.font = "700 18px Inter, system-ui, sans-serif";
-    ctx.fillText(m.goal, bx + cardW / 2, macroGridY + 140);
-  });
+      // Goal
+      ctx.fillStyle = "#A8A29E";
+      ctx.font = "700 18px Inter, system-ui, sans-serif";
+      ctx.fillText(m.goal, bx + cardW / 2, macroGridY + 140);
+    });
+  }
 
   // =================================================================
   // MEALS TIMELINE CONTAINER (Dark Frosted Glass with Glowing Dots)
   // =================================================================
-  const timelineY = macroGridY + cardH + 30;
+  const timelineY = hasMacros ? macroGridY + cardH + 30 : ringCenterY + ringRadius + 45;
   const timelineH = H - timelineY - 140;
 
   ctx.fillStyle = "rgba(24, 21, 19, 0.92)";

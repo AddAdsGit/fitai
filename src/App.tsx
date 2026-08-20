@@ -1740,7 +1740,7 @@ Do not include any extra text, markdown styling, backticks, or "json" prefix. Ju
       }
 
       if (!edgeSuccess) {
-        throw new Error("AI generation is unavailable right now. Configure your free Gemini Key in Settings.");
+        throw new Error("AI service is temporarily busy. Please try again.");
       }
 
       const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();

@@ -16,6 +16,7 @@ interface ObsidianCardComponentProps {
   targetCarbs?: number;
   targetFats?: number;
   targetFiber?: number;
+  trackedNutrients?: any[];
   currentStreak?: number;
   mealImages?: Record<string, HTMLImageElement | string>;
   handleStr?: string;
@@ -36,11 +37,37 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
   targetCarbs = 210,
   targetFats = 65,
   targetFiber = 35,
+  trackedNutrients,
   currentStreak = 0,
   mealImages = {},
   handleStr,
   layout = "original",
 }) => {
+  const activeMacros = React.useMemo(() => {
+    if (Array.isArray(trackedNutrients) && trackedNutrients.length > 0) {
+      return trackedNutrients.slice(0, 4).map((n) => {
+        let val = 0;
+        if (n.id === "protein") val = protein;
+        else if (n.id === "carbs") val = carbs;
+        else if (n.id === "fats") val = fats;
+        else if (n.id === "fiber") val = fiber;
+        return {
+          name: n.name,
+          value: val,
+          max: n.target || 100,
+          color: n.color || "#F97316",
+          trackColor: `${n.color || "#F97316"}20`,
+          unit: n.unit || "g",
+        };
+      });
+    }
+    const list = [];
+    if (targetProtein && targetProtein > 0) list.push({ name: "Protein", value: protein, max: targetProtein, color: "#F97316", trackColor: "rgba(249,115,22,0.12)", unit: "g" });
+    if (targetFiber && targetFiber > 0) list.push({ name: "Fiber", value: fiber, max: targetFiber, color: "#10B981", trackColor: "rgba(16,185,129,0.12)", unit: "g" });
+    if (targetCarbs && targetCarbs > 0) list.push({ name: "Carbs", value: carbs, max: targetCarbs, color: "#0891B2", trackColor: "rgba(8,145,178,0.12)", unit: "g" });
+    if (targetFats && targetFats > 0) list.push({ name: "Fats", value: fats, max: targetFats, color: "#EAB308", trackColor: "rgba(234,179,8,0.12)", unit: "g" });
+    return list;
+  }, [trackedNutrients, protein, fiber, carbs, fats, targetProtein, targetFiber, targetCarbs, targetFats]);
   // Format date exactly like the app: e.g., "JULY 13, 2026"
   const getFormattedSelectedDate = () => {
     if (!date) return "TODAY";
@@ -215,78 +242,75 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
               <div className="h-[38px]" />
             )}
           </div>
-
-          {/* Right Column: 4 Circular Macro Progress Rings (Vertical Stack, No Container) */}
-          <div className="flex-1 flex flex-col justify-center gap-4.5 pl-1 pr-2">
-            {[
-              { name: "Protein", value: protein, max: targetProtein, color: "#F97316", trackColor: "rgba(249,115,22,0.12)" },
-              { name: "Fiber", value: fiber, max: targetFiber, color: "#10B981", trackColor: "rgba(16,185,129,0.12)" },
-              { name: "Carbs", value: carbs, max: targetCarbs, color: "#0891B2", trackColor: "rgba(8,145,178,0.12)" },
-              { name: "Fats", value: fats, max: targetFats, color: "#EAB308", trackColor: "rgba(234,179,8,0.12)" },
-            ].map((macro) => {
-              const macroR = 19;
-              const macroCircumference = 2 * Math.PI * macroR;
-              const macroOffset = macroCircumference - Math.min(1, macro.value / macro.max) * macroCircumference;
-              return (
-                <div key={macro.name} className="flex items-center justify-between gap-2.5 select-none w-full">
-                  {/* Left Label (Outside Circle) */}
-                  <div className="flex flex-col text-right min-w-0 flex-1 justify-center">
-                    <span 
-                      className="text-[10px] font-black uppercase tracking-wider leading-none"
-                      style={{ color: macro.color }}
-                    >
-                      {macro.name}
-                    </span>
-                  </div>
-                  
-                  {/* Right Circle SVG (Values Staked Inside Circle) */}
-                  <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="absolute inset-0 w-full h-full -rotate-90"
-                      viewBox="0 0 50 50"
-                    >
-                      <circle
-                        cx="25"
-                        cy="25"
-                        r={macroR}
-                        strokeWidth="4.5"
-                        fill="transparent"
-                        stroke={macro.trackColor}
-                      />
-                      <circle
-                        cx="25"
-                        cy="25"
-                        r={macroR}
-                        strokeWidth="4.5"
-                        fill="transparent"
-                        strokeLinecap="round"
-                        stroke={macro.color}
-                        strokeDasharray={macroCircumference}
-                        strokeDashoffset={macroOffset}
-                      />
-                    </svg>
-                    {/* Inner progress number & goal */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[9.5px] font-black text-stone-750 leading-none">
-                        {macro.value}
-                      </span>
-                      <span className="text-[6.5px] font-bold text-stone-400 leading-none mt-[1px]">
-                        /{macro.max}
+          {/* Right Column: Dynamic Circular Macro Progress Rings */}
+          {activeMacros.length > 0 && (
+            <div className="flex-1 flex flex-col justify-center gap-4.5 pl-1 pr-2">
+              {activeMacros.map((macro) => {
+                const macroR = 19;
+                const macroCircumference = 2 * Math.PI * macroR;
+                const macroOffset = macroCircumference - Math.min(1, macro.value / macro.max) * macroCircumference;
+                return (
+                  <div key={macro.name} className="flex items-center justify-between gap-2.5 select-none w-full">
+                    {/* Left Label (Outside Circle) */}
+                    <div className="flex flex-col text-right min-w-0 flex-1 justify-center">
+                      <span 
+                        className="text-[10px] font-black uppercase tracking-wider leading-none"
+                        style={{ color: macro.color }}
+                      >
+                        {macro.name}
                       </span>
                     </div>
+                    
+                    {/* Right Circle SVG (Values Staked Inside Circle) */}
+                    <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="absolute inset-0 w-full h-full -rotate-90"
+                        viewBox="0 0 50 50"
+                      >
+                        <circle
+                          cx="25"
+                          cy="25"
+                          r={macroR}
+                          strokeWidth="4.5"
+                          fill="transparent"
+                          stroke={macro.trackColor}
+                        />
+                        <circle
+                          cx="25"
+                          cy="25"
+                          r={macroR}
+                          strokeWidth="4.5"
+                          fill="transparent"
+                          strokeLinecap="round"
+                          stroke={macro.color}
+                          strokeDasharray={macroCircumference}
+                          strokeDashoffset={macroOffset}
+                        />
+                      </svg>
+                      
+                      {/* Inside Circle: Current Value & Goal Stacked */}
+                      <div className="flex flex-col items-center justify-center leading-none z-10 select-none">
+                        <span className="text-[10px] font-black text-stone-900 tracking-tight">
+                          {macro.value}
+                        </span>
+                        <span className="text-[7.5px] font-bold text-stone-400 mt-0.5">
+                          /{macro.max}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : layout === "split" ? (
-        <div className="flex items-stretch gap-4 my-2 z-10 shrink-0">
-          {/* Left Column: Calorie Circle & Weight Card */}
-          <div className="w-[42%] flex flex-col items-center justify-between py-1 shrink-0">
-            {/* Calorie Progress Ring (Sized for split layout) */}
-            <div className="relative w-full aspect-square max-w-[130px] flex items-center justify-center">
+        /* Split Layout Variation (Original Bars) */
+        <div className="flex items-center justify-between gap-4 p-4 my-2 z-10 w-full">
+          {/* Left Column: Calorie Ring + Stats */}
+          <div className="flex flex-col items-center justify-center w-[46%] shrink-0">
+            <div className="relative w-36 h-36 flex items-center justify-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-md"
@@ -296,15 +320,15 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                   cx="120"
                   cy="120"
                   r={r}
-                  strokeWidth="22"
+                  strokeWidth="24"
                   fill="transparent"
-                  stroke="rgba(255, 237, 213, 0.5)"
+                  stroke="rgba(255, 237, 213, 0.4)"
                 />
                 <circle
                   cx="120"
                   cy="120"
                   r={r}
-                  strokeWidth="22"
+                  strokeWidth="24"
                   fill="transparent"
                   strokeLinecap="round"
                   stroke="#F97316"
@@ -312,20 +336,20 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                   strokeDashoffset={strokeDashoffset}
                 />
               </svg>
-              <div className="text-center z-10 bg-white/85 w-22 h-22 rounded-full flex flex-col items-center justify-center shadow-inner border border-white/50">
-                <span className="text-2xl font-black text-orange-950 px-1 truncate leading-none">
+              <div className="text-center z-10 bg-white/90 w-24 h-24 rounded-full flex flex-col items-center justify-center shadow-inner border border-white/60">
+                <div className="text-2xl font-black text-orange-950 px-1 truncate leading-none">
                   {totalCalories.toLocaleString()}
-                </span>
-                <span className="text-[7.5px] text-orange-900/50 font-black tracking-wide mt-1 block uppercase leading-none">
-                  KCAL
-                </span>
+                </div>
+                <div className="h-1 w-4 bg-orange-500 rounded-full my-1" />
+                <div className="text-orange-900/50 font-black tracking-[0.05em] text-[7.5px] uppercase">
+                  / {goalCalories.toLocaleString()} KCAL
+                </div>
               </div>
             </div>
 
-            {/* Weight Capsule (Placed in Left Column) */}
             {weight && weight > 0 ? (
-              <div className="bg-white/70 backdrop-blur-md w-full py-2 rounded-2xl border border-white/80 shadow-2xs flex flex-col items-center justify-center mt-2.5">
-                <span className="text-[6.5px] font-black text-stone-400 uppercase tracking-widest leading-none">
+              <div className="flex flex-col items-center justify-center mt-2.5">
+                <span className="text-[8.5px] font-black uppercase tracking-wider text-stone-400 leading-none">
                   {isToday ? "TODAY'S WEIGHT" : "LAST WEIGHT"}
                 </span>
                 <span className="text-xs font-black text-stone-850 mt-1 leading-none">
@@ -337,34 +361,31 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
             )}
           </div>
 
-          {/* Right Column: 4 Vertical Macros Progress Bars */}
-          <div className="flex-1 bg-white/60 backdrop-blur-md p-3 rounded-[24px] border border-white/80 shadow-xl shadow-orange-100/10 flex flex-col justify-center gap-2.5">
-            {[
-              { name: "Protein", value: protein, max: targetProtein, color: "#F97316" },
-              { name: "Fiber", value: fiber, max: targetFiber, color: "#10B981" },
-              { name: "Carbs", value: carbs, max: targetCarbs, color: "#0891B2" },
-              { name: "Fats", value: fats, max: targetFats, color: "#EAB308" },
-            ].map((macro) => (
-              <div key={macro.name} className="space-y-0.5">
-                <div className="flex justify-between items-end text-[9px] font-black uppercase tracking-[0.05em] leading-none mb-1">
-                  <span className="text-orange-950/70">{macro.name}</span>
-                  <span style={{ color: macro.color }} className="font-extrabold">
-                    {macro.value}
-                    <span className="text-orange-900/40 text-[8px] ml-0.5 font-bold">/{macro.max}</span>
-                  </span>
+          {/* Right Column: Dynamic Vertical Macros Progress Bars */}
+          {activeMacros.length > 0 && (
+            <div className="flex-1 bg-white/60 backdrop-blur-md p-3 rounded-[24px] border border-white/80 shadow-xl shadow-orange-100/10 flex flex-col justify-center gap-2.5">
+              {activeMacros.map((macro) => (
+                <div key={macro.name} className="space-y-0.5">
+                  <div className="flex justify-between items-end text-[9px] font-black uppercase tracking-[0.05em] leading-none mb-1">
+                    <span className="text-orange-950/70">{macro.name}</span>
+                    <span style={{ color: macro.color }} className="font-extrabold">
+                      {macro.value}
+                      <span className="text-orange-900/40 text-[8px] ml-0.5 font-bold">/{macro.max}</span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden border border-white/40 shadow-inner">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(macro.value / macro.max) * 100}%`,
+                        backgroundColor: macro.color,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 w-full bg-black/5 rounded-full overflow-hidden border border-white/40 shadow-inner">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(macro.value / macro.max) * 100}%`,
-                      backgroundColor: macro.color,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : layout === "creative" ? (
         <div className="flex flex-col items-center gap-3 my-2 z-10 shrink-0 w-full select-none">
@@ -608,34 +629,31 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
             </div>
           </div>
 
-          {/* 4. Macros Grid (Exact copy of App.tsx macros panel) */}
-          <div className="bg-white/60 backdrop-blur-md p-4 rounded-[32px] border border-white/80 shadow-xl shadow-orange-100/20 grid grid-cols-2 gap-x-5 gap-y-3.5 mx-1 z-10 shrink-0">
-            {[
-              { name: "Protein", value: protein, max: targetProtein, color: "#F97316" },
-              { name: "Carbs", value: carbs, max: targetCarbs, color: "#0891B2" },
-              { name: "Fats", value: fats, max: targetFats, color: "#EAB308" },
-              { name: "Fiber", value: fiber, max: targetFiber, color: "#10B981" },
-            ].map((macro) => (
-              <div key={macro.name} className="space-y-1">
-                <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-[0.05em]">
-                  <span className="text-orange-950/70">{macro.name}</span>
-                  <span style={{ color: macro.color }}>
-                    {macro.value}
-                    <span className="text-orange-900/40 text-[9px] ml-0.5">/ {macro.max}</span>
-                  </span>
+          {/* 4. Dynamic Macros Grid */}
+          {activeMacros.length > 0 && (
+            <div className={`bg-white/60 backdrop-blur-md p-4 rounded-[32px] border border-white/80 shadow-xl shadow-orange-100/20 grid ${activeMacros.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-x-5 gap-y-3.5 mx-1 z-10 shrink-0`}>
+              {activeMacros.map((macro) => (
+                <div key={macro.name} className="space-y-1">
+                  <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-[0.05em]">
+                    <span className="text-orange-950/70">{macro.name}</span>
+                    <span style={{ color: macro.color }}>
+                      {macro.value}
+                      <span className="text-orange-900/40 text-[9px] ml-0.5">/ {macro.max}</span>
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden border border-white/40 shadow-inner">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(macro.value / macro.max) * 100}%`,
+                        backgroundColor: macro.color,
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="h-2 w-full bg-black/5 rounded-full overflow-hidden border border-white/40 shadow-inner">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(macro.value / macro.max) * 100}%`,
-                      backgroundColor: macro.color,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
@@ -687,16 +705,18 @@ export const ObsidianCardComponent: React.FC<ObsidianCardComponentProps> = ({
                   <h4 className={`text-[12px] font-black leading-tight tracking-tight truncate ${hasImage ? "text-white" : "text-stone-850"}`}>
                     {meal.name}
                   </h4>
-                  <div className={`flex flex-wrap gap-x-2 gap-y-0.5 text-[7.5px] font-extrabold uppercase tracking-wide mt-1 ${hasImage ? "text-white/60" : "text-stone-500"}`}>
-                    {[
-                      { l: "P", v: `${meal.protein || 0}g` },
-                      { l: "C", v: `${meal.carbs || 0}g` },
-                      { l: "F", v: `${meal.fats || 0}g` },
-                      { l: "Fb", v: `${meal.fiber || 0}g` },
-                    ].map((m) => (
-                      <span key={m.l}>{m.l}: {m.v}</span>
-                    ))}
-                  </div>
+                  {(targetProtein > 0 || targetCarbs > 0 || targetFats > 0 || targetFiber > 0) && (
+                    <div className={`flex flex-wrap gap-x-2 gap-y-0.5 text-[7.5px] font-extrabold uppercase tracking-wide mt-1 ${hasImage ? "text-white/60" : "text-stone-500"}`}>
+                      {[
+                        { l: "P", v: `${meal.protein || 0}g`, show: targetProtein > 0 || meal.protein > 0 },
+                        { l: "C", v: `${meal.carbs || 0}g`, show: targetCarbs > 0 || meal.carbs > 0 },
+                        { l: "F", v: `${meal.fats || 0}g`, show: targetFats > 0 || meal.fats > 0 },
+                        { l: "Fb", v: `${meal.fiber || 0}g`, show: targetFiber > 0 || meal.fiber > 0 },
+                      ].filter(m => m.show).map((m) => (
+                        <span key={m.l}>{m.l}: {m.v}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Right Side: Calories and Time */}

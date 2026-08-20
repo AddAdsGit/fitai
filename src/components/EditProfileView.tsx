@@ -794,12 +794,14 @@ export const EditProfileView = ({
                   <span
                     className={cn(
                       "text-[9px] font-black font-mono px-2 py-0.5 rounded-full border",
-                      activeCount >= 8
+                      activeCount === 0
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                        : activeCount >= 8
                         ? "bg-amber-50 text-amber-700 border-amber-200"
                         : "bg-orange-50 text-orange-600 border-orange-200/80"
                     )}
                   >
-                    {activeCount}/8 Active Slots
+                    {activeCount === 0 ? "✨ Zen Calorie Mode (0/8)" : `${activeCount}/8 Active Slots`}
                   </span>
                 );
               })()}

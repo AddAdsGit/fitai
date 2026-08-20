@@ -302,42 +302,44 @@ export const MealDetailModal: React.FC<MealDetailModalProps> = ({
                     Meal Notes & Description
                   </span>
                   <div className="bg-white border border-stone-200/80 rounded-2xl p-4 shadow-3xs">
-                    <p className="text-xs text-stone-700 font-medium leading-relaxed italic">
-                      "{meal.meal_description}"
+                    <p className="text-xs text-stone-700 font-medium leading-relaxed whitespace-pre-line">
+                      {meal.meal_description}
                     </p>
                   </div>
                 </div>
               )}
 
               {/* 3. Macronutrient Density (Matching RecipeModal Tinted Cards) */}
-              <div className="pt-2 border-t border-stone-200/60 space-y-2">
-                <span className="text-[9.5px] font-black uppercase text-stone-400 tracking-wider block">
-                  Macronutrient Density
-                </span>
-                <div className="grid grid-cols-2 gap-2 text-left">
-                  {activeTrackedNutrients.map((n) => {
-                    const val = getNutrientVal(n.id);
-                    const cardColor = n.color || "#F97316";
-                    return (
-                      <div
-                        key={n.id}
-                        className="p-3 rounded-2xl border flex flex-col justify-between space-y-1 shadow-3xs"
-                        style={{
-                          backgroundColor: `${cardColor}12`,
-                          borderColor: `${cardColor}35`,
-                        }}
-                      >
-                        <span className="text-[9.5px] font-black uppercase tracking-wider truncate" style={{ color: cardColor }}>
-                          {n.name}
-                        </span>
-                        <div className="bg-white border border-stone-200/80 rounded-xl px-2 py-1 text-center shadow-inner">
-                          <span className="text-xs font-black text-stone-900">{formatNutrientValue(val)} {n.unit || "g"}</span>
+              {activeTrackedNutrients && activeTrackedNutrients.length > 0 && (
+                <div className="pt-2 border-t border-stone-200/60 space-y-2">
+                  <span className="text-[9.5px] font-black uppercase text-stone-400 tracking-wider block">
+                    Macronutrient Density
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 text-left">
+                    {activeTrackedNutrients.map((n) => {
+                      const val = getNutrientVal(n.id);
+                      const cardColor = n.color || "#F97316";
+                      return (
+                        <div
+                          key={n.id}
+                          className="p-3 rounded-2xl border flex flex-col justify-between space-y-1 shadow-3xs"
+                          style={{
+                            backgroundColor: `${cardColor}12`,
+                            borderColor: `${cardColor}35`,
+                          }}
+                        >
+                          <span className="text-[9.5px] font-black uppercase tracking-wider truncate" style={{ color: cardColor }}>
+                            {n.name}
+                          </span>
+                          <div className="bg-white border border-stone-200/80 rounded-xl px-2 py-1 text-center shadow-inner">
+                            <span className="text-xs font-black text-stone-900">{formatNutrientValue(val)} {n.unit || "g"}</span>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 4. Dietary & Tracking Tags */}
               {tags.length > 0 && (

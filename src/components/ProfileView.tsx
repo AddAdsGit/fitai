@@ -933,7 +933,14 @@ Do not return any markdown formatting, backticks, or "json" prefix. Return only 
                                 {meal.type} • {new Date(meal.date + "T00:00:00").toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                               </div>
                               <div className="text-[8px] font-mono text-orange-600 font-black tracking-wider mt-1">
-                                {meal.calories} KCAL • P: {meal.protein}g C: {meal.carbs}g F: {meal.fats}g Fb: {meal.fiber || 0}g
+                                {meal.calories} KCAL
+                                {activeTrackedNutrients && activeTrackedNutrients.length > 0 && (
+                                  <> • {activeTrackedNutrients.slice(0, 4).map((n) => {
+                                    const val = (meal as any).nutrients?.[n.id] ?? (meal as any)[n.id] ?? 0;
+                                    const code = n.id === "protein" ? "P" : n.id === "carbs" ? "C" : n.id === "fats" ? "F" : n.id === "fiber" ? "Fb" : n.name.slice(0, 2);
+                                    return `${code}: ${val}${n.unit || "g"}`;
+                                  }).join(" ")}</>
+                                )}
                               </div>
                             </div>
                           </div>

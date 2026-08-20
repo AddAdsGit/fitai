@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,26 +9,15 @@ const corsHeaders = {
 let globalKeyPointer = 0;
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // 1. Verify Authorization header is present
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Missing or invalid Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // 2. Parse request body
     const body = await req.json().catch(() => ({}));
-    const { prompt, image, mimeType, userApiKey, action } = body;
+    const { prompt, image, mimeType, userApiKey, openRouterKey, action } = body;
 
-    // 3. Retrieve & Parse Gemini API Key Pool (Priority: Custom user keys -> GEMINI_API_KEYS -> GEMINI_API_KEY)
+    // 1. Retrieve & Parse Gemini API Key Pool from env or user input
     const rawKeysString = (userApiKey && typeof userApiKey === "string" && userApiKey.trim())
       ? userApiKey.trim()
       : (Deno.env.get("GEMINI_API_KEYS") || Deno.env.get("GEMINI_API_KEY") || "");
@@ -40,15 +28,7 @@ serve(async (req) => {
       .filter(Boolean);
 
     if (keyPool.length === 0) {
-      return new Response(
-        JSON.stringify({
-          error: "No Gemini API keys found. Please set GEMINI_API_KEYS in Supabase secrets or enter API keys in App Settings.",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      keyPool.push(DEFAULT_BACKUP_KEY);
     }
 
     // Round-robin selection index
@@ -102,7 +82,7 @@ serve(async (req) => {
       }
     }
 
-    // 4. Key Pool Loop: Round-Robin rotation with instant failover on 429 rate limit
+    // 2. Try Google Gemini Flash Models (gemini-3.6-flash -> gemini-3.7-flash) with Key Rotation
     let response = null;
     let lastError = "";
 
@@ -129,12 +109,7 @@ serve(async (req) => {
           } else {
             const errData = await response.json().catch(() => ({}));
             lastError = errData.error?.message || `HTTP ${response.status} Error`;
-
-            // If key hit rate limit (429) or quota error (403), failover to next key in key pool
-            if (response.status === 429 || response.status === 403 || lastError.includes("RESOURCE_EXHAUSTED")) {
-              console.warn(`[Key Pool] Key ${apiKey.substring(0, 6)}... hit rate limit (${response.status}). Failing over to next key...`);
-              break;
-            }
+            console.warn(`[Gemini Edge] ${model} with key ${apiKey.substring(0, 6)}... returned ${response.status}: ${lastError}`);
           }
         } catch (err: any) {
           lastError = err.message || "Connection failed";
@@ -146,8 +121,53 @@ serve(async (req) => {
       }
     }
 
+    // 3. Fallback: If Gemini failed or quota exhausted, try OpenRouter if key available
+    const orApiKey = (openRouterKey && typeof openRouterKey === "string" && openRouterKey.trim())
+      ? openRouterKey.trim()
+      : Deno.env.get("OPENROUTER_API_KEY") || "";
+
+    if ((!response || !response.ok) && orApiKey) {
+      try {
+        console.log("[Gemini Edge] Triggering OpenRouter Fallback...");
+        const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${orApiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://fitai.app",
+            "X-Title": "FitAI",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.1,
+          }),
+        });
+
+        if (orRes.ok) {
+          const orData = await orRes.json();
+          const content = orData?.choices?.[0]?.message?.content || "{}";
+          return new Response(JSON.stringify({ text: content, candidates: [{ content: { parts: [{ text: content }] } }] }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (orErr: any) {
+        console.error("[Gemini Edge] OpenRouter fallback error:", orErr);
+      }
+    }
+
     if (!response || !response.ok) {
-      throw new Error(lastError || "Failed to contact Gemini API");
+      return new Response(JSON.stringify({ error: lastError || "Failed to contact AI service" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const data = await response.json();

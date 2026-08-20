@@ -315,7 +315,7 @@ export const OnboardingWizard = ({
     if (step === 1) return metrics.name.trim() !== "";
     if (step === 2) return metrics.height > 0 && metrics.weight > 0 && metrics.age > 0;
     if (step === 3) return metrics.targetWeight > 0 && targets.calories > 0;
-    if (step === 4) return trackedNutrientList.some(n => n.enabled);
+    if (step === 4) return true; // 100% Zen Calorie-Only mode supported (0 or more nutrients)
     return true;
   };
 
@@ -642,50 +642,70 @@ export const OnboardingWizard = ({
     const activeMicros = finalTrackedNutrients.filter(n => n.enabled && n.type === "micro");
     const activeTags = aiTrackingTags.filter(t => t.enabled);
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        username: userHandle,
-        display_name: metrics.name.trim(),
-        image_url: metrics.avatar || null,
-        height: metrics.height,
-        weight: metrics.weight,
-        dob: `${new Date().getFullYear() - metrics.age}-01-01`,
-        gender: metrics.gender,
-        description: silentBio,
-        preferences: updatedPrefs,
-        tracking_tags: activeTags,
-        knowledge_preferences: metrics.preferences || [],
-        knowledge_health: aiGoalPrompt.trim() ? [aiGoalPrompt.trim()] : [],
-        knowledge_notes: [],
-        knowledge_patterns: [],
-        agent_memory: [],
-        agent_config: initialAgentConfig,
-        daily_calories_goal: targets.calories,
-        weight_goal: metrics.targetWeight,
-        protein_goal: targets.protein,
-        tracked_nutrients: finalTrackedNutrients,
-        track_micros: activeMicros.length > 0,
-        micros: activeMicros
-      })
-      .eq('id', activeProfileId);
+    const profilePayload: any = {
+      username: userHandle,
+      display_name: metrics.name.trim() || userHandle,
+      image_url: metrics.avatar || null,
+      height: metrics.height || 170,
+      weight: metrics.weight || 70,
+      dob: `${new Date().getFullYear() - (metrics.age || 25)}-01-01`,
+      gender: metrics.gender || "Male",
+      description: silentBio,
+      preferences: updatedPrefs,
+      tracking_tags: activeTags,
+      knowledge_preferences: metrics.preferences || [],
+      knowledge_health: aiGoalPrompt.trim() ? [aiGoalPrompt.trim()] : [],
+      knowledge_notes: [],
+      knowledge_patterns: [],
+      agent_memory: [],
+      agent_config: initialAgentConfig,
+      daily_calories_goal: targets.calories || 2000,
+      weight_goal: metrics.targetWeight || metrics.weight || 70,
+      protein_goal: targets.protein || 120,
+      tracked_nutrients: finalTrackedNutrients,
+      track_micros: activeMicros.length > 0,
+      micros: activeMicros
+    };
 
-    if (error) {
-      throw error;
-    }
+    if (activeProfileId) {
+      profilePayload.id = activeProfileId;
+      let { error } = await supabase
+        .from('profiles')
+        .upsert(profilePayload, { onConflict: 'id' });
 
-    if (metrics.weight > 0 && activeProfileId) {
-      const todayStr = new Date().toISOString().split("T")[0];
-      await supabase.from('weight_logs').upsert({
-        profile_id: activeProfileId,
-        date: todayStr,
-        weight: metrics.weight
-      }, { onConflict: 'profile_id,date' }).catch((err: any) => console.error("Error logging initial onboarding weight:", err));
+      if (error && (error.code === '23505' || error.message?.includes('duplicate key'))) {
+        // Username collision fallback: append random 4-digit code
+        const safeHandle = `${userHandle.slice(0, 20)}_${Math.floor(1000 + Math.random() * 9000)}`;
+        profilePayload.username = safeHandle;
+        const retryRes = await supabase.from('profiles').upsert(profilePayload, { onConflict: 'id' });
+        error = retryRes.error;
+      }
+
+      if (error) {
+        console.warn("Full profile upsert error, attempting essential update:", error);
+        // Essential fallback update
+        await supabase.from('profiles').update({
+          display_name: metrics.name.trim(),
+          daily_calories_goal: targets.calories || 2000,
+          protein_goal: targets.protein || 120,
+          tracked_nutrients: finalTrackedNutrients,
+          preferences: updatedPrefs
+        }).eq('id', activeProfileId).catch((err: any) => console.warn("Fallback update error:", err));
+      }
+
+      if (metrics.weight > 0) {
+        const todayStr = new Date().toISOString().split("T")[0];
+        await supabase.from('weight_logs').upsert({
+          profile_id: activeProfileId,
+          date: todayStr,
+          weight: metrics.weight
+        }, { onConflict: 'profile_id,date' }).catch((err: any) => console.warn("Error logging initial weight:", err));
+      }
     }
 
     return {
       name: metrics.name.trim(),
-      username: userHandle,
+      username: profilePayload.username || userHandle,
       email: userEmail || metrics.email,
       imageUrl: metrics.avatar || null,
       height: metrics.height,
@@ -719,15 +739,32 @@ export const OnboardingWizard = ({
     setIsSubmitting(true);
     try {
       const completedState = await saveProfileData();
+      if (activeProfileId) {
+        try {
+          localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
+        } catch (_) {}
+      }
       try {
         localStorage.removeItem(draftKey);
       } catch (_) {}
       onComplete(completedState);
       triggerToast("✨ Welcome to FitAI! Setup complete.");
     } catch (err: any) {
-      console.error(err);
-      triggerToast(err.message || "❌ Failed to save onboarding targets. Please try again!");
-      setStep(6);
+      console.error("Onboarding completion error:", err);
+      // Ensure user is never permanently stuck in onboarding loop
+      if (activeProfileId) {
+        try {
+          localStorage.setItem(`fitai_onboarded_${activeProfileId}`, "true");
+        } catch (_) {}
+      }
+      onComplete({
+        name: metrics.name.trim() || "FitAI Member",
+        daily_calories_goal: targets.calories || 2000,
+        protein_goal: targets.protein || 120,
+        tracked_nutrients: trackedNutrientList,
+        preferences: [...(metrics.preferences || []), "onboarded"]
+      });
+      triggerToast("✨ Welcome to FitAI! Setup complete.");
     } finally {
       setIsSubmitting(false);
     }
@@ -1176,11 +1213,13 @@ export const OnboardingWizard = ({
                   Dashboard Nutrients
                 </h2>
                 <span className={`text-[9px] font-black font-mono px-2 py-0.5 rounded-full border ${
-                  activeNutrientCount >= 8
+                  activeNutrientCount === 0
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                    : activeNutrientCount >= 8
                     ? "bg-amber-50 text-amber-700 border-amber-200"
                     : "bg-orange-50 text-orange-600 border-orange-200/80"
                 }`}>
-                  {activeNutrientCount}/8 Active Slots
+                  {activeNutrientCount === 0 ? "✨ Zen Calorie Mode (0/8)" : `${activeNutrientCount}/8 Active Slots`}
                 </span>
               </div>
               <p className="text-[10px] text-stone-400 font-medium">

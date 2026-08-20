@@ -26,6 +26,7 @@ export interface CardDrawContext {
   targetCarbs?: number;
   targetFats?: number;
   targetFiber?: number;
+  trackedNutrients?: any[];
   currentStreak?: number;
 }
 

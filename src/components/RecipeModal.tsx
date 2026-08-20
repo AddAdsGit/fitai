@@ -73,7 +73,19 @@ export const RecipeModal: React.FC<RecipeModalProps> = ({
   const [description, setDescription] = useState(recipe.description || "");
   const [tags, setTags] = useState<string[]>(recipe.tags || ["Custom"]);
   const [image, setImage] = useState(recipe.image || "");
-  const [ingredientsText, setIngredientsText] = useState((recipe.ingredients || []).join("\n"));
+  const [ingredientsText, setIngredientsText] = useState<string>(() => {
+    if (recipe.ingredients && recipe.ingredients.length > 0) {
+      return recipe.ingredients.join("\n");
+    }
+    if (recipe.description) {
+      const match = recipe.description.match(/(?:Key Items|Ingredients|Items|Contents):\s*([^\n]+)/i);
+      if (match && match[1]) {
+        const items = match[1].split(/,\s*(?=[~0-9a-zA-Z])/).map(s => s.trim()).filter(Boolean);
+        if (items.length > 0) return items.join("\n");
+      }
+    }
+    return "";
+  });
   const [instructions, setInstructions] = useState(recipe.instructions || "");
   
   // Dynamic nutrient values for present tracked nutrients only

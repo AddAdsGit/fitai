@@ -67,11 +67,12 @@ export function DailyProgressSection({
       </div>
 
       {/* Macro Progress Bars — Locked 2x2 Grid with Horizontal Swipe Carousel */}
-      {(() => {
+      {enabledNutrients && enabledNutrients.length > 0 && (() => {
         const pages: any[][] = [];
         for (let i = 0; i < enabledNutrients.length; i += 4) {
           pages.push(enabledNutrients.slice(i, i + 4));
         }
+        if (pages.length === 0) return null;
 
         return (
           <div className="mt-3 flex flex-col gap-2.5">

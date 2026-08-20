@@ -355,18 +355,30 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                           <span className="text-[8px] font-bold text-stone-400 block uppercase tracking-wider">
                             {meal.time}
                           </span>
-                          <span className="text-[8px] text-stone-300 font-bold">
-                            •
-                          </span>
-                          <span className="text-[8px] font-extrabold text-stone-500 uppercase tracking-wide flex items-center gap-1.5">
-                            <span>P: {meal.protein}g</span>
-                            <span>•</span>
-                            <span>C: {meal.carbs}g</span>
-                            <span>•</span>
-                            <span>F: {meal.fats}g</span>
-                            <span>•</span>
-                            <span>Fb: {meal.fiber || 0}g</span>
-                          </span>
+                          {enabledNutrients && enabledNutrients.length > 0 && (
+                            <>
+                              <span className="text-[8px] text-stone-300 font-bold">
+                                •
+                              </span>
+                              <span className="text-[8px] font-extrabold text-stone-500 uppercase tracking-wide flex items-center gap-1.5">
+                                {enabledNutrients.slice(0, 4).map((n: any, idx: number) => {
+                                  let val = 0;
+                                  if (n.id === "protein") val = meal.protein || 0;
+                                  else if (n.id === "carbs") val = meal.carbs || 0;
+                                  else if (n.id === "fats") val = meal.fats || 0;
+                                  else if (n.id === "fiber") val = meal.fiber || 0;
+                                  else val = meal.nutrients?.[n.id] || 0;
+                                  const code = n.id === "protein" ? "P" : n.id === "carbs" ? "C" : n.id === "fats" ? "F" : n.id === "fiber" ? "Fb" : n.name.slice(0, 2);
+                                  return (
+                                    <React.Fragment key={n.id}>
+                                      {idx > 0 && <span>•</span>}
+                                      <span>{code}: {val}{n.unit || "g"}</span>
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -507,12 +519,9 @@ export const ConsumptionSection: React.FC<ConsumptionSectionProps> = ({
                                 unit: n.unit || "g",
                               };
                             })
-                          : [
-                              { id: "protein", code: "P", val: meal.protein || 0, unit: "g" },
-                              { id: "carbs", code: "C", val: meal.carbs || 0, unit: "g" },
-                              { id: "fats", code: "F", val: meal.fats || 0, unit: "g" },
-                              { id: "fiber", code: "Fb", val: meal.fiber || 0, unit: "g" },
-                            ];
+                          : [];
+
+                        if (nutrientItems.length === 0) return null;
 
                         const displayed = nutrientItems.slice(0, 4);
                         const remainingCount = nutrientItems.length - 4;

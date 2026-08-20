@@ -349,25 +349,27 @@ export const InsightsShareModal: React.FC<InsightsShareModalProps> = ({
                   )}
                 </div>
 
-                {/* 4 Core Macros Grid (Protein #F97316, Carbs #38BDF8, Fats #FBBF24, Fiber #34D399) */}
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="bg-stone-900/80 border border-orange-500/30 p-2.5 rounded-xl text-center">
-                    <span className="text-[7.5px] font-black uppercase tracking-wider text-stone-400 block">Protein</span>
-                    <span className="text-sm font-black text-[#F97316] font-mono mt-0.5 block">{data.protein}g</span>
+                {/* Dynamic Core Macros Grid (Hides in Zen Calorie mode) */}
+                {(data.protein > 0 || data.carbs > 0 || data.fats > 0 || data.fiber > 0) && (
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="bg-stone-900/80 border border-orange-500/30 p-2.5 rounded-xl text-center">
+                      <span className="text-[7.5px] font-black uppercase tracking-wider text-stone-400 block">Protein</span>
+                      <span className="text-sm font-black text-[#F97316] font-mono mt-0.5 block">{data.protein}g</span>
+                    </div>
+                    <div className="bg-stone-900/80 border border-sky-500/30 p-2.5 rounded-xl text-center">
+                      <span className="text-[7.5px] font-black uppercase tracking-wider text-stone-400 block">Carbs</span>
+                      <span className="text-sm font-black text-[#38BDF8] font-mono mt-0.5 block">{data.carbs}g</span>
+                    </div>
+                    <div className="bg-stone-900/80 border border-amber-500/30 p-2.5 rounded-xl text-center">
+                      <span className="text-[7.5px] font-black uppercase tracking-wider text-stone-400 block">Fats</span>
+                      <span className="text-sm font-black text-[#FBBF24] font-mono mt-0.5 block">{data.fats}g</span>
+                    </div>
+                    <div className="bg-stone-900/80 border border-emerald-500/30 p-2.5 rounded-xl text-center">
+                      <span className="text-[7.5px] font-black uppercase tracking-wider text-stone-400 block">Fiber</span>
+                      <span className="text-sm font-black text-[#34D399] font-mono mt-0.5 block">{data.fiber}g</span>
+                    </div>
                   </div>
-                  <div className="bg-stone-900/80 border border-sky-500/30 p-2.5 rounded-xl text-center">
-                    <span className="text-[7.5px] font-black uppercase tracking-wider text-stone-400 block">Carbs</span>
-                    <span className="text-sm font-black text-[#38BDF8] font-mono mt-0.5 block">{data.carbs}g</span>
-                  </div>
-                  <div className="bg-stone-900/80 border border-amber-500/30 p-2.5 rounded-xl text-center">
-                    <span className="text-[7.5px] font-black uppercase tracking-wider text-stone-400 block">Fats</span>
-                    <span className="text-sm font-black text-[#FBBF24] font-mono mt-0.5 block">{data.fats}g</span>
-                  </div>
-                  <div className="bg-stone-900/80 border border-emerald-500/30 p-2.5 rounded-xl text-center">
-                    <span className="text-[7.5px] font-black uppercase tracking-wider text-stone-400 block">Fiber</span>
-                    <span className="text-sm font-black text-[#34D399] font-mono mt-0.5 block">{data.fiber}g</span>
-                  </div>
-                </div>
+                )}
 
                 {/* Additional Insight Badges (Weight Change / Compliance) */}
                 {(data.weightChange !== undefined || data.compliancePct !== undefined) && (
@@ -436,25 +438,29 @@ export const InsightsShareModal: React.FC<InsightsShareModalProps> = ({
                 <span className="text-xs font-bold text-stone-400">Calorie Average</span>
                 <span className="text-lg font-black text-white font-mono">{data.avgCalories} kcal/d</span>
               </div>
-              <div className="h-px bg-stone-800" />
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-stone-500 block text-[9px] font-bold uppercase">Protein</span>
-                  <span className="text-stone-200 font-black font-mono">{data.protein}g</span>
-                </div>
-                <div>
-                  <span className="text-stone-500 block text-[9px] font-bold uppercase">Carbs</span>
-                  <span className="text-stone-200 font-black font-mono">{data.carbs}g</span>
-                </div>
-                <div>
-                  <span className="text-stone-500 block text-[9px] font-bold uppercase">Fats</span>
-                  <span className="text-stone-200 font-black font-mono">{data.fats}g</span>
-                </div>
-                <div>
-                  <span className="text-stone-500 block text-[9px] font-bold uppercase">Fiber</span>
-                  <span className="text-emerald-400 font-black font-mono">{data.fiber}g</span>
-                </div>
-              </div>
+              {(data.protein > 0 || data.carbs > 0 || data.fats > 0 || data.fiber > 0) && (
+                <>
+                  <div className="h-px bg-stone-800" />
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-stone-500 block text-[9px] font-bold uppercase">Protein</span>
+                      <span className="text-stone-200 font-black font-mono">{data.protein}g</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-500 block text-[9px] font-bold uppercase">Carbs</span>
+                      <span className="text-stone-200 font-black font-mono">{data.carbs}g</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-500 block text-[9px] font-bold uppercase">Fats</span>
+                      <span className="text-stone-200 font-black font-mono">{data.fats}g</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-500 block text-[9px] font-bold uppercase">Fiber</span>
+                      <span className="text-emerald-400 font-black font-mono">{data.fiber}g</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <p className="text-[10px] text-stone-500 text-center font-medium mt-auto">

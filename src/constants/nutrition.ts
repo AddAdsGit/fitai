@@ -19,19 +19,23 @@ export function normalizeTrackedNutrients(
   raw: unknown,
   proteinGoal?: number | null
 ): TrackedNutrient[] {
-  let list = Array.isArray(raw) && raw.length > 0
-    ? (raw as TrackedNutrient[])
-    : DEFAULT_TRACKED_NUTRIENTS;
+  if (Array.isArray(raw)) {
+    return (raw as TrackedNutrient[])
+      .map((item) => ({
+        ...item,
+        isDefault: (CORE_NUTRIENT_IDS as readonly string[]).includes(item.id),
+        target: item.id === "protein" && proteinGoal ? proteinGoal : item.target
+      }))
+      .filter((item) => item.enabled !== false);
+  }
 
-  list = list
+  return DEFAULT_TRACKED_NUTRIENTS
     .map((item) => ({
       ...item,
-      isDefault: (CORE_NUTRIENT_IDS as readonly string[]).includes(item.id),
+      isDefault: true,
       target: item.id === "protein" && proteinGoal ? proteinGoal : item.target
     }))
     .filter((item) => item.enabled !== false);
-
-  return list;
 }
 
 // Derives the legacy {protein, carbs, fats, fiber} macro-target shape still
