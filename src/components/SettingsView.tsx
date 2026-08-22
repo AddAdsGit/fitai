@@ -1052,16 +1052,45 @@ export const SettingsView = ({
     const calGoal = profileData.calorieGoal || profileData.daily_calories_goal || 2200;
     const proteinGoal = profileData.proteinGoal || profileData.protein_goal || 150;
 
-    const testMessage = `📊 *FitAI Weekly Progress Digest* (Sample Preview)\n` +
+    const activeTracked = (Array.isArray(profileData.tracked_nutrients) ? profileData.tracked_nutrients : [])
+      .filter((n: any) => n && n.enabled !== false && n.id !== "protein");
+
+    const nutrientEmoji: Record<string, string> = {
+      carbs: "🍞",
+      fats: "🥑",
+      fiber: "🌿",
+      zinc: "⚡",
+      iron: "🩸",
+      selenium: "🛡️",
+      sodium: "🧂",
+      calcium: "🥛",
+      potassium: "🍌",
+      caffeine: "☕",
+      sugar: "🍬",
+    };
+
+    let sampleNutrientsText = "";
+    if (activeTracked.length > 0) {
+      sampleNutrientsText = `🥗 *Nutrient Averages:*\n`;
+      for (const n of activeTracked) {
+        const emoji = nutrientEmoji[n.id.toLowerCase()] || "🔸";
+        const sampleVal = n.target ? Math.round(n.target * 0.9) : (n.unit === "mg" ? 15 : n.unit === "mcg" ? 45 : 30);
+        const targetStr = n.target ? ` (Goal: ${n.target}${n.unit || "g"})` : "";
+        sampleNutrientsText += `• ${emoji} *${n.name || n.id}:* ${sampleVal}${n.unit || "g"}${targetStr}\n`;
+      }
+      sampleNutrientsText += `\n`;
+    } else {
+      sampleNutrientsText = `🥗 *Nutrient Averages:*\n• 🍞 *Carbs:* 215g (Goal: 220g)\n• 🥑 *Fats:* 56g (Goal: 60g)\n• 🌿 *Fiber:* 32g (Goal: 30g)\n\n`;
+    }
+
+    const testMessage = `📊 *FitAI Progress Digest* (Sample Preview)\n` +
       `🗓 *Past 7 Days*\n\n` +
       `👤 *Member:* ${displayName}\n` +
       `📅 *Active Logged Days:* 6 of 7 days\n\n` +
       `🔥 *Calories:* 2,140 kcal / day avg (Goal: ${Number(calGoal).toLocaleString()})\n` +
       `🥩 *Protein:* 148g / day avg (Goal: ${Number(proteinGoal)}g)\n\n` +
-      `🥗 *Macro Averages:*\n` +
-      `• 🍞 Carbs: 215g\n` +
-      `• 🥑 Fats: 56g\n` +
-      `• 🌿 Fiber: 32g\n\n` +
+      sampleNutrientsText +
+      `⚖️ *Weight Progress:* 74.2 kg (-0.4 kg this week)\n\n` +
       `🎯 *Coach Summary:*\n` +
       `Fantastic discipline this week! You hit your calorie target with consistent protein intake. Keep up the great momentum! 🥗`;
 
@@ -1950,57 +1979,135 @@ export const SettingsView = ({
 
         {/* Telegram Chat Configuration */}
         {isTelegramChannelOn && (
-          <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-5 space-y-4">
-            <div>
-              <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1 px-1">
-                Setup Instructions
+          <div className="space-y-4">
+            {/* Delivery Schedule Card */}
+            <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-5 space-y-3.5">
+              <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block px-1">
+                Delivery Schedule
               </label>
-              <p className="text-xs text-stone-600 font-semibold leading-relaxed">
-                1. Open <a href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer" className="text-orange-600 font-bold underline">@fitpushappbot</a> in Telegram.
-                <br />
-                2. Your Telegram Chat ID is: <code className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded text-[11px] font-mono font-bold">1606605925</code>
-                <br />
-                3. Paste it below and tap Save:
-              </p>
+
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "sunday", label: "Sunday" },
+                  { id: "monday", label: "Monday" },
+                  { id: "daily", label: "Daily" },
+                ].map((sched) => {
+                  const currentSched = (profileData.preferences || []).find((p: string) => p.startsWith("telegram_digest_schedule:"))?.split(":")[1] || "sunday";
+                  const isSelected = currentSched === sched.id;
+                  return (
+                    <button
+                      key={sched.id}
+                      type="button"
+                      onClick={() => {
+                        const filtered = (profileData.preferences || []).filter((p: string) => !p.startsWith("telegram_digest_schedule:"));
+                        setProfileData({
+                          ...profileData,
+                          preferences: [...filtered, `telegram_digest_schedule:${sched.id}`],
+                        });
+                      }}
+                      className={cn(
+                        "py-2.5 px-2 rounded-2xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border text-center active:scale-95",
+                        isSelected
+                          ? "bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/20"
+                          : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200/70"
+                      )}
+                    >
+                      {sched.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="pt-2 flex items-center justify-between text-xs font-bold text-stone-600 px-1 border-t border-stone-100">
+                <span>Delivery Time</span>
+                <span className="text-orange-600 font-extrabold bg-orange-50 px-2.5 py-1 rounded-xl border border-orange-200/60">
+                  8:00 PM (Local Time)
+                </span>
+              </div>
             </div>
 
-            <div>
-              <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1 px-1">
-                Telegram Chat ID
+            {/* Report Content Modules Card */}
+            <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-5 space-y-3">
+              <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block px-1">
+                Included Report Modules
               </label>
-              <input
-                type="text"
-                placeholder="e.g. 1606605925"
-                value={tgChatId}
-                onChange={(e) => {
-                  setTgChatId(e.target.value);
-                  setProfileData({
-                    ...profileData,
-                    telegramChatId: e.target.value.trim(),
-                    telegramReportsEnabled: true,
-                  });
-                }}
-                className="w-full bg-stone-50 focus:bg-white border border-stone-200 focus:border-orange-400 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 outline-none transition-all"
-              />
+
+              <div className="space-y-2">
+                {[
+                  { id: "mod_cals_protein", label: "🔥 Calorie & Protein Goal Tracking", desc: "Average daily intake vs target goals" },
+                  { id: "mod_nutrients", label: "🥗 Active Tracked Nutrients", desc: "Averages for all active tracked vitamins & minerals" },
+                  { id: "mod_weight", label: "⚖️ Weight Progress & Trends", desc: "Latest recorded weight and weekly delta" },
+                  { id: "mod_coach", label: "🎯 AI Coach Actionable Advice", desc: "Momentum analysis and focus for the next week" },
+                ].map((mod) => (
+                  <div
+                    key={mod.id}
+                    className="flex items-center justify-between p-3 rounded-2xl bg-stone-50/70 border border-stone-200/60 text-left"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <span className="text-xs font-bold text-stone-900 block truncate">{mod.label}</span>
+                      <span className="text-[9.5px] font-semibold text-stone-400 block truncate">{mod.desc}</span>
+                    </div>
+                    <div className="w-5 h-5 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-3xs">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleSaveTelegram}
-              className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-[0.98] transition-all shadow-md shadow-orange-500/20 flex items-center justify-center border-none"
-            >
-              Save Digest Settings
-            </button>
+            {/* Connection Credentials Card */}
+            <div className="bg-white rounded-[28px] border border-stone-200/80 shadow-sm p-5 space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1 px-1">
+                  Setup Instructions
+                </label>
+                <p className="text-xs text-stone-600 font-semibold leading-relaxed">
+                  1. Open <a href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer" className="text-orange-600 font-bold underline">@fitpushappbot</a> in Telegram.
+                  <br />
+                  2. Your Telegram Chat ID is: <code className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded text-[11px] font-mono font-bold">1606605925</code>
+                  <br />
+                  3. Paste it below and tap Save:
+                </p>
+              </div>
 
-            <button
-              type="button"
-              onClick={handleTestTelegram}
-              disabled={isTestingTg}
-              className="w-full border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-600 text-xs font-black uppercase tracking-wider py-3 rounded-2xl transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isTestingTg ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              <span>{isTestingTg ? "Sending Digest..." : "Send Sample Weekly Digest"}</span>
-            </button>
+              <div>
+                <label className="text-[10px] font-black text-stone-400 uppercase tracking-wider block mb-1 px-1">
+                  Telegram Chat ID
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 1606605925"
+                  value={tgChatId}
+                  onChange={(e) => {
+                    setTgChatId(e.target.value);
+                    setProfileData({
+                      ...profileData,
+                      telegramChatId: e.target.value.trim(),
+                      telegramReportsEnabled: true,
+                    });
+                  }}
+                  className="w-full bg-stone-50 focus:bg-white border border-stone-200 focus:border-orange-400 rounded-2xl px-4 py-3 text-xs font-bold text-stone-900 outline-none transition-all"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveTelegram}
+                className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer active:scale-[0.98] transition-all shadow-md shadow-orange-500/20 flex items-center justify-center border-none"
+              >
+                Save Digest Settings
+              </button>
+
+              <button
+                type="button"
+                onClick={handleTestTelegram}
+                disabled={isTestingTg}
+                className="w-full border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-600 text-xs font-black uppercase tracking-wider py-3 rounded-2xl transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isTestingTg ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                <span>{isTestingTg ? "Sending Digest..." : "Send Sample Progress Digest"}</span>
+              </button>
+            </div>
           </div>
         )}
       </motion.div>

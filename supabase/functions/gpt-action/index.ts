@@ -265,24 +265,21 @@ serve(async (req) => {
 
       let totalCalories = 0;
       let totalProtein = 0;
-      let totalCarbs = 0;
-      let totalFats = 0;
-      let totalFiber = 0;
+      const nutrientTotals: Record<string, number> = {};
 
       mealList.forEach((m: any) => {
         totalCalories += Number(m.calories) || 0;
         totalProtein += Number(m.protein) || 0;
-        const nut = m.nutrients || {};
-        totalCarbs += Number(nut.carbs) || 0;
-        totalFats += Number(nut.fats) || 0;
-        totalFiber += Number(nut.fiber) || 0;
+        if (m.nutrients && typeof m.nutrients === "object") {
+          for (const [key, value] of Object.entries(m.nutrients)) {
+            if (key === "protein") continue;
+            nutrientTotals[key] = (nutrientTotals[key] || 0) + (Number(value) || 0);
+          }
+        }
       });
 
       const avgCalories = Math.round(totalCalories / activeLoggedDays);
       const avgProtein = Math.round(totalProtein / activeLoggedDays);
-      const avgCarbs = Math.round(totalCarbs / activeLoggedDays);
-      const avgFats = Math.round(totalFats / activeLoggedDays);
-      const avgFiber = Math.round(totalFiber / activeLoggedDays);
 
       const calGoal = prof.daily_calories_goal || 2000;
       const pGoal = prof.protein_goal || 140;
@@ -290,7 +287,24 @@ serve(async (req) => {
       const startMonth = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
       const endMonth = end.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-      let text = `📊 *FitAI Weekly Progress Digest*\n`;
+      const tracked = (Array.isArray(prof.tracked_nutrients) ? prof.tracked_nutrients : [])
+        .filter((n: any) => n && n.enabled !== false && n.id !== "protein");
+
+      const nutrientEmoji: Record<string, string> = {
+        carbs: "🍞",
+        fats: "🥑",
+        fiber: "🌿",
+        zinc: "⚡",
+        iron: "🩸",
+        selenium: "🛡️",
+        sodium: "🧂",
+        calcium: "🥛",
+        potassium: "🍌",
+        caffeine: "☕",
+        sugar: "🍬",
+      };
+
+      let text = `📊 *FitAI Progress Digest*\n`;
       text += `🗓 *${startMonth} – ${endMonth}*\n\n`;
       text += `👤 *Member:* ${prof.display_name || prof.username || "FitAI Member"}\n`;
       text += `📅 *Active Logged Days:* ${activeLoggedDays} of 7 days\n\n`;
@@ -298,10 +312,36 @@ serve(async (req) => {
       text += `🔥 *Calories:* ${avgCalories.toLocaleString()} kcal / day avg (Goal: ${calGoal.toLocaleString()})\n`;
       text += `🥩 *Protein:* ${avgProtein}g / day avg (Goal: ${pGoal}g)\n\n`;
 
-      text += `🥗 *Macro Averages:*\n`;
-      text += `• 🍞 Carbs: ${avgCarbs}g\n`;
-      text += `• 🥑 Fats: ${avgFats}g\n`;
-      text += `• 🌿 Fiber: ${avgFiber}g\n\n`;
+      if (tracked.length > 0) {
+        text += `🥗 *Nutrient Averages:*\n`;
+        for (const n of tracked) {
+          const total = nutrientTotals[n.id] || 0;
+          const avg = Math.round((total / activeLoggedDays) * 10) / 10;
+          const emoji = nutrientEmoji[n.id.toLowerCase()] || "🔸";
+          const targetStr = n.target ? ` (Goal: ${n.target}${n.unit || "g"})` : "";
+          text += `• ${emoji} *${n.name || n.id}:* ${avg}${n.unit || "g"}${targetStr}\n`;
+        }
+        text += `\n`;
+      }
+
+      // Check for weekly weight progress
+      try {
+        const { data: weights } = await supa
+          .from("weight_logs")
+          .select("*")
+          .eq("profile_id", prof.id)
+          .gte("date", startDateStr)
+          .lte("date", endDateFormatted)
+          .order("date", { ascending: true });
+
+        if (weights && weights.length > 0) {
+          const latestWeight = weights[weights.length - 1].weight;
+          const firstWeight = weights[0].weight;
+          const delta = Math.round((latestWeight - firstWeight) * 10) / 10;
+          const deltaStr = delta > 0 ? `+${delta} kg` : delta < 0 ? `${delta} kg` : "0.0 kg";
+          text += `⚖️ *Weight Progress:* ${latestWeight} kg (${deltaStr} over period)\n\n`;
+        }
+      } catch (_) {}
 
       if (avgCalories <= calGoal + 100 && avgCalories >= calGoal - 150) {
         text += `🎯 *Coach Summary:* Fantastic discipline this week! Your calorie intake is right in your target zone.`;
@@ -314,19 +354,54 @@ serve(async (req) => {
       return text;
     };
 
-    const generateSampleWeeklyDigestMessage = (displayName: string = "FitAI Member", calGoal: number = 2200, pGoal: number = 150): string => {
-      return `📊 *FitAI Weekly Progress Digest* (Sample Preview)\n` +
+    const generateSampleWeeklyDigestMessage = (
+      displayName: string = "FitAI Member",
+      calGoal: number = 2200,
+      pGoal: number = 150,
+      trackedNutrients: any[] = []
+    ): string => {
+      const activeTracked = Array.isArray(trackedNutrients)
+        ? trackedNutrients.filter((n: any) => n && n.enabled !== false && n.id !== "protein")
+        : [];
+
+      const nutrientEmoji: Record<string, string> = {
+        carbs: "🍞",
+        fats: "🥑",
+        fiber: "🌿",
+        zinc: "⚡",
+        iron: "🩸",
+        selenium: "🛡️",
+        sodium: "🧂",
+        calcium: "🥛",
+        potassium: "🍌",
+        caffeine: "☕",
+        sugar: "🍬",
+      };
+
+      let sampleNutrientsText = "";
+      if (activeTracked.length > 0) {
+        sampleNutrientsText = `🥗 *Nutrient Averages:*\n`;
+        for (const n of activeTracked) {
+          const emoji = nutrientEmoji[n.id.toLowerCase()] || "🔸";
+          const sampleVal = n.target ? Math.round(n.target * 0.9) : (n.unit === "mg" ? 15 : n.unit === "mcg" ? 45 : 30);
+          const targetStr = n.target ? ` (Goal: ${n.target}${n.unit || "g"})` : "";
+          sampleNutrientsText += `• ${emoji} *${n.name || n.id}:* ${sampleVal}${n.unit || "g"}${targetStr}\n`;
+        }
+        sampleNutrientsText += `\n`;
+      } else {
+        sampleNutrientsText = `🥗 *Nutrient Averages:*\n• 🍞 *Carbs:* 215g (Goal: 220g)\n• 🥑 *Fats:* 56g (Goal: 60g)\n• 🌿 *Fiber:* 32g (Goal: 30g)\n\n`;
+      }
+
+      return `📊 *FitAI Progress Digest* (Sample Preview)\n` +
         `🗓 *Past 7 Days*\n\n` +
         `👤 *Member:* ${displayName}\n` +
         `📅 *Active Logged Days:* 6 of 7 days\n\n` +
         `🔥 *Calories:* 2,140 kcal / day avg (Goal: ${calGoal.toLocaleString()})\n` +
         `🥩 *Protein:* 148g / day avg (Goal: ${pGoal}g)\n\n` +
-        `🥗 *Macro Averages:*\n` +
-        `• 🍞 Carbs: 215g\n` +
-        `• 🥑 Fats: 56g\n` +
-        `• 🌿 Fiber: 32g\n\n` +
+        sampleNutrientsText +
+        `⚖️ *Weight Progress:* 74.2 kg (-0.4 kg this week)\n\n` +
         `🎯 *Coach Summary:*\n` +
-        `Fantastic discipline this week! You hit your calorie target with consistent protein intake. Keep up the great momentum!`;
+        `Fantastic discipline this week! You hit your calorie target with consistent protein intake. Keep up the great momentum! 🥗`;
     };
 
     // D. POST /telegram/test or /telegram/weekly-digest

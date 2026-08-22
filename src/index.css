@@ -79,6 +79,23 @@
   background: transparent !important;
 }
 
+/* Remove default browser blue focus rings and outline boxes on Recharts charts */
+.recharts-wrapper,
+.recharts-surface,
+.recharts-responsive-container,
+.recharts-wrapper:focus,
+.recharts-surface:focus,
+.recharts-responsive-container:focus,
+svg.recharts-surface:focus,
+svg.recharts-surface:focus-visible,
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
 /* Nutrient picker: show nutrient name + target only; hide category labels. */
 div.flex.flex-col.min-w-0 > div[class*="text-[9px]"] > span:first-child,
 div.flex.flex-col.min-w-0 > div[class*="text-[9px]"] > span:nth-child(2) {

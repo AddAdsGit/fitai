@@ -287,15 +287,15 @@ export const InsightsView = ({
   const [showTdeeInfoModal, setShowTdeeInfoModal] = useState<boolean>(false);
   const [nutrientSlide, setNutrientSlide] = useState<number>(0);
 
-  // Minimalist Interactive Scrubber State (Unified Mutual Exclusion & Auto-fade in 2.5s)
+  // Minimalist Interactive Scrubber State (Unified Mutual Exclusion & Auto-fade)
   const [activeChartScrub, setActiveChartScrub] = useState<{
-    chartId: "calories" | "weight" | "water" | "energy" | "bloating" | "digestion";
+    chartId: "calories" | "weight" | "nutrients" | "water" | "energy" | "bloating" | "digestion";
     data: any;
   } | null>(null);
   const scrubTimerRef = React.useRef<any>(null);
 
   const triggerChartScrub = (
-    chartId: "calories" | "weight" | "water" | "energy" | "bloating" | "digestion",
+    chartId: "calories" | "weight" | "nutrients" | "water" | "energy" | "bloating" | "digestion",
     payload: any
   ) => {
     if (!payload) return;
@@ -303,15 +303,22 @@ export const InsightsView = ({
     setActiveChartScrub({ chartId, data: payload });
     scrubTimerRef.current = setTimeout(() => {
       setActiveChartScrub(null);
-    }, 2500);
+    }, 4000);
   };
 
   const handleChartStateScrub = (
-    chartId: "calories" | "weight" | "water" | "energy" | "bloating" | "digestion",
-    state: any
+    chartId: "calories" | "weight" | "nutrients" | "water" | "energy" | "bloating" | "digestion",
+    state: any,
+    fallbackList?: any[]
   ) => {
-    if (state && state.activePayload && state.activePayload.length) {
+    if (!state) return;
+    if (state.activePayload && state.activePayload.length > 0) {
       triggerChartScrub(chartId, state.activePayload[0].payload);
+    } else if (state.activeTooltipIndex !== undefined && fallbackList && fallbackList[state.activeTooltipIndex]) {
+      triggerChartScrub(chartId, fallbackList[state.activeTooltipIndex]);
+    } else if (state.activeLabel && fallbackList) {
+      const found = fallbackList.find((item: any) => item.date === state.activeLabel || item.day === state.activeLabel);
+      if (found) triggerChartScrub(chartId, found);
     }
   };
 
@@ -937,6 +944,11 @@ export const InsightsView = ({
                   <BarChart
                     data={chartData}
                     margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
+                    onClick={(state) => handleChartStateScrub("calories", state, chartData)}
+                    onMouseMove={(state) => handleChartStateScrub("calories", state, chartData)}
+                    onTouchMove={(state) => handleChartStateScrub("calories", state, chartData)}
+                    onTouchStart={(state) => handleChartStateScrub("calories", state, chartData)}
+                    onMouseDown={(state) => handleChartStateScrub("calories", state, chartData)}
                   >
                     <XAxis
                       dataKey="date"
@@ -979,8 +991,11 @@ export const InsightsView = ({
                   <LineChart
                     data={chartData}
                     margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-                    onMouseMove={(state) => handleChartStateScrub("calories", state)}
-                    onTouchMove={(state) => handleChartStateScrub("calories", state)}
+                    onClick={(state) => handleChartStateScrub("calories", state, chartData)}
+                    onMouseMove={(state) => handleChartStateScrub("calories", state, chartData)}
+                    onTouchMove={(state) => handleChartStateScrub("calories", state, chartData)}
+                    onTouchStart={(state) => handleChartStateScrub("calories", state, chartData)}
+                    onMouseDown={(state) => handleChartStateScrub("calories", state, chartData)}
                   >
                     <ReferenceLine y={profileData?.goals?.dailyCalories || 2000} stroke="#f9731640" strokeDasharray="6 4" strokeWidth={1.5} />
                     <Line
@@ -1054,7 +1069,7 @@ export const InsightsView = ({
                     ✨ Adaptive AI Model (from {tdeeStats.daysSampled} logged days)
                   </span>
                 ) : (
-                  "Standard Mifflin-St Jeor estimate (Log 7+ days with weight for Adaptive AI)"
+                  "Estimated baseline (Log 7+ days with weight for Adaptive AI)"
                 )}
               </p>
             </div>
@@ -1072,7 +1087,7 @@ export const InsightsView = ({
             <span>Adaptive Metabolism Insight</span>
             <span className="text-orange-600 font-extrabold flex items-center gap-1">
               <Sparkles className="w-3.5 h-3.5" />
-              {tdeeStats.isRealAI ? "Active Tracking" : "Standard Model"}
+              {tdeeStats.isRealAI ? "Active Tracking" : "Baseline Estimate"}
             </span>
           </div>
         </div>
@@ -1145,8 +1160,11 @@ export const InsightsView = ({
                     <AreaChart
                       data={filteredWeightData}
                       margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                      onMouseMove={(state) => handleChartStateScrub("weight", state)}
-                      onTouchMove={(state) => handleChartStateScrub("weight", state)}
+                      onClick={(state) => handleChartStateScrub("weight", state, filteredWeightData)}
+                      onMouseMove={(state) => handleChartStateScrub("weight", state, filteredWeightData)}
+                      onTouchMove={(state) => handleChartStateScrub("weight", state, filteredWeightData)}
+                      onTouchStart={(state) => handleChartStateScrub("weight", state, filteredWeightData)}
+                      onMouseDown={(state) => handleChartStateScrub("weight", state, filteredWeightData)}
                     >
                       <defs>
                         <linearGradient id="insightsWeightGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1161,7 +1179,17 @@ export const InsightsView = ({
                         axisLine={false} 
                         tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }}
                       />
-                      <Area type="monotone" dataKey="weight" stroke="#f97316" strokeWidth={2.5} fillOpacity={1} fill="url(#insightsWeightGrad)" />
+                      <RechartsTooltip cursor={{ stroke: '#f97316', strokeWidth: 1.5, strokeDasharray: '4 4' }} content={() => null} />
+                      <Area
+                        type="monotone"
+                        dataKey="weight"
+                        stroke="#f97316"
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#insightsWeightGrad)"
+                        dot={{ r: 3.5, fill: "#f97316", stroke: "#fff", strokeWidth: 2 }}
+                        activeDot={{ r: 6.5, fill: "#f97316", stroke: "#fff", strokeWidth: 2.5 }}
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -1333,8 +1361,11 @@ export const InsightsView = ({
                   <LineChart
                     data={chartData}
                     margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                    onMouseMove={(state) => handleChartStateScrub("nutrients", state)}
-                    onTouchMove={(state) => handleChartStateScrub("nutrients", state)}
+                    onClick={(state) => handleChartStateScrub("nutrients", state, chartData)}
+                    onMouseMove={(state) => handleChartStateScrub("nutrients", state, chartData)}
+                    onTouchMove={(state) => handleChartStateScrub("nutrients", state, chartData)}
+                    onTouchStart={(state) => handleChartStateScrub("nutrients", state, chartData)}
+                    onMouseDown={(state) => handleChartStateScrub("nutrients", state, chartData)}
                   >
                     {periodNutrientStats.map((n) => (
                       <Line
@@ -1344,7 +1375,8 @@ export const InsightsView = ({
                         connectNulls={true}
                         stroke={n.color}
                         strokeWidth={2.5}
-                        dot={false}
+                        dot={{ r: 2.5, fill: n.color, stroke: "#fff", strokeWidth: 1.5 }}
+                        activeDot={{ r: 5.5, fill: n.color, stroke: "#fff", strokeWidth: 2 }}
                         name={`${n.name} (${n.unit})`}
                       />
                     ))}
@@ -1460,8 +1492,11 @@ export const InsightsView = ({
                     <BarChart
                       data={dynamicVitalsChartData}
                       margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
-                      onMouseMove={(state) => handleChartStateScrub("water", state)}
-                      onTouchMove={(state) => handleChartStateScrub("water", state)}
+                      onClick={(state) => handleChartStateScrub("water", state, dynamicVitalsChartData)}
+                      onMouseMove={(state) => handleChartStateScrub("water", state, dynamicVitalsChartData)}
+                      onTouchMove={(state) => handleChartStateScrub("water", state, dynamicVitalsChartData)}
+                      onTouchStart={(state) => handleChartStateScrub("water", state, dynamicVitalsChartData)}
+                      onMouseDown={(state) => handleChartStateScrub("water", state, dynamicVitalsChartData)}
                     >
                       <YAxis domain={[0, 'dataMax + 0.5']} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} />
                       <ReferenceLine y={waterStats.goal} stroke="#38BDF8" strokeDasharray="4 4" strokeWidth={1.5} />
@@ -1567,11 +1602,14 @@ export const InsightsView = ({
                     <LineChart
                       data={dynamicVitalsChartData}
                       margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                      onMouseMove={(state) => handleChartStateScrub("energy", state)}
-                      onTouchMove={(state) => handleChartStateScrub("energy", state)}
+                      onClick={(state) => handleChartStateScrub("energy", state, dynamicVitalsChartData)}
+                      onMouseMove={(state) => handleChartStateScrub("energy", state, dynamicVitalsChartData)}
+                      onTouchMove={(state) => handleChartStateScrub("energy", state, dynamicVitalsChartData)}
+                      onTouchStart={(state) => handleChartStateScrub("energy", state, dynamicVitalsChartData)}
+                      onMouseDown={(state) => handleChartStateScrub("energy", state, dynamicVitalsChartData)}
                     >
                       <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} />
-                      <Line type="monotone" dataKey="energy" connectNulls={true} stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} name="Energy (1-5)" />
+                      <Line type="monotone" dataKey="energy" connectNulls={true} stroke="#F59E0B" strokeWidth={3} dot={{ r: 4, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} activeDot={{ r: 6.5, fill: "#F59E0B", stroke: "#fff", strokeWidth: 2 }} name="Energy (1-5)" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -1668,11 +1706,14 @@ export const InsightsView = ({
                     <LineChart
                       data={dynamicVitalsChartData}
                       margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                      onMouseMove={(state) => handleChartStateScrub("bloating", state)}
-                      onTouchMove={(state) => handleChartStateScrub("bloating", state)}
+                      onClick={(state) => handleChartStateScrub("bloating", state, dynamicVitalsChartData)}
+                      onMouseMove={(state) => handleChartStateScrub("bloating", state, dynamicVitalsChartData)}
+                      onTouchMove={(state) => handleChartStateScrub("bloating", state, dynamicVitalsChartData)}
+                      onTouchStart={(state) => handleChartStateScrub("bloating", state, dynamicVitalsChartData)}
+                      onMouseDown={(state) => handleChartStateScrub("bloating", state, dynamicVitalsChartData)}
                     >
                       <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fontSize: 9, fill: "#7C2D12", opacity: 0.4, fontWeight: "bold" }} />
-                      <Line type="monotone" dataKey="bloating" connectNulls={true} stroke="#F43F5E" strokeWidth={3} dot={{ r: 4, fill: "#F43F5E", stroke: "#fff", strokeWidth: 2 }} name="Bloating (1-5)" />
+                      <Line type="monotone" dataKey="bloating" connectNulls={true} stroke="#F43F5E" strokeWidth={3} dot={{ r: 4, fill: "#F43F5E", stroke: "#fff", strokeWidth: 2 }} activeDot={{ r: 6.5, fill: "#F43F5E", stroke: "#fff", strokeWidth: 2 }} name="Bloating (1-5)" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -1767,16 +1808,11 @@ export const InsightsView = ({
                   <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                      onMouseMove={(state: any) => {
-                        if (state && state.activePayload && state.activePayload.length) {
-                          triggerChartScrub("digestion", state.activePayload[0].payload);
-                        }
-                      }}
-                      onTouchMove={(state: any) => {
-                        if (state && state.activePayload && state.activePayload.length) {
-                          triggerChartScrub("digestion", state.activePayload[0].payload);
-                        }
-                      }}
+                      onClick={(state: any) => handleChartStateScrub("digestion", state, dynamicDigestionScatterData)}
+                      onMouseMove={(state: any) => handleChartStateScrub("digestion", state, dynamicDigestionScatterData)}
+                      onTouchMove={(state: any) => handleChartStateScrub("digestion", state, dynamicDigestionScatterData)}
+                      onTouchStart={(state: any) => handleChartStateScrub("digestion", state, dynamicDigestionScatterData)}
+                      onMouseDown={(state: any) => handleChartStateScrub("digestion", state, dynamicDigestionScatterData)}
                     >
                       <ReferenceLine y={3} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
                       <ReferenceLine y={4} stroke="#10B981" strokeDasharray="4 4" strokeWidth={1.5} />
