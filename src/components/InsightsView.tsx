@@ -14,6 +14,8 @@ import {
   Home,
   Sparkles,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Calendar,
   Flame,
   Trophy,
@@ -190,24 +192,63 @@ const ChartDateSlider = ({
 
   const safeIndex = Math.max(0, Math.min(dataLength - 1, currentIndex < 0 ? dataLength - 1 : currentIndex));
 
+  const handlePrevDay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newIdx = Math.max(0, safeIndex - 1);
+    onScrubIndex(newIdx);
+  };
+
+  const handleNextDay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newIdx = Math.min(dataLength - 1, safeIndex + 1);
+    onScrubIndex(newIdx);
+  };
+
   return (
     <div className="pt-2 px-1 border-t border-black/[0.04] space-y-1 select-none">
-      <div className="relative flex items-center w-full h-6 touch-none py-1">
-        <input
-          type="range"
-          min={0}
-          max={dataLength - 1}
-          value={safeIndex}
-          onInput={(e) => onScrubIndex(parseInt(e.currentTarget.value, 10))}
-          onChange={(e) => onScrubIndex(parseInt(e.currentTarget.value, 10))}
-          className="w-full h-2 bg-orange-100/90 hover:bg-orange-200/80 rounded-full appearance-none cursor-pointer accent-orange-500 transition-all border border-orange-200/60 focus:outline-none touch-none"
-          style={{ WebkitAppearance: "none", touchAction: "none" }}
-        />
+      <div className="flex items-center gap-2 w-full h-7 py-0.5">
+        {/* Step Back (-1 Day) Button */}
+        <button
+          type="button"
+          onClick={handlePrevDay}
+          disabled={safeIndex <= 0}
+          aria-label="Previous date"
+          title="Previous date"
+          className="w-6 h-6 rounded-full bg-orange-100/70 hover:bg-orange-200/80 active:scale-90 text-orange-950/70 flex items-center justify-center transition-all cursor-pointer select-none shrink-0 disabled:opacity-25 disabled:pointer-events-none border border-orange-200/50"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Range Slider Track */}
+        <div className="relative flex items-center flex-1 h-6 touch-none py-1">
+          <input
+            type="range"
+            min={0}
+            max={dataLength - 1}
+            value={safeIndex}
+            onInput={(e) => onScrubIndex(parseInt(e.currentTarget.value, 10))}
+            onChange={(e) => onScrubIndex(parseInt(e.currentTarget.value, 10))}
+            className="w-full h-2 bg-orange-100/90 hover:bg-orange-200/80 rounded-full appearance-none cursor-pointer accent-orange-500 transition-all border border-orange-200/60 focus:outline-none touch-none"
+            style={{ WebkitAppearance: "none", touchAction: "none" }}
+          />
+        </div>
+
+        {/* Step Forward (+1 Day) Button */}
+        <button
+          type="button"
+          onClick={handleNextDay}
+          disabled={safeIndex >= dataLength - 1}
+          aria-label="Next date"
+          title="Next date"
+          className="w-6 h-6 rounded-full bg-orange-100/70 hover:bg-orange-200/80 active:scale-90 text-orange-950/70 flex items-center justify-center transition-all cursor-pointer select-none shrink-0 disabled:opacity-25 disabled:pointer-events-none border border-orange-200/50"
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-orange-950/40 px-1">
         <span>{formatShortMonthDay(startDate)}</span>
-        <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">drag slider to inspect</span>
+        <span className="text-[9px] font-bold text-orange-950/30 lowercase tracking-normal">drag or tap arrows to inspect</span>
         <span>{formatShortMonthDay(endDate)}</span>
       </div>
     </div>
